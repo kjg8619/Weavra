@@ -2,11 +2,11 @@
 
 Adaptive Agent Workflow Runtime
 
-**Weavra v0.1 RC1 기반 development build.** 안정 기준점은 [`weavra-v0.1-rc1`](https://github.com/kjg8619/pi/tree/weavra-v0.1-rc1)이며 launcher/branding 작업은 그 이후 변경이다. Pi CLI/SDK `v0.85.1`은 별도 버전이다. 정식 release나 패키지 발행을 뜻하지 않는다.
+**Weavra v0.1 RC1 기반 development build.** 역사적 기준점은 [`weavra-v0.1-rc1`](https://github.com/kjg8619/pi/tree/weavra-v0.1-rc1)이며 현재 제품 소스는 `kjg8619/Weavra`다. Pi-derived 내부 CLI/SDK `v0.85.1`은 제품 버전과 별개이며 정식 release나 패키지 발행을 뜻하지 않는다.
 
 ## What is Weavra?
 
-Weavra는 Pi 위에서 작업 범위와 위험에 따라 QUICK 또는 STANDARD 순차 workflow를 실행하는 Runtime이다. 구현, 독립 리뷰, 실제 검증, 인간 승인을 구분하고 최신 증거를 확인한 Kernel만 완료를 결정한다. 일반 Pi 대화를 자동으로 workflow로 바꾸지 않으며 `/workflow run <goal>`로 시작한다.
+Weavra는 Pi-derived 구현 위에서 작업 범위와 위험에 따라 QUICK 또는 STANDARD 순차 workflow를 실행하는 독립 Runtime이다. 구현, 독립 리뷰, 실제 검증, 인간 승인을 구분하고 최신 증거를 확인한 Kernel만 완료를 결정한다. 일반 대화를 자동으로 workflow로 바꾸지 않으며 `/workflow run <goal>`로 시작한다.
 
 ## Current capabilities
 
@@ -14,7 +14,7 @@ Weavra는 Pi 위에서 작업 범위와 위험에 따라 QUICK 또는 STANDARD �
 - STANDARD/R0–R2: Developer → SELF_CHECK → 독립 Reviewer → TEST → COMPLETE.
 - Scoped R3: Git 추적 텍스트 파일 한 개 삭제에 한정한 1회 Human Approval.
 - 실제 Git diff/digest, 등록 checks, 부분 변경 보고, 명시적 취소와 읽기 전용 상태 조회.
-- Pi 기본 footer에 로컬 workflow/risk/phase·active role 및 마지막 종료 결과를 표시하는 Status Projection.
+- Runtime 기본 footer에 로컬 workflow/risk/phase·active role 및 마지막 종료 결과를 표시하는 Status Projection.
 - V0.2A: `/graph`로 기존 Run·attempt·Review·Check·Approval을 읽는 순수 DAG Projection과 ASCII 조회.
 - V0.2B: 같은 GraphProjection을 `/graph view`의 read-only TUI overlay에서 스크롤하며 조회.
 - V0.2C: `~/.weavra/agent` user-level 격리, 명시적 `weavra setup`과 읽기 전용 `weavra doctor`.
@@ -36,10 +36,10 @@ Weavra는 Pi 위에서 작업 범위와 위험에 따라 QUICK 또는 STANDARD �
 
 ```sh
 git clone --branch devlop --single-branch \
-  https://github.com/kjg8619/pi.git weavra
-cd weavra
+  https://github.com/kjg8619/Weavra.git weavra
+cd weavra/runtime/pi
 npm install --ignore-scripts
-npm run build  # workspace 의존성과 fork-local Pi CLI 빌드
+npm run build  # 독립 runtime workspace 및 CLI 빌드
 npm link --workspace packages/company-runtime --ignore-scripts
 weavra setup   # 프로젝트 밖에서도 가능; import는 파일별 동의
 weavra doctor  # 읽기 전용 로컬 검사
@@ -52,7 +52,7 @@ weavra
 
 | 기준 | 의미 |
 |---|---|
-| `main` | upstream/base Pi 계열 |
+| `main` | 독립 Weavra 저장소의 publication 기준; upstream sync 대상 아님 |
 | `devlop` | current Weavra development |
 | `weavra-v0.1-rc1` | immutable historical RC baseline; 현재 개발 기능을 포함하지 않으며 이동하지 않음 |
 
@@ -66,7 +66,7 @@ weavra <args>    → exec <checkout>/packages/coding-agent/dist/bundle/cli.js
 
 두 명령을 같은 시스템에서 함께 사용할 수 있다. launcher 자신의 symlink/npm-link 실제 위치에서 checkout을 찾고 두 경로를 절대경로로 전달한다. PATH의 `pi`는 검색하거나 fallback으로 실행하지 않으므로 global Pi의 업데이트/버전 차이가 Weavra의 CLI 선택에 영향을 주지 않는다.
 
-기본 `weavra`는 cwd·인수·stdio·exit code·signal을 유지한다. 환경은 V0.2C의 agent/session 경로 격리만 적용하며 아래를 따른다. `weavra --help`는 **fork-local Pi 도움말**, `weavra --version`은 **fork-local Pi 버전**을 그대로 출력한다. Weavra 버전/기능 도움말은 시작 알림과 `/workflow help`에서 확인한다. `weavra --model ...`은 부모 Pi 모델을 선택하며 worker profile은 `.ai/config.yaml`이 결정한다. `--no-extensions`는 자동 탐색을 끄지만 명시적 `-e`의 Weavra는 로드된다.
+기본 `weavra`는 cwd·인수·stdio·exit code·signal을 유지한다. `weavra --help`는 Weavra 도움말, `weavra --version`은 `Weavra development (runtime 0.85.1)`처럼 제품 development identity와 내부 버전을 구분하여 출력한다. `weavra update`는 Weavra 소스 갱신 정책만 안내하며 Pi updater를 실행하지 않는다. package/config 명령은 Extension 인수보다 먼저 dispatch한다. `weavra --model ...`은 대화 모델을 선택하며 worker profile은 `.ai/config.yaml`이 결정한다. `--no-extensions`는 자동 탐색을 끄지만 명시적 `-e`의 Weavra는 로드된다.
 
 Pi를 실행하는 명령은 local CLI build가 없거나 실행할 수 없으면 checkout 경로와 `npm install --ignore-scripts && npm run build` 안내를 출력하고 즉시 실패한다. `--help`/`--version`도 예외가 아니며 global Pi로 대체하지 않는다. Extension이 없으면 checkout/link 복구 안내를 표시한다.
 
@@ -93,7 +93,7 @@ WEAVRA_HOME="/absolute/path/나의 Weavra" weavra doctor
 WEAVRA_HOME="/absolute/path/나의 Weavra" weavra
 ```
 
-Launcher는 child 실행 직전에 `PI_CODING_AGENT_DIR`을 Weavra agent dir로 덮어쓰고 inherited `PI_CODING_AGENT_SESSION_DIR`을 제거한다. 기존 Pi 환경을 default로 사용하지 않는다. 기본 세션은 Weavra의 `agent/sessions/<encoded-cwd>` 아래에 저장되며 main repo와 worktree들은 **같은 user-level home 안에서 cwd별로 분리**된다. 명시적 Pi `--session-dir`/`--session`은 그대로 전달한다. `WEAVRA_SESSION_DIR`는 V0.2C에서 지원하지 않는다.
+Launcher는 child 실행 직전에 `WEAVRA_CODING_AGENT_DIR`을 Weavra agent dir로 설정하고 inherited `PI_CODING_AGENT_DIR`/`PI_CODING_AGENT_SESSION_DIR`을 제거한다. 기본 세션은 `agent/sessions/<encoded-cwd>` 아래에 저장되며 worktree들은 같은 user-level home 안에서 cwd별로 분리된다. 명시적 `--session-dir` > `WEAVRA_CODING_AGENT_SESSION_DIR` > settings.sessionDir > default 순서를 유지한다. `.pi` project-local resource 규칙은 이번 변경에서 유지한다.
 
 ### Setup과 import
 
@@ -107,7 +107,7 @@ Launcher는 child 실행 직전에 `PI_CODING_AGENT_DIR`을 Weavra agent dir로 
 
 ### First run과 Doctor
 
-Weavra agent dir가 없으면 일반 실행은 `Weavra has not been set up. Run: weavra setup` 안내 후 종료한다. worktree 생성 **전**에도 이 조건을 검사한다. Pi는 custom agent dir에서 자체 experimental first-time setup을 생략하므로 명시적 setup을 선택했다. 설정/auth가 없어도 디렉터리가 준비됐으면 Pi를 실행해 **Weavra 세션 안의 `/login`**을 사용할 수 있다. 기존 Pi에 로그인하는 것만으로 새 Weavra auth가 자동 갱신되지는 않는다.
+Weavra agent dir가 없으면 일반 실행은 `Weavra has not been set up. Run: weavra setup` 안내 후 종료한다. worktree 생성 전에도 검사한다. inherited experimental onboarding 대신 명시적 setup을 사용한다. 디렉터리가 준비됐으면 인증 없이도 `/login`을 사용할 수 있다. 기존 Pi 로그인 상태를 자동 fallback하지 않는다. 단순 help/version 및 source update 정책은 setup 전에 조회할 수 있다.
 
 `weavra doctor`는 checkout/build/Extension, Node/Git version, effective home/agent, private 디렉터리 및 읽기/쓰기 권한, Pi와 경로 격리, auth/models/settings JSON, 기본 session resolution을 검사한다. mkdir/chmod/repair/auth refresh/Provider/network/session/Git mutation/`.ai` 생성을 하지 않는다. 내용·token·JSON parse 원문 오류는 출력하지 않는다.
 
@@ -119,6 +119,10 @@ Weavra agent dir가 없으면 일반 실행은 `Weavra has not been set up. Run:
 `setup`/`doctor`는 단독 명령이며 Pi/worktree 옵션과 혼용하지 않는다. 문자 그대로의 prompt가 필요하면 `weavra -- setup`처럼 `--` 뒤에 둔다. `--worktree-list`는 setup/build 없이 기존대로 읽기 전용 조회할 수 있다.
 
 **격리는 default user-level 저장 영역에 한정된다.** `.ai`는 계속 각 프로젝트의 Runtime 원본이며 Weavra home은 workflow authority가 아니다. 명시적으로 import한 settings의 extension/command/sessionDir, 프로젝트 `.pi` 리소스, 일반 Provider 환경변수, 사용자가 지정한 session 경로는 Pi의 기존 규칙을 따른다. custom 실행 코드나 외부 동시 파일 교체를 OS sandbox하지 않으며 setup이 trust/approval을 자동 승인하지 않는다.
+
+### Product network policy
+
+Pi version/installer/release API와 install-report 요청을 제거했다. 기본 원격 vendor model catalog도 사용하지 않는다. 명시적으로 선택한 provider API는 정상 동작하며, SDK의 `catalogBaseUrl`을 지정한 경우에만 해당 catalog service를 사용한다. `/share`는 Weavra backend 미구성 오류를 반환하고 `/export` 로컬 저장을 안내한다. local metrics/evidence와 provider protocol은 유지한다. 정책·감사·한계는 [Runtime Product Independence](../../docs/architecture/RUNTIME_PRODUCT_INDEPENDENCE.md)를 따른다.
 
 ## Isolated Git worktree
 

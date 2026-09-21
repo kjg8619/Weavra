@@ -1,3 +1,17 @@
+# Pi-derived implementation reference
+
+This package is an internal implementation of **Weavra**, not an official Pi distribution.
+Use the [current Weavra runtime guide](../../README.md) for installation, `weavra setup`,
+`weavra doctor`, state ownership, and source-only updates. `0.85.1` is an inherited internal
+package version, not a Weavra release. Remote sharing, Pi analytics, automatic Pi model
+catalog refresh, and Pi self-update are not enabled by this product.
+
+The upstream documentation below is retained as implementation reference and historical
+attribution. Its Pi installation, release, service, community, and session-publication
+instructions are **not current Weavra product instructions**.
+
+---
+
 <p align="center">
   <a href="https://pi.dev">
     <img alt="pi logo" src="https://pi.dev/logo-auto.svg" width="128">
