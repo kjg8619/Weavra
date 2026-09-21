@@ -38,6 +38,7 @@ await git("commit", "-qm", "owned smoke project");
 await exec(executable, ["setup"], { cwd: project, input: "" });
 let document = "Ready";
 let modelRequests = 0;
+const modelReady = Promise.withResolvers();
 const pendingModelResponses = new Set();
 const server = createServer((request, response) => {
   if (request.method === "GET" && request.url === "/status") {
@@ -48,6 +49,7 @@ const server = createServer((request, response) => {
     request.resume();
     pendingModelResponses.add(response);
     response.on("close", () => pendingModelResponses.delete(response));
+    modelReady.resolve();
     // Deliberately pending local inference peer: cancellation must stop the actual Runtime worker.
   } else {
     response.writeHead(404);
@@ -129,8 +131,16 @@ try {
     const accepted = yield* mutate({ type: "workflow.confirm", previewId: workflowB.data.preview.previewId, previewDigest: workflowB.data.preview.previewDigest });
     assert.equal(accepted.success, true, JSON.stringify(accepted));
     assert.equal(accepted.data.kind, "accepted");
-    const running = yield* snapshot().pipe(Effect.repeat({ until: (value) => value.snapshot.status.run?.status === "RUNNING" && value.ownedRunId !== null, schedule: Schedule.spaced("25 millis") }), Effect.timeout("20 seconds"));
-    const cancelled = yield* mutate({ type: "workflow.cancel", runId: running.ownedRunId, expectedStateRevision: running.stateRevision });
+    // Startup persists several revisions. Wait for the owned pending request, not an early RUNNING snapshot.
+    yield* Effect.promise(() => modelReady.promise).pipe(Effect.timeout("20 seconds"));
+    const running = yield* snapshot();
+    assert.equal(running.snapshot.status.run.status, "RUNNING");
+    assert.notEqual(running.ownedRunId, null);
+    const cancelled = yield* transport.exchange({
+      protocolVersion: 1, id: running.nextRequestId, ownerId: running.ownerId,
+      expectedProjectRevision: running.projectRevision, type: "workflow.cancel",
+      runId: running.ownedRunId, expectedStateRevision: running.stateRevision,
+    });
     assert.equal(cancelled.success, true, JSON.stringify(cancelled));
     const final = yield* snapshot().pipe(Effect.repeat({ until: (value) => !value.busy, schedule: Schedule.spaced("25 millis") }), Effect.timeout("20 seconds"));
     assert.equal(final.snapshot.status.run.status, "CANCELLED");

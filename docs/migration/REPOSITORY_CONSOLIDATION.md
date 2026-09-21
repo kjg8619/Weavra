@@ -79,6 +79,11 @@ Root `Weavra CI` has independent `runtime/pi`, `app/t3code`, and `cross-boundary
 
 ## Current validation evidence
 
-Final local gate counts, exact root CI run/SHA, final refs and provenance tag are recorded only after execution. They are not yet claimed here.
+- Local Pi: install/hydrate/build, check/check:ci, both lock gates, npm test and test.sh PASS. Each test entrypoint: Vitest 553 passed files / 6,582 PASS / 894 skipped, 18 script tests PASS, TUI node:test success. The two entrypoints overlap and are not summed.
+- Local T3: 14 workspace test tasks, 1,270 passed files, 17,284 PASS, 58 skipped; focused contracts 17 / server 26 / client 28 / web 23 PASS; typecheck/lint/fmt/knip/build PASS. Lint remains 722 warnings, 0 errors.
+- Source archive + lock policy regressions: 3 PASS. Exact import manifest verification PASS.
+- Actual cross-boundary smoke PASS: candidate-only browser observation, real production T3 transports and executable, registration invalidation/confirm, fitness read, workflow invalidation/confirm/cancel, canonical CANCELLED/writer release, distinct fresh self-check/test captures and fresh Broken rejection. Paid requests 0; owned pending loopback request 1.
+- First root CI [35559913155](https://github.com/kjg8619/Weavra/actions/runs/35559913155), SHA `d58653e07c68ad338122f4650fbefbbc3723bcac`: cross-boundary failed on a smoke startup revision race (`STALE_PROJECT`). The fixture now synchronizes on the actual pending loopback request and uses one snapshot for cancellation. No retry, timeout relaxation or production authority change.
+- Exact corrected CI results, final refs and annotated provenance tag remain pending.
 
 Historical source results remain in [SPLIT_REPOSITORY_BASELINE.md](SPLIT_REPOSITORY_BASELINE.md). New local failures and resolutions are recorded in [../WORK_LOG.md](../WORK_LOG.md).
