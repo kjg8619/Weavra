@@ -88,7 +88,7 @@ export default function (pi: ExtensionAPI) {
 }
 ```
 
-The extension factory can also be `async`. For dynamic model discovery, fetch and register models in the factory instead of `session_start`. pi waits for the factory before startup continues, so the provider is available during interactive startup and to `pi --list-models`.
+The extension factory can also be `async`. For dynamic model discovery, fetch and register models in the factory instead of `session_start`. pi waits for the factory before startup continues, so the provider is available during interactive startup and to `weavra --list-models`.
 
 ## Override Existing Provider
 
@@ -382,7 +382,7 @@ interface OAuthLoginCallbacks {
 
 ### OAuthCredentials
 
-Credentials are persisted in `~/.pi/agent/auth.json`:
+Credentials are persisted in `~/.weavra/agent/auth.json`:
 
 ```typescript
 interface OAuthCredentials {
@@ -397,12 +397,12 @@ interface OAuthCredentials {
 For providers with non-standard APIs, implement `streamSimple`. Study the existing API implementations before writing your own:
 
 **Reference implementations:**
-- [anthropic-messages.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/anthropic-messages.ts) - Anthropic Messages API
-- [mistral-conversations.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/mistral-conversations.ts) - Mistral Conversations API
-- [openai-completions.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/openai-completions.ts) - OpenAI Chat Completions
-- [openai-responses.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/openai-responses.ts) - OpenAI Responses API
-- [google-generative-ai.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/google-generative-ai.ts) - Google Generative AI
-- [bedrock-converse-stream.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/bedrock-converse-stream.ts) - AWS Bedrock
+- [anthropic-messages.ts](https://github.com/kjg8619/Weavra/blob/main/runtime/pi/packages/ai/src/api/anthropic-messages.ts) - Anthropic Messages API
+- [mistral-conversations.ts](https://github.com/kjg8619/Weavra/blob/main/runtime/pi/packages/ai/src/api/mistral-conversations.ts) - Mistral Conversations API
+- [openai-completions.ts](https://github.com/kjg8619/Weavra/blob/main/runtime/pi/packages/ai/src/api/openai-completions.ts) - OpenAI Chat Completions
+- [openai-responses.ts](https://github.com/kjg8619/Weavra/blob/main/runtime/pi/packages/ai/src/api/openai-responses.ts) - OpenAI Responses API
+- [google-generative-ai.ts](https://github.com/kjg8619/Weavra/blob/main/runtime/pi/packages/ai/src/api/google-generative-ai.ts) - Google Generative AI
+- [bedrock-converse-stream.ts](https://github.com/kjg8619/Weavra/blob/main/runtime/pi/packages/ai/src/api/bedrock-converse-stream.ts) - AWS Bedrock
 
 ### Stream Pattern
 
@@ -571,7 +571,7 @@ When a request exceeds the model's context window, pi can recover automatically 
 Detection runs on the finalized assistant message:
 
 - `stopReason === "error"`
-- `errorMessage` matches one of pi's known overflow patterns (see [`packages/ai/src/utils/overflow.ts`](https://github.com/earendil-works/pi/blob/main/packages/ai/src/utils/overflow.ts))
+- `errorMessage` matches one of pi's known overflow patterns (see [`packages/ai/src/utils/overflow.ts`](https://github.com/kjg8619/Weavra/blob/main/runtime/pi/packages/ai/src/utils/overflow.ts))
 
 If your provider returns overflow errors with a message pi does not recognize, normalize the error from the same extension that registers the provider. Use a `message_end` handler to rewrite the assistant message so its `errorMessage` starts with a phrase pi recognizes. The generic fallback `context_length_exceeded` is the safest choice.
 
@@ -634,7 +634,7 @@ pi.registerProvider("my-provider", {
 
 ## Testing Your Implementation
 
-Test your provider against the same test suites used by built-in providers. Copy and adapt these test files from [packages/ai/test/](https://github.com/earendil-works/pi/tree/main/packages/ai/test):
+Test your provider against the same test suites used by built-in providers. Copy and adapt these test files from [packages/ai/test/](https://github.com/kjg8619/Weavra/tree/main/runtime/pi/packages/ai/test):
 
 | Test | Purpose |
 |------|---------|

@@ -45,7 +45,7 @@ export interface ClientRuntime {
 }
 
 export interface OpenClientRuntimeOptions {
-	/** Directory searched when --connect is omitted. Defaults to PI_SERVER_DIR or ~/.pi/server. */
+	/** Directory defaults to WEAVRA_SERVER_DIR, explicit PI_SERVER_DIR compatibility, or <WEAVRA_HOME or ~/.weavra>/server. */
 	readonly directory?: string;
 }
 

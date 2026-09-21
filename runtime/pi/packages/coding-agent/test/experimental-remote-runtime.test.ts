@@ -7,10 +7,12 @@ import { Client, ServerError as ClientServerError } from "@earendil-works/pi-cli
 import { createUnixTransportFactory } from "@earendil-works/pi-client/unix";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ExampleFacetService } from "../examples/plugins/pi-example-plugin/src/contract.ts";
+import { ENV_AGENT_DIR } from "../src/config.ts";
 import { runClient } from "../src/experimental/client.ts";
 import { activateBuiltinClientServices, openClientRuntime } from "../src/experimental/client-runtime.ts";
 import { createPresentationFacetLoaders } from "../src/experimental/plugins/bundled.ts";
 import * as processRuntime from "../src/experimental/process.ts";
+import { RadiusRelayAuthResolver } from "../src/experimental/radius-auth.ts";
 import { type RunningServer, startServer } from "../src/experimental/server.ts";
 import { AgentController } from "../src/experimental/services/agent-controller.ts";
 import { createSessionServiceSource, type SessionAttachmentState } from "../src/experimental/services/connection.ts";
@@ -39,7 +41,7 @@ beforeEach(async () => {
 	agentDir = await mkdtemp(join("/tmp", "pi-experimental-agent-"));
 	directories.add(agentDir);
 	await configureExperimentalWorkerModel(agentDir);
-	vi.stubEnv("PI_CODING_AGENT_DIR", agentDir);
+	vi.stubEnv(ENV_AGENT_DIR, agentDir);
 	await createExperimentalSessions(join(agentDir, "experimental", "sessions"), ["demo-1", "demo-2"]);
 });
 
@@ -82,6 +84,36 @@ afterEach(async () => {
 });
 
 describe("experimental durable server composition", () => {
+	test("starts a local server without using inherited Radius credentials or gateway settings", async () => {
+		vi.stubEnv("PI_OFFLINE", undefined);
+		vi.stubEnv("WEAVRA_RADIUS_GATEWAY", undefined);
+		vi.stubEnv("PI_RADIUS_GATEWAY", "https://radius.pi.dev");
+		await writeFile(
+			join(agentDir, "auth.json"),
+			JSON.stringify({
+				radius: {
+					type: "oauth",
+					access: "old-access",
+					refresh: "old-refresh",
+					expires: 0,
+				},
+			}),
+		);
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected hosted request"));
+		try {
+			await expect(new RadiusRelayAuthResolver().resolve({ required: false })).resolves.toBeUndefined();
+			const { directory, runtime } = await makeServer();
+			await expect(runClient({ command: "client" }, { directory })).resolves.toMatchObject({
+				kind: "list",
+				sessions: [{ sessionId: "demo-1" }, { sessionId: "demo-2" }],
+			});
+			await runtime.close();
+			expect(fetchSpy).not.toHaveBeenCalled();
+		} finally {
+			fetchSpy.mockRestore();
+		}
+	});
+
 	test("uses PI_SERVER_DIR and PI_SERVER_ID", async () => {
 		const directory = await mkdtemp(join("/tmp", "pi-server-dir-"));
 		directories.add(directory);

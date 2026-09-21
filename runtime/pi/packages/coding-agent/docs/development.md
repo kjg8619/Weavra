@@ -1,23 +1,12 @@
 # Development
 
-See [AGENTS.md](https://github.com/earendil-works/pi/blob/main/AGENTS.md) for additional guidelines.
+See the [root Weavra checkout guidance](../../../../../README.md) for product setup.
 
 ## Setup
 
-```bash
-git clone https://github.com/earendil-works/pi
-cd pi
-npm install
-npm run build
-```
+Complete the [root Weavra checkout setup](../../../../../README.md). The local runtime build context is `runtime/pi`; retain its lockfile acknowledgement, build and package-consumer gates.
 
-Run from source:
-
-```bash
-/path/to/pi/pi-test.sh
-```
-
-The script can be run from any directory. Pi keeps the caller's current working directory.
+Run the product through the checkout-bound `weavra` launcher. Local runtime development scripts remain available from `runtime/pi`.
 
 ### Experimental remote harness
 
@@ -28,24 +17,13 @@ PI_EXPERIMENTAL=1 ./pi-test.sh server
 PI_EXPERIMENTAL=1 ./pi-test.sh client
 ```
 
-`PI_SERVER_DIR` overrides the server profile and socket directory (default: `~/.pi/server`). `PI_SERVER_ID` selects the logical server ID when `--server-id` is omitted.
+`WEAVRA_SERVER_DIR` overrides the server profile and socket directory; explicit `PI_SERVER_DIR` remains a compatibility input. Otherwise the directory is `<WEAVRA_HOME or ~/.weavra>/server` (default: `~/.weavra/server`). `PI_SERVER_ID` selects the logical server ID when `--server-id` is omitted.
 
 The `client` and `experimental/plugin` package subpaths resolve only under the `source` condition in a checkout. Their implementations and the server/client commands are excluded from npm packages and standalone binaries. `pi-client`, `pi-protocol`, and `pi-server` are development dependencies of coding-agent, not runtime dependencies. The local SDK and stdio RPC API are unchanged.
 
 ## Forking / Rebranding
 
-Configure via `package.json`:
-
-```json
-{
-  "piConfig": {
-    "name": "pi",
-    "configDir": ".pi"
-  }
-}
-```
-
-Change `name`, `configDir`, and `bin` field for your fork. Affects CLI banner, config paths, and environment variable names.
+Product identity and home defaults are explicit in src/config.ts. Preserve package names/versions, project .pi paths, wire formats and the company-runtime launcher contract; do not derive product identity or home isolation from piConfig metadata.
 
 ## Path Resolution
 
@@ -61,7 +39,7 @@ Never use `__dirname` directly for package assets.
 
 ## Debug Command
 
-`/debug` (hidden) writes to `~/.pi/agent/pi-debug.log`:
+`/debug` (hidden) writes to `~/.weavra/agent/pi-debug.log`:
 - Rendered TUI lines with ANSI codes
 - Last messages sent to the LLM
 

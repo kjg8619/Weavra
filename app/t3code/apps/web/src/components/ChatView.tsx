@@ -2782,7 +2782,7 @@ export default function ChatView(props: ChatViewProps) {
                     type="button"
                     className="block max-w-full cursor-help truncate rounded-sm text-left"
                   >
-                    Server update available
+                    Client/server build mismatch
                   </button>
                 }
               />
@@ -2792,7 +2792,7 @@ export default function ChatView(props: ChatViewProps) {
               </TooltipPopup>
             </Tooltip>
           ) : (
-            "Server update available"
+            "Client/server build mismatch"
           ),
         description:
           !updateInProgress &&
@@ -9631,7 +9631,7 @@ export default function ChatView(props: ChatViewProps) {
     ) : renderedRightPanelSurface?.kind === "pull-request" && !supportsPullRequests ? (
       <PullRequestsUnavailableState
         title="Pull requests unavailable"
-        error="Update this environment's T3 Code server to browse pull requests."
+        error="This environment's server build does not support pull requests. Use a matching Weavra server build."
       />
     ) : renderedRightPanelSurface?.kind === "pull-request" ? (
       // No onClose: the surface tab's own X owns closing here, and a second X in the header

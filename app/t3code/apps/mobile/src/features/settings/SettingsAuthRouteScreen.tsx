@@ -1,65 +1,14 @@
-import { useAuth } from "@clerk/expo";
-import { AuthView, type UserProfileCustomPage, UserProfileView } from "@clerk/expo/native";
-import { StackActions, useNavigation } from "@react-navigation/native";
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { View } from "react-native";
-
-import { hasCloudPublicConfig } from "../cloud/publicConfig";
-import { T3ConnectProfilePage } from "../cloud/T3ConnectProfilePage";
-
-// Custom rows in Clerk's native profile. Mirrors the web UserButton pages.
-const USER_PROFILE_CUSTOM_PAGES = [
-  {
-    path: "t3-connect",
-    label: "T3 Connect",
-    icon: "globe",
-    content: <T3ConnectProfilePage />,
-  },
-] satisfies UserProfileCustomPage[];
+import { AppText as Text } from "../../components/AppText";
 
 export function SettingsAuthRouteScreen() {
-  const navigation = useNavigation();
-
-  useLayoutEffect(() => {
-    if (!hasCloudPublicConfig()) {
-      navigation.dispatch(StackActions.replace("SettingsContent"));
-    }
-  }, [navigation]);
-
-  return hasCloudPublicConfig() ? <ConfiguredSettingsAuthRouteScreen /> : null;
-}
-
-function ConfiguredSettingsAuthRouteScreen() {
-  const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
-  const navigation = useNavigation();
-  const handleHostBack = useCallback(
-    () => navigation.dispatch(StackActions.popTo("SettingsContent")),
-    [navigation],
-  );
-  const hasBeenSignedIn = useRef(isSignedIn);
-  if (isSignedIn) {
-    hasBeenSignedIn.current = true;
-  }
-
-  useEffect(() => {
-    if (hasBeenSignedIn.current && isLoaded && isSignedIn === false) {
-      navigation.dispatch(StackActions.popTo("SettingsContent"));
-    }
-  }, [isLoaded, isSignedIn, navigation]);
-
   return (
-    <View collapsable={false} className="flex-1 overflow-hidden bg-sheet">
-      {isLoaded ? (
-        hasBeenSignedIn.current ? (
-          <UserProfileView
-            customPages={USER_PROFILE_CUSTOM_PAGES}
-            isDismissible={false}
-            onHostBack={handleHostBack}
-          />
-        ) : (
-          <AuthView isDismissible={false} onHostBack={handleHostBack} />
-        )
-      ) : null}
+    <View className="flex-1 justify-center gap-3 bg-sheet px-6">
+      <Text className="text-lg font-t3-bold text-foreground">Cloud accounts unavailable</Text>
+      <Text className="text-base leading-normal text-foreground-muted">
+        This Weavra development build does not provide a hosted account or relay service. Add a
+        direct environment in Settings instead.
+      </Text>
     </View>
   );
 }

@@ -101,7 +101,7 @@ beforeEach(async () => {
 	await writeFile(
 		cli,
 		`#!/usr/bin/env node
-console.log(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2), agentDir: process.env.PI_CODING_AGENT_DIR, sessionDir: process.env.PI_CODING_AGENT_SESSION_DIR ?? null, home: process.env.HOME, marker: process.env.MARKER }));
+console.log(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2), agentDir: process.env.WEAVRA_CODING_AGENT_DIR, sessionDir: process.env.WEAVRA_CODING_AGENT_SESSION_DIR ?? null, legacyAgentDir: process.env.PI_CODING_AGENT_DIR ?? null, legacySessionDir: process.env.PI_CODING_AGENT_SESSION_DIR ?? null, home: process.env.HOME, marker: process.env.MARKER }));
 `,
 		{ mode: 0o755 },
 	);
@@ -116,6 +116,8 @@ console.log(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2), ag
 		MARKER: "preserved",
 		PI_CODING_AGENT_DIR: join(home, "old Pi"),
 		PI_CODING_AGENT_SESSION_DIR: join(home, "old sessions"),
+		WEAVRA_CODING_AGENT_DIR: join(home, "inherited agent"),
+		WEAVRA_CODING_AGENT_SESSION_DIR: join(home, "inherited sessions"),
 		GIT_CONFIG_NOSYSTEM: "1",
 		GIT_CONFIG_GLOBAL: "/dev/null",
 	};
@@ -191,7 +193,7 @@ describe("Weavra product home paths and first run", () => {
 		{ args: ["-r"] },
 		{ args: ["--session", "/explicit Pi session.jsonl"] },
 		{ args: ["--session-dir", "/explicit session directory"] },
-	])("preserves Pi argv but isolates child env: $args", ({ args }) => {
+	])("preserves explicit session argv but isolates child env: $args", ({ args }) => {
 		expect(run(["setup"]).status).toBe(0);
 		const result = run(args);
 		expect(result.status, result.stderr).toBe(0);
@@ -200,10 +202,90 @@ describe("Weavra product home paths and first run", () => {
 			args: ["-e", join(checkout, "packages/company-runtime/src/extension.ts"), ...args],
 			agentDir: agent(),
 			sessionDir: null,
+			legacyAgentDir: null,
+			legacySessionDir: null,
 			home,
 			marker: "preserved",
 		});
 		expect(env.PI_CODING_AGENT_DIR).toBe(join(home, "old Pi"));
+	});
+	it("ignores legacy agent paths even when they overlap the canonical product home", async () => {
+		const legacy = join(home, ".weavra", "unused-legacy-agent");
+		expect(run(["setup"], "", { PI_CODING_AGENT_DIR: legacy }).status).toBe(0);
+		const result = run([], "", { PI_CODING_AGENT_DIR: legacy });
+		expect(result.status, result.stderr).toBe(0);
+		expect(JSON.parse(result.stdout)).toMatchObject({ agentDir: agent(), legacyAgentDir: null });
+		await absent(legacy);
+	});
+	it.each([
+		{ args: ["--version"], status: 0 },
+		{ args: ["--help"], status: 0 },
+		{ args: ["update"], status: 1 },
+		{ args: ["update", "--all"], status: 1 },
+		{ args: ["update", "--extension", "--self"], status: 1 },
+	])(
+		"serves home-independent metadata or update denial without network or bootstrap: $args",
+		async ({ args, status }) => {
+			await piFiles();
+			await writeFile(join(checkout, "package.json"), '{"type":"module"}');
+			const main = fileURLToPath(new URL("../../coding-agent/src/main.ts", import.meta.url));
+			await writeFile(
+				cli,
+				`#!${process.execPath}
+import net from 'node:net';
+const denyNetwork = () => { throw new Error('UNEXPECTED_NETWORK'); };
+net.Socket.prototype.connect = denyNetwork;
+globalThis.fetch = denyNetwork;
+const { main } = await import(${JSON.stringify(main)});
+await main(process.argv.slice(2));
+`,
+			);
+			await writeFile(
+				join(checkout, "packages/company-runtime/src/extension.ts"),
+				"throw new Error('UNEXPECTED_EXTENSION');\n",
+			);
+			const before = await snapshot(home);
+			for (const extraEnv of [{}, { WEAVRA_HOME: join(home, ".pi") }]) {
+				const result = run(args, "", extraEnv);
+				expect(result.status, result.stdout + result.stderr).toBe(status);
+				expect(result.stdout + result.stderr).not.toContain("UNEXPECTED_NETWORK");
+				expect(result.stdout + result.stderr).not.toContain("UNEXPECTED_EXTENSION");
+				if (args[0] === "--version") expect(result.stdout.trim()).toBe("Weavra development");
+				if (args[0] === "--help") expect(result.stdout).toContain("Usage:");
+				if (args[0] === "update" && args.length <= 2) expect(result.stdout + result.stderr).toMatch(/checkout/i);
+				expect(await snapshot(home)).toEqual(before);
+				await absent(join(home, ".weavra"));
+			}
+		},
+	);
+	it.each([
+		{ args: ["install", "./local extension"] },
+		{ args: ["update", "--extensions"] },
+		{ args: ["update", "--models"] },
+		{ args: ["auth", "status"] },
+	])("keeps operational commands behind home validation and in the child command position: $args", ({ args }) => {
+		expect(run(args).status).toBe(1);
+		expect(run(["setup"]).status).toBe(0);
+		const result = run(args);
+		expect(result.status, result.stderr).toBe(0);
+		expect(JSON.parse(result.stdout)).toMatchObject({
+			args,
+			agentDir: agent(),
+			sessionDir: null,
+			legacyAgentDir: null,
+			legacySessionDir: null,
+		});
+	});
+	it("does not bypass preflight for metadata-looking prompts or worktree operations", async () => {
+		for (const args of [
+			["--", "--version"],
+			["--worktree", "inspect", "--help"],
+			["--version", "prompt"],
+		]) {
+			expect(run(args).status).toBe(1);
+			await absent(join(home, ".weavra"));
+			await absent(join(root, ".weavra-worktrees"));
+		}
 	});
 	it.each([
 		{ args: ["setup", "--continue"] },
@@ -403,7 +485,6 @@ describe("read-only doctor", () => {
 		expect(result.status, result.stderr).toBe(0);
 		for (const item of [
 			"Fork-local checkout",
-			"Pi build",
 			"Weavra extension",
 			"Node",
 			"Git",

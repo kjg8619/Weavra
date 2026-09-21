@@ -23,7 +23,7 @@ import {
 } from "@t3tools/client-runtime/connection";
 import { bootstrapRemoteBearerSession } from "@t3tools/client-runtime/authorization";
 import { fetchRemoteEnvironmentDescriptor } from "@t3tools/client-runtime/environment";
-import { managedRelayAccountChanges, managedRelaySessionAtom } from "@t3tools/client-runtime/relay";
+import { managedRelayAccountChanges } from "@t3tools/client-runtime/relay";
 import { EnvironmentRpcRequestObserver } from "@t3tools/client-runtime/rpc";
 import {
   AuthStandardClientScopes,
@@ -183,34 +183,13 @@ const capabilitiesLayer = Layer.effectContext(
       scopes: AuthStandardClientScopes,
     });
     const cloudSession = CloudSession.of({
-      identity: Effect.sync(() =>
-        Option.fromNullishOr(appAtomRegistry.get(managedRelaySessionAtom)),
+      identity: Effect.succeed(Option.none()),
+      clerkToken: Effect.fail(
+        new ConnectionBlockedError({
+          reason: "authentication",
+          detail: "Hosted relay access is unavailable in Weavra.",
+        }),
       ),
-      clerkToken: Effect.gen(function* () {
-        const session = appAtomRegistry.get(managedRelaySessionAtom);
-        if (session === null) {
-          return yield* new ConnectionBlockedError({
-            reason: "authentication",
-            detail: "Sign in to T3 Connect to connect this environment.",
-          });
-        }
-        const token = yield* session.readClerkToken().pipe(
-          Effect.mapError(
-            (error) =>
-              new ConnectionTransientError({
-                reason: "network",
-                detail: error.message,
-              }),
-          ),
-        );
-        if (token === null) {
-          return yield* new ConnectionBlockedError({
-            reason: "authentication",
-            detail: "The T3 Connect session is unavailable.",
-          });
-        }
-        return token;
-      }),
     });
     const identity = RelayDeviceIdentity.of({
       deviceId: Effect.succeed(Option.none()),

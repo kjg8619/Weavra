@@ -1604,17 +1604,14 @@ function buildBaseCodexHeaders(
 	token: string,
 ): Headers {
 	const headers = new Headers(initHeaders);
+	if (!headers.has("originator")) headers.set("originator", "weavra");
+	if (!headers.has("User-Agent")) headers.set("User-Agent", getPiUserAgent());
 	for (const [key, value] of Object.entries(additionalHeaders || {})) {
-		if (value === null) {
-			headers.delete(key);
-		} else {
-			headers.set(key, value);
-		}
+		if (value === null) headers.delete(key);
+		else headers.set(key, value);
 	}
 	headers.set("Authorization", `Bearer ${token}`);
 	headers.set("chatgpt-account-id", accountId);
-	headers.set("originator", "pi");
-	headers.set("User-Agent", getPiUserAgent());
 	return headers;
 }
 

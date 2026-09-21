@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { resolveModelSelection } from "../src/pi-harness.ts";
+import { buildSystemPrompt } from "../../coding-agent/src/core/system-prompt.ts";
+import { excludePiDocumentation, resolveModelSelection } from "../src/pi-harness.ts";
 
 describe("resolveModelSelection", () => {
 	it("prefers an explicit harness model over environment defaults", () => {
@@ -31,4 +32,18 @@ describe("resolveModelSelection", () => {
 			"Select a harness model explicitly or set both PI_PROVIDER and PI_MODEL as defaults.",
 		);
 	});
+});
+
+it("removes current product documentation while retaining the evaluation task context", () => {
+	const prompt = buildSystemPrompt({
+		cwd: "/evaluation-project",
+		selectedTools: ["read"],
+		contextFiles: [],
+		skills: [],
+	});
+	const filtered = excludePiDocumentation(prompt);
+	expect(filtered).toContain("Available tools:");
+	expect(filtered).toContain("Current working directory: /evaluation-project");
+	expect(filtered).not.toContain("- Main documentation:");
+	expect(filtered).not.toContain("- Additional docs:");
 });

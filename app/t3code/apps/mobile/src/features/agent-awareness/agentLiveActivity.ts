@@ -4,9 +4,3 @@ import type { AgentActivityProps } from "../../widgets/AgentActivity";
 export function getAgentLiveActivities(): Array<LiveActivity<AgentActivityProps>> {
   return [];
 }
-
-export function startAgentLiveActivity(
-  _props: AgentActivityProps,
-): LiveActivity<AgentActivityProps> | null {
-  return null;
-}

@@ -181,7 +181,7 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
     }),
   );
 
-  it.effect("reports agent activity publishing from the current secret state", () =>
+  it.effect("never advertises publishing even with saved cloud opt-in and credentials", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const baseDir = yield* fileSystem.makeTempDirectoryScoped({
@@ -200,15 +200,12 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
         const unlinked = yield* serverEnvironment.getDescriptor;
         expect(unlinked.capabilities.agentActivityPublishing).toBe(false);
 
-        // The opt-in alone is not enough: without relay link credentials no
-        // publish would leave this environment.
+        // Saved opt-in cannot enable the unavailable product capability.
         yield* secrets.set(PUBLISH_AGENT_ACTIVITY_SECRET, encode("true"));
         const withoutLink = yield* serverEnvironment.getDescriptor;
         expect(withoutLink.capabilities.agentActivityPublishing).toBe(false);
 
-        // Empty credentials are as unconfigured as missing ones: the
-        // publisher's truthiness gate skips them, so the capability must not
-        // advertise publishing.
+        // Neither empty nor complete saved link credentials enable publication.
         yield* secrets.set(RELAY_URL_SECRET, encode(""));
         yield* secrets.set(RELAY_ENVIRONMENT_CREDENTIAL_SECRET, encode("credential"));
         const emptyUrl = yield* serverEnvironment.getDescriptor;
@@ -216,10 +213,9 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
 
         yield* secrets.set(RELAY_URL_SECRET, encode("https://relay.example"));
         const linked = yield* serverEnvironment.getDescriptor;
-        expect(linked.capabilities.agentActivityPublishing).toBe(true);
+        expect(linked.capabilities.agentActivityPublishing).toBe(false);
 
-        // The toggle changes at runtime, so the same service instance must
-        // reflect a flip without a restart.
+        // Disabling the saved preference does not change the capability.
         yield* secrets.set(PUBLISH_AGENT_ACTIVITY_SECRET, encode("false"));
         const disabled = yield* serverEnvironment.getDescriptor;
         expect(disabled.capabilities.agentActivityPublishing).toBe(false);
@@ -227,7 +223,7 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
     }),
   );
 
-  it.effect("advertises desktopAppUpdate only with desktop mode and the control fd", () =>
+  it.effect("omits product update capabilities even with a desktop control fd", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const baseDir = yield* fileSystem.makeTempDirectoryScoped({
@@ -250,13 +246,13 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
         );
 
       const withFd = yield* describeWith({ mode: "desktop", desktopTelemetryControlFd: 5 });
-      expect(withFd.capabilities.serverSelfUpdate).toBe("desktop-managed");
-      expect(withFd.capabilities.desktopAppUpdate).toBe(true);
-      expect(withFd.capabilities.serverSelfUpdateProgress).toBe(true);
-      expect(withFd.capabilities.serverUpdateThreadContinuation).toBe(true);
+      expect(withFd.capabilities.serverSelfUpdate).toBeUndefined();
+      expect(withFd.capabilities.desktopAppUpdate).toBeUndefined();
+      expect(withFd.capabilities.serverSelfUpdateProgress).toBeUndefined();
+      expect(withFd.capabilities.serverUpdateThreadContinuation).toBeUndefined();
 
       const withoutFd = yield* describeWith({ mode: "desktop" });
-      expect(withoutFd.capabilities.serverSelfUpdate).toBe("desktop-managed");
+      expect(withoutFd.capabilities.serverSelfUpdate).toBeUndefined();
       expect(withoutFd.capabilities.desktopAppUpdate).toBeUndefined();
       expect(withoutFd.capabilities.serverSelfUpdateProgress).toBeUndefined();
       expect(withoutFd.capabilities.serverUpdateThreadContinuation).toBeUndefined();

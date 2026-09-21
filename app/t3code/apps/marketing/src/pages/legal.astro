@@ -4,35 +4,35 @@ import Layout from "../layouts/Layout.astro";
 const documents = [
   {
     number: "01",
-    title: "Privacy Policy",
-    description: "How T3 Code handles information, connected services, and your privacy choices.",
+    title: "Privacy information",
+    description: "Current scope, local data and third-party connections.",
     href: "/privacy-policy",
   },
   {
     number: "02",
-    title: "Terms of Service",
-    description: "The terms that govern your use of T3 Code and T3 Tools-operated services.",
+    title: "License and availability",
+    description: "Component licenses, provenance and development availability.",
     href: "/terms-of-service",
   },
   {
     number: "03",
-    title: "Security Policy",
-    description: "Our security practices, responsible disclosure process, and shared responsibilities.",
+    title: "Security information",
+    description: "Reporting guidance and responsibilities for your own environments.",
     href: "/security-policy",
   },
 ] as const;
 ---
 
 <Layout
-  title="Legal — T3 Code"
-  description="Privacy, terms, and security documents for T3 Code."
+  title="Project information — Weavra"
+  description="License, privacy and security information for the Weavra development project."
   pageClass="legal-document-page"
 >
   <div class="legal-index">
     <header class="legal-index-hero">
-      <p class="eyebrow">T3 Tools, Inc. / Legal</p>
-      <h1>Legal</h1>
-      <p>Policies and terms for T3 Code, collected in one place.</p>
+      <p class="eyebrow">Weavra / Project information</p>
+      <h1>Project information</h1>
+      <p>Current development information. Original component licenses and attribution remain in the source repository.</p>
     </header>
 
     <nav class="document-list" aria-label="Legal documents">

@@ -1,6 +1,7 @@
 {
 	"name": "@earendil-works/pi-session-backend-sqlite-node",
 	"version": "0.85.1",
+	"private": true,
 	"description": "Node sqlite session backend for @earendil-works/pi-agent-core sessions",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -22,7 +23,7 @@
 		"bench:session:timing": "vitest bench --config vitest.benchmark.config.ts",
 		"test": "vitest --run",
 		"coverage": "vitest --run --coverage",
-		"prepublishOnly": "npm run clean && npm run build"
+		"prepublishOnly": "node ../../../scripts/publish.mjs"
 	},
 	"author": "Earendil Works",
 	"license": "MIT",

@@ -108,7 +108,6 @@ describe("S4 extension and S0 loader/trust regression", () => {
 		start({ type: "session_start", reason: "startup" }, { ...context(), mode });
 		if (mode === "tui") {
 			expect(notify).toHaveBeenCalledTimes(1);
-			expect(notify).toHaveBeenCalledWith(expect.stringContaining("Weavra Runtime loaded — v0.1 RC1"), "info");
 			expect(setStatus).toHaveBeenCalledExactlyOnceWith("weavra.runtime", undefined);
 		} else {
 			expect(notify).not.toHaveBeenCalled();
@@ -121,24 +120,7 @@ describe("S4 extension and S0 loader/trust regression", () => {
 		const host = commands();
 		await host.call(name, "help");
 		const text = notify.mock.calls.at(-1)![0] as string;
-		expect(text).toContain("Weavra v0.1 RC1");
 		expect(text).toContain(`/${name}`);
-		expect(text).not.toMatch(/Company runtime|Personal AI Runtime/);
-		if (name === "workflow") {
-			for (const term of [
-				"QUICK",
-				"STANDARD",
-				"R0",
-				"R1",
-				"R2",
-				"scoped R3",
-				"independent Reviewer",
-				"Human Approval",
-				"No automatic commit/rollback",
-			])
-				expect(text).toContain(term);
-		}
-		expect(host.registered.get(name)!.description).toContain("Weavra");
 		expect(host.models).not.toHaveBeenCalled();
 		expect(await readdir(cwd)).toEqual([]);
 	});

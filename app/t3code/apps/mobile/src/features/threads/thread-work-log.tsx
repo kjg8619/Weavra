@@ -31,12 +31,12 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
+import { withUniwind } from "uniwind";
 import type { EnvironmentId, ToolActivityIcon } from "@t3tools/contracts";
 import { toolActivityFaviconUrl } from "@t3tools/shared/favicon";
 
 import { AppText as Text } from "../../components/AppText";
-import { T3Wordmark } from "../../components/T3Wordmark";
 import { cn } from "../../lib/cn";
 import { THREAD_WORK_ROW_MIN_HEIGHT, type deriveThreadWorkLogSizing } from "../../lib/layout";
 import {
@@ -72,6 +72,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { useAssetUrl } from "../../state/assets";
 
+const ThemedBrandPath = withUniwind(Path);
+
 const SHIMMER_WIDTH = 72;
 const SHIMMER_SWEEP_MS = 1_350;
 const SHIMMER_PAUSE_MS = 1_450;
@@ -91,7 +93,19 @@ function WorkLogIcon(props: {
   const colorClassName = props.highlighted ? "accent-foreground" : props.colorClassName;
   if (props.icon === "t3-code") {
     return (
-      <T3Wordmark height={10} {...(colorClassName ? { colorClassName } : { color: props.color })} />
+      <Svg
+        accessibilityLabel="Weavra"
+        height={10}
+        width={(10 * 94.5) / 57}
+        viewBox="15.53 37 94.5 57"
+      >
+        <ThemedBrandPath
+          d="M15.53 37H29L42 75L55 37H70L83 75L96.53 37H110.03L90 94H76L62.5 56L49 94H35Z"
+          color={colorClassName ? undefined : props.color}
+          colorClassName={colorClassName}
+          fill="currentColor"
+        />
+      </Svg>
     );
   }
   return (

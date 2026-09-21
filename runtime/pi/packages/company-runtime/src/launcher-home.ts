@@ -59,18 +59,7 @@ export async function resolveWeavraHome(env: NodeJS.ProcessEnv = process.env): P
 	const canonicalHome = await canonical(home);
 	if (overlaps(home, piHome) || overlaps(canonicalHome, await canonical(piHome)))
 		fail("Isolation: WEAVRA_HOME must not overlap ~/.pi");
-	// An inherited custom Pi agent dir is ignored, but must not alias our new home.
-	if (env.PI_CODING_AGENT_DIR) {
-		const inherited = env.PI_CODING_AGENT_DIR.startsWith("~/")
-			? join(userHome, env.PI_CODING_AGENT_DIR.slice(2))
-			: resolve(env.PI_CODING_AGENT_DIR);
-		// Re-entering weavra from its own child is valid. Other Pi homes remain protected.
-		if (
-			(await canonical(inherited)) !== join(canonicalHome, "agent") &&
-			overlaps(canonicalHome, await canonical(inherited))
-		)
-			fail("Isolation: WEAVRA_HOME overlaps the inherited Pi agent directory");
-	}
+	// Legacy PI_* variables never select or veto the canonical product home.
 	return { home, agentDir: join(home, "agent"), piHome, piAgentDir: join(piHome, "agent") };
 }
 async function privateDirectory(path: string): Promise<void> {
@@ -102,7 +91,7 @@ async function readJson(path: string): Promise<{ bytes: Buffer; value: Record<st
 		await handle.close();
 	}
 }
-/** Checks only; child Pi still owns authentication and sessions. No bootstrap writes here. */
+/** Checks only; Weavra Runtime owns authentication and sessions. No bootstrap writes here. */
 export async function prepareLaunch(env: NodeJS.ProcessEnv = process.env): Promise<string> {
 	const paths = await resolveWeavraHome(env);
 	await productDirectories(paths);
@@ -230,7 +219,7 @@ export async function doctorWeavra(
 	output("Weavra Doctor");
 	for (const [label, path, directory, executable] of [
 		["Fork-local checkout", checkout, true, false],
-		["Pi build", join(checkout, "packages/coding-agent/dist/bundle/cli.js"), false, true],
+		["Weavra Runtime build", join(checkout, "packages/coding-agent/dist/bundle/cli.js"), false, true],
 		["Weavra extension", join(checkout, "packages/company-runtime/src/extension.ts"), false, false],
 	] as const) {
 		try {
@@ -239,7 +228,7 @@ export async function doctorWeavra(
 			await access(path, constants.R_OK | (executable ? constants.X_OK : 0));
 			report("PASS", label, path);
 		} catch {
-			report("FAIL", label, "missing or inaccessible; no global Pi fallback");
+			report("FAIL", label, "missing or inaccessible; no global binary fallback");
 		}
 	}
 	const [major, minor, patch] = process.versions.node.split(".").map(Number);

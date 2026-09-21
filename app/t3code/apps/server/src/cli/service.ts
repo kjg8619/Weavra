@@ -4,7 +4,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Terminal from "effect/Terminal";
 import { Command, Flag, GlobalFlag, Prompt } from "effect/unstable/cli";
-import { FetchHttpClient } from "effect/unstable/http";
 
 import packageJson from "../../package.json" with { type: "json" };
 import * as BootService from "../cloud/bootService.ts";
@@ -18,11 +17,7 @@ export const bootServiceLayer = (config: ServerConfig.ServerConfig["Service"]) =
     baseDir: config.baseDir,
     logsDir: config.logsDir,
     cliVersion: packageJson.version,
-  }).pipe(
-    Layer.provide(ProcessRunner.layer),
-    // Archive-distributed versions download the release archive here.
-    Layer.provide(FetchHttpClient.layer),
-  );
+  }).pipe(Layer.provide(ProcessRunner.layer));
 
 export type ServiceReconcileResult =
   | {
@@ -63,15 +58,12 @@ export const reconcileService = Effect.fn("cli.service.reconcile")(function* (op
   } satisfies ServiceReconcileResult;
 });
 
-export function formatServiceStatus(
-  status: BootService.BootServiceStatus,
-  cliVersion: string,
-): string {
+function formatServiceStatus(status: BootService.BootServiceStatus, cliVersion: string): string {
   if (!status.supported) {
-    return "T3 Code service\n  Status: unavailable on this machine\n  Supported on: Linux with systemd, macOS with launchd";
+    return "Weavra development service\n  Status: unavailable on this machine\n  Supported on: Linux with systemd, macOS with launchd";
   }
   if (!status.installed) {
-    return "T3 Code service\n  Status: not installed\n  Next: Run `t3 service install`.";
+    return "Weavra development service\n  Status: not installed\n  Next: Run `weavra-server service install`.";
   }
   const installedVersion = status.installedVersion ?? cliVersion;
   const problems = (status.problems ?? []).map(
@@ -83,21 +75,21 @@ export function formatServiceStatus(
     compareExactServiceVersions(status.installedVersion, cliVersion) > 0
   ) {
     return [
-      "T3 Code service",
-      `  Status: installed · t3@${installedVersion} (newer than this t3@${cliVersion} CLI)`,
+      "Weavra development service",
+      `  Status: installed · runtime ${installedVersion} (newer than this CLI runtime ${cliVersion})`,
       `  Unit: ${status.unitPath}`,
       `  Logs: ${status.logPath}`,
       ...problems,
-      `  Next: Run \`t3 update ${installedVersion}\` to match it, or pass \`--allow-downgrade\` to \`t3 service install\` explicitly.`,
+      "  Next: Provision a matching Weavra build explicitly, or pass `--allow-downgrade` to `weavra-server service install` explicitly.",
     ].join("\n");
   }
   return [
-    "T3 Code service",
-    `  Status: ${status.current ? `installed · t3@${installedVersion}` : "needs an update or repair"}`,
+    "Weavra development service",
+    `  Status: ${status.current ? `installed · runtime ${installedVersion}` : "needs a local repair"}`,
     `  Unit: ${status.unitPath}`,
     `  Logs: ${status.logPath}`,
     ...problems,
-    ...(status.current ? [] : ["  Next: Run `t3 service install` to repair it."]),
+    ...(status.current ? [] : ["  Next: Run `weavra-server service install` to repair it."]),
   ].join("\n");
 }
 
@@ -119,7 +111,7 @@ const serviceReconcileFlags = {
 };
 
 const serviceInstallCommand = Command.make("install", serviceReconcileFlags).pipe(
-  Command.withDescription("Install T3 Code as a background service for this user."),
+  Command.withDescription("Install Weavra development as a background service for this user."),
   Command.withHandler((flags) =>
     runServiceCommand(
       flags,
@@ -127,37 +119,40 @@ const serviceInstallCommand = Command.make("install", serviceReconcileFlags).pip
         const result = yield* reconcileService({ allowDowngrade: flags.allowDowngrade });
         if (!result.changed) {
           yield* Console.log(
-            `T3 Code service is already installed with t3@${packageJson.version}.`,
+            `Weavra development service is already installed with runtime ${packageJson.version}.`,
           );
           return;
         }
         yield* Console.log(
-          `${result.previouslyInstalled ? "Updated" : "Installed"} T3 Code service with t3@${packageJson.version}.\nLogs: ${result.plan.logPath}`,
+          `${result.previouslyInstalled ? "Updated" : "Installed"} Weavra development service with runtime ${packageJson.version}.\nLogs: ${result.plan.logPath}`,
         );
       }),
     ),
   ),
 );
 
-// Kept one release for muscle memory and old docs. It did what `t3 service
-// install` does; the way to move to a newer release is `t3 update`.
+// Compatibility command repairs an explicitly provisioned local service only.
 const serviceUpdateCommand = Command.make("update", serviceReconcileFlags).pipe(
-  Command.withDescription("Deprecated. Run `t3 update` to move to a newer release."),
+  Command.withDescription(
+    "Repair an explicitly provisioned local service; automatic updates are unavailable.",
+  ),
   Command.unlisted,
   Command.withHandler((flags) =>
     runServiceCommand(
       flags,
       Effect.gen(function* () {
         yield* Console.log(
-          "`t3 service update` is deprecated: run `t3 update` to move to a newer release, or `t3 service install` to repair the service. Repairing now.",
+          "Automatic updates are unavailable. Repairing the explicitly provisioned runtime; use `weavra-server service install` directly.",
         );
         const result = yield* reconcileService({ allowDowngrade: flags.allowDowngrade });
         if (!result.changed) {
-          yield* Console.log(`T3 Code service is already using t3@${packageJson.version}.`);
+          yield* Console.log(
+            `Weavra development service is already using runtime ${packageJson.version}.`,
+          );
           return;
         }
         yield* Console.log(
-          `${result.previouslyInstalled ? "Updated" : "Installed"} T3 Code service with t3@${packageJson.version}.\nLogs: ${result.plan.logPath}`,
+          `${result.previouslyInstalled ? "Updated" : "Installed"} Weavra development service with runtime ${packageJson.version}.\nLogs: ${result.plan.logPath}`,
         );
       }),
     ),
@@ -165,9 +160,7 @@ const serviceUpdateCommand = Command.make("update", serviceReconcileFlags).pipe(
 );
 
 const serviceRestartCommand = Command.make("restart", projectLocationFlags).pipe(
-  Command.withDescription(
-    "Restart the background service. Picks up a version installed by `t3 update` that was not restarted at the time.",
-  ),
+  Command.withDescription("Restart the explicitly provisioned local background service."),
   Command.withHandler((flags) =>
     runServiceCommand(
       flags,
@@ -177,8 +170,8 @@ const serviceRestartCommand = Command.make("restart", projectLocationFlags).pipe
         const restarted = yield* service.restart;
         yield* Console.log(
           restarted
-            ? `Restarted the T3 Code service${status.installedVersion === undefined ? "" : ` on t3@${status.installedVersion}`}.`
-            : "T3 Code service is not installed.",
+            ? `Restarted the Weavra development service${status.installedVersion === undefined ? "" : ` on runtime ${status.installedVersion}`}.`
+            : "Weavra development service is not installed.",
         );
       }),
     ),
@@ -186,7 +179,7 @@ const serviceRestartCommand = Command.make("restart", projectLocationFlags).pipe
 );
 
 const serviceUninstallCommand = Command.make("uninstall", projectLocationFlags).pipe(
-  Command.withDescription("Stop and remove the T3 Code background service."),
+  Command.withDescription("Stop and remove the Weavra development background service."),
   Command.withHandler((flags) =>
     runServiceCommand(
       flags,
@@ -194,7 +187,9 @@ const serviceUninstallCommand = Command.make("uninstall", projectLocationFlags).
         const service = yield* BootService.BootService;
         const removed = yield* service.uninstall;
         yield* Console.log(
-          removed ? "Removed the T3 Code service." : "T3 Code service is not installed.",
+          removed
+            ? "Removed the Weavra development service."
+            : "Weavra development service is not installed.",
         );
       }),
     ),
@@ -202,7 +197,7 @@ const serviceUninstallCommand = Command.make("uninstall", projectLocationFlags).
 );
 
 const serviceStatusCommand = Command.make("status", projectLocationFlags).pipe(
-  Command.withDescription("Show whether the T3 Code background service is installed."),
+  Command.withDescription("Show whether the Weavra development background service is installed."),
   Command.withHandler((flags) =>
     runServiceCommand(
       flags,
@@ -222,7 +217,9 @@ export const offerServiceDuringOnboarding = Effect.gen(function* () {
     return false;
   }
   if (installed && current) {
-    yield* Console.log("T3 Code is already set up to run in the background on this machine.");
+    yield* Console.log(
+      "Weavra development is already set up to run in the background on this machine.",
+    );
     return true;
   }
   for (const problem of status.problems ?? []) {
@@ -234,7 +231,7 @@ export const offerServiceDuringOnboarding = Effect.gen(function* () {
     compareExactServiceVersions(status.installedVersion, packageJson.version) > 0
   ) {
     yield* Console.log(
-      `A newer t3@${status.installedVersion} background service is installed. Leaving it unchanged.`,
+      `A newer runtime ${status.installedVersion} background service is installed. Leaving it unchanged.`,
     );
     // This CLI cannot verify the newer service. Keep the manual fallback available.
     return false;
@@ -245,12 +242,12 @@ export const offerServiceDuringOnboarding = Effect.gen(function* () {
   const wanted = yield* Prompt.run(
     Prompt.Confirm({
       message: installed
-        ? "The installed T3 Code service needs an update or repair. Update it now?"
+        ? "The installed Weavra development service needs a local repair. Repair it now?"
         : platform === "darwin"
-          ? "Run T3 Code in the background whenever you log in to this Mac? " +
-            "It stays reachable through T3 Connect while you are logged in."
-          : "Run T3 Code in the background whenever this machine boots? " +
-            "It stays reachable through T3 Connect even after you log out.",
+          ? "Run Weavra development in the background whenever you log in to this Mac? " +
+            "Keeps the explicitly provisioned local server running."
+          : "Run Weavra development in the background whenever this machine boots? " +
+            "Keeps the explicitly provisioned local server running.",
       initial: true,
     }),
   );
@@ -288,7 +285,7 @@ export const recoverServiceOnboardingOffer = <R>(
   );
 
 export const serviceCommand = Command.make("service").pipe(
-  Command.withDescription("Manage the T3 Code background service."),
+  Command.withDescription("Manage the Weavra development background service."),
   Command.withSubcommands([
     serviceInstallCommand,
     serviceRestartCommand,

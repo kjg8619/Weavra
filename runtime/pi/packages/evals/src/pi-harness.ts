@@ -51,14 +51,14 @@ type PiCodingAgentHarnessWithOutput<TOutput extends JsonValue> = PiCodingAgentHa
 	}) => TOutput | Promise<TOutput>;
 };
 
-// Comparative evals intentionally remove the documentation block using stable prompt markers instead of changing Pi's
+// Comparative evals intentionally remove the documentation block using stable prompt markers instead of changing Weavra's
 // production prompt builder. The isolated eval prompt has no project context or skills between these markers. If
 // that setup changes, this transform must be updated so baseline and candidate still differ only by documentation.
 export function excludePiDocumentation(defaultPrompt: string): string {
-	const documentationStart = defaultPrompt.indexOf("\nPi documentation (read only");
-	if (documentationStart === -1) throw new Error("Default Pi system prompt has no Pi documentation section.");
+	const documentationStart = defaultPrompt.indexOf("\nWeavra documentation (read only");
+	if (documentationStart === -1) throw new Error("Default Weavra system prompt has no Weavra documentation section.");
 	const cwdStart = defaultPrompt.lastIndexOf("\nCurrent working directory: ");
-	if (cwdStart === -1) throw new Error("Default Pi system prompt has no working-directory section.");
+	if (cwdStart === -1) throw new Error("Default Weavra system prompt has no working-directory section.");
 	return defaultPrompt.slice(0, documentationStart) + defaultPrompt.slice(cwdStart);
 }
 

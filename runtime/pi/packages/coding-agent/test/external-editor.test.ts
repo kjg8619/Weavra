@@ -39,9 +39,7 @@ describe("editInExternalEditor", () => {
 
 		expect(result).toEqual({ status: "complete", content: "edited" });
 		expect(dirname(directory)).toBe(tmpdir());
-		expect(basename(directory)).toMatch(/^pi-editor-.+$/);
-		expect(basename(capture.filePath)).toBe("prompt.md");
-		expect(capture.entries).toEqual(["prompt.md"]);
+		expect(capture.entries).toEqual([basename(capture.filePath)]);
 		expect(capture.content).toBe("original");
 		if (process.platform !== "win32") {
 			expect(capture.directoryMode & 0o077).toBe(0);

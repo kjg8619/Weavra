@@ -170,7 +170,7 @@ export function registerCompanyRuntime(
 							[
 								name === "graph"
 									? "Weavra Graph — V0.2A projection / V0.2B viewer (read-only)"
-									: "Weavra v0.1 RC1 (development)",
+									: "Weavra development",
 								usage[name],
 								...(name === "workflow"
 									? [
@@ -537,7 +537,7 @@ export function registerCompanyRuntime(
 			statusUI = ctx.ui;
 			clearStatus();
 			ctx.ui.notify(
-				"Weavra Runtime loaded — v0.1 RC1 (development)\nQUICK / STANDARD · R0–R2 / scoped R3\n/workflow · /state · /team · /risk · /graph — /workflow help",
+				"Weavra Runtime loaded — development\nQUICK / STANDARD · R0–R2 / scoped R3\n/workflow · /state · /team · /risk · /graph — /workflow help",
 				"info",
 			);
 		}

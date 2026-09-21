@@ -78,7 +78,37 @@ it("serves exact standalone argv and drains EOF without creating a product home,
 	expect(await readdir(root)).toEqual(["project with spaces"]);
 });
 
-it("refuses a missing explicit project trust flag and mixed Pi or control arguments", async () => {
+it("serves control capabilities without initializing a missing home or changing wire version identity", async () => {
+	const result = spawnSync(launcher, ["bridge", "--stdio", "--project-trusted", "--control"], {
+		cwd: project,
+		env: {
+			...env,
+			PI_CODING_AGENT_DIR: join(root, "legacy-agent"),
+			PI_CODING_AGENT_SESSION_DIR: join(root, "legacy-sessions"),
+			WEAVRA_CODING_AGENT_DIR: join(root, "inherited-agent"),
+			WEAVRA_CODING_AGENT_SESSION_DIR: join(root, "inherited-sessions"),
+		},
+		input: `${JSON.stringify({ protocolVersion: 1, id: "hello", type: "control.hello" })}\n`,
+		encoding: "utf8",
+		timeout: 10000,
+	});
+	expect(result.status, result.stderr).toBe(0);
+	expect(JSON.parse(result.stdout)).toMatchObject({
+		type: "control_response",
+		success: true,
+		data: {
+			kind: "capabilities",
+			capabilities: {
+				readiness: "NOT_SETUP",
+				runtimeVersion: expect.stringMatching(/^\d+\.\d+\.\d+/),
+			},
+		},
+	});
+	expect(await readdir(project)).toEqual([]);
+	expect(await readdir(root)).toEqual(["project with spaces"]);
+});
+
+it("refuses a missing explicit project trust flag and mixed Runtime or control arguments", async () => {
 	for (const args of [
 		["bridge", "--stdio"],
 		["bridge", "--stdio", "--project-trusted", "start"],

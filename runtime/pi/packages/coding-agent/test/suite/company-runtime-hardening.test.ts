@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, watch, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Context, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -558,6 +558,11 @@ describe("S6 lifecycle cleanup ordering", () => {
 					"-m",
 					"Slow check fixture",
 				);
+				const marker = join(agentDir, "check-ready");
+				const watcher = watch(agentDir, () => {
+					if (existsSync(marker)) ready.resolve();
+				});
+				cleanupHooks.push(async () => watcher.close());
 			}
 			const commands = new Map<string, Omit<RegisteredCommand, "name" | "sourceInfo">>();
 			const hooks = new Map<string, () => Promise<unknown>>();
@@ -632,8 +637,7 @@ describe("S6 lifecycle cleanup ordering", () => {
 				.handler(`run ${phase === "approval" ? "Delete file src/obsolete.ts" : "Fix bug"}`, ctx);
 			// Await the fixture's actual pause, not an unrelated one-second polling deadline.
 			// The enclosing test deadline and afterEach cancellation still bound failed startup.
-			if (phase === "check") await vi.waitFor(() => expect(existsSync(join(agentDir, "check-ready"))).toBe(true));
-			else await ready.promise;
+			await ready.promise;
 			order.length = 0;
 			expect(existsSync(join(cwd, ".ai/writer.lock"))).toBe(true);
 			if (event === "cancel") await commands.get("workflow")!.handler("cancel", ctx);

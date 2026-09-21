@@ -17,7 +17,7 @@ import { Argument, Flag } from "effect/unstable/cli";
 
 import { readBootstrapEnvelope } from "../bootstrap.ts";
 import * as ServerConfig from "../config.ts";
-import { expandHomePath, resolveBaseDir } from "../os-jank.ts";
+import { appHomeConfig, expandHomePath, resolveBaseDir } from "../os-jank.ts";
 
 const modeFlag = Flag.Literals("mode", ServerConfig.RuntimeMode.literals).pipe(
   Flag.withDescription("Runtime mode. `desktop` keeps loopback defaults unless overridden."),
@@ -34,7 +34,7 @@ const hostFlag = Flag.String("host").pipe(
 );
 export const baseDirFlag = Flag.String("base-dir").pipe(
   Flag.withDescription(
-    "Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).",
+    "Explicit Weavra app data directory; runtime state is stored under userdata (equivalent to WEAVRA_APP_HOME).",
   ),
   Flag.optional,
 );
@@ -117,7 +117,7 @@ const EnvServerConfig = Config.all({
   ),
   port: Config.Port("T3CODE_PORT").pipe(Config.option, Config.map(Option.getOrUndefined)),
   host: Config.String("T3CODE_HOST").pipe(Config.option, Config.map(Option.getOrUndefined)),
-  t3Home: Config.String("T3CODE_HOME").pipe(Config.option, Config.map(Option.getOrUndefined)),
+  t3Home: appHomeConfig,
   devUrl: Config.URL("VITE_DEV_SERVER_URL").pipe(Config.option, Config.map(Option.getOrUndefined)),
   devAllowedOrigins: Config.String("T3CODE_DEV_ALLOWED_ORIGINS").pipe(
     Config.withDefault(""),

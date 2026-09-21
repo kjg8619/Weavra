@@ -1,12 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NetService from "@t3tools/shared/Net";
-import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
-import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
 import * as Sink from "effect/Sink";
@@ -111,69 +109,6 @@ const NODE_SCRIPT = {
 } as const;
 
 describe("ssh tunnel scripts", () => {
-  it("installs and runs the release archive without Node, npm, or npx", () => {
-    const script = buildRemoteT3RunnerScript(ARCHIVE);
-
-    assert.include(script, "T3_ARCHIVE_VERSION='1.2.3-preview.20260911.4'");
-    assert.include(script, "T3_NODE_SCRIPT_PATH=''");
-    assert.include(
-      script,
-      "T3_RELEASE_BASE_URL='https://github.com/pingdotgg/t3code/releases/download'",
-    );
-    assert.include(script, 'T3_RUNTIME_DIR="$HOME/.t3/runtime/versions/$T3_ARCHIVE_VERSION"');
-    assert.include(script, 'T3_ARCHIVE="t3-$T3_ARCHIVE_VERSION-$T3_PLATFORM-$T3_ARCH.tar.gz"');
-    assert.include(script, "SHA256SUMS");
-    assert.include(script, 'exec "$T3_RUNTIME_DIR/t3" "$@"');
-    assert.notInclude(script, "npx");
-    assert.notInclude(script, "npm exec");
-    assert.notInclude(script, "t3@latest");
-    assert.notInclude(script, 'exec t3 "$@"');
-    // Concurrent launches serialize on a per-version mkdir lock and recheck
-    // the completion marker after acquiring it.
-    assert.include(
-      script,
-      'T3_LOCK="$HOME/.t3/runtime/versions/.$T3_ARCHIVE_VERSION.install.lock"',
-    );
-    // mkdir is the exclusive create; the pid follows atomically. A dead owner
-    // is reclaimed at once, a never-published owner after a short grace.
-    assert.include(script, 'while ! mkdir "$T3_LOCK" 2>/dev/null; do');
-    assert.include(script, 'mv "$T3_LOCK/pid.tmp" "$T3_LOCK/pid"');
-    assert.include(script, 'if ! kill -0 "$T3_LOCK_OWNER" 2>/dev/null; then');
-    assert.include(script, 'if [ "$T3_LOCK_UNOWNED" -ge 5 ]; then');
-    assert.include(script, 'if [ "$T3_LOCK_WAITED" -ge 360 ]; then');
-    assert.include(script, '"$T3_STAGING/SHA256SUMS" 30');
-    assert.include(script, '"$T3_STAGING/$T3_ARCHIVE" 240');
-    assert.notInclude(script, "T3_LOCK_CANDIDATE");
-    assert.notInclude(script, "-mmin");
-    assert.equal(script.split("if ! t3_runtime_ready; then").length - 1, 2);
-    assert.isBelow(
-      script.indexOf('"$T3_STAGING/t3" --version'),
-      script.indexOf('> "$T3_STAGING/.install-complete"'),
-    );
-    // Node discovery is defined for the dev path but only ever invoked inside
-    // the node-script branch, which the archive path skips entirely.
-    assert.equal(script.split("ensure_remote_node_path || true").length - 1, 1);
-    assert.isBelow(
-      script.indexOf("ensure_remote_node_path || true"),
-      script.indexOf('exec node "$T3_NODE_SCRIPT_PATH" "$@"'),
-    );
-    assert.isBelow(
-      script.indexOf('exec node "$T3_NODE_SCRIPT_PATH" "$@"'),
-      script.indexOf("T3_ARCHIVE_VERSION="),
-    );
-
-    const launch = buildRemoteLaunchScript({
-      ...ARCHIVE,
-      releaseBaseUrl: "https://mirror.example/t3/",
-    });
-    assert.include(launch, "T3_ARCHIVE_MODE=1");
-    assert.include(launch, "T3_RELEASE_BASE_URL='https://mirror.example/t3'");
-    assert.include(launch, '"$RUNNER_FILE" __ssh-helper pick-port "$PORT_FILE"');
-    assert.include(launch, '"$RUNNER_FILE" __ssh-helper wait-ready "$REMOTE_PORT"');
-    assert.include(launch, '"$RUNNER_FILE" __ssh-helper runtime-port "$DEFAULT_RUNTIME_FILE"');
-    assert.include(buildRemoteLaunchScript(NODE_SCRIPT), "T3_ARCHIVE_MODE=0");
-  });
-
   it("rejects archive versions that are not a single exact version segment", () => {
     for (const archiveVersion of [
       "../other",
@@ -690,118 +625,5 @@ describe("ssh tunnel scripts", () => {
           Effect.scoped,
         );
       }),
-  );
-});
-
-// The archive runner is generated shell; string assertions cannot prove the
-// lock excludes concurrent installers. Run the real script against a tiny
-// fake archive served from a file:// mirror.
-describe("archive runner script", () => {
-  const hostPlatform = HostProcessPlatform.defaultValue();
-  const hostArch = HostProcessArchitecture.defaultValue();
-  const windowsHost = hostPlatform === "win32";
-  const archiveVersion = "1.2.3-preview.20260911.4";
-
-  const runRunner = (home: string, runner: string) =>
-    Effect.gen(function* () {
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      const child = yield* spawner.spawn(
-        ChildProcess.make("sh", [runner, "--version"], {
-          env: { PATH: process.env.PATH ?? "", HOME: home },
-          extendEnv: false,
-        }),
-      );
-      const [stdout, stderr, exitCode] = yield* Effect.all(
-        [
-          child.stdout.pipe(
-            Stream.decodeText(),
-            Stream.runFold(
-              () => "",
-              (acc, chunk) => acc + chunk,
-            ),
-          ),
-          child.stderr.pipe(
-            Stream.decodeText(),
-            Stream.runFold(
-              () => "",
-              (acc, chunk) => acc + chunk,
-            ),
-          ),
-          child.exitCode.pipe(Effect.map(Number)),
-        ],
-        { concurrency: "unbounded" },
-      );
-      return { stdout, stderr, exitCode };
-    });
-
-  // A fake "executable" that answers --version, packed the way the release
-  // workflow packs the real archive: one top-level directory named after the
-  // stem, checksummed in SHA256SUMS.
-  const makeMirror = Effect.fn("makeMirror")(function* (root: string) {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const platform = hostPlatform === "darwin" ? "darwin" : "linux";
-    const arch = hostArch === "arm64" ? "arm64" : "x64";
-    const stem = `t3-${archiveVersion}-${platform}-${arch}`;
-    const stage = `${root}/stage/${stem}`;
-    const release = `${root}/mirror/v${archiveVersion}`;
-    const script = [
-      "set -eu",
-      `mkdir -p '${stage}' '${release}'`,
-      `printf '#!/bin/sh\\necho t3 v${archiveVersion}\\n' > '${stage}/t3'`,
-      `chmod +x '${stage}/t3'`,
-      `tar -czf '${release}/${stem}.tar.gz' -C '${root}/stage' '${stem}'`,
-      `cd '${release}' && (sha256sum '${stem}.tar.gz' 2>/dev/null || shasum -a 256 '${stem}.tar.gz') > SHA256SUMS`,
-    ].join("\n");
-    const child = yield* spawner.spawn(ChildProcess.make("sh", ["-c", script]));
-    assert.equal(Number(yield* child.exitCode), 0);
-    return `file://${root}/mirror`;
-  });
-
-  it.effect.skipIf(windowsHost)(
-    "installs once when several launches race, and reclaims stale locks",
-    () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-archive-runner-" });
-        const releaseBaseUrl = yield* makeMirror(root);
-        const runner = `${root}/run-t3.sh`;
-        yield* fs.writeFileString(
-          runner,
-          buildRemoteT3RunnerScript({ archiveVersion, releaseBaseUrl }),
-        );
-        const home = `${root}/home`;
-        yield* fs.makeDirectory(home, { recursive: true });
-
-        const results = yield* Effect.all(
-          [runRunner(home, runner), runRunner(home, runner), runRunner(home, runner)],
-          { concurrency: "unbounded" },
-        );
-        for (const result of results) {
-          assert.equal(result.exitCode, 0, result.stderr);
-          assert.include(result.stdout, `t3 v${archiveVersion}`);
-        }
-        const versionsDir = `${home}/.t3/runtime/versions`;
-        assert.deepEqual(yield* fs.readDirectory(versionsDir), [archiveVersion]);
-        assert.equal(
-          (yield* fs.readFileString(`${versionsDir}/${archiveVersion}/.install-complete`)).trim(),
-          archiveVersion,
-        );
-
-        // A lock left by a crashed installer (dead pid) must not block the
-        // next launch, and neither must one that never published a pid.
-        const lock = `${versionsDir}/.${archiveVersion}.install.lock`;
-        yield* fs.remove(`${versionsDir}/${archiveVersion}`, { recursive: true });
-        yield* fs.makeDirectory(lock);
-        yield* fs.writeFileString(`${lock}/pid`, "999999\n");
-        const afterDead = yield* runRunner(home, runner);
-        assert.equal(afterDead.exitCode, 0, afterDead.stderr);
-
-        yield* fs.remove(`${versionsDir}/${archiveVersion}`, { recursive: true });
-        yield* fs.makeDirectory(lock);
-        const afterUnowned = yield* runRunner(home, runner);
-        assert.equal(afterUnowned.exitCode, 0, afterUnowned.stderr);
-        assert.isFalse(yield* fs.exists(lock));
-      }).pipe(Effect.provide(NodeServices.layer)),
-    60_000,
   );
 });

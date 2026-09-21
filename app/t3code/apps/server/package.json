@@ -1,20 +1,22 @@
 {
   "name": "t3",
   "version": "0.0.42",
+  "private": true,
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pingdotgg/t3code",
-    "directory": "apps/server"
+    "url": "https://github.com/kjg8619/Weavra",
+    "directory": "app/t3code/apps/server"
   },
   "bin": {
-    "t3": "./dist/bin.mjs"
+    "weavra-server": "./dist/bin.mjs"
   },
   "files": [
     "dist"
   ],
   "type": "module",
   "scripts": {
+    "prepublishOnly": "node scripts/cli.ts publish",
     "dev": "node --watch src/bin.ts",
     "build:bundle": "vp pack",
     "build:exe": "node scripts/cli.ts build-exe",

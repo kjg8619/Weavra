@@ -35,11 +35,11 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Hydrate reviewed model metadata
         run: npm run hydrate:model-data
-      - name: Build Pi packages
+      - name: Build Runtime packages
         run: npm run build
       - name: Prove immutable imports
         run: node ../../scripts/verify-imports.mjs
-      - name: Run Pi checks, lock gates and both test entrypoints
+      - name: Run Runtime identity, network, lock and full regression gates
         run: node ../../scripts/validate.mjs pi
       - name: Verify staged lock policy regression
         run: node --test scripts/check-lockfile-commit.test.mjs
@@ -91,7 +91,7 @@ jobs:
       - name: Install and build Runtime
         working-directory: runtime/pi
         run: npm ci --ignore-scripts && npm run hydrate:model-data && npm run build
-      - name: Install T3 production transport modules
+      - name: Install App production transport modules
         working-directory: app/t3code
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install fresh isolated browser tooling

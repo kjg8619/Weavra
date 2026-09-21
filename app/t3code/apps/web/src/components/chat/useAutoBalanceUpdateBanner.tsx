@@ -85,7 +85,7 @@ export function useAutoBalanceUpdateBanner(
   );
   const count = running || failed || machines.length;
   const status = running ? "running" : failed ? "failed" : "idle";
-  const prefix = running ? "Updating" : failed ? "Could not update" : "Update available for";
+  const prefix = running ? "Updating" : failed ? "Could not update" : "Build mismatch on";
   const title = `${prefix} ${count} ${count === 1 ? "machine" : "machines"}`;
   return {
     id: `auto-balance-server-updates-${dismissedNotices.size}`,
@@ -109,14 +109,14 @@ export function useAutoBalanceUpdateBanner(
                   <ServerUpdateProgress state={machine.state} />
                 ) : !machine.remoteUpdate ? (
                   <>
-                    <div className="text-muted-foreground">Manual update required</div>
+                    <div className="text-muted-foreground">Matching local builds required</div>
                     <ServerUpdateAction {...machine} />
                   </>
                 ) : (
                   <div className="text-muted-foreground">
                     {machine.connected
-                      ? `Ready to update to ${machine.targetVersion}`
-                      : "Reconnect this machine to update"}
+                      ? `Client build: ${machine.targetVersion}. Automatic updates are unavailable.`
+                      : "Reconnect this machine to inspect build compatibility"}
                   </div>
                 )}
               </div>
@@ -126,7 +126,7 @@ export function useAutoBalanceUpdateBanner(
       </Popover>
     ),
     description:
-      manual > 0 ? `${manual} ${manual === 1 ? "needs" : "need"} a manual update` : undefined,
+      manual > 0 ? "Use matching local builds. Automatic updates are unavailable." : undefined,
     actions:
       running === 0 && targets.length > 0 ? (
         <ServerUpdatesAction

@@ -62,7 +62,7 @@ export class SqliteStateSharedHomeMutationError extends Schema.TaggedError<Sqlit
   {},
 ) {
   override get message(): string {
-    return "Refusing to mutate the shared ~/.t3 database. Use an isolated --base-dir.";
+    return "Refusing to mutate the shared ~/.weavra/app database. Use an isolated --base-dir.";
   }
 }
 
@@ -181,7 +181,23 @@ export const runSqliteState = Effect.fn("runSqliteState")(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const baseDir = path.resolve(input.baseDir);
-  const sharedHome = path.resolve(options.sharedHome ?? path.join(NodeOS.homedir(), ".t3"));
+  const rawProductHome = process.env.WEAVRA_HOME?.trim();
+  const expandHome = (value: string) =>
+    value === "~"
+      ? NodeOS.homedir()
+      : value.startsWith("~/")
+        ? path.join(NodeOS.homedir(), value.slice(2))
+        : value;
+  const sharedHome = path.resolve(
+    expandHome(
+      options.sharedHome ??
+        (process.env.WEAVRA_APP_HOME?.trim() ||
+          process.env.T3CODE_HOME?.trim() ||
+          (rawProductHome
+            ? path.join(expandHome(rawProductHome), "app")
+            : path.join(NodeOS.homedir(), ".weavra", "app"))),
+    ),
+  );
   const databasePath = path.join(baseDir, "userdata", "state.sqlite");
   const source = yield* resolveSqlSource(input.sql, input.file);
 

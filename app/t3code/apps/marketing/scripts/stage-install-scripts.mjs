@@ -1,7 +1,6 @@
-// The CLI install scripts live in scripts/ at the repo root with the rest of
-// the release tooling; the site serves them at /install.sh and /install.ps1.
-// Copy them into public/ before every Astro build and dev server so the two
-// never drift. The copies are gitignored.
+// Serve the canonical unavailable-installer responses from scripts/.
+// Weavra has no hosted installer source. Build/dev must copy both files so a
+// stale inherited downloader can never survive in the marketing output.
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";

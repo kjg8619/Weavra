@@ -12,7 +12,7 @@ async function check(t, manifest, source, extraFiles = {}) {
 	const root = await mkdtemp(join(tmpdir(), "pi-runtime-deps-"));
 	t.after(() => rm(root, { recursive: true, force: true }));
 	const files = {
-		"packages/example/package.json": JSON.stringify({ name: "example", version: "1.0.0", ...manifest }),
+		"packages/example/package.json": JSON.stringify({ name: "example", version: "1.0.0", main: "dist/index.js", scripts: { build: "tsc" }, ...manifest }),
 		"packages/example/src/index.ts": source,
 		...extraFiles,
 	};
@@ -99,11 +99,17 @@ for (const statement of ['export * from "./experimental/server";', 'import type 
 	});
 }
 
-test("ignores tests, declarations, and private packages", async (t) => {
+test("checks private runtime artifacts instead of treating publication privacy as a validation exemption", async (t) => {
+	const result = await check(t, { private: true }, 'import "undeclared-runtime";');
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /undeclared-runtime is not declared/);
+});
+
+test("ignores tests, declarations, and source-only packages without library entrypoints", async (t) => {
 	const result = await check(t, {}, "", {
 		"packages/example/test/test.ts": 'import "test-only";',
 		"packages/example/src/index.d.ts": 'import "declaration-only";',
-		"packages/private/package.json": JSON.stringify({ name: "private", private: true }),
+		"packages/private/package.json": JSON.stringify({ name: "private", private: true, scripts: { build: "tsc --noEmit" } }),
 		"packages/private/src/index.ts": 'import "private-only";',
 	});
 	assert.equal(result.status, 0, result.stderr);

@@ -53,7 +53,7 @@ import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { cn } from "../../lib/utils";
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
 import { formatElapsedDurationLabel, formatExpiresInLabel } from "../../timestampFormat";
-import { resolveDesktopPairingUrl, resolveHostedPairingUrl } from "./pairingUrls";
+import { resolveDesktopPairingUrl } from "./pairingUrls";
 import {
   applyWslEnableSelection,
   isQrShareableEndpoint,
@@ -539,10 +539,7 @@ function resolveAdvertisedEndpointPairingUrl(
   credential: string,
 ): string {
   if (endpoint.compatibility.hostedHttpsApp === "compatible") {
-    return (
-      resolveHostedPairingUrl(endpoint.httpBaseUrl, credential) ??
-      resolveDesktopPairingUrl(endpoint.httpBaseUrl, credential)
-    );
+    return resolveDesktopPairingUrl(endpoint.httpBaseUrl, credential);
   }
   return resolveDesktopPairingUrl(endpoint.httpBaseUrl, credential);
 }
@@ -614,13 +611,6 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
     () => (credential ? resolveCurrentOriginPairingUrl(credential) : null),
     [credential],
   );
-  const hostedPairingUrl = useMemo(
-    () =>
-      credential && endpointUrl != null && endpointUrl !== ""
-        ? resolveHostedPairingUrl(endpointUrl, credential)
-        : null,
-    [endpointUrl, credential],
-  );
   const endpointPairingUrl = useMemo(() => {
     const endpoint = selectPairingEndpoint(endpoints, defaultEndpointKey);
     return endpoint && credential
@@ -656,7 +646,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
   const shareablePairingUrl =
     endpointPairingUrl ??
     (credential && endpointUrl != null && endpointUrl !== ""
-      ? (hostedPairingUrl ?? resolveDesktopPairingUrl(endpointUrl, credential))
+      ? resolveDesktopPairingUrl(endpointUrl, credential)
       : isLoopbackHostname(window.location.hostname)
         ? null
         : currentOriginPairingUrl);
@@ -1580,7 +1570,7 @@ function SavedBackendListRow({
                 ? connectionStatusText(environment.connection)
                 : "Switched off"}
             {versionMismatch
-              ? `\nUpdate available: ${versionMismatch.serverVersion} → ${versionMismatch.clientVersion}`
+              ? `\nBuild mismatch: ${versionMismatch.serverVersion} → ${versionMismatch.clientVersion}`
               : ""}
           </TooltipPopup>
         </Tooltip>
@@ -1885,7 +1875,7 @@ export function ConnectionsSettings() {
           !environment.entry.enabled ||
           environment.connection.phase !== "connected" ||
           isDesktopLocalConnectionTarget(environment.entry.target) ||
-          // Manual-update machines only offer a copy command on their row.
+          // No remote update capability is offered for this machine.
           selfUpdate === null ||
           (selfUpdate === "desktop-managed" && !desktopAppUpdate)
         ) {
@@ -3136,7 +3126,7 @@ export function ConnectionsSettings() {
         {desktopWslState.enabled ? (
           <SettingsRow
             title="WSL only"
-            description="Run only the WSL backend. T3 Code restarts when this changes."
+            description="Run only the WSL backend. Weavra restarts when this changes."
             className="bg-muted/20 pl-7 sm:pl-8"
             control={
               <Switch
@@ -3350,7 +3340,7 @@ export function ConnectionsSettings() {
                       }
                     />
                   ) : primaryServerUpdateState.status === "idle" && primaryServerConfig ? (
-                    <span className="text-xs text-muted-foreground">Up to date</span>
+                    <span className="text-xs text-muted-foreground">Updates unavailable</span>
                   ) : undefined
                 }
               />
@@ -3417,8 +3407,8 @@ export function ConnectionsSettings() {
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                   {pendingDesktopServerExposureMode === "network-accessible"
-                    ? "T3 Code will restart to expose this environment over the network."
-                    : "T3 Code will restart and limit this environment back to this machine."}
+                    ? "Weavra will restart to expose this environment over the network."
+                    : "Weavra will restart and limit this environment back to this machine."}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -3476,15 +3466,15 @@ export function ConnectionsSettings() {
                 <AlertDialogDescription>
                   {pendingWslChange?.kind === "disable"
                     ? pendingWslChange.wasWslOnly
-                      ? "T3 Code will restart on the Windows backend. Threads and projects opened against WSL stay safe inside the distro and become available again when you re-enable WSL."
-                      : "The WSL backend will stop. Threads and projects opened against WSL stay safe inside the distro, but they'll be unavailable in T3 Code until you re-enable WSL."
+                      ? "Weavra will restart on the Windows backend. Threads and projects opened against WSL stay safe inside the distro and become available again when you re-enable WSL."
+                      : "The WSL backend will stop. Threads and projects opened against WSL stay safe inside the distro, but they'll be unavailable in Weavra until you re-enable WSL."
                     : pendingWslChange?.kind === "distro"
-                      ? "T3 Code will restart the WSL backend on the new distro. Sessions still running on the current distro will be interrupted."
+                      ? "Weavra will restart the WSL backend on the new distro. Sessions still running on the current distro will be interrupted."
                       : pendingWslChange?.kind === "enable"
                         ? "Run the WSL backend alongside the Windows one, or stop the Windows backend and use only WSL? You can change this later from Settings."
                         : pendingWslChange?.nextValue
-                          ? "T3 Code will restart and start only the WSL backend. Your Windows-side projects won't be accessible until you turn this off again."
-                          : "T3 Code will restart and bring the Windows backend back up alongside WSL."}
+                          ? "Weavra will restart and start only the WSL backend. Your Windows-side projects won't be accessible until you turn this off again."
+                          : "Weavra will restart and bring the Windows backend back up alongside WSL."}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -3570,7 +3560,7 @@ export function ConnectionsSettings() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Disable Tailscale HTTPS?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  T3 Code will restart the local backend without Tailscale Serve.
+                  Weavra will restart the local backend without Tailscale Serve.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -3608,7 +3598,7 @@ export function ConnectionsSettings() {
               <DialogHeader>
                 <DialogTitle>Set up Tailscale HTTPS?</DialogTitle>
                 <DialogDescription>
-                  T3 Code will restart the local backend with Tailscale Serve enabled and ask
+                  Weavra will restart the local backend with Tailscale Serve enabled and ask
                   Tailscale to proxy HTTPS traffic to this backend.
                 </DialogDescription>
               </DialogHeader>

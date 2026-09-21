@@ -1,5 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { assert, expect, it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
 import * as NetService from "@t3tools/shared/Net";
 import * as ConfigProvider from "effect/ConfigProvider";
@@ -13,7 +13,6 @@ import { afterEach, vi } from "vite-plus/test";
 import packageJson from "../../package.json" with { type: "json" };
 import * as BootService from "../cloud/bootService.ts";
 import {
-  formatServiceStatus,
   offerServiceDuringOnboarding,
   reconcileService,
   recoverServiceOnboardingOffer,
@@ -29,71 +28,6 @@ const status = {
   unitPath: "/home/me/.config/systemd/user/t3code.service",
   logPath: "/home/me/.t3/userdata/logs/boot-service.log",
 } as const;
-
-it("reports the installed service version and host paths", () => {
-  assert.equal(
-    formatServiceStatus(status, "0.0.29"),
-    [
-      "T3 Code service",
-      "  Status: installed · t3@0.0.29",
-      "  Unit: /home/me/.config/systemd/user/t3code.service",
-      "  Logs: /home/me/.t3/userdata/logs/boot-service.log",
-    ].join("\n"),
-  );
-});
-
-it("gives a direct repair command for a stale service", () => {
-  assert.include(
-    formatServiceStatus({ ...status, current: false }, "0.0.29"),
-    "Next: Run `t3 service install` to repair it.",
-  );
-});
-
-it("explains an incomplete nightly installation and keeps repair on its installed version", () => {
-  const output = formatServiceStatus(
-    {
-      ...status,
-      current: false,
-      installedVersion: "0.0.32-nightly.1",
-      problems: ["linger-disabled", "service-stopped"],
-    },
-    "0.0.32-nightly.1",
-  );
-
-  expect(output).toContain("[linger-disabled]");
-  expect(output).toContain("last login session ends");
-  expect(output).toContain('sudo loginctl enable-linger "$(id -un)"');
-  expect(output).toContain("[service-stopped]");
-  expect(output).toContain("Run `t3 service install` to repair it.");
-  expect(output).not.toContain("npx");
-});
-
-it("points an older service at a repair, never at npx", () => {
-  const output = formatServiceStatus(
-    { ...status, current: false, installedVersion: "0.0.28" },
-    "0.0.29",
-  );
-  expect(output).toContain("Run `t3 service install` to repair it.");
-  expect(output).not.toContain("npx");
-});
-
-it("explains where the service is supported", () => {
-  assert.include(
-    formatServiceStatus({ ...status, supported: false, installed: false }, "0.0.29"),
-    "Supported on: Linux with systemd, macOS with launchd",
-  );
-});
-
-it("reports a newer installed service and tells the CLI to catch up to it", () => {
-  const output = formatServiceStatus(
-    { ...status, current: false, installedVersion: "0.0.32-nightly.1" },
-    "0.0.31",
-  );
-
-  assert.include(output, "t3@0.0.32-nightly.1 (newer than this t3@0.0.31 CLI)");
-  assert.include(output, "Run `t3 update 0.0.32-nightly.1` to match it");
-  assert.notInclude(output, "npx");
-});
 
 const newerServiceStatus = { ...status, current: false, installedVersion: "999.0.0" };
 

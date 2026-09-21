@@ -8,7 +8,7 @@ import {
 	type RefreshModelsContext,
 } from "@earendil-works/pi-ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VERSION } from "../src/config.ts";
+import { PRODUCT_VERSION } from "../src/config.ts";
 import { withRemoteCatalog } from "../src/core/remote-catalog-provider.ts";
 
 const neverAbortedSignal = new AbortController().signal;
@@ -43,7 +43,7 @@ function testProvider(localGeneratedAt?: number) {
 				},
 			},
 		}),
-		"https://pi.dev",
+		"https://catalog.example.test",
 		localGeneratedAt,
 	);
 }
@@ -90,7 +90,7 @@ describe("remote catalog provider", () => {
 		expect((await store.read(provider.id))?.models.map((entry) => entry.id)).toEqual(["dynamic"]);
 		expect(fetchSpy).toHaveBeenCalledTimes(2);
 		expect(fetchSpy.mock.calls[0]?.[1]?.headers).toMatchObject({
-			"User-Agent": expect.stringContaining(`pi/${VERSION}`),
+			"User-Agent": expect.stringContaining(`weavra/${PRODUCT_VERSION}`),
 		});
 	});
 
@@ -229,7 +229,7 @@ describe("remote catalog provider", () => {
 		expect((await store.read(provider.id))?.models.map((entry) => entry.id)).toEqual(["newer"]);
 	});
 
-	it("treats unimplemented pi.dev catalog routes as an unavailable overlay", async () => {
+	it("treats unimplemented explicit catalog routes as an unavailable overlay", async () => {
 		vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("not implemented", { status: 501 }));
 		const provider = testProvider();
 		const store = new InMemoryModelsStore();
@@ -237,5 +237,34 @@ describe("remote catalog provider", () => {
 		await expect(refreshProvider(provider, store)).resolves.toBeUndefined();
 		expect(provider.getModels().map((entry) => entry.id)).toEqual(["static"]);
 		expect(await store.read(provider.id)).toMatchObject({ models: [], checkedAt: expect.any(Number) });
+	});
+
+	it("rejects unscoped and foreign-source cached overlays and validators", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response(JSON.stringify({ fresh: model("fresh") }), {
+				headers: { "content-type": "application/json" },
+			}),
+		);
+		const store = new InMemoryModelsStore();
+		const provider = testProvider();
+		await store.write(provider.id, {
+			models: [model("legacy")],
+			etag: '"legacy"',
+			checkedAt: Date.now(),
+			lastModified: Date.now(),
+		});
+		await refreshProvider(provider, store, { allowNetwork: false });
+		expect(provider.getModels().map((entry) => entry.id)).toEqual(["static"]);
+		await store.write(provider.id, {
+			models: [model("foreign")],
+			source: "https://old.example.test/api/models/providers/test-provider",
+			etag: '"foreign"',
+			checkedAt: Date.now(),
+			lastModified: Date.now(),
+		});
+		await refreshProvider(provider, store);
+		expect(fetchSpy).toHaveBeenCalledOnce();
+		expect(fetchSpy.mock.calls[0]?.[1]?.headers).not.toHaveProperty("if-none-match");
+		expect(provider.getModels().map((entry) => entry.id)).toEqual(["static", "fresh"]);
 	});
 });

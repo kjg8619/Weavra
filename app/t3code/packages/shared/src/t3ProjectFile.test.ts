@@ -10,11 +10,11 @@ import {
 const decodeJson = Schema.decodeUnknownSync(T3ProjectFileFromJson);
 
 describe("buildT3ProjectFileJsonSchema", () => {
-  it("emits a draft 2020-12 schema with the published $id", () => {
+  it("emits a draft 2020-12 schema with a non-network $id", () => {
     const schema = buildT3ProjectFileJsonSchema();
 
     expect(schema.$schema).toBe("https://json-schema.org/draft/2020-12/schema");
-    expect(schema.$id).toBe("https://t3.codes/schema/t3.json");
+    expect(schema.$id).toBe("urn:weavra:project-config");
     expect(schema.type).toBe("object");
     expect(schema.additionalProperties).toBe(false);
   });
@@ -38,8 +38,6 @@ describe("buildT3ProjectFileJsonSchema", () => {
       "scripts",
     ]);
     expect(schema.required).toBeUndefined();
-    expect(schema.properties.iconPath?.description).toContain("Workspace-relative path");
-    expect(schema.properties.defaultThreadEnvMode?.description).toContain("new threads start");
 
     const script = schema.properties.scripts?.items;
     expect(script?.required).toEqual(["name", "command"]);

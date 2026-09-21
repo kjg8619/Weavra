@@ -51,13 +51,11 @@ import {
   resolveFffNativeDependencies,
   resolveBuildOptions,
   resolveDesktopBuildIconAssets,
-  resolveDesktopProductName,
   resolveDesktopUpdateChannel,
   resolveDesktopWebAssetBrand,
   resolveResourceMonitorRustTargets,
   resolveWindowsServerAsarIgnoreGlobs,
   resourceMonitorExecutableName,
-  resolveGitHubPublishConfig,
   resolveMockUpdateServerPort,
   resolveMockUpdateServerUrl,
   resolvePackageManagerUserAgent,
@@ -108,7 +106,7 @@ const makeLinuxCliArchiveFixture = Effect.fn("test.makeLinuxCliArchiveFixture")(
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const contentRoot = path.join(input.root, "content");
   const members = [
-    `${input.stem}/t3`,
+    `${input.stem}/weavra-server`,
     `${input.stem}/client/index.html`,
     `${input.stem}/node_modules/node-pty/package.json`,
     `${input.stem}/node_modules/node-pty/build/Release/pty.node`,
@@ -207,7 +205,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
     path.join(resourcesDir, "resource-monitor/t3-resource-monitor.exe"),
     "monitor",
   );
-  const appExecutableName = "t3code.exe";
+  const appExecutableName = "weavra-desktop.exe";
   yield* fs.writeFileString(path.join(packagedAppDir, appExecutableName), "electron");
   yield* fs.writeFileString(path.join(packagedAppDir, "chrome_crashpad_handler.exe"), "crashpad");
 
@@ -220,7 +218,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
           yield* makeLinuxCliArchiveFixture({
             root: path.join(tempDir, "wsl-runtime"),
             stem: "apps",
-            omitMembers: ["apps/t3", "apps/client/index.html"],
+            omitMembers: ["apps/weavra-server", "apps/client/index.html"],
             extraMembers: ["apps/server/dist/bin.mjs", "node_modules/node-pty/package.json"],
           })
         : yield* makeLinuxCliArchiveFixture({
@@ -253,11 +251,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.equal(resolveDesktopUpdateChannel("0.0.17"), "latest");
   });
 
-  it("switches desktop packaging product names to nightly for nightly builds", () => {
-    assert.equal(resolveDesktopProductName("0.0.17"), "T3 Code (Alpha)");
-    assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42"), "T3 Code (Nightly)");
-  });
-
   it("switches desktop packaging icons to the nightly artwork for nightly versions", () => {
     assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.17"), {
       macIconPng: BRAND_ASSET_PATHS.productionMacIconPng,
@@ -277,92 +270,30 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.equal(resolveDesktopWebAssetBrand("0.0.17-nightly.20260413.42"), "nightly");
   });
 
-  it.effect("resolves GitHub desktop publish config from Effect config", () =>
+  it.effect("never packages an updater feed even with inherited release and mock flags", () =>
     Effect.gen(function* () {
-      const latestConfig = yield* resolveGitHubPublishConfig("latest").pipe(
-        Effect.provide(
-          ConfigProvider.layer(
-            ConfigProvider.fromEnv({
-              env: {
-                T3CODE_DESKTOP_UPDATE_REPOSITORY: "pingdotgg/t3code",
-              },
-            }),
-          ),
-        ),
-      );
-      const nightlyConfig = yield* resolveGitHubPublishConfig("nightly").pipe(
-        Effect.provide(
-          ConfigProvider.layer(
-            ConfigProvider.fromEnv({
-              env: {
-                GITHUB_REPOSITORY: "pingdotgg/t3code",
-              },
-            }),
-          ),
-        ),
-      );
-
-      assert.deepStrictEqual(latestConfig, {
-        provider: "github",
-        owner: "pingdotgg",
-        repo: "t3code",
-        releaseType: "release",
-      });
-      assert.deepStrictEqual(nightlyConfig, {
-        provider: "github",
-        owner: "pingdotgg",
-        repo: "t3code",
-        releaseType: "prerelease",
-        channel: "nightly",
-      });
-    }),
-  );
-
-  it.effect("omits update feeds for pull request preview builds", () =>
-    Effect.gen(function* () {
-      const preview = yield* createBuildConfig(
-        "mac",
-        "dmg",
-        "0.0.33-pr.8182.1",
-        false,
-        false,
-        undefined,
-        undefined,
-      );
-      const release = yield* createBuildConfig(
-        "mac",
-        "dmg",
-        "0.0.33",
-        false,
-        false,
-        undefined,
-        undefined,
-      );
-
-      const previewChannel = yield* createBuildConfig(
-        "mac",
-        "dmg",
-        "0.0.41-preview.20260912.1589",
-        false,
-        false,
-        undefined,
-        undefined,
-      );
-
-      assert.notProperty(preview, "publish");
-      assert.notProperty(previewChannel, "publish");
-      assert.deepStrictEqual(release.publish, [
-        {
-          provider: "github",
-          owner: "pingdotgg",
-          repo: "t3code",
-          releaseType: "release",
-        },
-      ]);
+      for (const version of ["1.2.3", "1.2.3-nightly.20260921.1", "1.2.3-preview.20260921.1"]) {
+        const config = yield* createBuildConfig(
+          "mac",
+          "dmg",
+          version,
+          false,
+          true,
+          8123,
+          undefined,
+        );
+        assert.notProperty(config, "publish");
+      }
     }).pipe(
       Effect.provide(
         ConfigProvider.layer(
-          ConfigProvider.fromEnv({ env: { GITHUB_REPOSITORY: "pingdotgg/t3code" } }),
+          ConfigProvider.fromEnv({
+            env: {
+              GITHUB_REPOSITORY: "pingdotgg/t3code",
+              T3CODE_DESKTOP_UPDATE_REPOSITORY: "pingdotgg/t3code",
+              T3CODE_DESKTOP_MOCK_UPDATES: "1",
+            },
+          }),
         ),
       ),
     ),
@@ -657,8 +588,8 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         "**/node_modules/.bin/**",
         "**/*.map",
       ]);
-      assert.deepStrictEqual(mac.dmg, {
-        title: "T3 Code (Alpha) 1.2.3 Installer",
+      const { title: _title, ...dmgLayout } = mac.dmg as Record<string, unknown>;
+      assert.deepStrictEqual(dmgLayout, {
         background: "dmg/dmg-background-latest.png",
         window: { width: 640, height: 432 },
         contents: [
@@ -669,9 +600,9 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         iconTextSize: 12,
       });
       // Linux must register the renderer schemes so the generated .desktop
-      // entry advertises MimeType=x-scheme-handler/t3code; for OAuth deep links.
+      // entry advertises MimeType=x-scheme-handler/weavra; for OAuth deep links.
       assert.deepStrictEqual((linux.linux as Record<string, unknown>).protocols, [
-        { name: "T3 Code", schemes: ["t3code", "t3code-dev"] },
+        { name: "Weavra", schemes: ["weavra", "weavra-dev"] },
       ]);
       assert.deepStrictEqual(mac.files, [...DESKTOP_FILE_EXCLUSIONS, ...MAC_FILE_EXCLUSIONS]);
       assert.deepStrictEqual(linux.files, [...DESKTOP_FILE_EXCLUSIONS, ...LINUX_FILE_EXCLUSIONS]);
@@ -1149,7 +1080,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
-  // The fixture's t3code.exe is a text placeholder, not an executable. These
+  // The fixture's weavra-desktop.exe is a text placeholder, not an executable. These
   // cases reach the native-load probe, so pin only that host-platform check to
   // Linux. Host-native paths and the real Windows tar/archive checks still run.
   it.effect("validates every ASAR-unpacked native in the packaged Windows payload", () =>
@@ -1754,7 +1685,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     });
 
     assert.deepStrictEqual(configuration, {
-      appId: "com.t3tools.t3code",
+      appId: "io.weavra.desktop",
       teamId: "ABC1234567",
       rpDomains: ["example.clerk.accounts.dev"],
       provisioningProfilePath: "/tmp/t3code.provisionprofile",
@@ -1774,7 +1705,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       "clerk.example.com",
       "example.clerk.accounts.dev",
     ]);
-    assert.include(entitlements, "<string>ABC1234567.com.t3tools.t3code</string>");
+    assert.include(entitlements, "<string>ABC1234567.io.weavra.desktop</string>");
     assert.include(entitlements, "<string>webcredentials:clerk.example.com</string>");
     assert.include(entitlements, "<string>webcredentials:example.clerk.accounts.dev</string>");
     assert.include(entitlements, "<key>com.apple.security.cs.allow-jit</key>");
@@ -1869,12 +1800,12 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       });
 
       const mac = config.mac as Record<string, unknown>;
-      assert.equal(config.appId, "com.t3tools.t3code");
+      assert.equal(config.appId, "io.weavra.desktop");
       assert.equal(mac.entitlements, "/tmp/entitlements.mac.plist");
       assert.equal(mac.provisioningProfile, "/tmp/t3code.provisionprofile");
       assert.match(String(mac.sign), /[\\/]scripts[\\/]sign-macos\.ts$/);
       assert.deepStrictEqual(mac.protocols, [
-        { name: "T3 Code", schemes: ["t3code", "t3code-dev"] },
+        { name: "Weavra", schemes: ["weavra", "weavra-dev"] },
       ]);
     }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
   );
@@ -1951,18 +1882,20 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     });
     // Both the staging and the packaging config hang off this one decision:
     // Windows only, and only when CI handed the build a Linux CLI archive.
-    const runtimeArchivePath = "/tmp/t3-1.2.3-linux-x64.tar.gz";
+    const runtimeArchivePath = "/tmp/weavra-server-1.2.3-linux-x64.tar.gz";
     assert.isTrue(bundlesWslRuntime({ platform: "win", runtimeArchivePath }));
     assert.isFalse(bundlesWslRuntime({ platform: "win", runtimeArchivePath: undefined }));
     assert.isFalse(bundlesWslRuntime({ platform: "linux", runtimeArchivePath }));
     assert.isFalse(bundlesWslRuntime({ platform: "mac", runtimeArchivePath }));
-    assert.equal(wslRuntimeArchiveStem("1.2.3", "x64"), "t3-1.2.3-linux-x64");
+    assert.equal(wslRuntimeArchiveStem("1.2.3", "x64"), "weavra-server-1.2.3-linux-x64");
   });
 
   it("parses Windows bsdtar member listings with CRLF line endings", () => {
     assert.deepStrictEqual(
-      parseWslRuntimeArchiveMembers("./t3-1.2.3-linux-x64/t3\r\nt3-1.2.3-linux-x64/client/\r\n"),
-      ["t3-1.2.3-linux-x64/t3", "t3-1.2.3-linux-x64/client"],
+      parseWslRuntimeArchiveMembers(
+        "./weavra-server-1.2.3-linux-x64/weavra-server\r\nweavra-server-1.2.3-linux-x64/client/\r\n",
+      ),
+      ["weavra-server-1.2.3-linux-x64/weavra-server", "weavra-server-1.2.3-linux-x64/client"],
     );
   });
 
@@ -1974,7 +1907,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-wsl-runtime-stage-" });
         const sourceArchivePath = yield* makeLinuxCliArchiveFixture({
           root,
-          stem: "t3-1.2.3-linux-x64",
+          stem: "weavra-server-1.2.3-linux-x64",
         });
         const stageAppDir = path.join(root, "app");
         const archivePath = path.join(stageAppDir, WSL_RUNTIME_ARCHIVE_EXTRA_RESOURCE.from);

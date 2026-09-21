@@ -4,6 +4,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import type * as ServerSecretStore from "../auth/ServerSecretStore.ts";
+import { hasCloudPublicConfig } from "./publicConfig.ts";
 
 export const CLOUD_MINT_PUBLIC_KEY = "cloud-mint-ed25519-public-key";
 export const CLOUD_ENDPOINT_RUNTIME_CONFIG = "cloud-endpoint-runtime-config";
@@ -12,10 +13,6 @@ export const RELAY_URL_SECRET = "cloud-relay-url";
 export const RELAY_ISSUER_SECRET = "cloud-relay-issuer";
 export const RELAY_ENVIRONMENT_CREDENTIAL_SECRET = "cloud-relay-environment-credential";
 export const PUBLISH_AGENT_ACTIVITY_SECRET = "cloud-publish-agent-activity";
-
-export const encodeEndpointRuntimeConfigJson = Schema.encodeEffect(
-  Schema.fromJsonString(RelayManagedEndpointRuntimeConfig),
-);
 
 export const decodeRuntimeConfig = Schema.decodeUnknownOption(
   Schema.fromJsonString(RelayManagedEndpointRuntimeConfig),
@@ -33,6 +30,7 @@ export const readAgentActivityPublishingActive = (
   secrets: ServerSecretStore.ServerSecretStore["Service"],
 ): Effect.Effect<boolean> =>
   Effect.gen(function* () {
+    if (!hasCloudPublicConfig) return false;
     const readSecretString = (name: string) =>
       secrets
         .get(name)

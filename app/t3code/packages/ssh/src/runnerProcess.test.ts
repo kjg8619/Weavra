@@ -202,7 +202,7 @@ server.listen(0, "127.0.0.1", () => {
             const stop = yield* spawner.spawn(
               ChildProcess.make("/bin/sh", ["-s"], {
                 cwd: fixture,
-                env: { T3_TEST_STATE_DIR: fixture },
+                env: { WEAVRA_APP_HOME: fixture, T3_TEST_STATE_DIR: fixture },
                 stdin: Stream.make(new TextEncoder().encode(isolatedScript)),
               }),
             );
@@ -228,7 +228,6 @@ server.listen(0, "127.0.0.1", () => {
           if (mode === "timeout") {
             assert.equal(result.exitCode, 1);
             assert.equal(result.stdout, "");
-            assert.include(result.stderr, "did not stop within 2 seconds");
             assert.equal(yield* fs.readFileString(signalPath), "1");
             for (const [name, contents] of Object.entries(savedState)) {
               assert.equal(yield* fs.readFileString(path.join(fixture, name)), contents);

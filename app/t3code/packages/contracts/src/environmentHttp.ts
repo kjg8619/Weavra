@@ -560,7 +560,7 @@ class EnvironmentConnectHttpApi extends HttpApiGroup.make("connect")
       headers: OptionalBearerHeaders,
       payload: RelayLinkProofRequest,
       success: RelayEnvironmentLinkProof,
-      error: EnvironmentHttpCloudErrors,
+      error: [...EnvironmentHttpCloudErrors, EnvironmentCloudEndpointUnavailableError],
     }).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(
@@ -597,21 +597,21 @@ class EnvironmentConnectHttpApi extends HttpApiGroup.make("connect")
     HttpApiEndpoint.post("health", "/api/t3-connect/health", {
       payload: RelayCloudEnvironmentHealthRequest,
       success: RelayEnvironmentHealthResponse,
-      error: EnvironmentHttpCloudErrors,
+      error: [...EnvironmentHttpCloudErrors, EnvironmentCloudEndpointUnavailableError],
     }),
   )
   .add(
     HttpApiEndpoint.post("mintCredential", "/api/connect/mint-credential", {
       payload: RelayCloudMintCredentialRequest,
       success: RelayEnvironmentMintResponse,
-      error: EnvironmentHttpCloudErrors,
+      error: [...EnvironmentHttpCloudErrors, EnvironmentCloudEndpointUnavailableError],
     }),
   )
   .add(
     HttpApiEndpoint.post("t3MintCredential", "/api/t3-connect/mint-credential", {
       payload: RelayCloudMintCredentialRequest,
       success: RelayEnvironmentMintResponse,
-      error: EnvironmentHttpCloudErrors,
+      error: [...EnvironmentHttpCloudErrors, EnvironmentCloudEndpointUnavailableError],
     }),
   ) {}
 

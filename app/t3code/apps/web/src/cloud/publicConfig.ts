@@ -1,15 +1,12 @@
 import { relayClerkTokenOptions } from "@t3tools/shared/relayAuth";
-import { normalizeSecureRelayUrl } from "@t3tools/shared/relayUrl";
 import * as Schema from "effect/Schema";
 
 export class CloudPublicConfigMissingError extends Schema.TaggedError<CloudPublicConfigMissingError>()(
   "CloudPublicConfigMissingError",
-  {
-    key: Schema.Literal("T3CODE_CLERK_JWT_TEMPLATE"),
-  },
+  { key: Schema.Literal("T3CODE_CLERK_JWT_TEMPLATE") },
 ) {
   override get message(): string {
-    return `${this.key} is not configured.`;
+    return "Hosted account access is unavailable in Weavra.";
   }
 }
 
@@ -28,33 +25,14 @@ export function trimNonEmpty(value: string | undefined): string | null {
   return value?.trim() || null;
 }
 
-function normalizeSecureUrl(value: string): string | null {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" ? url.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
 export function resolveCloudPublicConfig(): CloudPublicConfig {
+  // Legacy build variables cannot activate inherited accounts or telemetry.
+  // Local, direct, SSH, and Tailscale connections do not use this service.
   return {
-    clerkPublishableKey: trimNonEmpty(
-      import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined,
-    ),
-    clerkJwtTemplate: trimNonEmpty(import.meta.env.VITE_CLERK_JWT_TEMPLATE as string | undefined),
-    relayUrl: normalizeSecureRelayUrl(
-      (import.meta.env.VITE_T3CODE_RELAY_URL as string | undefined) ?? "",
-    ),
-    relayTracing: {
-      tracesUrl: normalizeSecureUrl(
-        (import.meta.env.VITE_RELAY_OTLP_TRACES_URL as string | undefined) ?? "",
-      ),
-      tracesDataset: trimNonEmpty(
-        import.meta.env.VITE_RELAY_OTLP_TRACES_DATASET as string | undefined,
-      ),
-      tracesToken: trimNonEmpty(import.meta.env.VITE_RELAY_OTLP_TRACES_TOKEN as string | undefined),
-    },
+    clerkPublishableKey: null,
+    clerkJwtTemplate: null,
+    relayUrl: null,
+    relayTracing: { tracesUrl: null, tracesDataset: null, tracesToken: null },
   };
 }
 

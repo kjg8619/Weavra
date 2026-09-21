@@ -44,6 +44,7 @@ const commands = scope === "pi" ? [
   ["npm", "run", "check:ci"],
   ["npm", "run", "check:shrinkwrap"],
   ["npm", "run", "check:install-lock:coding-agent"],
+  ["node", "--test", "../../scripts/product-independence.test.mjs"],
   ["npm", "test"],
   ["bash", "./test.sh"],
   ["bash", "-n", "packages/company-runtime/bin/weavra"],

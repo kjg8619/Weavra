@@ -6,6 +6,8 @@ import {
   readPathFromLaunchctl,
   resolveWindowsEnvironment,
 } from "@t3tools/shared/shell";
+import * as Config from "effect/Config";
+import * as Option from "effect/Option";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -102,10 +104,27 @@ export const expandHomePath = Effect.fn(function* (input: string) {
   return input;
 });
 
+/** Explicit legacy configuration is supported; legacy default directories are not. */
+export const appHomeConfig = Config.all({
+  canonical: Config.String("WEAVRA_APP_HOME").pipe(Config.option),
+  compatibility: Config.String("T3CODE_HOME").pipe(Config.option),
+}).pipe(
+  Config.map(({ canonical, compatibility }) =>
+    Option.getOrUndefined(
+      Option.orElse(
+        Option.filter(canonical, (value) => value.trim().length > 0),
+        () => Option.filter(compatibility, (value) => value.trim().length > 0),
+      ),
+    ),
+  ),
+);
+
 export const resolveBaseDir = Effect.fn(function* (raw: string | undefined) {
   const { join, resolve } = yield* Path.Path;
-  if (!raw || raw.trim().length === 0) {
-    return join(NodeOS.homedir(), ".t3");
-  }
-  return resolve(yield* expandHomePath(raw.trim()));
+  const explicit = raw?.trim() || (yield* appHomeConfig)?.trim();
+  if (explicit) return resolve(yield* expandHomePath(explicit));
+  const productHome = (yield* Config.String("WEAVRA_HOME").pipe(Config.withDefault(""))).trim();
+  return productHome
+    ? join(resolve(yield* expandHomePath(productHome)), "app")
+    : join(NodeOS.homedir(), ".weavra", "app");
 });

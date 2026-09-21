@@ -1624,7 +1624,7 @@ function PullRequestsRouteView() {
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
           title="Pull requests unavailable"
-          error="Update your T3 Code servers to browse pull requests."
+          error="These server builds do not support pull requests. Use matching Weavra server builds."
         />
       ) : firstLoad ? (
         <PullRequestListGhost rows={7} />

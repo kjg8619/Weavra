@@ -2,6 +2,7 @@ import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react
 import type { ReactNode } from "react";
 import { memo, useCallback } from "react";
 import { Link, useCanGoBack, useLocation, useNavigate } from "@tanstack/react-router";
+import { WEAVRA_PRODUCT_NAME } from "@t3tools/shared/product";
 
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
@@ -89,14 +90,14 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
     >
       {/* Center the visible capitals, without the font's ascender/descender space. */}
       <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
-        <T3Wordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
+        <T3Wordmark aria-hidden="true" className="h-[1cap] w-auto shrink-0" />
         <span
           className={cn(
             "truncate [text-box:trim-both_cap_alphabetic]",
             onBackdrop ? "text-white/70" : "text-muted-foreground",
           )}
         >
-          Code
+          {WEAVRA_PRODUCT_NAME}
         </span>
       </span>
     </Link>

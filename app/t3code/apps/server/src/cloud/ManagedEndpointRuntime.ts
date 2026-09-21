@@ -17,6 +17,7 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import { CLOUD_ENDPOINT_RUNTIME_CONFIG, decodeRuntimeConfig } from "./config.ts";
+import { hasCloudPublicConfig } from "./publicConfig.ts";
 
 function bytesToString(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes);
@@ -113,6 +114,11 @@ const stopConnector = (connector: ActiveConnector | null) =>
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
+  if (!hasCloudPublicConfig) {
+    return CloudManagedEndpointRuntime.of({
+      applyConfig: () => Effect.succeed({ status: "disabled" as const }),
+    });
+  }
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const relayClient = yield* RelayClient.RelayClient;
   const activeRef = yield* Ref.make<ActiveConnector | null>(null);

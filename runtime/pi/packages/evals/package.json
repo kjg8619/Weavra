@@ -4,6 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"prepublishOnly": "node ../../scripts/publish.mjs",
 		"clean": "shx rm -rf .eval",
 		"eval": "node scripts/run-evals.mjs",
 		"test": "vitest run --config vitest.test.config.ts"

@@ -1,6 +1,7 @@
 {
 	"name": "@earendil-works/chord",
 	"version": "0.85.1",
+	"private": true,
 	"description": "Application composition runtime for services, replicated state, RPC, and plugins",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -43,7 +44,7 @@
 		"clean": "shx rm -rf dist",
 		"build": "tsgo -p tsconfig.build.json",
 		"test": "vitest --run",
-		"prepublishOnly": "npm run clean && npm run build"
+		"prepublishOnly": "node ../../scripts/publish.mjs"
 	},
 	"keywords": [
 		"application",

@@ -1,6 +1,7 @@
 {
 	"name": "@earendil-works/pi-server",
 	"version": "0.85.1",
+	"private": true,
 	"description": "experimental server package for pi",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -30,7 +31,7 @@
 		"build": "tsgo -p tsconfig.build.json",
 		"test": "vitest --run",
 		"typecheck": "tsgo -p tsconfig.test.json",
-		"prepublishOnly": "npm run clean && npm run build"
+		"prepublishOnly": "node ../../scripts/publish.mjs"
 	},
 	"keywords": [
 		"pi",

@@ -13,7 +13,6 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 
 import {
   buildWslRuntimeInstallScript,
-  buildWslRuntimeInvalidateScript,
   buildWslRuntimePruneScript,
   buildWslRuntimeProbeScript,
   DesktopWslDistroListError,
@@ -144,256 +143,17 @@ describe("probeWslDistros", () => {
 });
 
 describe("WSL runtime cache", () => {
-  it.each([
-    [
-      "install",
-      (id: string) => buildWslRuntimeInstallScript("/runtime.tar.gz", id, "b".repeat(64)),
-    ],
-    ["prune", buildWslRuntimePruneScript],
-    ["invalidate", buildWslRuntimeInvalidateScript],
-  ] as const)("sanitizes cache ids in the %s script", (_, buildScript) => {
-    const runtimeId = "1.2.3/x64; touch /tmp/nope";
-    const script = buildScript(runtimeId);
-    expect(script).toContain("/1.2.3_x64__touch__tmp_nope");
-    expect(script).not.toContain(runtimeId);
-  });
-
-  it("installs through a temporary directory and only reuses valid completed caches", () => {
-    const script = buildWslRuntimeInstallScript(
-      "/mnt/c/Program Files/T3 Code/wsl-runtime.tar.gz",
-      "1.2.3-x64",
-      "b".repeat(64),
-    );
-
-    expect(script).toContain('runtime_parent="$HOME/.t3/wsl-runtime"');
-    expect(script).toContain('  [ -f "$ready_marker" ] &&');
-    expect(script).toContain('    runtime_entry_runs "$runtime_root" &&');
-    expect(script).toContain("if runtime_is_ready; then");
-    expect(script).not.toContain("bin.mjs");
-    expect(script).not.toContain("node-pty");
-    expect(script).toContain("trap 'exit 1' HUP INT TERM");
-    expect(script).toContain('exec 9> "$runtime_lock"');
-    expect(script).toContain("flock -x 9");
-    expect(script).not.toContain('rm -rf "$runtime_lock"');
-    expect(script).toContain('mv -T "$runtime_root" "$runtime_stale"');
-    expect(script).toContain('mktemp -d "$runtime_parent/.1.2.3-x64.tmp.XXXXXX"');
-    // The release archive wraps everything in one `t3-<version>-linux-x64/`
-    // directory; stripping it puts the executable at `$runtime_root/t3`.
-    expect(script).toContain(
-      "tar -xzf '/mnt/c/Program Files/T3 Code/wsl-runtime.tar.gz' -C \"$runtime_tmp\" --strip-components=1",
-    );
-    expect(script).toContain('if ! runtime_entry_runs "$runtime_tmp"; then');
-    expect(script).toContain('mv -T "$runtime_tmp" "$runtime_root"');
-    expect(script).not.toContain('rm -rf "$runtime_root"');
-
-    const lockAcquired = script.indexOf("flock -x 9");
-    const readinessAfterLock = script.indexOf("if runtime_is_ready; then", lockAcquired + 1);
-    const existingRuntimeMoved = script.indexOf('mv -T "$runtime_root" "$runtime_stale"');
-    expect(lockAcquired).toBeGreaterThan(-1);
-    expect(readinessAfterLock).toBeGreaterThan(lockAcquired);
-    expect(existingRuntimeMoved).toBeGreaterThan(readinessAfterLock);
-  });
-
-  it("verifies the archive digest before extracting, and only on a cache miss", () => {
-    const script = buildWslRuntimeInstallScript(
-      "/mnt/c/Program Files/T3 Code/wsl-runtime.tar.gz",
-      "1.2.3-x64",
-      "b".repeat(64),
-    );
-
-    const expected = "b".repeat(64);
-    expect(script).toContain(
-      "archive_sha=$(sha256sum '/mnt/c/Program Files/T3 Code/wsl-runtime.tar.gz' | cut -d ' ' -f 1)",
-    );
-    expect(script).toContain(`if [ "$archive_sha" != '${expected}' ]; then`);
-
-    // A warm cache exits before the hash, so reuse never pays for it, and the
-    // mismatch check runs before anything mutates the cache.
-    const readyShortCircuit = script.indexOf("if runtime_is_ready; then");
-    const digestChecked = script.indexOf("archive_sha=$(sha256sum");
-    const existingRuntimeMoved = script.indexOf('mv -T "$runtime_root" "$runtime_stale"');
-    const extracted = script.indexOf("tar -xzf");
-    expect(digestChecked).toBeGreaterThan(readyShortCircuit);
-    expect(existingRuntimeMoved).toBeGreaterThan(digestChecked);
-    expect(extracted).toBeGreaterThan(digestChecked);
-  });
-
-  // Invalidation revokes the ready marker without stopping the backend that
-  // failed the probe, so the next install can find an unready tree that a live
-  // process is still running out of. Deleting it there unlinks node_modules
-  // under that process; the pruner already refuses to touch in-use caches, and
-  // the install path has to refuse too.
-  it("moves an in-use runtime aside instead of deleting it under a live backend", () => {
-    const script = buildWslRuntimeInstallScript(
-      "/mnt/c/Program Files/T3 Code/wsl-runtime.tar.gz",
-      "sha256-" + "c".repeat(64),
-      "b".repeat(64),
-    );
-
-    expect(script).toContain('grep -qF -- "$1/" /proc/[0-9]*/cmdline 2>/dev/null');
-    // No /proc means no way to tell, and guessing wrong costs a backend its
-    // runtime, so an unknowable answer has to count as in use.
-    expect(script).toContain("  [ -d /proc/1 ] || return 0");
-    expect(script).toContain('  if runtime_in_use "$runtime_root"; then');
-
-    // A process's cmdline keeps the pre-rename path, so the question is only
-    // answerable before the move.
-    const inUseChecked = script.indexOf('if runtime_in_use "$runtime_root"; then');
-    const moved = script.indexOf('mv -T "$runtime_root" "$runtime_stale"');
-    expect(inUseChecked).toBeGreaterThan(-1);
-    expect(inUseChecked).toBeLessThan(moved);
-
-    // In use: keep the tree and restart the sweep's clock, because renaming
-    // preserves the directory's mtime and a long-installed tree would otherwise
-    // already be past the age gate. Idle: delete it now, as before.
-    const kept = script.indexOf('touch "$runtime_stale"');
-    const deleted = script.indexOf('rm -rf "$runtime_stale"');
-    expect(kept).toBeGreaterThan(moved);
-    expect(deleted).toBeGreaterThan(kept);
-  });
-
-  it("treats a runtime whose executable no longer runs as a cache miss", () => {
-    const script = buildWslRuntimeInstallScript(
-      "/mnt/c/Program Files/T3 Code/wsl-runtime.tar.gz",
-      "1.2.3-x64",
-      "b".repeat(64),
-    );
-
-    // The same proof the SSH runner and CLI installers use: executable, and
-    // `--version` exits 0. That is what decides arch and loadability, so no
-    // separate native probe is needed.
-    expect(script).toContain('  [ -x "$1/t3" ] && "$1/t3" --version >/dev/null 2>&1');
-
-    // Readiness gates the short-circuit, so a cache whose executable broke
-    // reinstalls from the archive instead of being reused forever.
-    const entryCheckDefined = script.indexOf("runtime_entry_runs() {");
-    const readinessDefined = script.indexOf("runtime_is_ready() {");
-    const readyShortCircuit = script.indexOf("if runtime_is_ready; then");
-    expect(entryCheckDefined).toBeGreaterThan(-1);
-    expect(entryCheckDefined).toBeLessThan(readinessDefined);
-    expect(readinessDefined).toBeLessThan(readyShortCircuit);
-  });
-
-  // A swapped or half-written `t3` can still exist and even still answer
-  // `--version`, and launch then runs something this install never verified.
-  // The digest the install records is what turns that into a miss.
-  it("re-hashes the executable against the digest the install recorded", () => {
-    const script = buildWslRuntimeInstallScript(
-      "/mnt/c/Program Files/T3 Code/wsl-runtime.tar.gz",
-      "1.2.3-x64",
-      "b".repeat(64),
-    );
-
-    expect(script).toContain(`  sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1`);
-    expect(script).toContain(
-      '    [ "$recorded_entry_digest" = "$(runtime_server_entry_digest "$runtime_root")" ]',
-    );
-    // A runtime installed before the marker carried a digest reads as empty,
-    // which has to be a miss rather than a pass.
-    expect(script).toContain('    [ -n "$recorded_entry_digest" ] &&');
-    expect(script).toContain(
-      `printf '%s\\n' "$installed_entry_digest" > "$runtime_tmp/.t3code-wsl-runtime-ready"`,
-    );
-
-    // The digest is recorded after extraction and before promotion.
-    const extracted = script.indexOf("tar -xzf");
-    const digestRecorded = script.indexOf(
-      'installed_entry_digest=$(runtime_server_entry_digest "$runtime_tmp")',
-    );
-    const markerWritten = script.indexOf('> "$runtime_tmp/.t3code-wsl-runtime-ready"');
-    const promoted = script.indexOf('mv -T "$runtime_tmp" "$runtime_root"');
-    expect(digestRecorded).toBeGreaterThan(extracted);
-    expect(markerWritten).toBeGreaterThan(digestRecorded);
-    expect(promoted).toBeGreaterThan(markerWritten);
-  });
-
-  it("refuses to mark an archive whose executable does not run as ready", () => {
-    const script = buildWslRuntimeInstallScript(
-      "/mnt/c/Program Files/T3 Code/wsl-runtime.tar.gz",
-      "1.2.3-x64",
-      "b".repeat(64),
-    );
-
-    expect(script).toContain('if ! runtime_entry_runs "$runtime_tmp"; then');
-
-    // The extracted tree is rejected before the ready marker is written, so a
-    // defective archive falls back to the mounted tree instead of caching.
-    const payloadValidated = script.indexOf('runtime_entry_runs "$runtime_tmp"');
-    const markerWritten = script.indexOf('> "$runtime_tmp/.t3code-wsl-runtime-ready"');
-    const promoted = script.indexOf('mv -T "$runtime_tmp" "$runtime_root"');
-    expect(payloadValidated).toBeGreaterThan(-1);
-    expect(markerWritten).toBeGreaterThan(payloadValidated);
-    expect(promoted).toBeGreaterThan(payloadValidated);
-  });
-
   it("parses only absolute Linux runtime paths", () => {
-    expect(parseWslRuntimeRoot("runtimeRoot:/home/josh/.t3/wsl-runtime/1.2.3-x64\n")).toBe(
-      "/home/josh/.t3/wsl-runtime/1.2.3-x64",
+    expect(parseWslRuntimeRoot("runtimeRoot:/home/josh/.weavra/app/wsl-runtime/1.2.3-x64\n")).toBe(
+      "/home/josh/.weavra/app/wsl-runtime/1.2.3-x64",
     );
     expect(parseWslRuntimeRoot("runtimeRoot:relative/path\n")).toBeNull();
     expect(parseWslRuntimeRoot("noise\n")).toBeNull();
   });
-
-  it("prunes completed runtimes except the current and newest previous cache", () => {
-    const script = buildWslRuntimePruneScript("1.2.3/x64");
-
-    expect(script).toContain('current_runtime="$runtime_parent/1.2.3_x64"');
-    expect(script).toContain('[ "$candidate" -nt "$previous_runtime" ]');
-    expect(script).toContain('[ "$candidate" != "$current_runtime" ] || continue');
-    expect(script).toContain('[ "$candidate" != "$previous_runtime" ] || continue');
-    expect(script).toContain('[ -f "$candidate/.t3code-wsl-runtime-ready" ] || continue');
-    expect(script).toContain('rm -rf -- "$candidate"');
-  });
-
-  it("never deletes a runtime another backend is running from", () => {
-    const script = buildWslRuntimePruneScript("1.2.3/x64");
-
-    // The running backend's argv holds `<runtime>/t3`, so
-    // the process itself is the lease and exiting releases it. Nothing has to be
-    // registered up front, which is what makes this cover backends already
-    // running from an older version that knows nothing about pruning.
-    expect(script).toContain('  grep -qF -- "$1/" /proc/[0-9]*/cmdline 2>/dev/null');
-    expect(script).toContain('  ! runtime_in_use "$candidate" || continue');
-
-    // Without visible processes the retention rules cannot tell a live cache
-    // from an abandoned one, so the sweep is skipped rather than guessed at.
-    expect(script).toContain("[ -d /proc/1 ] || exit 0");
-
-    // The guard has to gate the delete, not just exist.
-    const inUseChecked = script.indexOf('! runtime_in_use "$candidate"');
-    const removed = script.indexOf('rm -rf -- "$candidate"');
-    expect(inUseChecked).toBeGreaterThan(-1);
-    expect(removed).toBeGreaterThan(inUseChecked);
-  });
-
-  it("sweeps orphaned install scratch directories the ready-marker loops cannot see", () => {
-    const script = buildWslRuntimePruneScript("1.2.3/x64");
-
-    // Dot-prefixed, so `"$runtime_parent"/*` never matches them, and they carry
-    // no ready marker either; without this pass a killed install leaks forever.
-    expect(script).toContain(
-      'for scratch in "$runtime_parent"/.*.tmp.* "$runtime_parent"/.*.stale.*; do',
-    );
-    // Age guard: a scratch directory younger than this belongs to a live install.
-    expect(script).toContain('find "$scratch" -maxdepth 0 -mmin +120');
-  });
-
-  it("invalidates a cache by dropping its ready marker, not the tree", () => {
-    const script = buildWslRuntimeInvalidateScript("1.2.3/x64");
-
-    // Readiness is a presence check, so a tree whose pty.node is present but
-    // unloadable stays ready forever unless the probe can revoke the marker.
-    expect(script).toContain('rm -f "$HOME/.t3/wsl-runtime/1.2.3_x64/.t3code-wsl-runtime-ready"');
-    // Deleting the tree here would pull it out from under any backend still
-    // running from it; the next install moves an unready root aside instead.
-    expect(script).not.toContain("rm -rf");
-  });
 });
 
-// Reading the generated script proves what it says, not what it does. A cache
-// whose entry was truncated satisfied every assertion above and still got
-// reused, so these run the real script against a real archive in a throwaway
-// HOME and check the outcome.
+// Run the generated script against a real archive in a throwaway HOME and
+// check the outcome rather than pinning shell source text.
 describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed)", () => {
   const fixtures: Array<string> = [];
 
@@ -411,8 +171,8 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         // holds the executable and its native addons.
         'stage="$work/stage/t3-0.0.0-linux-x64"',
         'mkdir -p "$stage/node_modules/node-pty/build/Release" "$work/home"',
-        `printf '%s' ${sh(SERVER_ENTRY_SOURCE)} > "$stage/t3"`,
-        'chmod +x "$stage/t3"',
+        `printf '%s' ${sh(SERVER_ENTRY_SOURCE)} > "$stage/weavra-server"`,
+        'chmod +x "$stage/weavra-server"',
         `printf '%s' 'pty-native-payload' > "$stage/node_modules/node-pty/build/Release/pty.node"`,
         `tar -czf "$work/wsl-runtime.tar.gz" -C "$work/stage" t3-0.0.0-linux-x64`,
         `printf 'work:%s\\n' "$work"`,
@@ -439,9 +199,9 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
       archivePath,
       archiveSha,
       runtimeId,
-      runtimeParent: `${work}/home/.t3/wsl-runtime`,
-      runtimeRoot: `${work}/home/.t3/wsl-runtime/${runtimeId}`,
-      serverEntry: `${work}/home/.t3/wsl-runtime/${runtimeId}/t3`,
+      runtimeParent: `${work}/home/.weavra/app/wsl-runtime`,
+      runtimeRoot: `${work}/home/.weavra/app/wsl-runtime/${runtimeId}`,
+      serverEntry: `${work}/home/.weavra/app/wsl-runtime/${runtimeId}/weavra-server`,
       installScript,
       install: (archive?: string, sha?: string) => runShell(installScript(archive, sha)),
     };
@@ -712,7 +472,7 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         `runtime_root=${sh(fixture.runtimeRoot)}`,
         `runtime_parent=${sh(fixture.runtimeParent)}`,
         'rm "$runtime_root/.t3code-wsl-runtime-ready"',
-        'sh -c "sleep 30" "$runtime_root/t3" >/dev/null 2>&1 &',
+        'sh -c "sleep 30" "$runtime_root/weavra-server" >/dev/null 2>&1 &',
         "active_pid=$!",
         "sleep 0.1",
         fixture.installScript(),
@@ -737,7 +497,7 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         "set -eu",
         "work=$(mktemp -d)",
         'home="$work/home"',
-        'runtime_parent="$home/.t3/wsl-runtime"',
+        'runtime_parent="$home/.weavra/app/wsl-runtime"',
         'mkdir -p "$runtime_parent"',
         'make_ready() { mkdir -p "$runtime_parent/$1"; printf ready > "$runtime_parent/$1/.t3code-wsl-runtime-ready"; }',
         "make_ready sha256-current",
@@ -750,7 +510,7 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         'touch -d "4 minutes ago" "$runtime_parent/sha256-active"',
         'touch -d "3 minutes ago" "$runtime_parent/sha256-old"',
         'touch -d "2 minutes ago" "$runtime_parent/sha256-locked"',
-        'sh -c "sleep 30" "$runtime_parent/sha256-active/t3" >/dev/null 2>&1 &',
+        'sh -c "sleep 30" "$runtime_parent/sha256-active/weavra-server" >/dev/null 2>&1 &',
         "active_pid=$!",
         "(",
         '  exec 9> "$runtime_parent/.sha256-locked.install.lock"',

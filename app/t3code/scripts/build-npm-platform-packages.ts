@@ -1,23 +1,19 @@
 #!/usr/bin/env node
 /**
- * Turns the per-platform CLI archives of one release into the npm packages
- * behind `npx t3` / `npm i -g t3`: one `@t3code/t3-<platformKey>` package per
- * archive holding the archive's contents verbatim, plus the `t3` launcher
- * that lists them as optionalDependencies and execs the one npm installed.
- * The bytes a user gets from npm are therefore the release archive's, and
- * running them needs neither a Node runtime, npm, nor a native build.
+ * Turns local per-platform CLI archives into private npm-format artifacts:
+ * one `@t3code/weavra-server-<platformKey>` package per archive holding the
+ * archive's contents verbatim, plus the `weavra-server` launcher that lists
+ * them as optionalDependencies and executes the matching local package.
+ * These artifacts are not a published npm release.
  *
  * Output layout under `--output-dir`:
  *
- *   @t3code/t3-<platformKey>/      archive contents flattened + package.json
- *   @t3code/t3-<platformKey>.tgz   the same tree as an npm tarball
- *   t3/                             launcher: package.json, bin/t3.js, README.md
- *   t3.tgz                          the launcher as an npm tarball
+ *   @t3code/weavra-server-<platformKey>/      archive contents + package.json
+ *   @t3code/weavra-server-<platformKey>.tgz   the same tree as an npm tarball
+ *   weavra-server/       launcher: package.json, bin/weavra-server.js, README.md
+ *   weavra-server.tgz    the launcher as an npm tarball
  *
- * The tarballs are what gets published. `npm publish <dir>` always drops
- * `node_modules/` (npm-packlist ignores it whatever `files` says, and
- * bundleDependencies needs an arborist tree these flattened installs are
- * not), whereas `npm publish <tarball>` uploads the bytes as given.
+ * Tarballs preserve the flattened bundled node_modules layout for local use.
  */
 import { legacyCliLauncherScript } from "@t3tools/shared/legacyCliLauncher";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
@@ -44,7 +40,7 @@ import serverPackageJson from "../apps/server/package.json" with { type: "json" 
 import { windowsSystemTar } from "./build-cli-archive.ts";
 
 export const NPM_PLATFORM_PACKAGE_SCOPE = "@t3code";
-export const NPM_LAUNCHER_PACKAGE_NAME = "t3";
+export const NPM_LAUNCHER_PACKAGE_NAME = "weavra-server";
 
 const encodePackageJson = Schema.encodeEffect(fromJsonStringPretty(Schema.Unknown));
 
@@ -85,7 +81,7 @@ export class NpmPackagesArchiveLayoutError extends Schema.TaggedError<NpmPackage
 }
 
 export function npmPlatformPackageName(platformKey: CliArchivePlatformKey): string {
-  return `${NPM_PLATFORM_PACKAGE_SCOPE}/t3-${platformKey}`;
+  return `${NPM_PLATFORM_PACKAGE_SCOPE}/weavra-server-${platformKey}`;
 }
 
 /**
@@ -107,12 +103,13 @@ export function npmPlatformPackageManifest(
   return {
     name: npmPlatformPackageName(platformKey),
     version,
-    description: `T3 Code CLI executable for ${platformKey}`,
+    private: true,
+    description: `Weavra server executable for ${platformKey}`,
     license: serverPackageJson.license,
     repository: serverPackageJson.repository,
     os: [os],
     cpu: [cpu],
-    files: ["t3", "t3.exe", "client", "resource-monitor", "node_modules"],
+    files: ["weavra-server", "weavra-server.exe", "client", "resource-monitor", "node_modules"],
     preferUnplugged: true,
     dependencies: Object.fromEntries(bundleDependencies.map((name) => [name, bundled[name]])),
     bundleDependencies,
@@ -155,20 +152,15 @@ export function npmPlatformPackageReadme(platformKey: CliArchivePlatformKey): st
   return [
     `# ${npmPlatformPackageName(platformKey)}`,
     "",
-    `The T3 Code CLI executable for ${platformKey}. Do not install this package directly:`,
-    `it is an optional dependency of \`${NPM_LAUNCHER_PACKAGE_NAME}\`, which picks the package for the`,
-    "current platform and runs the executable inside it.",
-    "",
-    "```sh",
-    `npx ${NPM_LAUNCHER_PACKAGE_NAME}@latest`,
-    "```",
-    "",
-    "Source and documentation: https://github.com/pingdotgg/t3code",
+    `Local Weavra server executable for ${platformKey}.`,
+    "This private artifact is produced from a local Weavra archive. It is not a published npm release.",
+    "No hosted installation or update source is configured.",
+    "Source and documentation: https://github.com/kjg8619/Weavra",
     "",
   ].join("\n");
 }
 
-/** package.json for the `t3` launcher. No engines: bin/t3.js is trivial CJS. */
+/** package.json for the local launcher. No engines: bin/weavra-server.js is trivial CJS. */
 export function npmLauncherPackageManifest(
   version: string,
   platformKeys: ReadonlyArray<CliArchivePlatformKey>,
@@ -176,10 +168,11 @@ export function npmLauncherPackageManifest(
   return {
     name: NPM_LAUNCHER_PACKAGE_NAME,
     version,
-    description: "T3 Code CLI. Installs the self-contained executable for this platform.",
+    private: true,
+    description: "Weavra server. Local, self-contained executable for this platform.",
     license: serverPackageJson.license,
     repository: serverPackageJson.repository,
-    bin: { t3: "./bin/t3.js" },
+    bin: { "weavra-server": "./bin/weavra-server.js" },
     files: ["bin", "dist"],
     optionalDependencies: Object.fromEntries(
       platformKeys.map((key) => [npmPlatformPackageName(key), version]),
@@ -188,7 +181,7 @@ export function npmLauncherPackageManifest(
 }
 
 /**
- * The launcher every `npx t3` runs. Plain CommonJS with no dependencies so it
+ * The local artifact launcher. Plain CommonJS with no dependencies so it
  * loads on any Node that npm itself runs on; the real work happens in the
  * single-executable it execs.
  */
@@ -203,24 +196,24 @@ const key = process.platform + "-" + process.arch;
 
 let packageDir;
 try {
-  packageDir = dirname(require.resolve("${NPM_PLATFORM_PACKAGE_SCOPE}/t3-" + key + "/package.json"));
+  packageDir = dirname(require.resolve("${NPM_PLATFORM_PACKAGE_SCOPE}/weavra-server-" + key + "/package.json"));
 } catch {
   process.stderr.write(
     [
-      "t3: no T3 Code CLI build is available for this platform (" + key + ").",
+      "weavra-server: no Weavra server build is available for this platform (" + key + ").",
       "Supported platforms: " + SUPPORTED.join(", ") + ".",
-      "If yours is listed, reinstall t3 so npm fetches its optional dependency.",
-      "The desktop app and release archives are at https://github.com/pingdotgg/t3code/releases",
+      "Build the matching platform archive from the Weavra source checkout.",
+      "Source: https://github.com/kjg8619/Weavra",
       "",
     ].join("\\n"),
   );
   process.exit(1);
 }
 
-const executable = join(packageDir, process.platform === "win32" ? "t3.exe" : "t3");
+const executable = join(packageDir, process.platform === "win32" ? "weavra-server.exe" : "weavra-server");
 const result = spawnSync(executable, process.argv.slice(2), { stdio: "inherit" });
 if (result.error) {
-  process.stderr.write("t3: failed to start " + executable + ": " + result.error.message + "\\n");
+  process.stderr.write("weavra-server: failed to start " + executable + ": " + result.error.message + "\\n");
   process.exit(1);
 }
 // A child killed by a signal has no status; report it the way a shell would.
@@ -332,7 +325,7 @@ const stagePlatformPackage = Effect.fn("stagePlatformPackage")(function* (input:
   const extractDir = path.join(scratch, "extract");
   yield* fs.makeDirectory(extractDir);
   const contentDir = yield* extractArchive(input.archive, extractDir);
-  const executableName = input.key.startsWith("win32") ? "t3.exe" : "t3";
+  const executableName = input.key.startsWith("win32") ? "weavra-server.exe" : "weavra-server";
   const executable = path.join(contentDir, executableName);
   if (!(yield* fs.exists(executable))) {
     return yield* new NpmPackagesArchiveLayoutError({
@@ -341,7 +334,7 @@ const stagePlatformPackage = Effect.fn("stagePlatformPackage")(function* (input:
     });
   }
   // The tarball carries the on-disk mode, so the bit must be set before packing.
-  if (executableName === "t3") {
+  if (executableName === "weavra-server") {
     yield* fs.chmod(executable, 0o755);
   }
   const bundled = yield* readBundledPackages(path.join(contentDir, "node_modules"));
@@ -365,7 +358,7 @@ const stagePlatformPackage = Effect.fn("stagePlatformPackage")(function* (input:
   return output;
 }, Effect.scoped);
 
-/** Writes the launcher package (package.json, bin/t3.js, README) and its tarball. */
+/** Writes the launcher package (package.json, bin/weavra-server.js, README) and its tarball. */
 const stageLauncherPackage = Effect.fn("stageLauncherPackage")(function* (input: {
   readonly outputDir: string;
   readonly version: string;
@@ -383,7 +376,7 @@ const stageLauncherPackage = Effect.fn("stageLauncherPackage")(function* (input:
     path.join(stageDir, "package.json"),
     `${yield* encodePackageJson(npmLauncherPackageManifest(input.version, input.platformKeys))}\n`,
   );
-  const launcherScript = path.join(stageDir, "bin/t3.js");
+  const launcherScript = path.join(stageDir, "bin/weavra-server.js");
   yield* fs.writeFileString(launcherScript, NPM_LAUNCHER_SCRIPT);
   yield* fs.chmod(launcherScript, 0o755);
   // Older service updaters and launchers run this exact path with Node.
@@ -463,7 +456,7 @@ const command = Command.make(
   "build-npm-platform-packages",
   {
     archivesDir: Flag.String("archives-dir").pipe(
-      Flag.withDescription("Directory holding the release's t3-<version>-<platform> archives."),
+      Flag.withDescription("Directory holding local weavra-server-<version>-<platform> archives."),
     ),
     version: Flag.String("version").pipe(
       Flag.withDescription(
@@ -479,7 +472,7 @@ const command = Command.make(
   buildNpmPlatformPackages,
 ).pipe(
   Command.withDescription(
-    "Build the t3 launcher and @t3code/t3-<platform> npm packages from CLI release archives.",
+    "Build private local weavra-server launcher and @t3code/weavra-server-<platform> artifacts from CLI archives.",
   ),
 );
 

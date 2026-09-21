@@ -40,6 +40,36 @@ const makeEnvironment = (
   DesktopEnvironment.DesktopEnvironment.pipe(Effect.provide(makeEnvironmentLayer(overrides, env)));
 
 describe("DesktopEnvironment", () => {
+  it.effect("gives the canonical app home precedence over legacy and root homes", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment(
+        {},
+        {
+          WEAVRA_APP_HOME: " /isolated/app ",
+          WEAVRA_HOME: "/isolated/root",
+          T3CODE_HOME: "/legacy/profile",
+        },
+      );
+      assert.equal(environment.baseDir, "/isolated/app");
+      assert.equal(environment.stateDir, "/isolated/app/userdata");
+    }),
+  );
+
+  it.effect("uses the product root only as a parent and keeps implicit development separate", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment(
+        {},
+        {
+          WEAVRA_HOME: "/isolated/root",
+          WEAVRA_APP_HOME: " ",
+          VITE_DEV_SERVER_URL: "http://localhost:5173",
+        },
+      );
+      assert.equal(environment.baseDir, "/isolated/root/app");
+      assert.equal(environment.stateDir, "/isolated/root/app/dev");
+      assert.equal(environment.userDataDirName, "weavra-dev");
+    }),
+  );
   it.effect("derives state paths and development identity inside Effect", () =>
     Effect.gen(function* () {
       const environment = yield* makeEnvironment(
@@ -77,9 +107,9 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.serverRoot, "/repo");
       assert.equal(environment.backendEntryPath, "/repo/apps/server/dist/bin.mjs");
       assert.equal(environment.backendCwd, "/repo");
-      assert.equal(environment.appUserModelId, "com.t3tools.t3code.dev");
-      assert.equal(environment.linuxWmClass, "t3code-dev");
-      assert.equal(environment.linuxDesktopEntryName, "com.t3tools.T3Code.Development.desktop");
+      assert.equal(environment.appUserModelId, "io.weavra.desktop.dev");
+      assert.equal(environment.linuxWmClass, "weavra-dev");
+      assert.equal(environment.linuxDesktopEntryName, "io.weavra.desktop.dev.desktop");
       assert.deepEqual(
         Option.map(environment.devServerUrl, (url) => url.href),
         Option.some("http://localhost:5173/"),
@@ -151,7 +181,7 @@ describe("DesktopEnvironment", () => {
         resourcesPath: "/tmp/.mount_t3code/resources",
       });
 
-      assert.equal(environment.linuxDesktopEntryName, "com.t3tools.T3Code.desktop");
+      assert.equal(environment.linuxDesktopEntryName, "io.weavra.desktop.desktop");
     }),
   );
 
@@ -163,8 +193,8 @@ describe("DesktopEnvironment", () => {
       );
       const production = yield* makeEnvironment();
 
-      assert.equal(development.stateDir, "/Users/alice/.t3/dev");
-      assert.equal(production.stateDir, "/Users/alice/.t3/userdata");
+      assert.equal(development.stateDir, "/Users/alice/.weavra/app/dev");
+      assert.equal(production.stateDir, "/Users/alice/.weavra/app/userdata");
     }),
   );
 

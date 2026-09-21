@@ -159,8 +159,8 @@ describe("openai-codex streaming", () => {
 				expect(headers?.get("Authorization")).toBe(`Bearer ${token}`);
 				expect(headers?.get("chatgpt-account-id")).toBe("acc_test");
 				expect(headers?.get("OpenAI-Beta")).toBe("responses=experimental");
-				expect(headers?.get("originator")).toBe("pi");
-				expect(headers?.get("User-Agent")).toBe(`pi (${platform()} ${release()}; ${arch()})`);
+				expect(headers?.get("originator")).toBe("weavra");
+				expect(headers?.get("User-Agent")).toBe(`weavra (${platform()} ${release()}; ${arch()})`);
 				expect(headers?.get("accept")).toBe("text/event-stream");
 				expect(headers?.has("x-api-key")).toBe(false);
 				return new Response(stream, {

@@ -146,8 +146,8 @@ describe("createAgentSession provider attribution headers", () => {
 	it("adds default attribution headers for OpenRouter models", async () => {
 		const headers = await captureHeaders(createModel("openrouter", "https://openrouter.ai/api/v1"));
 
-		expect(headers?.["HTTP-Referer"]).toBe("https://pi.dev");
-		expect(headers?.["X-OpenRouter-Title"]).toBe("pi");
+		expect(headers?.["HTTP-Referer"]).toBe("https://github.com/kjg8619/Weavra");
+		expect(headers?.["X-OpenRouter-Title"]).toBe("Weavra");
 		expect(headers?.["X-OpenRouter-Categories"]).toBe("cli-agent");
 	});
 
@@ -164,16 +164,16 @@ describe("createAgentSession provider attribution headers", () => {
 	it("adds attribution headers for custom providers routed through OpenRouter", async () => {
 		const headers = await captureHeaders(createModel("custom-openrouter", "https://openrouter.ai/api/v1"));
 
-		expect(headers?.["HTTP-Referer"]).toBe("https://pi.dev");
-		expect(headers?.["X-OpenRouter-Title"]).toBe("pi");
+		expect(headers?.["HTTP-Referer"]).toBe("https://github.com/kjg8619/Weavra");
+		expect(headers?.["X-OpenRouter-Title"]).toBe("Weavra");
 		expect(headers?.["X-OpenRouter-Categories"]).toBe("cli-agent");
 	});
 
 	it("preserves legacy OpenRouter base URL substring attribution matching", async () => {
 		const headers = await captureHeaders(createModel("custom-openrouter", "not-a-url-openrouter.ai"));
 
-		expect(headers?.["HTTP-Referer"]).toBe("https://pi.dev");
-		expect(headers?.["X-OpenRouter-Title"]).toBe("pi");
+		expect(headers?.["HTTP-Referer"]).toBe("https://github.com/kjg8619/Weavra");
+		expect(headers?.["X-OpenRouter-Title"]).toBe("Weavra");
 		expect(headers?.["X-OpenRouter-Categories"]).toBe("cli-agent");
 	});
 
@@ -193,16 +193,27 @@ describe("createAgentSession provider attribution headers", () => {
 		expect(headers?.["X-OpenRouter-Categories"]).toBe("provider-category");
 	});
 
+	it("honors caller header overrides regardless of casing", async () => {
+		const headers = await captureHeaders(createModel("openrouter", "https://openrouter.ai/api/v1"), {
+			providerHeaders: { "http-referer": "https://provider.example" },
+			requestHeaders: { "x-openrouter-title": "caller-title" },
+		});
+		expect(headers?.["HTTP-Referer"]).toBeUndefined();
+		expect(headers?.["X-OpenRouter-Title"]).toBeUndefined();
+		expect(headers?.["http-referer"]).toBe("https://provider.example");
+		expect(headers?.["x-openrouter-title"]).toBe("caller-title");
+	});
+
 	it("adds default attribution headers for direct NVIDIA NIM endpoints", async () => {
 		const headers = await captureHeaders(createModel("custom-nim", "https://integrate.api.nvidia.com/v1"));
 
-		expect(headers?.["X-BILLING-INVOKE-ORIGIN"]).toBe("Pi");
+		expect(headers?.["X-BILLING-INVOKE-ORIGIN"]).toBe("Weavra");
 	});
 
 	it("adds default attribution headers for the NVIDIA provider", async () => {
 		const headers = await captureHeaders(createModel("nvidia", "https://example.test/v1"));
 
-		expect(headers?.["X-BILLING-INVOKE-ORIGIN"]).toBe("Pi");
+		expect(headers?.["X-BILLING-INVOKE-ORIGIN"]).toBe("Weavra");
 	});
 
 	it("does not add NVIDIA NIM attribution headers when telemetry is disabled", async () => {
@@ -231,7 +242,7 @@ describe("createAgentSession provider attribution headers", () => {
 			createModel("openrouter", "https://openrouter.ai/api/v1", "nvidia/nemotron-3-super-120b-a12b"),
 		);
 
-		expect(headers?.["HTTP-Referer"]).toBe("https://pi.dev");
+		expect(headers?.["HTTP-Referer"]).toBe("https://github.com/kjg8619/Weavra");
 		expect(headers?.["X-BILLING-INVOKE-ORIGIN"]).toBeUndefined();
 	});
 
@@ -249,7 +260,7 @@ describe("createAgentSession provider attribution headers", () => {
 		});
 
 		expect(headers?.["x-opencode-session"]).toBe("opencode-session");
-		expect(headers?.["x-opencode-client"]).toBe("pi");
+		expect(headers?.["x-opencode-client"]).toBe("weavra");
 	});
 
 	it("lets configured OpenCode headers override the defaults", async () => {

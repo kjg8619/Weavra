@@ -1,4 +1,4 @@
-# Using Pi
+# Using Weavra
 
 This page collects day-to-day usage details that do not fit on the quickstart page.
 
@@ -54,7 +54,6 @@ Type `/` in the editor to open command completion. Extensions can register custo
 | `/copy` | Copy last assistant message to clipboard |
 | `/export [file]` | Export session to HTML or JSONL |
 | `/import <file>` | Import and resume a session from a JSONL file |
-| `/share` | Upload as private GitHub gist with shareable HTML link |
 | `/reload` | Reload keybindings, extensions, skills, prompts, themes, and context files |
 | `/hotkeys` | Show all keyboard shortcuts |
 | `/changelog` | Display version history |
@@ -75,15 +74,15 @@ Configure delivery in [Settings](settings.md) with `steeringMode` and `followUpM
 
 ## Sessions
 
-Sessions are saved automatically to `~/.pi/agent/sessions/`, organized by working directory.
+Sessions are saved automatically to `~/.weavra/agent/sessions/`, organized by working directory.
 
 ```bash
-pi -c                  # Continue most recent session
-pi -r                  # Browse and select a session
-pi --no-session        # Ephemeral mode; do not save
-pi --name "my task"    # Set session display name at startup
-pi --session <path|id> # Use a specific session file or session ID
-pi --fork <path|id>    # Fork a session into a new session file
+weavra -c                  # Continue most recent session
+weavra -r                  # Browse and select a session
+weavra --no-session        # Ephemeral mode; do not save
+weavra --name "my task"    # Set session display name at startup
+weavra --session <path|id> # Use a specific session file or session ID
+weavra --fork <path|id>    # Fork a session into a new session file
 ```
 
 Useful session commands:
@@ -100,7 +99,7 @@ See [Sessions](sessions.md) and [Compaction](compaction.md) for details.
 
 Pi loads `AGENTS.md` or `CLAUDE.md` at startup from:
 
-- `~/.pi/agent/AGENTS.md` for global instructions
+- `~/.weavra/agent/AGENTS.md` for global instructions
 - parent directories, walking up from the current working directory
 - the current directory
 
@@ -113,56 +112,52 @@ Use context files for project conventions, commands, safety rules, and preferenc
 Replace the default system prompt with:
 
 - `.pi/SYSTEM.md` for a project
-- `~/.pi/agent/SYSTEM.md` globally
+- `~/.weavra/agent/SYSTEM.md` globally
 
 Append to the default prompt without replacing it with `APPEND_SYSTEM.md` in either location.
 
 ### Project Trust
 
-On interactive startup, pi asks before trusting a project folder that contains project-local settings, resources, or project `.agents/skills` and has no saved decision for the folder or a parent folder in `~/.pi/agent/trust.json`. Trusting a project allows pi to load `.pi/settings.json` and `.pi` resources, install missing project packages, and execute project extensions.
+On interactive startup, pi asks before trusting a project folder that contains project-local settings, resources, or project `.agents/skills` and has no saved decision for the folder or a parent folder in `~/.weavra/agent/trust.json`. Trusting a project allows pi to load `.pi/settings.json` and `.pi` resources, install missing project packages, and execute project extensions.
 
 Before the trust decision, pi loads only context files, user/global extensions, and CLI `-e` extensions so they can handle the `project_trust` event. Project-local extensions, project package-managed extensions, and project settings are loaded only after the project is trusted. This split also applies when switching to a session from a different cwd whose trust has not been resolved in the current process.
 
 Non-interactive modes (`-p`, `--mode json`, and `--mode rpc`) do not show a trust prompt. Without an applicable saved trust decision, they use `defaultProjectTrust` from global settings: `ask` (default) and `never` ignore those project resources, while `always` trusts them. Pass `--approve`/`-a` or `--no-approve`/`-na` to override project trust for one run.
 
-If no extension or saved decision applies, `defaultProjectTrust` controls the fallback behavior. Set it to `"ask"`, `"always"`, or `"never"` in `~/.pi/agent/settings.json`, or change it with `/settings`.
+If no extension or saved decision applies, `defaultProjectTrust` controls the fallback behavior. Set it to `"ask"`, `"always"`, or `"never"` in `~/.weavra/agent/settings.json`, or change it with `/settings`.
 
-`pi config` and package commands use the same project trust flow, except `pi update` never prompts. Pass `--approve` to trust project-local settings for one command or `--no-approve` to ignore them.
+`weavra config` and package commands use the same project trust flow, except `weavra update` never prompts. Pass `--approve` to trust project-local settings for one command or `--no-approve` to ignore them.
 
-Use `/trust` in interactive mode to save a project trust decision for future sessions, including trust for the immediate parent folder. It writes `~/.pi/agent/trust.json` only; the current session is not reloaded, so restart pi for changes to take effect.
+Use `/trust` in interactive mode to save a project trust decision for future sessions, including trust for the immediate parent folder. It writes `~/.weavra/agent/trust.json` only; the current session is not reloaded, so restart pi for changes to take effect.
 
 
 ## Exporting and Sharing Sessions
 
 Use `/export [file]` to write a session to HTML.
 
-Use `/share` to upload a private GitHub gist with a shareable HTML link.
-
-If you use pi for open source work and want to publish sessions for model, prompt, tool, and evaluation research, see [`badlogic/pi-share-hf`](https://github.com/badlogic/pi-share-hf). It publishes sessions to Hugging Face datasets.
+Use /export for a local HTML file or the JSONL export API for local session data. No hosted Weavra sharing destination is configured; review exported transcripts before choosing any external destination yourself.
 
 ## CLI Reference
 
 ```bash
-pi [options] [--] [@files...] [messages...]
+weavra [options] [--] [@files...] [messages...]
 ```
 
 ### Package Commands
 
 ```bash
-pi install <source> [-l]     # Install package, -l for project-local
-pi remove <source> [-l]      # Remove package
-pi uninstall <source> [-l]   # Alias for remove
-pi update [source|self|pi]   # Update pi only, or one package source
-pi update --all              # Update pi and packages; reconcile pinned git refs
-pi update --extensions       # Update packages only; reconcile pinned git refs
-pi update --models           # Refresh model catalogs only
-pi update --self             # Update pi only
-pi update --extension <src>  # Update one package
-pi list                      # List installed packages
-pi config                    # Enable/disable package resources
+weavra install <source> [-l]     # Install package, -l for project-local
+weavra remove <source> [-l]      # Remove package
+weavra uninstall <source> [-l]   # Alias for remove
+weavra update <source>       # Update one explicit package source
+weavra update --extensions       # Update packages only; reconcile pinned git refs
+weavra update --models           # Refresh model catalogs only
+weavra update --extension <src>  # Update one package
+weavra list                      # List installed packages
+weavra config                    # Enable/disable package resources
 ```
 
-These commands manage pi packages and `pi update` can update the pi CLI installation. To uninstall pi itself, see [Quickstart](quickstart.md#uninstall). `pi config` and project package commands accept `--approve`/`--no-approve` to trust or ignore project-local settings for one command. `pi update` never prompts for project trust.
+Self and all-target product updates are unavailable; update this source checkout through the root workflow. Extension updates are explicit user-selected operations. `weavra config` and project package commands accept `--approve`/`--no-approve` to trust or ignore project-local settings for one command. `weavra update` never prompts for project trust.
 
 See [Pi Packages](packages.md) for package sources and security notes.
 
@@ -179,7 +174,7 @@ See [Pi Packages](packages.md) for package sources and security notes.
 In print mode, pi also reads piped stdin and merges it into the initial prompt:
 
 ```bash
-cat README.md | pi -p "Summarize this text"
+cat README.md | weavra -p "Summarize this text"
 ```
 
 ### Model Options
@@ -233,7 +228,7 @@ Built-in tools: `read`, `bash`, `powershell` (Windows), `edit`, `write`, `grep`,
 Combine `--no-*` with explicit flags to load exactly what you need, ignoring settings. Example:
 
 ```bash
-pi --no-extensions -e ./my-extension.ts
+weavra --no-extensions -e ./my-extension.ts
 ```
 
 ### Other Options
@@ -260,46 +255,46 @@ Set **TUI mode** in `/settings` to switch between `regular` and `fullscreen` imm
 Prefix files with `@` to include them in the message:
 
 ```bash
-pi @prompt.md "Answer this"
-pi -p @screenshot.png "What's in this image?"
-pi @code.ts @test.ts "Review these files"
+weavra @prompt.md "Answer this"
+weavra -p @screenshot.png "What's in this image?"
+weavra @code.ts @test.ts "Review these files"
 ```
 
 ### Examples
 
 ```bash
 # Interactive with initial prompt
-pi "List all .ts files in src/"
+weavra "List all .ts files in src/"
 
 # Non-interactive
-pi -p "Summarize this codebase"
+weavra -p "Summarize this codebase"
 
 # Prompt beginning with a dash
-pi -p -- "- Summarize these points"
+weavra -p -- "- Summarize these points"
 
 # Non-interactive with piped stdin
-cat README.md | pi -p "Summarize this text"
+cat README.md | weavra -p "Summarize this text"
 
 # Named one-shot session
-pi --name "release audit" -p "Audit this repository"
+weavra --name "release audit" -p "Audit this repository"
 
 # Different model
-pi --provider openai --model gpt-4o "Help me refactor"
+weavra --provider openai --model gpt-4o "Help me refactor"
 
 # Model with provider prefix
-pi --model openai/gpt-4o "Help me refactor"
+weavra --model openai/gpt-4o "Help me refactor"
 
 # Model with thinking level shorthand
-pi --model sonnet:high "Solve this complex problem"
+weavra --model sonnet:high "Solve this complex problem"
 
 # Limit model cycling
-pi --models "claude-*,gpt-4o"
+weavra --models "claude-*,gpt-4o"
 
 # Read-only mode
-pi --tools read,grep,find,ls -p "Review the code"
+weavra --tools read,grep,find,ls -p "Review the code"
 
 # Disable one extension or built-in tool while keeping the rest available
-pi --exclude-tools ask_question
+weavra --exclude-tools ask_question
 ```
 
 ## Design Principles

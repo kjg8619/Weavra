@@ -1,88 +1,59 @@
-import { EventEmitter } from "node:events";
-import { readFileSync, writeFileSync } from "node:fs";
-import { PassThrough } from "node:stream";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import type * as ChildProcess from "node:child_process";
+import type { Mock } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-const childProcessMocks = vi.hoisted(() => ({
-	spawn: vi.fn(),
-	spawnSync: vi.fn(() => ({ status: 0 })),
+const childProcessMocks = vi.hoisted(() => ({ spawn: vi.fn(), spawnSync: vi.fn() }));
+vi.mock("node:child_process", async (importOriginal) => ({
+	...(await importOriginal<typeof ChildProcess>()),
+	...childProcessMocks,
 }));
 
-vi.mock("node:child_process", () => childProcessMocks);
-
+import { InteractiveMode } from "../src/modes/interactive/interactive-mode.ts";
 import { shareSession } from "../src/modes/interactive/session-share.ts";
-import { initTheme } from "../src/modes/interactive/theme/theme.ts";
 
-function deferred(): { promise: Promise<void>; resolve: () => void } {
-	let resolve!: () => void;
-	const promise = new Promise<void>((done) => {
-		resolve = done;
-	});
-	return { promise, resolve };
-}
+afterEach(() => {
+	vi.unstubAllEnvs();
+	vi.unstubAllGlobals();
+	vi.clearAllMocks();
+});
 
-describe("shareSession", () => {
-	beforeAll(() => initTheme("dark"));
-
-	it("keeps concurrent session exports isolated", async () => {
-		const uploads: string[] = [];
-		childProcessMocks.spawn.mockImplementation((_command, args: string[]) => {
-			uploads.push(readFileSync(args.at(-1)!, "utf8"));
-			const child = Object.assign(new EventEmitter(), {
-				stdout: new PassThrough(),
-				stderr: new PassThrough(),
-				kill: vi.fn(),
+describe("hosted sharing is unavailable", () => {
+	it.each(["/share", "/share https://example.invalid/upload"])(
+		"rejects %s without touching a session or uploading",
+		async (command) => {
+			vi.stubEnv("PI_TELEMETRY", "1");
+			vi.stubEnv("PI_SHARE_VIEWER_URL", "https://example.invalid/viewer/");
+			vi.stubEnv("PI_RADIUS_GATEWAY", "https://example.invalid/radius/");
+			const fetchMock = vi.fn(() => {
+				throw new Error("Upload forbidden");
 			});
-			queueMicrotask(() => {
-				child.stdout.end(`https://gist.github.com/test/${uploads.length}\n`);
-				child.stderr.end();
-				child.emit("close", 0);
+			vi.stubGlobal("fetch", fetchMock);
+			const errors: string[] = [];
+			const showError = (message: string) => errors.push(message);
+			const mode = Object.assign(Object.create(InteractiveMode.prototype), {
+				defaultEditor: {} as { onSubmit?: (text: string) => Promise<void> },
+				editor: { setText: vi.fn() },
+				showError,
+			}) as {
+				setupEditorSubmitHandler(): void;
+				defaultEditor: { onSubmit?: (text: string) => Promise<void> };
+				editor: { setText: Mock };
+			};
+			Object.defineProperty(mode, "session", {
+				get() {
+					throw new Error("Session/auth/export access forbidden");
+				},
 			});
-			return child;
-		});
-
-		const aWritten = deferred();
-		const bWritten = deferred();
-		const releaseB = deferred();
-		const errors: string[] = [];
-		const context = (name: "A" | "B") => ({
-			session: {
-				sessionManager: {
-					getSessionId: () => name,
-					getCwd: () => "/tmp",
-					getBranch: () => [],
-				},
-				state: { systemPrompt: name, tools: [] },
-				modelRuntime: { getProvider: () => undefined },
-				exportToHtml: async (filePath: string) => {
-					writeFileSync(filePath, name);
-					if (name === "A") {
-						aWritten.resolve();
-						await bWritten.promise;
-					} else {
-						bWritten.resolve();
-						await releaseB.promise;
-					}
-				},
-			},
-			ui: { setFocus() {}, requestRender() {} },
-			editorContainer: { clear() {}, addChild() {} },
-			editor: {},
-			showStatus() {},
-			showError(message: string) {
-				errors.push(message);
-			},
-		});
-
-		const shareA = shareSession(context("A") as never);
-		await aWritten.promise;
-		const shareB = shareSession(context("B") as never);
-		await bWritten.promise;
-		await shareA;
-		releaseB.resolve();
-		await shareB;
-
-		expect(uploads).toEqual(["A", "B"]);
-		expect(errors).toEqual([]);
-	});
+			mode.setupEditorSubmitHandler();
+			await mode.defaultEditor.onSubmit!(command);
+			expect(errors).toHaveLength(1);
+			expect(errors[0]).toContain("/export");
+			expect(mode.editor.setText).toHaveBeenCalledWith("");
+			await shareSession({ showError });
+			expect(errors).toHaveLength(2);
+			expect(fetchMock).not.toHaveBeenCalled();
+			expect(childProcessMocks.spawn).not.toHaveBeenCalled();
+			expect(childProcessMocks.spawnSync).not.toHaveBeenCalled();
+		},
+	);
 });
