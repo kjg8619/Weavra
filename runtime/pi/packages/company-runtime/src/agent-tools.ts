@@ -499,7 +499,7 @@ export function createWorkerTools(options: {
 						content: [
 							{
 								type: "text",
-								text: "UNAVAILABLE: request recorded in Pi session; checks run only in Kernel verification stages. Do not claim PASS.",
+								text: "UNAVAILABLE: request recorded in runtime session; checks run only in Kernel verification stages. Do not claim PASS.",
 							},
 						],
 						details: { id: params.id, status: "UNAVAILABLE" },

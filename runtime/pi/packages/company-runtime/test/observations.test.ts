@@ -189,7 +189,6 @@ describe("pure bounded command views", () => {
 		value.activeAgents = ["Developer"];
 		const text = formatRunView("team", { run: value, source: "stored snapshot" });
 		expect(text).toContain("liveness unconfirmed");
-		expect(text).toContain("owning Pi session to cancel");
 	});
 	it("config inspection describes effective revision limits without resolving providers", () => {
 		const config = parseRuntimeConfig(

@@ -29,7 +29,9 @@ try {
 	} catch {
 		/* Advertise fixed readiness only; never raw paths, credentials or diagnostics. */
 	}
-	process.env.PI_CODING_AGENT_DIR = agentDir;
+	process.env.WEAVRA_CODING_AGENT_DIR = agentDir;
+	delete process.env.WEAVRA_CODING_AGENT_SESSION_DIR;
+	delete process.env.PI_CODING_AGENT_DIR;
 	delete process.env.PI_CODING_AGENT_SESSION_DIR;
 	const bridge = await HostControlBridge.create({ cwd: process.cwd(), projectTrusted: true, agentDir, readiness });
 	let closing = false;

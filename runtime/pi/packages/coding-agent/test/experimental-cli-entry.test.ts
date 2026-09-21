@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { VERSION } from "../src/config.ts";
+import { PRODUCT_VERSION } from "../src/config.ts";
 
 const sourceResolverPath = resolve(__dirname, "../src/experimental/source-resolver.ts");
 const tempDirs: string[] = [];
@@ -34,7 +34,7 @@ function runEntry(entry: string, experimental: boolean) {
 				...process.env,
 				HOME: directory,
 				USERPROFILE: directory,
-				PI_CODING_AGENT_DIR: join(directory, "agent"),
+				WEAVRA_CODING_AGENT_DIR: join(directory, "agent"),
 				PI_OFFLINE: "1",
 				PI_EXPERIMENTAL: experimental ? "1" : "0",
 			},
@@ -47,19 +47,19 @@ describe("stable and development CLI entrypoints", () => {
 	it("does not dispatch experimental commands from the stable entrypoint", () => {
 		const result = runEntry("cli.ts", true);
 		expect(result.status, result.stderr).toBe(0);
-		expect(result.stdout.trim()).toBe(VERSION);
+		expect(result.stdout.trim()).toBe(PRODUCT_VERSION);
 	});
 
 	it("keeps experimental dispatch in the development entrypoint", () => {
 		const result = runEntry("experimental/cli.ts", true);
 		expect(result.status, result.stderr).toBe(1);
 		expect(result.stderr).toContain("Invalid --server-id");
-		expect(result.stdout).not.toContain(VERSION);
+		expect(result.stdout).not.toContain(PRODUCT_VERSION);
 	});
 
 	it("falls back to the stable CLI when experiments are disabled", () => {
 		const result = runEntry("experimental/cli.ts", false);
 		expect(result.status, result.stderr).toBe(0);
-		expect(result.stdout.trim()).toBe(VERSION);
+		expect(result.stdout.trim()).toBe(PRODUCT_VERSION);
 	});
 });

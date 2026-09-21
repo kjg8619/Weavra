@@ -41,7 +41,7 @@ vi.mock("openai", () => {
 	return { AzureOpenAI };
 });
 
-const PI_USER_AGENT = `pi (${platform()} ${release()}; ${arch()})`;
+const PI_USER_AGENT = `Weavra (${platform()} ${release()}; ${arch()})`;
 
 const context: Context = {
 	messages: [{ role: "user", content: "hello", timestamp: Date.now() }],

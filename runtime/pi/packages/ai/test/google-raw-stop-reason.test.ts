@@ -90,7 +90,7 @@ import { stream as streamGoogleVertex } from "../src/api/google-vertex.ts";
 import { getModel } from "../src/compat.ts";
 import type { Context } from "../src/types.ts";
 
-const PI_USER_AGENT = `pi (${platform()} ${release()}; ${arch()})`;
+const PI_USER_AGENT = `Weavra (${platform()} ${release()}; ${arch()})`;
 
 const context: Context = {
 	messages: [{ role: "user", content: "hello", timestamp: Date.now() }],

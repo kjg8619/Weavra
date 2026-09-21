@@ -32,8 +32,8 @@ import { buildInitialMessage } from "./cli/initial-message.ts";
 import { listModels } from "./cli/list-models.ts";
 import { createProjectTrustContext } from "./cli/project-trust.ts";
 import { selectSession } from "./cli/session-picker.ts";
-import { shouldRunFirstTimeSetup, showFirstTimeSetup, showStartupSelector } from "./cli/startup-ui.ts";
-import { APP_NAME, ENV_SESSION_DIR, expandTildePath, getAgentDir, getPackageDir, VERSION } from "./config.ts";
+import { showStartupSelector } from "./cli/startup-ui.ts";
+import { APP_NAME, ENV_SESSION_DIR, expandTildePath, getAgentDir, PRODUCT_VERSION } from "./config.ts";
 import { type CreateAgentSessionRuntimeFactory, createAgentSessionRuntime } from "./core/agent-session-runtime.ts";
 import {
 	type AgentSessionRuntimeDiagnostic,
@@ -66,9 +66,8 @@ import { runMigrations, showDeprecationWarnings } from "./migrations.ts";
 import { InteractiveMode, runPrintMode, runRpcMode } from "./modes/index.ts";
 import { initTheme, setThemeJsonValidator, stopThemeWatcher } from "./modes/interactive/theme/theme.ts";
 import { validateThemeJson } from "./modes/interactive/theme/theme-json.ts";
-import { cleanupManagedInstall, handleConfigCommand, handlePackageCommand } from "./package-manager-cli.ts";
+import { handleConfigCommand, handlePackageCommand } from "./package-manager-cli.ts";
 import { isLocalPath, normalizePath, resolvePath } from "./utils/paths.ts";
-import { cleanupWindowsSelfUpdateQuarantine } from "./utils/windows-self-update.ts";
 
 const EXTENSION_LOAD_FAILURE_HINT = `Hint: Start without extensions using "${APP_NAME} -ne".`;
 
@@ -562,20 +561,17 @@ export interface MainOptions {
 export async function main(args: string[], options?: MainOptions) {
 	resetTimings();
 	const extensionFactories = [...builtInExtensions, ...(options?.extensionFactories ?? [])];
-	const offlineMode = args.includes("--offline") || isTruthyEnvFlag(process.env.PI_OFFLINE);
+	const offlineMode =
+		args.includes("--offline") || isTruthyEnvFlag(process.env.WEAVRA_OFFLINE ?? process.env.PI_OFFLINE);
 	if (offlineMode) {
 		process.env.PI_OFFLINE = "1";
-		process.env.PI_SKIP_VERSION_CHECK = "1";
+	} else if (process.env.WEAVRA_OFFLINE !== undefined) {
+		delete process.env.PI_OFFLINE;
 	}
 
 	if (await runAuthCommand(args)) {
 		return;
 	}
-
-	if (process.platform === "win32") {
-		cleanupWindowsSelfUpdateQuarantine(getPackageDir());
-	}
-	cleanupManagedInstall();
 
 	const cwd = process.cwd();
 	const agentDir = getAgentDir();
@@ -613,7 +609,7 @@ export async function main(args: string[], options?: MainOptions) {
 	time("parseArgs");
 
 	if (parsed.version) {
-		console.log(VERSION);
+		console.log(PRODUCT_VERSION);
 		process.exit(0);
 	}
 
@@ -651,13 +647,6 @@ export async function main(args: string[], options?: MainOptions) {
 
 	const startupSettingsManager = SettingsManager.create(cwd, agentDir);
 	const startupSettingsDiagnostics = collectSettingsDiagnostics(startupSettingsManager);
-
-	// Experimental first-time setup: theme choice and analytics opt-in.
-	// Runs before any runtime services are created so the chosen settings apply everywhere.
-	if (appMode === "interactive" && !parsed.help && parsed.listModels === undefined && shouldRunFirstTimeSetup()) {
-		await showFirstTimeSetup(startupSettingsManager);
-		time("firstTimeSetup");
-	}
 
 	if (appMode === "interactive" && parsed.useTheme !== undefined) {
 		startupSettingsManager.applyOverrides({ theme: parsed.useTheme });

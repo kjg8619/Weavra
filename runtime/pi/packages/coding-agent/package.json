@@ -1,7 +1,7 @@
 {
 	"name": "@earendil-works/pi-coding-agent",
 	"version": "0.85.1",
-	"description": "Coding agent CLI with read, bash, edit, write tools and session management",
+	"description": "Pi-derived internal implementation of the Weavra development runtime",
 	"type": "module",
 	"piConfig": {
 		"configDir": ".pi"
@@ -98,8 +98,8 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/earendil-works/pi.git",
-		"directory": "packages/coding-agent"
+		"url": "git+https://github.com/kjg8619/Weavra.git",
+		"directory": "runtime/pi/packages/coding-agent"
 	},
 	"engines": {
 		"node": ">=22.19.0"

@@ -229,8 +229,8 @@ export async function doctorWeavra(
 	};
 	output("Weavra Doctor");
 	for (const [label, path, directory, executable] of [
-		["Fork-local checkout", checkout, true, false],
-		["Pi build", join(checkout, "packages/coding-agent/dist/bundle/cli.js"), false, true],
+		["Runtime checkout", checkout, true, false],
+		["Weavra runtime build", join(checkout, "packages/coding-agent/dist/bundle/cli.js"), false, true],
 		["Weavra extension", join(checkout, "packages/company-runtime/src/extension.ts"), false, false],
 	] as const) {
 		try {
@@ -239,7 +239,7 @@ export async function doctorWeavra(
 			await access(path, constants.R_OK | (executable ? constants.X_OK : 0));
 			report("PASS", label, path);
 		} catch {
-			report("FAIL", label, "missing or inaccessible; no global Pi fallback");
+			report("FAIL", label, "missing or inaccessible; no global runtime fallback");
 		}
 	}
 	const [major, minor, patch] = process.versions.node.split(".").map(Number);

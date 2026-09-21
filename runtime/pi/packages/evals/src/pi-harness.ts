@@ -55,8 +55,8 @@ type PiCodingAgentHarnessWithOutput<TOutput extends JsonValue> = PiCodingAgentHa
 // production prompt builder. The isolated eval prompt has no project context or skills between these markers. If
 // that setup changes, this transform must be updated so baseline and candidate still differ only by documentation.
 export function excludePiDocumentation(defaultPrompt: string): string {
-	const documentationStart = defaultPrompt.indexOf("\nPi documentation (read only");
-	if (documentationStart === -1) throw new Error("Default Pi system prompt has no Pi documentation section.");
+	const documentationStart = defaultPrompt.indexOf("\nWeavra runtime documentation (");
+	if (documentationStart === -1) throw new Error("Default runtime system prompt has no documentation section.");
 	const cwdStart = defaultPrompt.lastIndexOf("\nCurrent working directory: ");
 	if (cwdStart === -1) throw new Error("Default Pi system prompt has no working-directory section.");
 	return defaultPrompt.slice(0, documentationStart) + defaultPrompt.slice(cwdStart);
@@ -167,7 +167,7 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 			agentDir,
 			modelRuntime,
 			settingsManager: SettingsManager.inMemory({
-				shellCommandPrefix: `export HOME=${JSON.stringify(isolatedHome)}; unset PI_CODING_AGENT_DIR PI_EVAL_ARTIFACT_DIR PI_MODEL PI_PROVIDER PI_REASONING_LEVEL PI_SESSION_FILE PI_SESSION_ID;`,
+				shellCommandPrefix: `export HOME=${JSON.stringify(isolatedHome)}; unset WEAVRA_HOME WEAVRA_CODING_AGENT_DIR WEAVRA_CODING_AGENT_SESSION_DIR PI_CODING_AGENT_DIR PI_EVAL_ARTIFACT_DIR PI_MODEL PI_PROVIDER PI_REASONING_LEVEL PI_SESSION_FILE PI_SESSION_ID;`,
 			}),
 			...(extensionFactories.length > 0 ? { resourceLoaderOptions: { extensionFactories } } : {}),
 		});

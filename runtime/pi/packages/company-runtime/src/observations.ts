@@ -300,7 +300,7 @@ export function formatRunView(
 				...(last ? [`  ${displayText(last.sessionId)} → ${displayText(last.sessionFile)}`] : []),
 			);
 		}
-		lines.push("Session references only; transcript/usage remain owned by Pi.");
+		lines.push("Session references only; transcript/usage remain owned by the runtime session.");
 	} else if (command === "risk") {
 		lines.push(
 			`Classification: ${displayText(run.classification.reason)}`,
@@ -391,7 +391,7 @@ export function formatRunView(
 	lines.push(
 		`Partial changes exist: ${active ? "possible; active step is not a live diff snapshot" : view.report?.partialChanges || (run.status !== "COMPLETED" && !!run.workspace?.changedFiles.length) ? "yes" : "no"}${view.report?.changesUnknown ? " (collection incomplete)" : ""}`,
 		`Error: ${displayText(view.report?.error ?? run.lastError ?? "none")}`,
-		`Next: ${displayText(active ? (local ? "Use /workflow status or /workflow cancel; parent Esc does not cancel workers" : "Inspect the owning Pi session to cancel; this stored snapshot has no local worker and is not automatically recovered") : (view.report?.recommendedAction ?? "Inspect stored evidence and current git diff; no automatic resume"))}`,
+		`Next: ${displayText(active ? (local ? "Use /workflow status or /workflow cancel; parent Esc does not cancel workers" : "Inspect the owning Weavra session to cancel; this stored snapshot has no local worker and is not automatically recovered") : (view.report?.recommendedAction ?? "Inspect stored evidence and current git diff; no automatic resume"))}`,
 	);
 	const output = lines.join("\n");
 	return output.length > 32000

@@ -101,7 +101,7 @@ beforeEach(async () => {
 	await writeFile(
 		cli,
 		`#!/usr/bin/env node
-console.log(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2), agentDir: process.env.PI_CODING_AGENT_DIR, sessionDir: process.env.PI_CODING_AGENT_SESSION_DIR ?? null, home: process.env.HOME, marker: process.env.MARKER }));
+console.log(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2), agentDir: process.env.WEAVRA_CODING_AGENT_DIR, sessionDir: process.env.WEAVRA_CODING_AGENT_SESSION_DIR ?? null, home: process.env.HOME, marker: process.env.MARKER }));
 `,
 		{ mode: 0o755 },
 	);
@@ -401,16 +401,7 @@ describe("read-only doctor", () => {
 		const before = await snapshot(home);
 		const result = run(["doctor"]);
 		expect(result.status, result.stderr).toBe(0);
-		for (const item of [
-			"Fork-local checkout",
-			"Pi build",
-			"Weavra extension",
-			"Node",
-			"Git",
-			"Isolation",
-			"Agent directory",
-			"Default session root",
-		])
+		for (const item of ["Weavra extension", "Node", "Git", "Isolation", "Agent directory", "Default session root"])
 			expect(result.stdout).toContain(`PASS  ${item}`);
 		expect(result.stdout).toContain("WARN  auth.json");
 		expect(result.stdout).toContain("Result: READY (local checks only");

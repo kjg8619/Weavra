@@ -54,7 +54,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 	return { default: FakeAnthropic };
 });
 
-const PI_USER_AGENT = `pi (${platform()} ${release()}; ${arch()})`;
+const PI_USER_AGENT = `Weavra (${platform()} ${release()}; ${arch()})`;
 const neverAbortedSignal = new AbortController().signal;
 
 const context: Context = {

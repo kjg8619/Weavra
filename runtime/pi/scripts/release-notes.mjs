@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const DEFAULT_REPO = "earendil-works/pi";
 const DEFAULT_BASE_PATH = "packages/coding-agent";
 const DEFAULT_CHANGELOG = "packages/coding-agent/CHANGELOG.md";
-const DEFAULT_FIX_SINCE_TAG = "v0.74.0";
 const LEGACY_REPO_RE = /^https:\/\/github\.com\/(?:badlogic|earendil-works)\/pi-mono(?=\/|$)/;
 const URL_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 const INLINE_MARKDOWN_LINK_RE = /(!?\[[^\]\n]+\]\()([^\s)]+)((?:\s+[^)]*)?\))/g;
@@ -18,7 +15,6 @@ function printUsage() {
 
 Commands:
   extract              Extract release notes from the coding-agent changelog
-  fix-github-releases  Rewrite existing GitHub release note links in place
 
 extract options:
   --version <x.y.z>    Version to extract
@@ -28,43 +24,16 @@ extract options:
   --repo <owner/repo>  GitHub repository for generated links (default: ${DEFAULT_REPO})
   --base-path <path>   Base path for relative changelog links (default: ${DEFAULT_BASE_PATH})
 
-fix-github-releases options:
-  --repo <owner/repo>     GitHub repository to patch (default: ${DEFAULT_REPO})
-  --tag <vX.Y.Z>          Patch only one release tag
-  --since-tag <vX.Y.Z>    Oldest release tag to patch (default: ${DEFAULT_FIX_SINCE_TAG})
-  --base-path <path>      Base path for relative changelog links (default: ${DEFAULT_BASE_PATH})
-  --dry-run               Print releases that would change without updating GitHub
 `);
 }
 
-function commandForPlatform(command) {
-	return process.platform === "win32" ? `${command}.cmd` : command;
-}
-
-function run(command, args, options = {}) {
-	const result = spawnSync(commandForPlatform(command), args, {
-		cwd: options.cwd,
-		encoding: "utf8",
-		maxBuffer: options.maxBuffer ?? 20 * 1024 * 1024,
-		stdio: options.capture ? ["inherit", "pipe", "pipe"] : "inherit",
-	});
-
-	if (result.status !== 0) {
-		const output = [result.stdout, result.stderr].filter(Boolean).join("\n");
-		throw new Error(output ? `Command failed: ${command} ${args.join(" ")}\n${output}` : `Command failed: ${command} ${args.join(" ")}`);
-	}
-
-	return result.stdout ?? "";
-}
 
 function parseOptions(args) {
 	const options = {
 		basePath: DEFAULT_BASE_PATH,
 		changelog: DEFAULT_CHANGELOG,
-		dryRun: false,
 		out: undefined,
 		repo: DEFAULT_REPO,
-		sinceTag: DEFAULT_FIX_SINCE_TAG,
 		tag: undefined,
 		version: undefined,
 	};
@@ -75,12 +44,8 @@ function parseOptions(args) {
 			printUsage();
 			process.exit(0);
 		}
-		if (arg === "--dry-run") {
-			options.dryRun = true;
-			continue;
-		}
 
-		const optionNames = new Set(["--base-path", "--changelog", "--out", "--repo", "--since-tag", "--tag", "--version"]);
+		const optionNames = new Set(["--base-path", "--changelog", "--out", "--repo", "--tag", "--version"]);
 		if (!optionNames.has(arg)) {
 			throw new Error(`Unknown option: ${arg}`);
 		}
@@ -94,7 +59,6 @@ function parseOptions(args) {
 		if (arg === "--changelog") options.changelog = value;
 		if (arg === "--out") options.out = value;
 		if (arg === "--repo") options.repo = value;
-		if (arg === "--since-tag") options.sinceTag = value;
 		if (arg === "--tag") options.tag = value;
 		if (arg === "--version") options.version = value;
 	}
@@ -113,19 +77,6 @@ function versionFromTag(tag) {
 	return tag.startsWith("v") ? tag.slice(1) : tag;
 }
 
-function compareVersions(a, b) {
-	const aParts = versionFromTag(a).split(".").map(Number);
-	const bParts = versionFromTag(b).split(".").map(Number);
-
-	for (let i = 0; i < 3; i++) {
-		const diff = (aParts[i] || 0) - (bParts[i] || 0);
-		if (diff !== 0) {
-			return diff;
-		}
-	}
-
-	return 0;
-}
 
 function escapeRegExp(value) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -265,83 +216,6 @@ function extractReleaseNotes(options) {
 	writeOutput(markdown, options.out);
 }
 
-function listGithubReleases(repo) {
-	const output = run("gh", ["api", `repos/${repo}/releases`, "--paginate", "--jq", ".[] | {id, tag_name, body} | @json"], {
-		capture: true,
-	});
-	return output
-		.split("\n")
-		.map((line) => line.trim())
-		.filter(Boolean)
-		.map((line) => JSON.parse(line));
-}
-
-function uniqueChanges(changes) {
-	const seen = new Set();
-	const unique = [];
-	for (const change of changes) {
-		const key = `${change.from}\n${change.to}`;
-		if (seen.has(key)) {
-			continue;
-		}
-		seen.add(key);
-		unique.push(change);
-	}
-	return unique;
-}
-
-function updateGithubRelease(repo, tag, body) {
-	const tempDir = mkdtempSync(path.join(tmpdir(), "pi-release-notes-"));
-	try {
-		const notesPath = path.join(tempDir, "notes.md");
-		writeFileSync(notesPath, body);
-		run("gh", ["release", "edit", tag, "--repo", repo, "--notes-file", notesPath], { capture: true });
-	} finally {
-		rmSync(tempDir, { force: true, recursive: true });
-	}
-}
-
-function fixGithubReleases(options) {
-	const tagFilter = normalizeTag(options.tag);
-	const sinceTag = normalizeTag(options.sinceTag);
-	const matchingReleases = listGithubReleases(options.repo).filter((release) => !tagFilter || release.tag_name === tagFilter);
-
-	if (tagFilter && matchingReleases.length === 0) {
-		throw new Error(`Release not found: ${tagFilter}`);
-	}
-
-	const releases = matchingReleases.filter((release) => compareVersions(release.tag_name, sinceTag) >= 0);
-	if (tagFilter && releases.length === 0) {
-		console.log(`Skipping ${tagFilter}: older than ${sinceTag}.`);
-		console.log(`${options.dryRun ? "Would update" : "Updated"} 0 releases.`);
-		return;
-	}
-
-	let changedCount = 0;
-	for (const release of releases) {
-		const tag = release.tag_name;
-		const body = release.body ?? "";
-		const result = normalizeReleaseNoteLinks(body, { basePath: options.basePath, repo: options.repo, tag });
-		if (result.markdown === body) {
-			continue;
-		}
-
-		changedCount++;
-		const unique = uniqueChanges(result.changes);
-		console.log(`${options.dryRun ? "Would update" : "Updating"} ${tag} (${unique.length} link${unique.length === 1 ? "" : "s"})`);
-		for (const change of unique) {
-			console.log(`  ${change.from}`);
-			console.log(`  -> ${change.to}`);
-		}
-
-		if (!options.dryRun) {
-			updateGithubRelease(options.repo, tag, result.markdown);
-		}
-	}
-
-	const prefix = options.dryRun ? "Would update" : "Updated";
-	console.log(`${prefix} ${changedCount} release${changedCount === 1 ? "" : "s"}.`);
-}
 
 try {
 	const [command, ...args] = process.argv.slice(2);
@@ -354,7 +228,7 @@ try {
 	if (command === "extract") {
 		extractReleaseNotes(options);
 	} else if (command === "fix-github-releases") {
-		fixGithubReleases(options);
+		throw new Error("Weavra does not rewrite source-repository releases.");
 	} else {
 		throw new Error(`Unknown command: ${command}`);
 	}

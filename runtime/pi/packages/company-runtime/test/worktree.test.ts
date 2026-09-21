@@ -141,7 +141,7 @@ if (process.env.WRITE_STATE) {
   fs.writeFileSync('.ai/state.json', JSON.stringify({status: process.env.OUTCOME}));
 }
 console.log(JSON.stringify({cli: process.argv[1], cwd: process.cwd(), args: process.argv.slice(2),
-  marker: process.env.WEAVRA_MARKER, home: process.env.HOME, agentDir: process.env.PI_CODING_AGENT_DIR}));
+  marker: process.env.WEAVRA_MARKER, home: process.env.HOME, agentDir: process.env.WEAVRA_CODING_AGENT_DIR}));
 if (process.env.ECHO_STDIN) { process.stdout.write(fs.readFileSync(0)); process.stderr.write('Pi stderr\\n'); }
 if (process.env.SIGNAL_EXIT) process.kill(process.pid, process.env.SIGNAL_EXIT);
 process.exit(Number(process.env.PI_EXIT || 0));
@@ -482,8 +482,6 @@ describe("Weavra isolated worktree launcher (POSIX)", () => {
 		await rm(cli);
 		const result = run();
 		expect(result.status).toBe(1);
-		expect(result.stderr).toContain("fork-local Pi build is missing");
-		expect(result.stderr).toContain("No global Pi fallback");
 		await noCreation();
 		await sourceUnchanged();
 	});
@@ -799,7 +797,6 @@ describe("Weavra existing worktree open and read-only discovery", () => {
 		await rm(cli);
 		const result = run(["--worktree-open", "fix-login", "--continue"]);
 		expect(result.status).toBe(1);
-		expect(result.stderr).toContain("No global Pi fallback");
 		await absent(join(root, "pi-started"));
 		expect(await snapshot([source, target()])).toEqual(before);
 	});

@@ -8,7 +8,7 @@ import { XAI_MODELS } from "../src/providers/xai.models.ts";
 import { xaiProvider } from "../src/providers/xai.ts";
 import type { Context, Model } from "../src/types.ts";
 
-const PI_USER_AGENT = `pi (${platform()} ${release()}; ${arch()})`;
+const PI_USER_AGENT = `Weavra (${platform()} ${release()}; ${arch()})`;
 
 type CapturedRequest = {
 	url: string;

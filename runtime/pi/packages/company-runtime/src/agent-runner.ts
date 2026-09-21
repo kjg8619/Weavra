@@ -288,7 +288,8 @@ export class PiAgentExecutor implements AgentExecutor {
 			throw new Error("Invalid worker limits");
 		const paths = await FilePolicyPathInspector.open(options.cwd);
 		const agentDir = await realpath(options.agentDir);
-		if (inside(paths.projectPath, agentDir)) throw new Error("Pi agent directory must be outside worker workspace");
+		if (inside(paths.projectPath, agentDir))
+			throw new Error("Weavra agent directory must be outside worker workspace");
 		const protectedPaths = [...(options.protectedPaths ?? [])];
 		// Freeze explicitly registered local programs/scripts; a worker must not rewrite its own check.
 		// Same source resolution as the verifier trust snapshot, so protection and freeze never drift.
