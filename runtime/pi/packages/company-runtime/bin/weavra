@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve npm-link symlinks without changing the caller's working directory.
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+  DIRECTORY="$(CDPATH= cd -P -- "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" = /* ]] || SOURCE="$DIRECTORY/$SOURCE"
+done
+DIRECTORY="$(CDPATH= cd -P -- "$(dirname "$SOURCE")" && pwd)"
+fail() {
+  printf 'Weavra: %s\n' "$1" >&2
+  exit 1
+}
+
+# Product commands are exact launcher-owned invocations, never Pi prompts/options.
+if [[ "${1-}" = setup || "${1-}" = doctor ]]; then
+  (( $# == 1 )) || fail "setup/doctor cannot be combined with Pi arguments or worktree options."
+  exec node "$DIRECTORY/../src/launcher-home.ts" "$1"
+fi
+if [[ "${1-}" = fitness ]]; then
+  shift
+  exec node "$DIRECTORY/../src/launcher-fitness.ts" "$@"
+fi
+if [[ "${1-}" = browser ]]; then
+  shift
+  exec node "$DIRECTORY/../src/launcher-browser.ts" "$@"
+fi
+if [[ "${1-}" = bridge ]]; then
+  if [[ $# == 4 && "$2" = --stdio && "$3" = --project-trusted && "$4" = --control ]]; then
+    exec node "$DIRECTORY/../src/launcher-control.ts" --stdio --project-trusted --control
+  fi
+  [[ $# == 3 && "$2" = --stdio && "$3" = --project-trusted ]] || fail "Usage: weavra bridge --stdio --project-trusted [--control]"
+  exec node "$DIRECTORY/../src/launcher-bridge.ts" --stdio --project-trusted
+fi
+
+WORKTREE_NAME=""
+WORKTREE_MODE=""
+PI_ARGS=()
+while (( $# )); do
+  case "$1" in
+    --worktree|--worktree-open)
+      [[ -z "$WORKTREE_MODE" ]] || fail "choose only one of --worktree, --worktree-open, or --worktree-list."
+      (( $# >= 2 )) && [[ -n "$2" && "$2" != --* ]] || fail "$1 requires a name: weavra $1 fix-login"
+      WORKTREE_MODE="$1"
+      WORKTREE_NAME="$2"
+      shift 2
+      ;;
+    --worktree-list)
+      [[ -z "$WORKTREE_MODE" ]] || fail "choose only one of --worktree, --worktree-open, or --worktree-list."
+      WORKTREE_MODE="$1"
+      shift
+      ;;
+    setup|doctor|bridge|fitness|browser)
+      fail "setup/doctor/bridge/fitness/browser must be standalone launcher commands. Use -- for a literal Pi prompt."
+      ;;
+    --)
+      PI_ARGS+=("$@")
+      break
+      ;;
+    *)
+      PI_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+# The conditional expansion also supports empty arrays on macOS Bash 3.2 with nounset.
+set -- "${PI_ARGS[@]+"${PI_ARGS[@]}"}"
+
+# Discovery does not need a Pi build or load an Extension/session.
+if [[ "$WORKTREE_MODE" = --worktree-list ]]; then
+  (( $# == 0 )) || fail "--worktree-list does not accept Pi arguments."
+  exec node "$DIRECTORY/../src/launcher-worktrees.ts" list
+fi
+
+EXTENSION="$DIRECTORY/../src/extension.ts"
+if [[ ! -f "$EXTENSION" || ! -r "$EXTENSION" ]]; then
+  printf '%s\n' "Weavra: extension not found or unreadable at $EXTENSION. Keep the repository checkout intact and run npm link --workspace packages/company-runtime --ignore-scripts again." >&2
+  exit 1
+fi
+EXTENSION="$(CDPATH= cd -P -- "$DIRECTORY/../src" && pwd)/extension.ts"
+CHECKOUT="$(CDPATH= cd -P -- "$DIRECTORY/../../.." && pwd)"
+# Keep the CLI and Extension tied to the same checkout, never a PATH-selected Pi.
+PI="$CHECKOUT/packages/coding-agent/dist/bundle/cli.js"
+if [[ ! -f "$PI" || ! -r "$PI" || ! -x "$PI" ]]; then
+  printf 'Weavra: fork-local Pi build is missing or not executable: %s\nBuild from this checkout: cd %q && npm install --ignore-scripts && npm run build\nNo global Pi fallback.\n' "$PI" "$CHECKOUT" >&2
+  exit 1
+fi
+
+# Resolve and validate before creating a worktree. Never bootstrap or fall back to Pi's home.
+WEAVRA_AGENT_DIR="$(node "$DIRECTORY/../src/launcher-home.ts" launch)" || exit 1
+[[ -n "$WEAVRA_AGENT_DIR" && "$WEAVRA_AGENT_DIR" = /* && "$WEAVRA_AGENT_DIR" != *$'\n'* && "$WEAVRA_AGENT_DIR" != *$'\r'* ]] || fail "invalid Weavra agent directory."
+
+if [[ "$WORKTREE_MODE" = --worktree-open ]]; then
+  TARGET="$(node "$DIRECTORY/../src/launcher-worktrees.ts" open "$WORKTREE_NAME")" || exit 1
+  [[ -n "$TARGET" && "$TARGET" = /* && "$TARGET" != *$'\n'* && "$TARGET" != *$'\r'* ]] || fail "invalid worktree discovery result."
+  cd -- "$TARGET" || fail "cannot enter registered worktree; no repair was performed."
+elif [[ "$WORKTREE_MODE" = --worktree ]]; then
+  [[ "$WORKTREE_NAME" != *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-]* ]] || fail "invalid worktree name; use only A-Z, a-z, 0-9, dot, underscore, or hyphen."
+  BRANCH="weavra/$WORKTREE_NAME"
+
+  # Reject repository redirection rather than changing the environment inherited by Pi.
+  for VARIABLE in GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE; do
+    [[ -z "${!VARIABLE-}" ]] || fail "unset $VARIABLE before using --worktree."
+  done
+  # No optional index writes or user checkout/fsmonitor hooks during launcher operations.
+  # Every invocation is an argv command, never eval or a shell command string.
+  worktree_git() {
+    GIT_OPTIONAL_LOCKS=0 git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"
+  }
+  worktree_git check-ref-format --branch "$BRANCH" >/dev/null || fail "invalid Git branch name: $BRANCH"
+  # Preserve trailing newlines long enough to reject ambiguous line-based Git paths.
+  REPO="$(worktree_git rev-parse --show-toplevel && printf '.')" || fail "cannot locate source Git repository."
+  REPO="${REPO%.}"
+  REPO="${REPO%$'\n'}"
+  [[ "$REPO" != *$'\n'* && "$REPO" != *$'\r'* ]] || fail "source repository path must not contain line breaks."
+  REPO="$(CDPATH= cd -P -- "$REPO" && pwd)" || fail "cannot resolve source repository root."
+  SOURCE_HEAD="$(worktree_git -C "$REPO" rev-parse --verify 'HEAD^{commit}')" || fail "source repository has no readable HEAD commit."
+  SOURCE_BRANCH="$(worktree_git -C "$REPO" rev-parse --symbolic-full-name HEAD)" || fail "cannot inspect source branch."
+
+  check_source() {
+    local head branch status
+    head="$(worktree_git -C "$REPO" rev-parse --verify 'HEAD^{commit}')" || fail "cannot verify source HEAD."
+    branch="$(worktree_git -C "$REPO" rev-parse --symbolic-full-name HEAD)" || fail "cannot verify source branch."
+    [[ "$head" = "$SOURCE_HEAD" && "$branch" = "$SOURCE_BRANCH" ]] || fail "source HEAD or branch changed; Pi was not started. No rollback was performed."
+    status="$(worktree_git -C "$REPO" status --porcelain=v1 --untracked-files=all --ignore-submodules=none)" || fail "cannot inspect source workspace status."
+    [[ -z "$status" ]] || fail $'source workspace has uncommitted changes.\nCommit or clean them before creating an isolated worktree.\nNo stash/reset was performed.'
+  }
+  check_source
+  if worktree_git -C "$REPO" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+    fail "branch already exists: $BRANCH. No reuse or deletion was performed."
+  else
+    RESULT=$?
+    [[ "$RESULT" = 1 ]] || fail "cannot inspect existing branches."
+  fi
+
+  PARENT="$(dirname "$REPO")"
+  PROJECT="$(basename "$REPO")"
+  BASE="$PARENT/.weavra-worktrees/$PROJECT"
+  TARGET="$BASE/$WORKTREE_NAME"
+  [[ "$TARGET" != "$REPO/"* ]] || fail "worktree target must be outside the source repository."
+  [[ ! -e "$TARGET" && ! -L "$TARGET" ]] || fail "worktree target already exists: $TARGET. No overwrite or deletion was performed."
+  # Do not follow a pre-existing symlink back into the source or another workspace.
+  for DIRECTORY in "$PARENT/.weavra-worktrees" "$BASE"; do
+    [[ ! -L "$DIRECTORY" ]] || fail "worktree parent must not be a symlink: $DIRECTORY"
+    if [[ ! -e "$DIRECTORY" ]]; then
+      mkdir -- "$DIRECTORY" || fail "cannot create worktree parent: $DIRECTORY"
+    fi
+    [[ -d "$DIRECTORY" ]] || fail "worktree parent is not a directory: $DIRECTORY"
+  done
+  check_source
+  # Reserve exclusively: Git otherwise accepts an existing empty target directory.
+  mkdir -- "$TARGET" || fail "cannot reserve new worktree target: $TARGET. Nothing was removed."
+  printf 'Weavra: creating %s at %s. Any remaining worktree, directory, or branch will be preserved on failure.\n' "$BRANCH" "$TARGET" >&2
+  RESULT=0
+  worktree_git -C "$REPO" worktree add -b "$BRANCH" "$TARGET" "$SOURCE_HEAD" >&2 || RESULT=$?
+  check_source
+  [[ "$RESULT" = 0 ]] || fail "git worktree add failed. Inspect $TARGET and $BRANCH manually; no cleanup was performed."
+
+  TARGET_HEAD="$(worktree_git -C "$TARGET" rev-parse --verify 'HEAD^{commit}')" || fail "cannot verify created worktree HEAD; no cleanup was performed."
+  TARGET_BRANCH="$(worktree_git -C "$TARGET" symbolic-ref HEAD)" || fail "cannot verify created worktree branch; no cleanup was performed."
+  TARGET_STATUS="$(worktree_git -C "$TARGET" status --porcelain=v1 --untracked-files=all --ignore-submodules=none)" || fail "cannot verify created worktree status; no cleanup was performed."
+  [[ "$TARGET_HEAD" = "$SOURCE_HEAD" && "$TARGET_BRANCH" = "refs/heads/$BRANCH" && -z "$TARGET_STATUS" ]] || fail "created worktree failed verification; Pi was not started. No cleanup was performed."
+  check_source
+  # Keep launcher diagnostics off Pi's stdout (including JSON/RPC streams).
+  printf 'Weavra worktree created\nBranch: %s\nPath: %s\nBase: %s\n' "$BRANCH" "$TARGET" "$SOURCE_HEAD" >&2
+  cd -- "$TARGET" || fail "cannot enter created worktree; no cleanup was performed."
+fi
+
+# Isolate child Pi config/auth/session roots; retain argv including explicit --session-dir/--session.
+export PI_CODING_AGENT_DIR="$WEAVRA_AGENT_DIR"
+unset PI_CODING_AGENT_SESSION_DIR
+# No shell re-parsing, proxy process, signal interception, or global Pi fallback.
+exec "$PI" -e "$EXTENSION" "$@"

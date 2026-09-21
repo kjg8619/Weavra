@@ -1,0 +1,19 @@
+# Copy to <project>/.ai/config.yaml and edit before use.
+# Provider/model IDs are placeholders, not verified or bundled models.
+schemaVersion: 1
+models:
+  profiles:
+    coding:
+      provider: your-provider
+      model: your-coding-model
+    reasoning:
+      provider: your-provider
+      model: your-review-model
+files:
+  allowed_paths: [src, test]
+verification:
+  checks:
+    - id: regression
+      kind: test
+      executable: node
+      args: [scripts/check.mjs]

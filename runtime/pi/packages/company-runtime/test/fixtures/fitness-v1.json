@@ -1,0 +1,100 @@
+{
+	"schemaVersion": 1,
+	"id": "8b90b143-dc28-449f-9dc3-74c902ef4b80",
+	"corpusRevision": "weavra-fitness-1",
+	"corpusDigest": "sha256:5e6391d964668262b0851860af152813e40e3d9071d0e3b697e079a4ce4b8b57",
+	"target": {
+		"provider": "commandcode",
+		"model": "deepseek/deepseek-v4.1-flash",
+		"api": "openai-completions",
+		"endpointIdentity": "sha256:54098f3495c573bb3398e9d9c3f11e3493dbbdb631366891b5b113b3b2b7b2d2",
+		"harnessRevision": "c94d5ddc4871a66943abebebe437f460fa119e99",
+		"toolSchemaRevision": "sha256:0375b1881ee51c6ee700b0c7fd0e57d33bb1d55b74644f8b38ccd521695776e9",
+		"promptRuntimeRevision": "sha256:b0ea9fdffc38374a46acfe06a975bf335521eb4ff5b63058d170c272d0ebf3fd",
+		"configurationDigest": "sha256:c4b7c18bfd2a8725893732010ad8ef80900b6bdc49044303bf96d1db5972c1bf"
+	},
+	"kind": "ACTUAL",
+	"startedAt": 1789899183502,
+	"completedAt": 1789899192114,
+	"status": "CALIBRATION_FAILED",
+	"budget": {
+		"maxFixtures": 2,
+		"maxWorkerCalls": 4,
+		"maxTotalTokens": 100000
+	},
+	"plannedFixtures": [
+		"F01",
+		"F02"
+	],
+	"fixtures": [
+		{
+			"fixtureId": "F01",
+			"fixtureDigest": "sha256:7959c21fc10ddc1812e94b56ffdc67913721e4bd52871928c13f90052cf9cd1e",
+			"runId": "dbf464c7-4ebd-4321-afc0-41f5a44e33f8",
+			"taskContractDigest": "sha256:1f90b8d5e25ae486e6f99e8a5a1375077b0d74db9fa0102a281d32d0c9dead17",
+			"registeredCheckDigest": "sha256:2b03570126ff8b532dd21bc3249342705e59b45616928f15a56b7dfc2948d10a",
+			"configurationDigest": "sha256:6a8974d6955c768b833272ed690e394d155377b564e2239a70f3d1c7f30154fa",
+			"terminalStatus": "COMPLETED",
+			"oracle": "FAIL",
+			"falseCompletion": true,
+			"latencyMs": 8594,
+			"ac": {
+				"met": 1,
+				"notMet": 0
+			},
+			"checks": {
+				"passed": 2,
+				"failed": 0,
+				"notRun": 0
+			},
+			"contract": {
+				"scopeViolations": 0,
+				"forbiddenMutationAttempts": 0,
+				"taskContractAdherence": true,
+				"strictReceiptRejections": 0,
+				"handoffRejections": 0,
+				"reviewRejections": 0
+			},
+			"tools": {
+				"calls": 3,
+				"invalidCalls": 0,
+				"retries": 0,
+				"runtimeRead": 1,
+				"runtimeEdit": 0,
+				"runtimeWrite": 0,
+				"lsp": 0
+			},
+			"reliability": {
+				"providerErrors": 0,
+				"authErrors": 0,
+				"transportErrors": null,
+				"timeouts": 0,
+				"cancellation": "NOT_REQUESTED",
+				"repairCount": 0,
+				"reviewerRevisionCount": 0,
+				"cleanup": "CONFIRMED"
+			},
+			"efficiency": {
+				"usage": {
+					"state": "KNOWN",
+					"input": 2867,
+					"output": 964,
+					"total": 6391,
+					"knownTotal": 6391
+				},
+				"workerInvocations": 1,
+				"modelTurns": 2,
+				"httpAttempts": null,
+				"contextBytes": 1289,
+				"costUsd": null
+			},
+			"evidenceDigest": "sha256:0f0ed63cdee194a107f85ccfb67e8ca71eb9fc87238b11ac4d3d7d95ec7bb773"
+		}
+	],
+	"environment": {
+		"platform": "darwin",
+		"arch": "arm64",
+		"node": "v26.7.0"
+	},
+	"resultDigest": "sha256:e592cf3ef6cfdecdfa08bd1128972501bb91f53dd36e2663ea903b7c1d074c44"
+}
