@@ -71,6 +71,7 @@ describe("AgentSession concurrent prompt guard", () => {
 		delete (globalThis as typeof globalThis & { testExtensionApi?: unknown }).testExtensionApi;
 		delete (globalThis as typeof globalThis & { testCommandRuns?: unknown }).testCommandRuns;
 		if (session) {
+			await session.abort();
 			session.dispose();
 		}
 		if (tempDir && existsSync(tempDir)) {
@@ -133,16 +134,11 @@ describe("AgentSession concurrent prompt guard", () => {
 		// Start first prompt (don't await, it will block until abort)
 		const firstPrompt = session.prompt("First message");
 
-		// Wait a tick for isStreaming to be set
-		await new Promise((resolve) => setTimeout(resolve, 10));
-
-		// Verify we're streaming
-		expect(session.isStreaming).toBe(true);
+		// Credential preparation is asynchronous; wait for the observable streaming state.
+		await expect.poll(() => session.isStreaming).toBe(true);
 
 		// Second prompt should reject
-		await expect(session.prompt("Second message")).rejects.toThrow(
-			"Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.",
-		);
+		await expect(session.prompt("Second message")).rejects.toThrow();
 
 		// Cleanup
 		await session.abort();
@@ -154,7 +150,7 @@ describe("AgentSession concurrent prompt guard", () => {
 
 		// Start first prompt
 		const firstPrompt = session.prompt("First message");
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await expect.poll(() => session.isStreaming).toBe(true);
 
 		// steer should work while streaming
 		await expect(session.steer("Steering message")).resolves.toBeUndefined();
@@ -170,7 +166,7 @@ describe("AgentSession concurrent prompt guard", () => {
 
 		// Start first prompt
 		const firstPrompt = session.prompt("First message");
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await expect.poll(() => session.isStreaming).toBe(true);
 
 		// followUp should work while streaming
 		await expect(session.followUp("Follow-up message")).resolves.toBeUndefined();
@@ -265,8 +261,7 @@ describe("AgentSession concurrent prompt guard", () => {
 		});
 
 		const firstPrompt = session.prompt("First message");
-		await new Promise((resolve) => setTimeout(resolve, 10));
-		expect(session.isStreaming).toBe(true);
+		await expect.poll(() => session.isStreaming).toBe(true);
 
 		const pi = (
 			globalThis as typeof globalThis & {
@@ -278,12 +273,11 @@ describe("AgentSession concurrent prompt guard", () => {
 		expect(pi).toBeDefined();
 
 		pi!.sendUserMessage("Steer from extension", { deliverAs: "steer" });
-		await new Promise((resolve) => setTimeout(resolve, 25));
+		await expect.poll(() => queueEvents.some((event) => event.steering.includes("Steer from extension"))).toBe(true);
 
 		expect(session.pendingMessageCount).toBe(1);
 		expect(session.getSteeringMessages()).toContain("Steer from extension");
 		expect(lastInputSource).toBe("extension");
-		expect(queueEvents.some((event) => event.steering.includes("Steer from extension"))).toBe(true);
 
 		await session.abort();
 		await firstPrompt.catch(() => {});

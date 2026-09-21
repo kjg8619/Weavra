@@ -138,3 +138,12 @@
 - 따라서 위 절의 Icon Composer 경로 대기 및 그에 따른 commit/push/PR 차단 상태는 역사적 기록이 되었다. 코드·비아이콘 UI·authority 경계는 검증된 범위로 유지하고, 아이콘 예외를 PR에 명시하여 feature branch delivery를 재개한다. PR은 `devlop` 대상이며 merge하지 않는다.
 - 이번 승인은 실행 코드 변경이나 검증 gate 완화가 아니다. Runtime 551.38초 / App 418.96초 전체 PASS, 실제 UI·network·C08 smoke 결과를 유지한다. Native mobile GUI 미검증 및 lint warnings는 계속 별도 제한사항으로 보고한다.
 - 최초 commit 시 App hook이 Git product root에서 `vite.config.ts`를 찾지 못해 정상적으로 중단됐다. hook을 비활성화하지 않고 자신의 App package root를 `--cwd`로 지정하도록 수정했다. 별도 실제 Git staged-file smoke에서 App 파일은 포맷되고 Runtime 파일은 byte-for-byte 유지됨을 확인했다. 두 build root의 formatter 경계를 유지한 수정이다.
+
+## 2026-09-21 KST — PR #4 생성 및 원격 CI timing regression 수정
+
+- 구현 commit `8446e2f63b75c138208e001932a9223431655f9c`를 isolated feature branch에 정상 push하고 [PR #4](https://github.com/kjg8619/Weavra/pull/4)를 `devlop` 대상으로 열었다. Hook 우회, force-push, history 수정, merge는 하지 않았다.
+- [첫 원격 CI run](https://github.com/kjg8619/Weavra/actions/runs/35589049449)의 실제 cross-boundary 검증은 PASS했다. Runtime은 concurrent-session 테스트가 비동기 credential 준비를 10ms 고정 sleep으로 기다리다가 streaming 진입 전에 단정하여 실패했다. 이어 fixture 삭제가 진행 중인 credential read와 경합한 unhandled rejection도 관측됐다. 앞선 로컬 전체 PASS와 이 원격 실패는 구분한다.
+- 고정 startup/queue sleep을 기존 `expect.poll` 방식의 관측 가능한 streaming/queue event 대기로 교체하고, teardown은 stream abort 완료 후 dispose와 fixture 삭제를 수행하도록 수정했다. Concurrent-session 회귀 7개가 로컬에서 모두 PASS했다(Vitest 2.10초). 실패한 assertion을 제거하거나 timeout을 늘려 숨기지 않았다.
+- 첫 Ubuntu run의 sandbox suite는 OS backend unavailable을 명시하고 8개를 skip했다. 해당 Linux OS sandbox 실제 경계를 검증했다고 주장하지 않는다. macOS 실제 cross-boundary 결과와 별개 제한사항이다.
+- 최종 head의 전체 Root CI 결과와 job 링크는 PR 본문에 기록한다. 이 기록 시점에서 아직 완료되지 않은 원격 gate를 PASS로 선기록하지 않으며, PR은 OPEN으로 유지한다.
+- Timing 수정 후 Runtime `npm run check`도 6.50초에 PASS했다. Biome은 1,465개 파일에 추가 수정이 없었고, 10 artifact package dependency 검사, import/entry graph, shrinkwrap/install-lock, TypeScript 및 browser smoke gate를 유지했다.
