@@ -1,6 +1,6 @@
 # Repository consolidation record
 
-Status: VALIDATION IN PROGRESS. Do not interpret source historical results as consolidated validation.
+Status: implementation validated locally and by all three root CI jobs. Historical source results and current evidence are distinct. Published baseline identity is recorded by the annotated provenance tag described below.
 
 Date: 2026-09-21. Target: independent public [kjg8619/Weavra](https://github.com/kjg8619/Weavra). Harness: OMP / GPT-6 Astra. Scope: repository consolidation only; no C09/V0.6D feature work.
 
@@ -84,6 +84,20 @@ Root `Weavra CI` has independent `runtime/pi`, `app/t3code`, and `cross-boundary
 - Source archive + lock policy regressions: 3 PASS. Exact import manifest verification PASS.
 - Actual cross-boundary smoke PASS: candidate-only browser observation, real production T3 transports and executable, registration invalidation/confirm, fitness read, workflow invalidation/confirm/cancel, canonical CANCELLED/writer release, distinct fresh self-check/test captures and fresh Broken rejection. Paid requests 0; owned pending loopback request 1.
 - First root CI [35559913155](https://github.com/kjg8619/Weavra/actions/runs/35559913155), SHA `d58653e07c68ad338122f4650fbefbbc3723bcac`: cross-boundary failed on a smoke startup revision race (`STALE_PROJECT`). The fixture now synchronizes on the actual pending loopback request and uses one snapshot for cancellation. No retry, timeout relaxation or production authority change.
-- Exact corrected CI results, final refs and annotated provenance tag remain pending.
+- Corrected exact CI [35561216496](https://github.com/kjg8619/Weavra/actions/runs/35561216496), SHA `3b22c41ee3d94af38d86b9b8e862105c57a0316f`: **success**. `runtime/pi` job `106215141718`, `app/t3code` job `106215141632`, and `cross-boundary` job `106215141757` all succeeded, including unchanged-tracked-source checks.
+- Local `main` and `devlop` were created from that validated implementation. This evidence-only successor must also pass exact-SHA root CI before publication. No validation result is inferred from an ancestor.
+
+## Final publication identity
+
+The annotated tag `weavra-consolidation-baseline-2026-09-21` is the publication record, not a product release. Its annotation records the exact final commit, exact final CI run, source SHAs, import commits, date/harness, and verification/authority limitations. It is created only after the evidence revision passes all three CI jobs and `main`/`devlop` are fast-forwarded to that same revision.
+
+```sh
+git show --no-patch weavra-consolidation-baseline-2026-09-21
+git rev-parse main devlop 'weavra-consolidation-baseline-2026-09-21^{}'
+git ls-remote --refs origin refs/heads/main refs/heads/devlop
+git status --porcelain
+```
+
+The source repositories remain historical provenance, not operational upstreams. Their local refs/worktrees and remote branch/tag refs were compared with pre-task snapshots and remained unchanged. Existing lint/build warnings, platform-specific skipped tests, C08's local-static scope, and absence of personal-session/paid-provider verification remain explicit limitations.
 
 Historical source results remain in [SPLIT_REPOSITORY_BASELINE.md](SPLIT_REPOSITORY_BASELINE.md). New local failures and resolutions are recorded in [../WORK_LOG.md](../WORK_LOG.md).
