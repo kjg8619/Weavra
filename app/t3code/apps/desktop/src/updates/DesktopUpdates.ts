@@ -1,3 +1,4 @@
+import { APP_UPDATES_ENABLED, APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import {
   DesktopUpdateChannelSchema,
   type DesktopRuntimeInfo,
@@ -219,6 +220,7 @@ function createBaseUpdateState(
     ...createInitialDesktopUpdateState(environment.appVersion, environment.runtimeInfo, channel),
     enabled,
     status: enabled ? "idle" : "disabled",
+    message: enabled ? null : APP_UPDATE_UNAVAILABLE_REASON,
   };
 }
 
@@ -252,6 +254,7 @@ function getAutoUpdateDisabledReason(args: {
   disabledByEnv: boolean;
   hasUpdateFeedConfig: boolean;
 }): string | null {
+  if (!APP_UPDATES_ENABLED) return APP_UPDATE_UNAVAILABLE_REASON;
   if (!args.hasUpdateFeedConfig) {
     return "Automatic updates are not available because no update feed is configured.";
   }
@@ -288,10 +291,10 @@ export const make = Effect.gen(function* () {
   const updaterConfiguredRef = yield* Ref.make(false);
   const lastLoggedDownloadMilestoneRef = yield* Ref.make(-1);
   const updateStateRef = yield* Ref.make<DesktopUpdateState>(
-    createInitialDesktopUpdateState(
-      environment.appVersion,
-      environment.runtimeInfo,
+    createBaseUpdateState(
       environment.defaultDesktopSettings.updateChannel,
+      APP_UPDATES_ENABLED,
+      environment,
     ),
   );
 

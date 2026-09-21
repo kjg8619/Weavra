@@ -32,7 +32,7 @@ describe("hostedPairing", () => {
         host: "https://backend.example.com:3773",
         token: "pairing-token",
         label: "Workstation",
-      }),
+      })!,
     );
 
     expect(url.origin).toBe("https://preview.t3.codes");

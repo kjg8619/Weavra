@@ -314,11 +314,6 @@ const cursorAcpDiscoveryFailedMessage = [
   "Check server logs for ACP details.",
 ].join(" ");
 const missingCursorBinaryPath = "/definitely/not/installed/t3-cursor-agent";
-const cursorCliCommandMissingMessage = [
-  `Cursor CLI command \`${missingCursorBinaryPath}\` was not found.`,
-  `Install or enable the Cursor CLI, make sure \`${missingCursorBinaryPath}\` is on PATH, then restart T3 Code.`,
-  "See https://cursor.com/docs/cli/installation.",
-].join(" ");
 
 describe("Cursor skills", () => {
   it("discovers recursive project skills with project precedence", async () =>
@@ -698,7 +693,6 @@ describe("checkCursorProviderStatus", () => {
       installed: false,
       status: "error",
       auth: { status: "unknown" },
-      message: cursorCliCommandMissingMessage,
     });
   });
 

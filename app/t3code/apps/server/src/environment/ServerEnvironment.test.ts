@@ -227,7 +227,7 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
     }),
   );
 
-  it.effect("advertises desktopAppUpdate only with desktop mode and the control fd", () =>
+  it.effect("does not advertise updates even when a desktop control fd exists", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const baseDir = yield* fileSystem.makeTempDirectoryScoped({
@@ -250,13 +250,13 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
         );
 
       const withFd = yield* describeWith({ mode: "desktop", desktopTelemetryControlFd: 5 });
-      expect(withFd.capabilities.serverSelfUpdate).toBe("desktop-managed");
-      expect(withFd.capabilities.desktopAppUpdate).toBe(true);
-      expect(withFd.capabilities.serverSelfUpdateProgress).toBe(true);
-      expect(withFd.capabilities.serverUpdateThreadContinuation).toBe(true);
+      expect(withFd.capabilities.serverSelfUpdate).toBeUndefined();
+      expect(withFd.capabilities.desktopAppUpdate).toBeUndefined();
+      expect(withFd.capabilities.serverSelfUpdateProgress).toBeUndefined();
+      expect(withFd.capabilities.serverUpdateThreadContinuation).toBeUndefined();
 
       const withoutFd = yield* describeWith({ mode: "desktop" });
-      expect(withoutFd.capabilities.serverSelfUpdate).toBe("desktop-managed");
+      expect(withoutFd.capabilities.serverSelfUpdate).toBeUndefined();
       expect(withoutFd.capabilities.desktopAppUpdate).toBeUndefined();
       expect(withoutFd.capabilities.serverSelfUpdateProgress).toBeUndefined();
       expect(withoutFd.capabilities.serverUpdateThreadContinuation).toBeUndefined();

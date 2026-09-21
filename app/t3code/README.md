@@ -1,125 +1,43 @@
-# T3 Code
+# Weavra App
 
-T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
+Desktop, Web, Mobile and Server sources for [Weavra](https://github.com/kjg8619/Weavra).
+This is an independent product, not an upstream-synchronized T3 Code fork.
 
-Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, and Google Antigravity. If they're set up on your computer, T3 Code can control them.
+## Run from this checkout
 
-## "Wait, what are you selling me?"
+Use Node 24 and pnpm 11. This directory is an independent build root; do not combine
+its workspace or lockfile with `runtime/pi`.
 
-Nothing. We built T3 Code because we wanted the best possible development experience with agents. We were inspired by existing solutions like the Codex desktop app, Conductor, Claude Desktop and Cursor Glass, but none met our bar.
-
-We wanted something performant, remote-ready, and truly open. If we ever go the wrong direction, we want you to have everything you need to fork and build the editor that you want.
-
-## Installation
-
-> [!WARNING]
-> T3 Code currently supports Codex, Claude, Cursor, Grok Build, OpenCode, and Antigravity. Install and authenticate at least one provider before use:
->
-> - Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
-> - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
-> - Cursor: install [Cursor CLI](https://cursor.com/cli) and run `agent login`
-> - Grok Build: install [Grok Build CLI](https://x.ai/cli) and run `grok login`
-> - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
-> - Antigravity: enable it in Settings, then use **Install Antigravity** and **Sign in with Google**. No CLI is required.
-
-### Command line
-
-```bash
-curl -fsSL https://t3.codes/install.sh | sh
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-On Windows, in PowerShell:
+See the [product README](../../README.md) for the App/runtime launch boundary and
+[App product independence](../../docs/architecture/APP_PRODUCT_INDEPENDENCE.md) for
+identity, release authority, compatibility names and validation evidence.
 
-```powershell
-irm https://t3.codes/install.ps1 | iex
-```
+## Distribution and updates
 
-Then run `t3` to start the server and open the local web app. `t3 service install` keeps it running in the background, `t3 update` moves to a newer release, and `t3 --help` has the full reference.
+No Weavra release channel is configured. Desktop checks/downloads/installs, Server
+self-update, Mobile OTA and the inherited shell/PowerShell installers are disabled.
+Build matching App and Server revisions from this repository. Do not install or
+update Weavra with `npx t3`, the T3 website, T3 app-store entries, T3 GitHub releases,
+Homebrew, winget or the inherited AUR recipes: those distribute a different product.
+The local `t3` executable name and internal `@t3tools/*` packages remain compatibility
+names, not permission to download or publish upstream packages.
 
-To try it once without installing, run `npx t3@latest` instead.
+Hosted auth, relay, tracing and legal services require explicit operator configuration.
+There is no default Weavra hosted website, Expo update project or store submission.
 
-### Desktop app
+## Historical material
 
-Install the latest version of the desktop app from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), or from your favorite package registry:
+`apps/marketing`, nested `.github/workflows`, AUR packaging, release notification
+scripts and inherited `docs/` describe historical T3 infrastructure unless explicitly
+reviewed by the App independence document. They are not current Weavra distribution
+or deployment instructions. Historical testimonials, statistics, screenshots, legal
+policies and source issue links must not be relabeled as Weavra claims.
 
-#### Windows (`winget`)
-
-```bash
-winget install T3Tools.T3Code
-```
-
-#### macOS (Homebrew)
-
-```bash
-brew install --cask t3-code
-```
-
-#### Arch Linux (AUR)
-
-Stable:
-
-```bash
-yay -S t3code-bin
-```
-
-Nightly:
-
-```bash
-yay -S t3code-nightly-bin
-```
-
-The AUR packaging is maintained in this repository under [`packaging/aur`](./packaging/aur).
-
-## Some notes
-
-We are very very early in this project. Expect bugs.
-
-We are (mostly) not accepting contributions yet. Small fixes may be considered. Big features will not be.
-
-## Documentation
-
-Full docs live in [docs/](./docs). There's no docs site yet.
-
-- [Install and first run](./docs/user/install.md)
-- [Permission modes](./docs/user/permission-modes.md)
-- [Keyboard shortcuts](./docs/user/keybindings.md)
-- [Project settings](./docs/user/project-settings.md)
-- [Remote access from a phone or another machine](./docs/user/remote-access.md)
-- [Keeping app and server in sync](./docs/user/updating.md)
-- [Source control integrations](./docs/user/source-control.md)
-- Multiple accounts: [Codex](./docs/user/providers-codex.md) · [Claude](./docs/user/providers-claude.md)
-- [Run T3 Code as a background service](./docs/user/background-service.md)
-
-Building from source? Start at [docs/internals/overview.md](./docs/internals/overview.md).
-
-## If you REALLY want to contribute still.... read this first
-
-### Install `vp`
-
-T3 Code uses Vite+ so you'll need to install the global `vp` command-line tool.
-
-#### macOS / Linux
-
-```bash
-curl -fsSL https://vite.plus | bash
-```
-
-#### Windows
-
-```bash
-irm https://vite.plus/ps1 | iex
-```
-
-Checkout their getting started guide for more information: https://viteplus.dev/guide/
-
-### Install dependencies
-
-```bash
-vp i
-```
-
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) before reporting a bug or opening a PR.
-
-Have a feature request? Start an [Ideas discussion](https://github.com/pingdotgg/t3code/discussions/categories/ideas).
-
-Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).
+T3 Code provenance and the existing [MIT license](LICENSE) are preserved. Package,
+OS application identifiers, data paths and artwork are intentionally not fully
+renamed in this lane. No automatic synchronization with a source repository is enabled.

@@ -1,3 +1,5 @@
+// Legacy T3 hosting topology, not a Weavra deployment configuration.
+// Git deployments remain disabled. Do not deploy this router for Weavra.
 import { matchers, routes, type Transform, type VercelConfig } from "@vercel/config/v1";
 
 const ROUTER_HOST = "app.t3.codes";

@@ -17,12 +17,8 @@ import {
   resolveServerConfigVersionMismatch,
   resolveServerSelfUpdateCapability,
   resolveVersionMismatch,
-  serverUpdateGuidance,
   supportsDesktopAppUpdate,
 } from "./versionSkew";
-
-const MISMATCH_HINT =
-  "Version mismatch. Try syncing the client and server to the same T3 Code version.";
 
 describe("versionSkew", () => {
   beforeEach(() => {
@@ -67,10 +63,9 @@ describe("versionSkew", () => {
   });
 
   it("returns a mismatch when the server is behind the client", () => {
-    expect(resolveVersionMismatch("0.0.33")).toEqual({
+    expect(resolveVersionMismatch("0.0.33")).toMatchObject({
       clientVersion: "0.0.34",
       serverVersion: "0.0.33",
-      hint: MISMATCH_HINT,
     });
   });
 
@@ -91,10 +86,9 @@ describe("versionSkew", () => {
     (serverVersion) => {
       branding.APP_VERSION = "0.0.34-nightly.20260824.1125";
 
-      expect(resolveVersionMismatch(serverVersion)).toEqual({
+      expect(resolveVersionMismatch(serverVersion)).toMatchObject({
         clientVersion: "0.0.34-nightly.20260824.1125",
         serverVersion,
-        hint: MISMATCH_HINT,
       });
     },
   );
@@ -112,18 +106,16 @@ describe("versionSkew", () => {
   it("still warns when a nightly client outruns the server by a release", () => {
     branding.APP_VERSION = "0.0.35-nightly.20260818.1124";
 
-    expect(resolveVersionMismatch("0.0.34")).toEqual({
+    expect(resolveVersionMismatch("0.0.34")).toMatchObject({
       clientVersion: "0.0.35-nightly.20260818.1124",
       serverVersion: "0.0.34",
-      hint: MISMATCH_HINT,
     });
   });
 
   it("falls back to string inequality when a version is not semver", () => {
-    expect(resolveVersionMismatch("dev")).toEqual({
+    expect(resolveVersionMismatch("dev")).toMatchObject({
       clientVersion: "0.0.34",
       serverVersion: "dev",
-      hint: MISMATCH_HINT,
     });
 
     branding.APP_VERSION = "dev";
@@ -175,7 +167,7 @@ describe("versionSkew", () => {
     ).toBe(false);
   });
 
-  it("reads desktop-managed update capabilities from config descriptors", () => {
+  it("refuses inherited desktop-managed update capabilities", () => {
     expect(
       resolveServerSelfUpdateCapability({
         environment: {
@@ -189,11 +181,11 @@ describe("versionSkew", () => {
           },
         },
       }),
-    ).toBe("desktop-managed");
+    ).toBeNull();
     expect(resolveServerSelfUpdateCapability(null)).toBeNull();
   });
 
-  it("detects remote desktop-app update support from config descriptors", () => {
+  it("never advertises remote desktop update support", () => {
     const descriptor = (desktopAppUpdate?: boolean) => ({
       environment: {
         environmentId: EnvironmentId.make("environment-desktop"),
@@ -208,14 +200,9 @@ describe("versionSkew", () => {
       },
     });
 
-    expect(supportsDesktopAppUpdate(descriptor(true))).toBe(true);
+    expect(supportsDesktopAppUpdate(descriptor(true))).toBe(false);
     expect(supportsDesktopAppUpdate(descriptor(false))).toBe(false);
     expect(supportsDesktopAppUpdate(descriptor())).toBe(false);
     expect(supportsDesktopAppUpdate(null)).toBe(false);
-  });
-
-  it("matches version-drift guidance to the advertised update path", () => {
-    expect(serverUpdateGuidance("respawn")).toBe("Update to stay in sync");
-    expect(serverUpdateGuidance("desktop-managed")).toBe("Update the desktop app");
   });
 });

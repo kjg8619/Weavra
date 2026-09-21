@@ -1,3 +1,4 @@
+import { APP_UPDATES_ENABLED } from "@t3tools/shared/cliRelease";
 import type { DesktopBridge, DesktopUpdateState } from "@t3tools/contracts";
 import { ArrowRightIcon } from "lucide-react";
 
@@ -50,6 +51,7 @@ export function showDesktopUpdateDownloadedToast(
   shell: DesktopUpdateShell,
   state: DesktopUpdateState,
 ): void {
+  if (!APP_UPDATES_ENABLED) return;
   const releaseUrl = getDesktopUpdateReleaseUrl(getDesktopUpdateDownloadedVersion(state));
   toastManager.add({
     type: "success",

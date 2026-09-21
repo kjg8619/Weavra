@@ -31,13 +31,11 @@ describe("cliRelease", () => {
     expect(cliArchivePlatformKey("linux", "ia32")).toBeUndefined();
   });
 
-  it("resolves download URLs under the tagged release, honoring a mirror", () => {
-    expect(cliReleaseDownloadBaseUrl("1.2.3")).toBe(
-      "https://github.com/pingdotgg/t3code/releases/download/v1.2.3",
-    );
-    expect(cliReleaseDownloadBaseUrl("1.2.3", "https://mirror.example/t3/")).toBe(
-      "https://mirror.example/t3/v1.2.3",
-    );
+  it("refuses downloads without a Weavra channel, including inherited mirrors", () => {
+    expect(() => cliReleaseDownloadBaseUrl("1.2.3")).toThrow("no Weavra release channel");
+    expect(() =>
+      cliReleaseDownloadBaseUrl("1.2.3", "https://github.com/pingdotgg/t3code/releases/download"),
+    ).toThrow("no Weavra release channel");
   });
 
   it("parses sha256sum output including binary-mode markers", () => {
@@ -85,10 +83,7 @@ describe("cliRelease", () => {
     expect(newestCliReleaseVersion([{ tag_name: "v1.2.3" }], "preview")).toBeUndefined();
   });
 
-  it("pages through the release index at the largest page GitHub allows", () => {
-    expect(cliReleaseIndexPageUrl(1)).toBe(
-      "https://api.github.com/repos/pingdotgg/t3code/releases?per_page=100&page=1",
-    );
-    expect(cliReleaseIndexPageUrl(3)).toContain("page=3");
+  it("refuses to resolve an inherited release index", () => {
+    expect(() => cliReleaseIndexPageUrl(1)).toThrow("no Weavra release channel");
   });
 });

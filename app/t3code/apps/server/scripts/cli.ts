@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { APP_UPDATES_ENABLED, APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
@@ -13,6 +14,7 @@ import { DEVELOPMENT_ICON_OVERRIDES } from "../../../scripts/lib/brand-assets.ts
 import { findEsmImportsOfExternalPackages } from "../../../scripts/lib/cli-executable-imports.ts";
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
 import {
+  ServerCliPublishUnavailableError,
   ServerCliBuildAssetMissingError,
   ServerCliCommandExitError,
   ServerCliDevelopmentIconSourceMissingError,
@@ -186,6 +188,10 @@ const publishCmd = Command.make(
   },
   (config) =>
     Effect.gen(function* () {
+      if (!APP_UPDATES_ENABLED)
+        return yield* new ServerCliPublishUnavailableError({
+          message: APP_UPDATE_UNAVAILABLE_REASON,
+        });
       const path = yield* Path.Path;
       const fs = yield* FileSystem.FileSystem;
       // npm runs with cwd set to the packages dir below, so tarball paths are
@@ -236,7 +242,7 @@ const publishCmd = Command.make(
 // ---------------------------------------------------------------------------
 
 const cli = Command.make("cli").pipe(
-  Command.withDescription("T3 server build & publish CLI."),
+  Command.withDescription("Weavra server build & publish CLI."),
   Command.withSubcommands([buildCmd, buildExeCmd, publishCmd]),
 );
 

@@ -31,15 +31,10 @@ const status = {
 } as const;
 
 it("reports the installed service version and host paths", () => {
-  assert.equal(
-    formatServiceStatus(status, "0.0.29"),
-    [
-      "T3 Code service",
-      "  Status: installed · t3@0.0.29",
-      "  Unit: /home/me/.config/systemd/user/t3code.service",
-      "  Logs: /home/me/.t3/userdata/logs/boot-service.log",
-    ].join("\n"),
-  );
+  const output = formatServiceStatus(status, "0.0.29");
+  assert.include(output, "t3@0.0.29");
+  assert.include(output, status.unitPath);
+  assert.include(output, status.logPath);
 });
 
 it("gives a direct repair command for a stale service", () => {

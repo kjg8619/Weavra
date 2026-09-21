@@ -1,3 +1,4 @@
+import { APP_UPDATES_ENABLED, APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import {
   ServerSelfUpdateError,
   type DesktopUpdateState,
@@ -68,7 +69,10 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
   const receiver = yield* DesktopTelemetryReceiver.DesktopTelemetryReceiver;
   const inFlight = yield* Ref.make(false);
 
-  const available = config.mode === "desktop" && config.desktopTelemetryControlFd !== undefined;
+  const available =
+    APP_UPDATES_ENABLED &&
+    config.mode === "desktop" &&
+    config.desktopTelemetryControlFd !== undefined;
   const failWith = (reason: string, cause?: unknown) =>
     cause === undefined
       ? new ServerSelfUpdateError({ reason })
@@ -135,7 +139,7 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
       }
       if (report.outcome === "up-to-date") {
         return yield* failWith(
-          `The T3 Code desktop app on this machine is already up to date on ${report.state.currentVersion}.`,
+          `The Weavra desktop app on this machine is already up to date on ${report.state.currentVersion}.`,
         );
       }
       return yield* failWith(
@@ -146,9 +150,7 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
   const run: DesktopAppUpdate["Service"]["run"] = Effect.fn("desktopUpdate.desktopAppUpdate.run")(
     function* (reportProgress) {
       if (!available) {
-        return yield* failWith(
-          "This server was not started by the T3 Code desktop app, so it cannot drive a desktop update.",
-        );
+        return yield* failWith(APP_UPDATE_UNAVAILABLE_REASON);
       }
       if (yield* Ref.getAndSet(inFlight, true)) {
         return yield* failWith("A desktop app update is already in progress.");
@@ -168,7 +170,7 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
             .requestDesktopUpdate(requestId)
             .pipe(
               Effect.mapError((error) =>
-                failWith("Could not reach the T3 Code desktop app on this machine.", error),
+                failWith("Could not reach the Weavra desktop app on this machine.", error),
               ),
             );
           return yield* consumeReports(requestId, changes, reportProgress).pipe(
@@ -189,7 +191,7 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
     "desktopUpdate.desktopAppUpdate.commit",
   )(function* (requestId, onHandoffAccepted = () => Effect.void) {
     if (!available) {
-      return yield* failWith("This server cannot commit a desktop app update.");
+      return yield* failWith(APP_UPDATE_UNAVAILABLE_REASON);
     }
     const terminal = yield* Effect.scoped(
       Effect.gen(function* () {
@@ -200,7 +202,7 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
         });
         yield* Effect.uninterruptible(
           receiver.commitDesktopUpdate(requestId).pipe(
-            Effect.mapError((error) => failWith("Could not reach the T3 Code desktop app.", error)),
+            Effect.mapError((error) => failWith("Could not reach the Weavra desktop app.", error)),
             Effect.tap(() => onHandoffAccepted()),
           ),
         );

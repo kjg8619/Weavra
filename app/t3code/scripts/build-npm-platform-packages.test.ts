@@ -173,10 +173,7 @@ it.layer(NodeServices.layer)("build-npm-platform-packages", (it) => {
       assert.equal(launcherManifest.version, VERSION);
       assert.deepStrictEqual(launcherManifest.bin, { t3: "./bin/t3.js" });
       assert.deepStrictEqual(launcherManifest.files, ["bin", "dist"]);
-      assert.deepStrictEqual(launcherManifest.optionalDependencies, {
-        "@t3code/t3-darwin-arm64": VERSION,
-        "@t3code/t3-linux-x64": VERSION,
-      });
+      assert.deepStrictEqual(launcherManifest.optionalDependencies, {});
       assert.isUndefined(launcherManifest.engines);
       assert.isTrue(yield* fs.exists(path.join(launcherDir, "bin/t3.js")));
 
@@ -255,7 +252,7 @@ it.layer(NodeServices.layer)("build-npm-platform-packages", (it) => {
       assert.equal(unsupported.exitCode, 1);
       assert.include(unsupported.stderr, "linux-x64");
       assert.include(unsupported.stderr, "win32-arm64");
-      assert.include(unsupported.stderr, "https://github.com/pingdotgg/t3code/releases");
+      assert.include(unsupported.stderr, "https://github.com/kjg8619/Weavra");
     }),
   );
 });

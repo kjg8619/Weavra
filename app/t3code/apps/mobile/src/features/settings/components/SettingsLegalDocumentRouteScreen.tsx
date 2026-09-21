@@ -33,9 +33,10 @@ export function SettingsLegalDocumentCloseHeaderButton() {
 export function SettingsLegalDocumentExternalHeaderButton({
   externalUrl = LEGAL_URL,
 }: {
-  readonly externalUrl?: string;
+  readonly externalUrl?: string | null;
 }) {
   const safeExternalUrl = isLegalDocumentUrl(externalUrl) ? externalUrl : LEGAL_URL;
+  if (safeExternalUrl === null) return null;
 
   return (
     <Pressable
@@ -58,7 +59,7 @@ export function SettingsLegalDocumentExternalHeaderButton({
 
 interface SettingsLegalDocumentRouteScreenProps {
   readonly documentName: string;
-  readonly documentUrl: string;
+  readonly documentUrl: string | null;
 }
 
 export function SettingsLegalDocumentRouteScreen({
@@ -84,6 +85,16 @@ export function SettingsLegalDocumentRouteScreen({
   const openExternalUrl = useCallback((url: string) => {
     void Linking.openURL(url).catch(() => undefined);
   }, []);
+  if (documentUrl === null) {
+    return (
+      <View className="flex-1 items-center justify-center bg-sheet px-8">
+        <Text className="text-center text-sm text-foreground-muted">
+          Weavra legal documents are not configured. Upstream T3 policies do not describe this
+          product.
+        </Text>
+      </View>
+    );
+  }
   if (loadError) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-sheet px-8">

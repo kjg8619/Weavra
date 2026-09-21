@@ -17,8 +17,6 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
     electron-updater events are driven by hand via `emit`. Used by
     DesktopUpdates.test.ts and DesktopRemoteUpdates.test.ts. */
 
-export const flushCallbacks = Effect.yieldNow;
-
 export interface UpdatesHarnessOptions {
   readonly checkForUpdates?: Effect.Effect<
     void,

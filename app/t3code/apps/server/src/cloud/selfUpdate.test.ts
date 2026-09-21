@@ -1,12 +1,11 @@
+import { APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import { ServerSelfUpdateError, ThreadId } from "@t3tools/contracts";
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import * as Cause from "effect/Cause";
-import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as Fiber from "effect/Fiber";
 import * as Path from "effect/Path";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
@@ -344,83 +343,32 @@ it.layer(NodeServices.layer)("server self update", (it) => {
     }),
   );
 
-  it.effect("stages and preflights before asking the launcher for an update ID", () =>
+  it.effect("refuses server and desktop updates before any staging or control request", () =>
     Effect.gen(function* () {
-      const { selfUpdate, order } = yield* makeHarness();
-      expect(yield* selfUpdate.update({ targetVersion: "1.1.0" })).toEqual({
-        targetVersion: "1.1.0",
-        method: "boot-service",
-        updateId: "launcher-id",
-      });
-      expect(order).toEqual(["download", "extract", "preflight", "accept"]);
-    }),
-  );
-
-  it.effect("rejects invalid versions and desktop-managed servers before staging", () =>
-    Effect.gen(function* () {
-      const web = yield* makeHarness();
-      expect(
-        (yield* web.selfUpdate.update({ targetVersion: "latest" }).pipe(Effect.flip)).reason,
-      ).toBe("'latest' is not an exact t3 version.");
-      const desktop = yield* makeHarness({ mode: "desktop" });
-      expect(
-        (yield* desktop.selfUpdate.update({ targetVersion: "1.1.0" }).pipe(Effect.flip)).reason,
-      ).toContain("desktop app");
-      expect([...web.order, ...desktop.order]).toEqual([]);
-    }),
-  );
-
-  it.effect("delegates desktop-managed updates to the desktop app when available", () =>
-    Effect.gen(function* () {
-      const stages: string[] = [];
-      const { selfUpdate, order } = yield* makeHarness({
-        mode: "desktop",
-        desktopAppUpdate: {
-          available: true,
-          run: (reportProgress) =>
-            reportProgress("downloading").pipe(
-              Effect.andThen(reportProgress("installing")),
-              Effect.as({ targetVersion: "1.2.0", method: "desktop-app" as const }),
-            ),
-          commit: () => Effect.never,
-        },
-      });
-      const result = yield* selfUpdate.update({ targetVersion: "1.1.0" }, (stage) =>
-        Effect.sync(() => void stages.push(stage)),
-      );
-      expect(result).toEqual({ targetVersion: "1.2.0", method: "desktop-app" });
-      expect(stages).toEqual(["downloading", "installing"]);
-      // The launcher staging path must not run on the desktop path.
-      expect(order).toEqual([]);
-    }),
-  );
-
-  it.effect("preserves the preflight refusal reason", () =>
-    Effect.gen(function* () {
-      const { selfUpdate } = yield* makeHarness({ preflight: "blocked" });
-      expect((yield* selfUpdate.update({ targetVersion: "1.1.0" }).pipe(Effect.flip)).reason).toBe(
-        "local update required",
-      );
-    }),
-  );
-
-  it.effect("allows only one update at a time", () =>
-    Effect.gen(function* () {
-      const requested = yield* Deferred.make<void>();
-      const accepted = yield* Deferred.make<string>();
-      const { selfUpdate } = yield* makeHarness({
-        requestUpdate: () =>
-          Deferred.succeed(requested, undefined).pipe(Effect.andThen(Deferred.await(accepted))),
-      });
-      const first = yield* Effect.forkChild(selfUpdate.update({ targetVersion: "1.1.0" }), {
-        startImmediately: true,
-      });
-      yield* Deferred.await(requested);
-      expect((yield* selfUpdate.update({ targetVersion: "1.1.1" }).pipe(Effect.flip)).reason).toBe(
-        "A server update is already in progress.",
-      );
-      yield* Deferred.succeed(accepted, "launcher-id");
-      expect((yield* Fiber.join(first)).updateId).toBe("launcher-id");
+      const calls: string[] = [];
+      for (const mode of ["web", "desktop"] as const) {
+        const { selfUpdate, order } = yield* makeHarness({
+          mode,
+          desktopAppUpdate: {
+            available: true,
+            run: () =>
+              Effect.sync(() => {
+                calls.push("run");
+                return { targetVersion: "1.2.0", method: "desktop-app" as const };
+              }),
+            commit: () =>
+              Effect.sync(() => void calls.push("commit")).pipe(Effect.andThen(Effect.never)),
+          },
+        });
+        expect((yield* Effect.flip(selfUpdate.update({ targetVersion: "1.2.0" }))).reason).toBe(
+          APP_UPDATE_UNAVAILABLE_REASON,
+        );
+        expect(
+          (yield* Effect.flip(selfUpdate.commitDesktopUpdate("inherited-update"))).reason,
+        ).toBe(APP_UPDATE_UNAVAILABLE_REASON);
+        expect(order).toEqual([]);
+      }
+      expect(calls).toEqual([]);
     }),
   );
 });

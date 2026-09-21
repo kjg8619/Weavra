@@ -1,3 +1,4 @@
+import { APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import Constants from "expo-constants";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,7 +21,7 @@ export function SettingsAboutRouteScreen() {
   const insets = useSafeAreaInsets();
 
   return (
-    <SettingsScreen title="About T3 Code">
+    <SettingsScreen title="About Weavra">
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -140,6 +141,9 @@ function AppSettingsSection() {
       ) : (
         versionRow
       )}
+      <Text className="px-4 pb-4 text-sm text-foreground-muted">
+        {APP_UPDATE_UNAVAILABLE_REASON}
+      </Text>
     </SettingsSection>
   );
 }

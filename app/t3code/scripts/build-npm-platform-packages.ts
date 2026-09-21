@@ -20,6 +20,7 @@
  * not), whereas `npm publish <tarball>` uploads the bytes as given.
  */
 import { legacyCliLauncherScript } from "@t3tools/shared/legacyCliLauncher";
+import { APP_UPDATES_ENABLED } from "@t3tools/shared/cliRelease";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
@@ -107,7 +108,8 @@ export function npmPlatformPackageManifest(
   return {
     name: npmPlatformPackageName(platformKey),
     version,
-    description: `T3 Code CLI executable for ${platformKey}`,
+    private: true,
+    description: `Weavra CLI executable for ${platformKey}`,
     license: serverPackageJson.license,
     repository: serverPackageJson.repository,
     os: [os],
@@ -155,15 +157,12 @@ export function npmPlatformPackageReadme(platformKey: CliArchivePlatformKey): st
   return [
     `# ${npmPlatformPackageName(platformKey)}`,
     "",
-    `The T3 Code CLI executable for ${platformKey}. Do not install this package directly:`,
-    `it is an optional dependency of \`${NPM_LAUNCHER_PACKAGE_NAME}\`, which picks the package for the`,
-    "current platform and runs the executable inside it.",
+    `The locally built Weavra CLI executable for ${platformKey}.`,
+    "No public Weavra npm distribution is configured.",
+    "Install only locally built artifacts from a trusted matching Weavra checkout.",
+    "The inherited t3/@t3code names are compatibility names, not upstream install instructions.",
     "",
-    "```sh",
-    `npx ${NPM_LAUNCHER_PACKAGE_NAME}@latest`,
-    "```",
-    "",
-    "Source and documentation: https://github.com/pingdotgg/t3code",
+    "Source and documentation: https://github.com/kjg8619/Weavra",
     "",
   ].join("\n");
 }
@@ -176,14 +175,15 @@ export function npmLauncherPackageManifest(
   return {
     name: NPM_LAUNCHER_PACKAGE_NAME,
     version,
-    description: "T3 Code CLI. Installs the self-contained executable for this platform.",
+    private: true,
+    description: "Weavra CLI. Installs the self-contained executable for this platform.",
     license: serverPackageJson.license,
     repository: serverPackageJson.repository,
     bin: { t3: "./bin/t3.js" },
     files: ["bin", "dist"],
-    optionalDependencies: Object.fromEntries(
-      platformKeys.map((key) => [npmPlatformPackageName(key), version]),
-    ),
+    optionalDependencies: APP_UPDATES_ENABLED
+      ? Object.fromEntries(platformKeys.map((key) => [npmPlatformPackageName(key), version]))
+      : {},
   };
 }
 
@@ -207,10 +207,10 @@ try {
 } catch {
   process.stderr.write(
     [
-      "t3: no T3 Code CLI build is available for this platform (" + key + ").",
+      "t3: no Weavra CLI build is available for this platform (" + key + ").",
       "Supported platforms: " + SUPPORTED.join(", ") + ".",
-      "If yours is listed, reinstall t3 so npm fetches its optional dependency.",
-      "The desktop app and release archives are at https://github.com/pingdotgg/t3code/releases",
+      "No Weavra release channel is configured. Install a locally built matching platform artifact.",
+      "Source: https://github.com/kjg8619/Weavra",
       "",
     ].join("\\n"),
   );

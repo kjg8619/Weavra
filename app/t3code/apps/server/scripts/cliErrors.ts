@@ -1,5 +1,10 @@
 import * as Schema from "effect/Schema";
 
+export class ServerCliPublishUnavailableError extends Schema.TaggedError<ServerCliPublishUnavailableError>()(
+  "ServerCliPublishUnavailableError",
+  { message: Schema.String },
+) {}
+
 export class ServerCliCommandExitError extends Schema.TaggedError<ServerCliCommandExitError>()(
   "ServerCliCommandExitError",
   {

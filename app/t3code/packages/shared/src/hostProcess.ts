@@ -46,13 +46,6 @@ export const HostProcessExecutablePath = Context.Reference<string>(
   },
 );
 
-export const HostProcessArguments = Context.Reference<ReadonlyArray<string>>(
-  "@t3tools/shared/hostProcess/HostProcessArguments",
-  {
-    defaultValue: () => process.argv,
-  },
-);
-
 /**
  * The command the shell was given, before Node resolved it to the binary:
  * `t3` for a PATH lookup, `./t3` or the launcher symlink for an explicit

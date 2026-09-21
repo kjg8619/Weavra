@@ -1,3 +1,4 @@
+import { APP_UPDATES_ENABLED, APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import type { EnvironmentId, ServerConfig, ServerSelfUpdateCapability } from "@t3tools/contracts";
 import type { ServerUpdateState } from "@t3tools/client-runtime/state/server";
 import { compareSemverVersions, parseSemver } from "@t3tools/shared/semver";
@@ -80,7 +81,7 @@ export function resolveVersionMismatch(
   return {
     clientVersion: normalizedClientVersion,
     serverVersion: normalizedServerVersion,
-    hint: "Version mismatch. Try syncing the client and server to the same T3 Code version.",
+    hint: "Version mismatch. Try syncing the client and server to the same Weavra version.",
   };
 }
 
@@ -95,6 +96,7 @@ export function resolveServerConfigVersionMismatch(
 export function resolveServerSelfUpdateCapability(
   serverConfig: Pick<ServerConfig, "environment"> | null | undefined,
 ): ServerSelfUpdateCapability | null {
+  if (!APP_UPDATES_ENABLED) return null;
   return serverConfig?.environment.capabilities.serverSelfUpdate ?? null;
 }
 
@@ -103,7 +105,7 @@ export function resolveServerSelfUpdateCapability(
 export function supportsDesktopAppUpdate(
   serverConfig: Pick<ServerConfig, "environment"> | null | undefined,
 ): boolean {
-  return serverConfig?.environment.capabilities.desktopAppUpdate === true;
+  return APP_UPDATES_ENABLED && serverConfig?.environment.capabilities.desktopAppUpdate === true;
 }
 
 /** True when the connected server can recover opted-in running turns after
@@ -116,10 +118,11 @@ export function supportsServerUpdateThreadContinuation(
 
 /** The command to hand users whose server cannot update itself. */
 export function manualServerUpdateCommand(targetVersion: string): string {
-  return `npx t3@${targetVersion}`;
+  return `# ${APP_UPDATE_UNAVAILABLE_REASON} Build the matching Weavra revision (${targetVersion}) from the source repository.`;
 }
 
 export function serverUpdateGuidance(capability: ServerSelfUpdateCapability): string {
+  if (!APP_UPDATES_ENABLED) return APP_UPDATE_UNAVAILABLE_REASON;
   return capability === "desktop-managed" ? "Update the desktop app" : "Update to stay in sync";
 }
 

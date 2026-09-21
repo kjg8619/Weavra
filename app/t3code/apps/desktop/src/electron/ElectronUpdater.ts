@@ -1,3 +1,4 @@
+import { APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -123,34 +124,27 @@ export const make = ElectronUpdater.of({
       autoUpdater.disableDifferentialDownload = value;
       return Effect.void;
     }),
-  checkForUpdates: Effect.suspend(() => {
-    const channel = autoUpdater.channel;
-    return Effect.tryPromise({
-      try: () => autoUpdater.checkForUpdates(),
-      catch: (cause) => new ElectronUpdaterCheckForUpdatesError({ channel, cause }),
-    }).pipe(Effect.asVoid);
-  }),
-  downloadUpdate: Effect.suspend(() => {
-    const channel = autoUpdater.channel;
-    return Effect.tryPromise({
-      try: () => autoUpdater.downloadUpdate(),
-      catch: (cause) => new ElectronUpdaterDownloadUpdateError({ channel, cause }),
-    }).pipe(Effect.asVoid);
-  }),
-  quitAndInstall: ({ isSilent, isForceRunAfter }) =>
-    Effect.suspend(() => {
-      const channel = autoUpdater.channel;
-      return Effect.try({
-        try: () => autoUpdater.quitAndInstall(isSilent, isForceRunAfter),
-        catch: (cause) =>
-          new ElectronUpdaterQuitAndInstallError({
-            channel,
-            isSilent,
-            isForceRunAfter,
-            cause,
-          }),
-      });
+  checkForUpdates: Effect.fail(
+    new ElectronUpdaterCheckForUpdatesError({
+      channel: null,
+      cause: APP_UPDATE_UNAVAILABLE_REASON,
     }),
+  ),
+  downloadUpdate: Effect.fail(
+    new ElectronUpdaterDownloadUpdateError({
+      channel: null,
+      cause: APP_UPDATE_UNAVAILABLE_REASON,
+    }),
+  ),
+  quitAndInstall: ({ isSilent, isForceRunAfter }) =>
+    Effect.fail(
+      new ElectronUpdaterQuitAndInstallError({
+        channel: null,
+        isSilent,
+        isForceRunAfter,
+        cause: APP_UPDATE_UNAVAILABLE_REASON,
+      }),
+    ),
   on: (eventName, listener) => {
     const eventTarget = autoUpdater as unknown as {
       on: (eventName: string, listener: (...args: Array<unknown>) => void) => void;

@@ -1,3 +1,4 @@
+import { APP_UPDATES_ENABLED, APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import type { EnvironmentId, ServerSelfUpdateCapability } from "@t3tools/contracts";
 import type { ServerUpdateStage, ServerUpdateState } from "@t3tools/client-runtime/state/server";
 import {
@@ -54,6 +55,7 @@ type UpdateButtonProps = Pick<ComponentProps<typeof Button>, "variant" | "size" 
 function useServerUpdate() {
   const updateServer = useAtomCommand(serverEnvironment.updateServer, { reportFailure: false });
   return async (target: ServerUpdateTarget, failureTitle = "Server update failed") => {
+    if (!APP_UPDATES_ENABLED) return;
     const { environmentId, serverLabel, selfUpdate, targetVersion } = target;
     if (pendingUpdateEnvironmentIds.has(environmentId)) return;
     pendingUpdateEnvironmentIds.add(environmentId);
@@ -121,7 +123,7 @@ export function ServerUpdatesAction({
       if (desktopTargets.length > 0) {
         const confirmed =
           (await requestConfirmDialog(
-            `Update the T3 Code desktop apps on ${desktopTargets.map((target) => target.serverLabel).join(", ")}? They will close and relaunch on those machines.`,
+            `Update the Weavra desktop apps on ${desktopTargets.map((target) => target.serverLabel).join(", ")}? They will close and relaunch on those machines.`,
           )) ?? true;
         if (!confirmed) return;
       }
@@ -138,10 +140,10 @@ export function ServerUpdatesAction({
       size={size}
       variant={variant}
       className={className}
-      disabled={isPending || eligible.length === 0}
+      disabled={!APP_UPDATES_ENABLED || isPending || eligible.length === 0}
       onClick={() => void handleUpdate()}
     >
-      {label}
+      {APP_UPDATES_ENABLED ? label : "Updates unavailable"}
     </Button>
   );
 }
@@ -222,6 +224,9 @@ export function ServerUpdateAction({
       });
     },
   });
+  if (!APP_UPDATES_ENABLED) {
+    return <span className="text-muted-foreground text-xs">{APP_UPDATE_UNAVAILABLE_REASON}</span>;
+  }
 
   const handleUpdate = async () => {
     if (pendingUpdateEnvironmentIds.has(environmentId)) {
@@ -233,7 +238,7 @@ export function ServerUpdateAction({
       // remote machine installs without asking anyone there.
       const confirmed =
         (await requestConfirmDialog(
-          `Update the T3 Code desktop app that runs the ${serverLabel}? It will close and relaunch on that machine.`,
+          `Update the Weavra desktop app that runs the ${serverLabel}? It will close and relaunch on that machine.`,
         )) ?? true;
       if (!confirmed) {
         return;

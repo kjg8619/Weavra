@@ -44,6 +44,7 @@ import {
   type QuitConfirmationMode,
 } from "@t3tools/contracts/settings";
 import { resolveServerBackgroundActivitySettings } from "@t3tools/shared/backgroundActivitySettings";
+import { APP_UPDATES_ENABLED, APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import { createModelSelection } from "@t3tools/shared/model";
 import * as Duration from "effect/Duration";
 import * as Equal from "effect/Equal";
@@ -392,6 +393,20 @@ function AboutVersionSection() {
         );
       });
   }, [isUpdateActionPending, updateState]);
+
+  if (!APP_UPDATES_ENABLED) {
+    return (
+      <SettingsRow
+        title={<AboutVersionTitle />}
+        description={APP_UPDATE_UNAVAILABLE_REASON}
+        control={
+          <Button size="sm" variant="outline" disabled>
+            Updates unavailable
+          </Button>
+        }
+      />
+    );
+  }
 
   const action = updateState ? resolveDesktopUpdateButtonAction(updateState) : "none";
   const buttonTooltip = updateState ? getDesktopUpdateButtonTooltip(updateState) : null;
@@ -3189,10 +3204,7 @@ export function GeneralSettingsPanel() {
         {isElectron || HOSTED_APP_CHANNEL ? (
           <AboutVersionSection />
         ) : (
-          <SettingsRow
-            title={<AboutVersionTitle />}
-            description="Current version of the application."
-          />
+          <SettingsRow title={<AboutVersionTitle />} description={APP_UPDATE_UNAVAILABLE_REASON} />
         )}
       </SettingsSection>
       <SettingsSection title="Diagnostics">
@@ -3217,7 +3229,7 @@ export function GeneralSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("open-source-licenses")}
-          description="Notices for dependencies, assets, and optional tools used by T3 Code."
+          description="Notices for dependencies, assets, and optional tools used by Weavra."
           control={
             <Button
               render={<Link to="/settings/open-source-licenses" />}

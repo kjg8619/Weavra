@@ -1,1 +1,7 @@
-vp staged
+#!/bin/sh
+set -eu
+
+# Git starts hooks at the product root; Vite+ belongs to this package root.
+cd "$(dirname "$0")/.."
+export PATH="$PWD/node_modules/.bin:$PATH"
+exec vp staged --cwd "$PWD"

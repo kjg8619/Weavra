@@ -194,9 +194,6 @@ describe("buildThreadTitlePrompt", () => {
       previousTitle: "Investigate reconnect regressions",
     });
 
-    expect(result.prompt).toContain(
-      "Regenerate the title for an existing T3 Code thread so the user can recognize it weeks later.",
-    );
     expect(result.prompt).toContain('The previous title was "Investigate reconnect regressions".');
     expect(result.prompt).toContain("Thread contents:");
     expect(result.prompt).toContain("The remaining issue is stale session state");

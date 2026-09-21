@@ -1,4 +1,6 @@
+import { APP_UPDATES_ENABLED, APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import {
+  ServerSelfUpdateError,
   type EnvironmentId,
   type ServerConfig,
   type ServerConfigStreamEvent,
@@ -705,6 +707,9 @@ export function createServerEnvironmentAtoms<R, E>(
       });
 
       return Effect.gen(function* () {
+        if (!APP_UPDATES_ENABLED) {
+          return yield* new ServerSelfUpdateError({ reason: APP_UPDATE_UNAVAILABLE_REASON });
+        }
         const environmentRegistry = yield* EnvironmentRegistry;
         const desktopCommitStarting = yield* Deferred.make<void>();
         const desktopReconnectObserverArmed = yield* Deferred.make<void>();

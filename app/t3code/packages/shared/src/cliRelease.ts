@@ -5,9 +5,12 @@
  * platform key, so a rename here is a release-breaking change.
  */
 
-const CLI_RELEASE_REPOSITORY = "pingdotgg/t3code";
+/** No Weavra release channel is configured. Compatibility names do not authorize updates. */
+export const APP_UPDATES_ENABLED: boolean = false;
+export const APP_UPDATE_UNAVAILABLE_REASON =
+  "Weavra updates are unavailable: no Weavra release channel is configured.";
 export const CLI_RELEASE_CHECKSUMS_FILE = "SHA256SUMS";
-/** Overrides the download origin for mirrors and air-gapped installs. */
+/** Legacy mirror setting; cannot enable downloads while APP_UPDATES_ENABLED is false. */
 export const CLI_RELEASE_BASE_URL_ENV = "T3CODE_RELEASE_BASE_URL";
 
 /**
@@ -29,7 +32,7 @@ export const CLI_ARCHIVE_PLATFORM_KEYS = [
 export type CliArchivePlatformKey = (typeof CLI_ARCHIVE_PLATFORM_KEYS)[number];
 
 export function cliArchivePlatformKey(
-  platform: NodeJS.Platform,
+  platform: string,
   arch: string,
 ): CliArchivePlatformKey | undefined {
   const key = `${platform}-${arch}`;
@@ -42,7 +45,7 @@ export function cliArchivePlatformKey(
  * PATH cannot open the zip, so the system copy is named by absolute path.
  */
 export function cliArchiveTarCommand(
-  platform: NodeJS.Platform,
+  platform: string,
   env: Readonly<Record<string, string | undefined>>,
 ): string {
   if (platform !== "win32") return "tar";
@@ -54,14 +57,12 @@ export function cliArchiveFileName(version: string, platformKey: CliArchivePlatf
   return `t3-${version}-${platformKey}.${platformKey.startsWith("win32") ? "zip" : "tar.gz"}`;
 }
 
-const CLI_RELEASE_DEFAULT_BASE_URL = `https://github.com/${CLI_RELEASE_REPOSITORY}/releases/download`;
-
 /** Directory that `releases/download/<tag>/<asset>` lives under. */
-export function cliReleaseDownloadBaseUrl(
-  version: string,
-  baseUrl: string | undefined = CLI_RELEASE_DEFAULT_BASE_URL,
-): string {
-  return `${(baseUrl?.trim() || CLI_RELEASE_DEFAULT_BASE_URL).replace(/\/+$/, "")}/v${version}`;
+export function cliReleaseDownloadBaseUrl(version: string, baseUrl?: string): string {
+  if (!APP_UPDATES_ENABLED || !baseUrl?.trim()) {
+    throw new Error(APP_UPDATE_UNAVAILABLE_REASON);
+  }
+  return `${baseUrl.trim().replace(/\/+$/, "")}/v${version}`;
 }
 
 /**
@@ -92,13 +93,9 @@ export function cliReleaseChannelOf(version: string): CliReleaseChannel {
   return channel === "nightly" || channel === "preview" ? channel : "stable";
 }
 
-/**
- * One page of GitHub's list-releases endpoint, newest first. Callers walk pages
- * until a channel match turns up; a busy nightly train can push the newest
- * preview or stable release past any single page.
- */
-export function cliReleaseIndexPageUrl(page: number): string {
-  return `https://api.github.com/repos/${CLI_RELEASE_REPOSITORY}/releases?per_page=100&page=${page}`;
+/** No release index is authoritative until a Weavra channel is separately configured. */
+export function cliReleaseIndexPageUrl(_page: number): string {
+  throw new Error(APP_UPDATE_UNAVAILABLE_REASON);
 }
 
 /**

@@ -1,3 +1,4 @@
+import { APP_UPDATES_ENABLED, APP_UPDATE_UNAVAILABLE_REASON } from "@t3tools/shared/cliRelease";
 import * as Updates from "expo-updates";
 
 import {
@@ -124,7 +125,7 @@ let appUpdateCheckInFlight: AppUpdateCheckInFlight | undefined;
 
 /** Expo's development launcher reports updates as enabled even though its OTA APIs reject. */
 export function isAppUpdateCheckAvailable(client: Pick<AppUpdateClient, "isEnabled"> = Updates) {
-  return client.isEnabled && !(typeof __DEV__ !== "undefined" && __DEV__);
+  return APP_UPDATES_ENABLED && client.isEnabled && !(typeof __DEV__ !== "undefined" && __DEV__);
 }
 
 /**
@@ -150,7 +151,11 @@ export function registerHiddenUpdateTap(count: number): {
 
 export async function runAppUpdateCheck(options: AppUpdateCheckOptions = {}): Promise<void> {
   const client = options.client ?? Updates;
-  if (!isAppUpdateCheckAvailable(client)) return;
+  if (!isAppUpdateCheckAvailable(client)) {
+    options.onFailure?.(APP_UPDATE_UNAVAILABLE_REASON);
+    options.onStateChange?.("idle");
+    return;
+  }
 
   if (appUpdateCheckInFlight) {
     await observeAppUpdateCheck(appUpdateCheckInFlight, options);
