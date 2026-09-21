@@ -24,10 +24,34 @@ Use Node 24.19.0 for the consolidation validation environment. Install/build ins
 ```sh
 # From product root: configure the exact executable without enabling control.
 source scripts/weavra-env.sh
-# Then run the existing T3 development command from app/t3code.
+# Then run the existing App development command from app/t3code.
 ```
 
 See [architecture boundaries](docs/architecture/BOUNDARIES.md) for project/source-root semantics and C08 authority.
+
+## Product development build
+
+The canonical agent command is `weavra`; its product identity is `Weavra development`.
+Build/install inside `runtime/pi`, then expose the checkout-local launcher:
+
+```sh
+cd runtime/pi
+npm install --ignore-scripts
+npm run hydrate:model-data
+npm run build
+npm link --workspace packages/company-runtime --ignore-scripts
+weavra setup
+weavra doctor
+weavra --help
+```
+
+Runtime state belongs to `~/.weavra/agent`. Self-update and remote session sharing
+are unavailable until independent Weavra infrastructure exists; `weavra update`
+explains source-checkout updates instead of installing Pi or T3 Code.
+Explicit extension installation/removal is separate from product self-update.
+
+See [Product Independence](docs/architecture/PRODUCT_INDEPENDENCE.md) for version
+semantics, network/hosted-service policy, compatibility shims and preserved lineage.
 
 ## Consolidation provenance
 
@@ -48,8 +72,12 @@ Nested READMEs and licenses remain authoritative for their scopes. See [NOTICE.m
 
 ## Branches
 
-- `migration/repository-consolidation`: import and compatibility work until all gates pass.
-- `main`: validated consolidated baseline only.
-- `devlop`: ongoing development, created from validated main.
+- `main`: validated product history; never a direct implementation target.
+- `devlop`: integration branch; only verified PRs are merged here.
+- Feature branches: implementation and validation in isolated worktrees, PRs targeting `devlop`.
+- `migration/repository-consolidation`: preserved consolidation history.
+
+Use normal pushes and merge-based integration when needed. No force pushes,
+history rewriting, direct integration-branch implementation or automatic PR merge.
 
 Nested `.github/workflows` files are preserved historical source files; GitHub does not execute them as root workflows. Only root `.github/workflows` defines active Weavra CI.

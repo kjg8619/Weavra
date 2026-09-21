@@ -8,6 +8,18 @@ import {
 } from "./DesktopEarlyElectronStartup.ts";
 
 describe("DesktopEarlyElectronStartup", () => {
+  it("uses the canonical app override before legacy settings at early startup", () => {
+    const preference = resolveEarlyLinuxPasswordStorePreference({
+      env: { WEAVRA_APP_HOME: "/new/app", WEAVRA_HOME: "/new/root", T3CODE_HOME: "/old/app" },
+      homeDirectory: "/home/user",
+      joinPath,
+      readFileString: (path) => {
+        assert.equal(path, "/new/app/userdata/desktop-settings.json");
+        return JSON.stringify({ linuxPasswordStore: "kwallet6" });
+      },
+    });
+    assert.equal(preference, "kwallet6");
+  });
   const joinPath = NodePath.posix.join;
 
   it("reads the persisted linux password-store preference before Electron is ready", () => {
@@ -82,8 +94,8 @@ describe("DesktopEarlyElectronStartup", () => {
 
     assert.deepEqual(options, {
       isDevelopment: true,
-      linuxWmClass: "t3code-dev",
-      linuxDesktopEntryName: "com.t3tools.T3Code.Development.desktop",
+      linuxWmClass: "weavra-dev",
+      linuxDesktopEntryName: "io.weavra.desktop.dev.desktop",
       passwordStore: "gnome-libsecret",
     });
   });
@@ -96,7 +108,7 @@ describe("DesktopEarlyElectronStartup", () => {
       homeDirectory: "/home/user",
       joinPath,
       readFileString: (path) => {
-        assert.equal(path, "/home/user/.t3/dev/desktop-settings.json");
+        assert.equal(path, "/home/user/.weavra/app/dev/desktop-settings.json");
         return JSON.stringify({ linuxPasswordStore: "kwallet" });
       },
     });
@@ -113,7 +125,7 @@ describe("DesktopEarlyElectronStartup", () => {
       homeDirectory: "/home/user",
       joinPath,
       readFileString: (path) => {
-        assert.equal(path, "/home/user/.t3/dev/desktop-settings.json");
+        assert.equal(path, "/home/user/.weavra/app/dev/desktop-settings.json");
         return JSON.stringify({ linuxPasswordStore: "gnome-libsecret" });
       },
     });

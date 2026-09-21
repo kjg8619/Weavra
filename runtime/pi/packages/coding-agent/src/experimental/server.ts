@@ -48,11 +48,16 @@ import { createExperimentalServerServices } from "./services/server.ts";
 import type { SessionCreateOptions, SessionSummary } from "./services/sessions.ts";
 import { SessionPluginSelectionConflictError, SessionWorkerManager } from "./session-worker-manager.ts";
 
-export const ENV_SERVER_DIR = "PI_SERVER_DIR";
+export const ENV_SERVER_DIR = "WEAVRA_SERVER_DIR";
 export const ENV_SERVER_ID = "PI_SERVER_ID";
 
 export function resolveServerDirectory(directory?: string): string {
-	return resolvePath(directory ?? process.env[ENV_SERVER_DIR] ?? join(homedir(), ".pi", "server"));
+	return resolvePath(
+		directory ??
+			process.env[ENV_SERVER_DIR] ??
+			process.env.PI_SERVER_DIR ??
+			join(resolvePath(process.env.WEAVRA_HOME ?? join(homedir(), ".weavra")), "server"),
+	);
 }
 
 export async function ensurePrivateServerDirectory(directory: string): Promise<void> {
@@ -141,7 +146,7 @@ export interface ActivateServerOptions {
 	readonly model?: string;
 }
 
-/** Ensure the selected logical server is reachable, launching the current Pi installation if needed. */
+/** Ensure the selected logical server is reachable, launching the current Weavra installation if needed. */
 export async function activateServer(options: ActivateServerOptions): Promise<ActivatedServer> {
 	if (options.provider !== undefined && options.model === undefined) {
 		throw new Error("Server model provider requires a model");
@@ -331,7 +336,7 @@ export interface RunningServer {
 }
 
 export interface StartServerOptions {
-	/** Server profile and socket directory. Defaults to PI_SERVER_DIR or ~/.pi/server. */
+	/** Directory defaults to WEAVRA_SERVER_DIR, explicit PI_SERVER_DIR compatibility, or <WEAVRA_HOME or ~/.weavra>/server. */
 	readonly directory?: string;
 	/** Logical service ID. Defaults to PI_SERVER_ID or the directory's default-server-id. */
 	readonly serverId?: ServerId;
@@ -343,7 +348,7 @@ export interface StartServerOptions {
 	readonly model?: string;
 	/** Hold the server open without client or Session demand. Defaults to true for foreground servers. */
 	readonly keepAlive?: boolean;
-	/** Optional explicit Radius credential. Stored Radius auth is used when omitted. */
+	/** Explicit token or token file enabling a relay to WEAVRA_RADIUS_GATEWAY (PI_RADIUS_GATEWAY compatibility). */
 	readonly relayAuth?: AuthInput;
 	/** Explicit plugin packages. Undefined restores the logical server profile; an empty list clears it. */
 	readonly pluginPackages?: readonly string[];
@@ -522,6 +527,10 @@ export async function startServer(options: StartServerOptions = {}): Promise<Run
 	if (options.provider !== undefined && options.model === undefined) {
 		throw new Error("Server model provider requires a model");
 	}
+	const relayAuth = options.relayAuth === undefined ? undefined : new RadiusRelayAuthResolver(options.relayAuth);
+	if (relayAuth !== undefined && relayAuth.gateway === undefined) {
+		throw new Error("An explicit WEAVRA_RADIUS_GATEWAY is required for relay connections");
+	}
 	const workerModel =
 		options.model === undefined
 			? undefined
@@ -634,13 +643,15 @@ export async function startServer(options: StartServerOptions = {}): Promise<Run
 		startupLease = undefined;
 		await workers.discover(coordinator.peerIds);
 		await backend.refreshSessions();
-		relay = new RadiusRelayHost({
-			serverId,
-			server: backend.server,
-			auth: new RadiusRelayAuthResolver(options.relayAuth),
-			onStatus: options.onRelayStatus,
-		});
-		relay.start();
+		if (relayAuth !== undefined) {
+			relay = new RadiusRelayHost({
+				serverId,
+				server: backend.server,
+				auth: relayAuth,
+				onStatus: options.onRelayStatus,
+			});
+			relay.start();
+		}
 
 		const activeBackend = backend;
 		const activeCoordinator = coordinator;
@@ -650,7 +661,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Run
 			.then(async () => {
 				lifetime.stop();
 				activeWorkers.detach();
-				await activeRelay.close();
+				await activeRelay?.close();
 				await activeBackend.close();
 			})
 			.finally(() => activeCoordinator.close())
@@ -662,12 +673,12 @@ export async function startServer(options: StartServerOptions = {}): Promise<Run
 			socketPath,
 			server: activeBackend.server,
 			workerPids: activeWorkers.workerPids,
-			closed: activeBackend.closed.finally(() => activeRelay.close()),
+			closed: activeBackend.closed.finally(() => activeRelay?.close()),
 			close() {
 				lifetime.stop();
 				closePromise ??= (async () => {
 					try {
-						await activeRelay.close();
+						await activeRelay?.close();
 						await activeBackend.close();
 					} finally {
 						try {

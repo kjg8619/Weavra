@@ -50,12 +50,16 @@ const electronAppLayer = Layer.succeed(ElectronApp.ElectronApp, {
   on: () => Effect.void,
 } satisfies ElectronApp.ElectronApp["Service"]);
 
-const electronDialogLayer = Layer.succeed(ElectronDialog.ElectronDialog, {
-  pickFolder: () => Effect.succeed(Option.none()),
-  pickFiles: () => Effect.succeed([]),
-  showMessageBox: () => Effect.succeed({ response: 0, checkboxChecked: false }),
-  showErrorBox: () => Effect.void,
-} satisfies ElectronDialog.ElectronDialog["Service"]);
+const makeElectronDialogLayer = (messageBox?: Deferred.Deferred<Electron.MessageBoxOptions>) =>
+  Layer.succeed(ElectronDialog.ElectronDialog, {
+    pickFolder: () => Effect.succeed(Option.none()),
+    pickFiles: () => Effect.succeed([]),
+    showMessageBox: (options) =>
+      (messageBox ? Deferred.succeed(messageBox, options) : Effect.void).pipe(
+        Effect.as({ response: 0, checkboxChecked: false }),
+      ),
+    showErrorBox: () => Effect.void,
+  } satisfies ElectronDialog.ElectronDialog["Service"]);
 
 const desktopUpdatesLayer = Layer.succeed(DesktopUpdates.DesktopUpdates, {
   getState: Effect.die("unexpected getState"),
@@ -63,7 +67,7 @@ const desktopUpdatesLayer = Layer.succeed(DesktopUpdates.DesktopUpdates, {
   isInstallActive: Effect.succeed(false),
   subscribe: Effect.die("unexpected subscribe"),
   emitState: Effect.void,
-  disabledReason: Effect.succeed(Option.none()),
+  disabledReason: Effect.succeed(Option.some(DesktopUpdates.UNAVAILABLE_REASON)),
   configure: Effect.void,
   setChannel: () => Effect.die("unexpected setChannel"),
   check: () => Effect.die("unexpected check"),
@@ -104,6 +108,7 @@ const makeElectronMenuLayer = (
 const configureMenu = (
   selectedAction: Deferred.Deferred<string>,
   applicationMenuTemplate: Deferred.Deferred<readonly Electron.MenuItemConstructorOptions[]>,
+  messageBox?: Deferred.Deferred<Electron.MessageBoxOptions>,
 ) =>
   Effect.gen(function* () {
     const menu = yield* DesktopApplicationMenu.DesktopApplicationMenu;
@@ -114,7 +119,7 @@ const configureMenu = (
         Layer.provideMerge(makeElectronMenuLayer(applicationMenuTemplate)),
         Layer.provideMerge(makeDesktopWindowLayer(selectedAction)),
         Layer.provideMerge(desktopUpdatesLayer),
-        Layer.provideMerge(electronDialogLayer),
+        Layer.provideMerge(makeElectronDialogLayer(messageBox)),
         Layer.provideMerge(electronAppLayer),
         Layer.provideMerge(
           DesktopEnvironment.layer(environmentInput).pipe(
@@ -126,6 +131,24 @@ const configureMenu = (
   );
 
 describe("DesktopApplicationMenu", () => {
+  it.effect("shows unavailable guidance without creating a window or checking a feed", () =>
+    Effect.gen(function* () {
+      const selectedAction = yield* Deferred.make<string>();
+      const applicationMenuTemplate =
+        yield* Deferred.make<readonly Electron.MenuItemConstructorOptions[]>();
+      const messageBox = yield* Deferred.make<Electron.MessageBoxOptions>();
+      yield* configureMenu(selectedAction, applicationMenuTemplate, messageBox);
+      const template = yield* Deferred.await(applicationMenuTemplate);
+      const help = template.find((item) => item.role === "help");
+      if (!Array.isArray(help?.submenu)) throw new Error("Expected Help submenu.");
+      const item = help.submenu.find((item) => item.label === "Check for Updates...");
+      if (typeof item?.click !== "function") throw new Error("Expected update click handler.");
+      item.click({} as Electron.MenuItem, {} as Electron.BrowserWindow, {} as KeyboardEvent);
+      const dialog = yield* Deferred.await(messageBox);
+      assert.equal(dialog.type, "info");
+      assert.equal(dialog.detail, DesktopUpdates.UNAVAILABLE_REASON);
+    }),
+  );
   it.effect("installs the native menu and routes Settings through DesktopWindow", () =>
     Effect.gen(function* () {
       const selectedAction = yield* Deferred.make<string>();

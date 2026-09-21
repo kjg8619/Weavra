@@ -93,7 +93,10 @@ function socketFactory() {
 	return { sockets, factory };
 }
 
-beforeEach(() => allowNetwork());
+beforeEach(() => {
+	allowNetwork();
+	vi.stubEnv("WEAVRA_RADIUS_GATEWAY", "https://relay.example.test");
+});
 
 afterEach(() => {
 	vi.useRealTimers();
@@ -101,6 +104,33 @@ afterEach(() => {
 });
 
 describe("experimental Radius relay", () => {
+	test("does not open a relay when a token exists but no gateway was selected", async () => {
+		vi.stubEnv("WEAVRA_RADIUS_GATEWAY", undefined);
+		vi.stubEnv("PI_RADIUS_GATEWAY", undefined);
+		const webSockets = socketFactory();
+		const transport = createRadiusClientTransportFactory({
+			serverId,
+			auth: new RadiusRelayAuthResolver({ type: "token", token: "old-token" }),
+			webSocketFactory: webSockets.factory,
+		});
+		await expect(transport({ onData: vi.fn(), onClose: vi.fn(), onError: vi.fn() })).rejects.toThrow(
+			"An explicit WEAVRA_RADIUS_GATEWAY is required",
+		);
+		expect(webSockets.sockets).toEqual([]);
+	});
+
+	test("does not discover or refresh stored provider auth for relay access", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected OAuth request"));
+		try {
+			const auth = new RadiusRelayAuthResolver();
+			await expect(auth.resolve({ required: false })).resolves.toBeUndefined();
+			await expect(auth.resolve({ required: true })).rejects.toThrow("An explicit token or token file is required");
+			expect(fetchSpy).not.toHaveBeenCalled();
+		} finally {
+			fetchSpy.mockRestore();
+		}
+	});
+
 	test("matches the Radius multiplexing envelope", () => {
 		const payload = Uint8Array.from([0, 1, 2, 255]);
 		const parsed = parseRelayDataFrame(encodeRelayDataFrame(connectionId, payload));
@@ -140,6 +170,7 @@ describe("experimental Radius relay", () => {
 		host.start();
 		await vi.waitFor(() => expect(webSockets.sockets).toHaveLength(1));
 		const { socket, options } = webSockets.sockets[0]!;
+		expect(options.url).toBe(`wss://relay.example.test/v1/session-relays/${serverId}/connect`);
 		expect(options.authorization).toBe("Bearer secret");
 		socket.open(options.protocol);
 		await vi.waitFor(() => expect(statuses).toContain("connected"));

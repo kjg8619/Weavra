@@ -24,10 +24,7 @@ export function parseT3ProjectFile(contents: string): T3ProjectFile | null {
 }
 
 /**
- * Build the publishable JSON Schema document for `t3.json` (draft 2020-12).
- *
- * Served from the marketing site at {@link T3_PROJECT_FILE_SCHEMA_URL} so
- * editors get LSP support via a `$schema` reference.
+ * Build the bundled project schema without asserting a hosted schema service.
  */
 export function buildT3ProjectFileJsonSchema(): Record<string, unknown> {
   // Closed objects, as before effect rc.113 changed the generator default;

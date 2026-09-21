@@ -1,43 +1,17 @@
 # Quickstart
 
-This page gets you from install to a useful first pi session.
+## Source setup
 
-## Install
+Complete the [root Weavra checkout setup](../../../../../README.md). Weavra development is not distributed through the upstream Pi npm package or hosted installer.
 
-Pi is distributed as an npm package:
+Then prepare and inspect your independent home:
 
-```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-```
+    weavra setup
+    weavra doctor
+    cd /path/to/project
+    weavra
 
-`--ignore-scripts` disables dependency lifecycle scripts during install. Pi does not require install scripts for normal npm installs.
-
-### Uninstall
-
-Use the package manager that installed pi. The curl installer uses npm globally, so curl and npm installs are removed with npm:
-
-```bash
-# curl installer or npm install -g
-npm uninstall -g @earendil-works/pi-coding-agent
-
-# pnpm
-pnpm remove -g @earendil-works/pi-coding-agent
-
-# Yarn
-yarn global remove @earendil-works/pi-coding-agent
-
-# Bun
-bun uninstall -g @earendil-works/pi-coding-agent
-```
-
-Uninstalling pi leaves settings, credentials, sessions, and installed pi packages in `~/.pi/agent/`.
-
-Then start pi in the project directory you want it to work on:
-
-```bash
-cd /path/to/project
-pi
-```
+Global state defaults to `<WEAVRA_HOME or ~/.weavra>/agent`; setup does not silently import upstream credentials or sessions. Follow the root instructions for explicit legacy migration. Removing a checkout or launcher does not delete your agent state.
 
 ## Authenticate
 
@@ -59,10 +33,10 @@ Set an API key before launching pi:
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-pi
+weavra
 ```
 
-You can also run `/login` and select an API-key provider to store the key in `~/.pi/agent/auth.json`.
+You can also run `/login` and select an API-key provider to store the key in `~/.weavra/agent/auth.json`.
 
 See [Providers](providers.md) for all supported providers, environment variables, and cloud-provider setup.
 
@@ -97,7 +71,7 @@ Pi loads context files at startup. Add an `AGENTS.md` file to tell it how to wor
 
 Pi loads:
 
-- `~/.pi/agent/AGENTS.md` for global instructions
+- `~/.weavra/agent/AGENTS.md` for global instructions
 - `AGENTS.md` or `CLAUDE.md` from parent directories and the current directory
 
 If a directory contains `AGENTS.override.md`, Pi loads it instead of `AGENTS.md` or `CLAUDE.md` from that directory.
@@ -111,8 +85,8 @@ Restart pi, or run `/reload`, after changing context files.
 Type `@` in the editor to fuzzy-search files, or pass files on the command line:
 
 ```bash
-pi @README.md "Summarize this"
-pi @src/app.ts @src/app.test.ts "Review these together"
+weavra @README.md "Summarize this"
+weavra @src/app.ts @src/app.test.ts "Review these together"
 ```
 
 Images or text can be pasted with Ctrl+V (Alt+V on Windows); images can also be dragged into supported terminals.
@@ -136,10 +110,10 @@ Use `/model` or Ctrl+L to choose a model for the current session. Press Ctrl+S i
 Sessions are saved automatically:
 
 ```bash
-pi -c                  # Continue most recent session
-pi -r                  # Browse previous sessions
-pi --name "my task"    # Set session display name at startup
-pi --session <path|id> # Open a specific session
+weavra -c                  # Continue most recent session
+weavra -r                  # Browse previous sessions
+weavra --name "my task"    # Set session display name at startup
+weavra --session <path|id> # Open a specific session
 ```
 
 Inside pi, use `/resume`, `/new`, `/tree`, `/fork`, and `/clone` to manage sessions.
@@ -149,9 +123,9 @@ Inside pi, use `/resume`, `/new`, `/tree`, `/fork`, and `/clone` to manage sessi
 For one-shot prompts:
 
 ```bash
-pi -p "Summarize this codebase"
-cat README.md | pi -p "Summarize this text"
-pi -p @screenshot.png "What's in this image?"
+weavra -p "Summarize this codebase"
+cat README.md | weavra -p "Summarize this text"
+weavra -p @screenshot.png "What's in this image?"
 ```
 
 Use `--mode json` for JSON event output or `--mode rpc` for process integration.

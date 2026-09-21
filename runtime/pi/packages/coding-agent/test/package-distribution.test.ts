@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 
 interface CodingAgentPackageJson {
-	bin: { pi: string };
+	bin: { "weavra-runtime": string };
 	main: string;
 	exports: {
 		".": { import: string; types: string };
@@ -18,7 +18,8 @@ const packageJson = JSON.parse(
 
 describe("package distribution entrypoints", () => {
 	test("uses the bundle for executables and modular output for libraries", () => {
-		expect(packageJson.bin.pi).toBe("dist/bundle/cli.js");
+		expect(packageJson.bin["weavra-runtime"]).toBe("dist/bundle/cli.js");
+		expect(Object.keys(packageJson.bin)).toEqual(["weavra-runtime"]);
 		expect(packageJson.main).toBe("./dist/index.js");
 		expect(packageJson.exports["."].import).toBe("./dist/index.js");
 		expect(packageJson.exports["./rpc-entry"].import).toBe("./dist/bundle/rpc-entry.js");

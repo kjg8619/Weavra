@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Validates lockstep versions for published packages, then synchronizes
- * internal dependency versions in all workspace packages, including private ones.
+ * Validates internal lockstep versions for build artifacts, then synchronizes
+ * dependency versions in all source packages. Publication privacy is independent.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { findPackageDirectories } from "./package-workspaces.mjs";
+import { getRuntimeArtifactPackages } from "./release-packages.mjs";
 
 const GENERATED_PACKAGE_SUFFIXES = [join("coding-agent", "install-lock")];
 
@@ -18,17 +19,17 @@ const workspacePackages = findPackageDirectories(packageRoot)
 		const path = join(directory, "package.json");
 		return { data: JSON.parse(readFileSync(path, "utf8")), path };
 	});
-const publishedPackages = workspacePackages.filter((pkg) => pkg.data.private !== true);
+const artifactPackages = getRuntimeArtifactPackages(packageRoot);
 const versionMap = new Map(workspacePackages.map((pkg) => [pkg.data.name, pkg.data.version]));
 
 console.log("Current versions:");
-for (const pkg of [...publishedPackages].sort((a, b) => a.data.name.localeCompare(b.data.name))) {
-	console.log(`  ${pkg.data.name}: ${pkg.data.version}`);
+for (const pkg of [...artifactPackages].sort((a, b) => a.name.localeCompare(b.name))) {
+	console.log(`  ${pkg.name}: ${pkg.version}`);
 }
 
-const versions = new Set(publishedPackages.map((pkg) => pkg.data.version));
-if (versions.size > 1) {
-	console.error("\nERROR: Not all non-private packages have the same version.");
+const versions = new Set(artifactPackages.map((pkg) => pkg.version));
+if (versions.size !== 1) {
+	console.error("\nERROR: Runtime build artifacts must have exactly one internal version.");
 	console.error("Expected lockstep versioning. Run one of:");
 	console.error("  npm run version:patch");
 	console.error("  npm run version:minor");
@@ -36,7 +37,7 @@ if (versions.size > 1) {
 	process.exit(1);
 }
 
-console.log("\nAll non-private packages are at the same version (lockstep).");
+console.log("\nAll Runtime build artifacts are at the same internal version (lockstep).");
 
 let totalUpdates = 0;
 const updatedPackages = new Set();

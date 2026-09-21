@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpath
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { getPublicWorkspacePackages } from "./release-packages.mjs";
+import { getRuntimeArtifactPackages } from "./release-packages.mjs";
 
 const codingAgentName = "@earendil-works/pi-coding-agent";
 const developmentPackages = new Set(["pi-client", "pi-protocol", "pi-server"].map((name) => `@earendil-works/${name}`));
@@ -92,7 +92,7 @@ export function smokeTestCodingAgentConsumer(directory, runtime = process.execPa
 		LOCALAPPDATA: home,
 		XDG_CONFIG_HOME: home,
 		XDG_CACHE_HOME: home,
-		PI_CODING_AGENT_DIR: join(home, ".pi", "agent"),
+		WEAVRA_CODING_AGENT_DIR: join(home, ".weavra", "agent"),
 		PI_OFFLINE: "1",
 		PI_TELEMETRY: "0",
 	};
@@ -113,9 +113,9 @@ for (const subpath of ["/client", "/experimental/plugin"]) {
 }
 `);
 		run(runtime, [entry], { cwd: directory, env, timeout: 30_000 });
-		for (const cli of new Set([manifest.bin.pi, "dist/cli.js"])) {
+		for (const cli of new Set([manifest.bin["weavra-runtime"], "dist/cli.js"])) {
 			const output = run(runtime, [join(packageDir, cli), "--version"], { cwd: directory, env, timeout: 30_000 });
-			if (output.trim() !== manifest.version) throw new Error(`Unexpected version from ${cli}: ${output}`);
+			if (output.trim() !== "Weavra development") throw new Error(`Unexpected version from ${cli}: ${output}`);
 		}
 	} finally {
 		rmSync(entry, { force: true });
@@ -128,7 +128,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
 	if (process.argv.length !== 2) throw new Error("Usage: node scripts/coding-agent-consumer.mjs");
 	const root = mkdtempSync(join(tmpdir(), "pi-package-consumer-"));
 	try {
-		const tarballs = packReleasePackages(getPublicWorkspacePackages(), join(root, "tarballs"));
+		const tarballs = packReleasePackages(getRuntimeArtifactPackages(), join(root, "tarballs"));
 		const directory = join(root, "consumer");
 		installCodingAgentConsumer(directory, tarballs);
 		smokeTestCodingAgentConsumer(directory);

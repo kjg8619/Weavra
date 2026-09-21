@@ -1,6 +1,7 @@
 {
 	"name": "@earendil-works/pi-ai",
 	"version": "0.85.1",
+	"private": true,
 	"description": "Unified LLM API with automatic model discovery and provider configuration",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -61,7 +62,7 @@
 		"build": "npm run generate-models && npm run build:offline",
 		"build:offline": "npm run check:model-data && tsgo -p tsconfig.build.json && shx rm -rf dist/providers/data && shx cp -r src/providers/data dist/providers/data",
 		"test": "vitest --run",
-		"prepublishOnly": "npm run clean && npm run build"
+		"prepublishOnly": "node ../../scripts/publish.mjs"
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "0.124.0",

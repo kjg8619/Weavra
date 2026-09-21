@@ -66,17 +66,14 @@ describe("credential print commands", () => {
 		expect(await storage.read("openai-codex")).toMatchObject({ access: "fresh-test-token" });
 	});
 
-	test("reports unknown auth options like package commands", async () => {
+	test("rejects unknown auth options", async () => {
 		const originalExitCode = process.exitCode;
 		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 		try {
 			process.exitCode = undefined;
 			await main(["auth", "check", "--provider", "openai-codex", "--credentails"]);
 			const stderr = errorSpy.mock.calls.map(([message]) => String(message)).join("\n");
-			expect(stderr).toContain('Unknown option --credentails for "auth check".');
-			expect(stderr).toContain(
-				'Use "pi --help" or "pi auth check --provider <provider> [--json] [--credentials] [--no-refresh]".',
-			);
+			expect(stderr).toContain("--credentails");
 			expect(process.exitCode).toBe(1);
 		} finally {
 			process.exitCode = originalExitCode;

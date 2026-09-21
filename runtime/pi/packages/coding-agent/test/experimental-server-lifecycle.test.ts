@@ -1,11 +1,28 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ServerLifetime } from "../src/experimental/server.ts";
+import { resolveServerDirectory, ServerLifetime } from "../src/experimental/server.ts";
 
 afterEach(() => {
 	vi.useRealTimers();
+	vi.unstubAllEnvs();
 });
 
 describe("server lifecycle", () => {
+	test("uses the isolated product server home and explicit compatibility overrides", () => {
+		vi.stubEnv("WEAVRA_SERVER_DIR", undefined);
+		vi.stubEnv("PI_SERVER_DIR", undefined);
+		vi.stubEnv("WEAVRA_HOME", undefined);
+		expect(resolveServerDirectory()).toBe(join(homedir(), ".weavra", "server"));
+		vi.stubEnv("WEAVRA_HOME", "~/weavra-custom");
+		expect(resolveServerDirectory()).toBe(join(homedir(), "weavra-custom", "server"));
+		vi.stubEnv("PI_SERVER_DIR", "/tmp/legacy-explicit-server");
+		expect(resolveServerDirectory()).toBe("/tmp/legacy-explicit-server");
+		vi.stubEnv("WEAVRA_SERVER_DIR", "/tmp/weavra-server");
+		expect(resolveServerDirectory()).toBe("/tmp/weavra-server");
+		expect(resolveServerDirectory("/tmp/explicit-server")).toBe("/tmp/explicit-server");
+	});
+
 	test("holds a foreground server until explicit shutdown", () => {
 		vi.useFakeTimers();
 		const retire = vi.fn();

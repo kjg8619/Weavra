@@ -1,9 +1,8 @@
 import type { Api, Model, ModelsStoreEntry, Provider } from "@earendil-works/pi-ai";
-import { VERSION } from "../config.ts";
+import { PRODUCT_VERSION } from "../config.ts";
 import { fetchWithRetry } from "../utils/management-http.ts";
 import { getPiUserAgent } from "../utils/pi-user-agent.ts";
 
-const DEFAULT_CATALOG_BASE_URL = "https://pi.dev";
 const REMOTE_CATALOG_ATTEMPT_TIMEOUT_MS = 4_000;
 export const REMOTE_CATALOG_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
@@ -42,19 +41,17 @@ function remoteModels(
 	return entry.models;
 }
 
-/** Add a persisted pi.dev catalog overlay to a static built-in provider. */
-export function withRemoteCatalog(
-	provider: Provider,
-	catalogBaseUrl: string = DEFAULT_CATALOG_BASE_URL,
-	localGeneratedAt?: number,
-): Provider {
+/** Add a persisted, explicitly configured catalog overlay to a static built-in provider. */
+export function withRemoteCatalog(provider: Provider, catalogBaseUrl: string, localGeneratedAt?: number): Provider {
 	let dynamicModels: readonly Model<Api>[] = [];
+	const url = new URL(`/api/models/providers/${encodeURIComponent(provider.id)}`, catalogBaseUrl);
+	const source = url.href;
 
 	return {
 		...provider,
 		getModels: () => mergeModels(provider.getModels(), dynamicModels),
 		refreshModels: async (context) => {
-			const stored = context.stored;
+			const stored = context.stored?.source === source ? context.stored : undefined;
 			const restored = remoteModels(stored, localGeneratedAt).filter((model) => model.provider === provider.id);
 			if (
 				!(await context.publish({
@@ -78,13 +75,12 @@ export function withRemoteCatalog(
 			// Only revalidate when a cached body backs the validator, so a 304 can never
 			// leave the overlay empty.
 			const validator = stored?.models.length ? stored.etag : undefined;
-			const url = new URL(`/api/models/providers/${encodeURIComponent(provider.id)}`, catalogBaseUrl);
 			const response = await fetchWithRetry(
 				url,
 				{
 					headers: {
 						accept: "application/json",
-						"User-Agent": getPiUserAgent(VERSION),
+						"User-Agent": getPiUserAgent(PRODUCT_VERSION),
 						...(validator ? { "if-none-match": validator } : {}),
 					},
 					signal: context.signal,
@@ -103,6 +99,7 @@ export function withRemoteCatalog(
 				await context.publish({
 					persist: {
 						...(stored ?? { models: [] }),
+						source,
 						checkedAt,
 						lastModified: 0,
 						etag: undefined,
@@ -113,13 +110,14 @@ export function withRemoteCatalog(
 			if (!response.ok) {
 				// Transient failure: the cached body and its validator stay valid, so keep the
 				// etag and let the next refresh revalidate instead of downloading the catalog.
-				await context.publish({ persist: { ...(stored ?? { models: [] }), checkedAt } });
+				await context.publish({ persist: { ...(stored ?? { models: [] }), source, checkedAt } });
 				throw new Error(`Model catalog request failed for ${provider.id}: ${response.status}`);
 			}
 			const refreshed = parseCatalog(provider.id, await response.json());
 			const lastModified = Date.parse(response.headers.get("last-modified") ?? "");
 			if (context.signal.aborted) return;
 			const entry = {
+				source,
 				models: refreshed,
 				checkedAt,
 				lastModified: Number.isNaN(lastModified) ? 0 : lastModified,

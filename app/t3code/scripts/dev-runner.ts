@@ -68,7 +68,7 @@ export function isProxiableBindHost(host: string): boolean {
 }
 
 export const DEFAULT_T3_HOME = Effect.map(Effect.service(Path.Path), (path) =>
-  path.join(NodeOS.homedir(), ".t3"),
+  path.join(NodeOS.homedir(), ".weavra", "app"),
 );
 
 const MODE_ARGS = {
@@ -309,8 +309,8 @@ export function createDevRunnerEnv({
   return Effect.gen(function* () {
     const serverPort = port ?? BASE_SERVER_PORT + serverOffset;
     const webPort = BASE_WEB_PORT + webOffset;
-    // Precedence (--home-dir > worktree .t3 > ambient T3CODE_HOME) is resolved
-    // by the caller; an unset t3Home here genuinely means "use the default".
+    // Precedence (--home-dir > worktree .weavra/app > WEAVRA_APP_HOME >
+    // explicit T3CODE_HOME compatibility) is resolved by the caller.
     const configuredBaseDir = t3Home?.trim() || undefined;
     const resolvedBaseDir = yield* resolveBaseDir(configuredBaseDir);
     const isDesktopMode = mode === "dev:desktop";
@@ -324,10 +324,11 @@ export function createDevRunnerEnv({
     };
 
     if (configuredBaseDir !== undefined) {
-      output.T3CODE_HOME = resolvedBaseDir;
+      output.WEAVRA_APP_HOME = resolvedBaseDir;
     } else {
-      delete output.T3CODE_HOME;
+      delete output.WEAVRA_APP_HOME;
     }
+    delete output.T3CODE_HOME;
 
     // A dev-runner server is never launcher-managed. When the shell that runs
     // this script was itself spawned by the machine's managed t3 service (an
@@ -665,8 +666,8 @@ export function runDevRunnerWithInput(input: DevRunnerCliInput) {
 
     const hostEnvironment = yield* HostProcessEnvironment;
     // A dev server started inside a worktree defaults to that worktree's own
-    // (gitignored) `.t3` — see @t3tools/shared/devHome for why this must
-    // outrank an ambient T3CODE_HOME. `--home-dir` still wins.
+    // (gitignored) `.weavra/app` — see @t3tools/shared/devHome for why this must
+    // outrank ambient WEAVRA_APP_HOME (or explicit T3CODE_HOME). `--home-dir` wins.
     const worktreeHome = yield* resolveWorktreeT3Home(yield* HostProcessWorkingDirectory);
     // Trim before choosing: `--home-dir ""` is not a selection, and treating it
     // as one would skip the worktree default and land on the shared home —
@@ -674,7 +675,21 @@ export function runDevRunnerWithInput(input: DevRunnerCliInput) {
     const resolvedT3Home =
       (input.t3Home?.trim() || undefined) ??
       worktreeHome ??
-      (hostEnvironment.T3CODE_HOME?.trim() || undefined);
+      (hostEnvironment.WEAVRA_APP_HOME?.trim() || undefined) ??
+      (hostEnvironment.T3CODE_HOME?.trim() || undefined) ??
+      (hostEnvironment.WEAVRA_HOME?.trim()
+        ? (yield* Path.Path).join(
+            hostEnvironment.WEAVRA_HOME.trim() === "~"
+              ? NodeOS.homedir()
+              : hostEnvironment.WEAVRA_HOME.trim().startsWith("~/")
+                ? (yield* Path.Path).join(
+                    NodeOS.homedir(),
+                    hostEnvironment.WEAVRA_HOME.trim().slice(2),
+                  )
+                : hostEnvironment.WEAVRA_HOME.trim(),
+            "app",
+          )
+        : undefined);
     const env = yield* createDevRunnerEnv({
       mode: input.mode,
       baseEnv: hostEnvironment,
@@ -693,7 +708,7 @@ export function runDevRunnerWithInput(input: DevRunnerCliInput) {
       serverOffset !== offset || webOffset !== offset
         ? ` selectedOffset(server=${serverOffset},web=${webOffset})`
         : "";
-    const baseDir = env.T3CODE_HOME ?? (yield* DEFAULT_T3_HOME);
+    const baseDir = env.WEAVRA_APP_HOME ?? (yield* DEFAULT_T3_HOME);
 
     yield* Effect.logInfo(
       `[dev-runner] mode=${input.mode} source=${source}${selectionSuffix} serverPort=${String(env.T3CODE_PORT)} webPort=${String(env.PORT)} baseDir=${baseDir}`,
@@ -850,7 +865,7 @@ const devRunnerCli = Command.make("dev-runner", {
   ),
   t3Home: Flag.String("home-dir").pipe(
     Flag.withDescription(
-      "Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME). Inside a git worktree this defaults to that worktree's own .t3 so dev state stays off the shared home.",
+      "Explicit Weavra app data directory; runtime state is stored under userdata (equivalent to WEAVRA_APP_HOME; explicit T3CODE_HOME remains compatible). Inside a git worktree this defaults to that worktree's own .weavra/app so dev state stays off the shared home.",
     ),
     Flag.optional,
     Flag.map(Option.getOrUndefined),

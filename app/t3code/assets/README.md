@@ -6,7 +6,7 @@ The three Icon Composer projects are the source of truth for full application ic
 - `nightly/app-icon.icon`
 - `prod/app-icon.icon`
 
-Each project uses `text.svg` for the T3 mark and `background.svg` when the background is a vector layer. Additional layers use semantic names that describe their role and placement.
+Each project uses `text.svg` for the Weavra mark and `background.svg` when the background is a vector layer. Additional layers use semantic names that describe their role and placement.
 
 Run `vp run icons:export` from the repository root to regenerate the tracked iOS, Linux, Windows, and web assets. The development web exports are also copied to `apps/web/public` for the browser favicon and splash screen. Run `vp run icons:check` to verify that the generated assets and public copies match their sources without changing files.
 
@@ -65,3 +65,5 @@ is instead rendered from the same Icon Composer SVG sources by `vp run icons:exp
 
 Rerun the export after changing a layer SVG. `android-icon-mark.png` remains a flat silhouette for
 Android's monochrome themed icon.
+
+After exporting, separately derive marketing `src/assets/icon.webp` and `icon-nightly.webp` from the production and nightly universal PNGs and copy production favicon/apple-touch files to `apps/marketing/public`; `icons:export` does not update these marketing copies. Derive Android `android-icon-mark.png` from the transparent foreground and `android-notification-icon.png` by resizing that foreground to 96×96. Keep all existing filenames and preserve alpha: both Android monochrome and notification outputs must be true transparent PNGs, not JPEGs or flattened black-background images.

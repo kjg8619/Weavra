@@ -20,6 +20,7 @@ function createFixture(t, { importServer = false, declareServer = false } = {}) 
 		const manifest = {
 			name: pkg.name,
 			version: "1.0.0",
+			private: true,
 			type: "module",
 			exports: isAgent ? {
 				".": "./dist/index.js",
@@ -27,7 +28,7 @@ function createFixture(t, { importServer = false, declareServer = false } = {}) 
 				"./experimental/plugin": { source: "./src/experimental/plugin.ts" },
 			} : "./dist/index.js",
 			...(isAgent ? {
-				bin: { pi: "dist/bundle/cli.js" },
+				bin: { "weavra-runtime": "dist/bundle/cli.js" },
 				dependencies: {
 					"@earendil-works/chord": "1.0.0",
 					...(declareServer ? { "@earendil-works/pi-server": "1.0.0" } : {}),
@@ -46,8 +47,8 @@ export class SessionManager { static inMemory() {} }
 export class ModelRuntime { static create() {} }
 ` : 'export const marker = "local tarball";',
 			...(isAgent ? {
-				"dist/cli.js": 'console.log("1.0.0");',
-				"dist/bundle/cli.js": 'console.log("1.0.0");',
+				"dist/cli.js": 'console.log("Weavra development");',
+				"dist/bundle/cli.js": 'console.log("Weavra development");',
 			} : {}),
 		};
 		for (const [path, content] of Object.entries(files)) {

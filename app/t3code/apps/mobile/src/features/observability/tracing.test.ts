@@ -3,11 +3,12 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { vi } from "vite-plus/test";
+import Constants from "expo-constants";
 
 import { remoteHttpClientLayer } from "@t3tools/client-runtime/rpc";
 import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
 
-import { makeTracingLayer } from "./tracing";
+import { makeTracingLayer, resolveTracingConfig } from "./tracing";
 
 vi.mock("expo-constants", () => ({
   default: {
@@ -91,6 +92,37 @@ it.effect("does not let OTLP serialization failures alter application effects", 
         expect(new TextDecoder().decode(fetchFn.mock.calls[0]?.[1]?.body as Uint8Array)).toContain(
           "mobile.test.failed-span",
         );
+      }),
+    ),
+  );
+});
+
+it.effect("ignores inherited tracing credentials without exporting spans", () => {
+  Constants.expoConfig!.extra = {
+    observability: {
+      tracesUrl: "https://api.axiom.co/v1/traces",
+      tracesDataset: "inherited",
+      tracesToken: "inherited-token",
+    },
+  };
+  const config = resolveTracingConfig();
+  Constants.expoConfig!.extra = {};
+  expect(config).toBeNull();
+  const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 202 }));
+  const application = Layer.effectDiscard(
+    Effect.void.pipe(Effect.withSpan("mobile.no-export"), withRelayClientTracing),
+  ).pipe(
+    Layer.provide(
+      makeTracingLayer(config, { appVariant: "development" }).pipe(
+        Layer.provide(remoteHttpClientLayer(fetchFn)),
+      ),
+    ),
+  );
+  return Layer.build(application).pipe(
+    Effect.scoped,
+    Effect.andThen(
+      Effect.sync(() => {
+        expect(fetchFn).not.toHaveBeenCalled();
       }),
     ),
   );

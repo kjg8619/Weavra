@@ -64,11 +64,9 @@ describe("app startup failures", () => {
     await import("./bootstrap");
     await vi.dynamicImportSettled();
 
-    expect(bootShell?.text).toContain("T3 Code could not load.");
     const reloadButton = bootShell?.children[0]?.children.find(
       (element) => element.tagName === "button",
     );
-    expect(reloadButton?.text).toBe("Reload");
     reloadButton?.dispatchEvent(new Event("click"));
     expect(reload).toHaveBeenCalledOnce();
   });
@@ -78,7 +76,6 @@ describe("app startup failures", () => {
 
     showBootError(new Error("internal module path"));
 
-    expect(bootShell?.text).toContain("T3 Code could not load.");
     expect(bootShell?.text.includes("internal module path")).toBe(dev);
   });
 

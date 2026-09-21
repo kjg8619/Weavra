@@ -1,4 +1,4 @@
-// This file mostly exists because we want dev mode to say "T3 Code (Dev)" instead of "electron"
+// This file mostly exists because we want dev mode to say "Weavra (Dev)" instead of "electron"
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
@@ -15,12 +15,12 @@ const repoRoot = NodePath.resolve(desktopDir, "..", "..");
 const devBundleIdSuffix = NodePath.basename(repoRoot)
   .toLowerCase()
   .replaceAll(/[^a-z0-9]+/g, "");
-const APP_DISPLAY_NAME = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
+const APP_DISPLAY_NAME = isDevelopment ? "Weavra (Dev)" : "Weavra";
 const APP_BUNDLE_ID = isDevelopment
-  ? `com.t3tools.t3code.dev.${devBundleIdSuffix || "local"}`
-  : "com.t3tools.t3code";
-const APP_PROTOCOL_SCHEMES = isDevelopment ? ["t3code-dev"] : ["t3code"];
-const LAUNCHER_VERSION = 19;
+  ? `io.weavra.desktop.dev.${devBundleIdSuffix || "local"}`
+  : "io.weavra.desktop";
+const APP_PROTOCOL_SCHEMES = isDevelopment ? ["weavra-dev"] : ["weavra"];
+const LAUNCHER_VERSION = 20;
 const developmentMacIconPngPath = NodePath.join(
   repoRoot,
   "assets",
@@ -112,6 +112,8 @@ export function makeDevelopmentEnvironmentScript(environment) {
   const envEntries = [
     ["VITE_DEV_SERVER_URL", environment.VITE_DEV_SERVER_URL],
     ["T3CODE_PORT", environment.T3CODE_PORT],
+    ["WEAVRA_HOME", environment.WEAVRA_HOME],
+    ["WEAVRA_APP_HOME", environment.WEAVRA_APP_HOME],
     ["T3CODE_HOME", environment.T3CODE_HOME],
     ["T3CODE_COMMIT_HASH", environment.T3CODE_COMMIT_HASH],
     ["T3CODE_OTLP_TRACES_URL", environment.T3CODE_OTLP_TRACES_URL],
@@ -262,16 +264,19 @@ function ensureMacIconIcns(runtimeDir) {
   }
 }
 
-export function resolveMacBundleInfoPlistStrings(executableName) {
+function resolveMacBundleInfoPlistStrings(executableName) {
   return {
     CFBundleDisplayName: APP_DISPLAY_NAME,
     CFBundleName: APP_DISPLAY_NAME,
     CFBundleIdentifier: APP_BUNDLE_ID,
     CFBundleExecutable: executableName,
+    // Native bundles require numeric versions; product surfaces report development.
+    CFBundleShortVersionString: "0.0.0",
+    CFBundleVersion: "0.0.0",
     CFBundleIconFile: "icon.icns",
     NSScreenCaptureUsageDescription:
-      "T3 Code captures the active window when you use the snapshot shortcut.",
-    NSDocumentsFolderUsageDescription: "T3 Code reads project files you open in the desktop app.",
+      "Weavra captures the active window when you use the snapshot shortcut.",
+    NSDocumentsFolderUsageDescription: "Weavra reads project files you open in the desktop app.",
   };
 }
 
@@ -331,9 +336,9 @@ function readJson(path) {
   }
 }
 
-export function resolveMacLauncherPaths(appBundlePath, displayName = APP_DISPLAY_NAME) {
+export function resolveMacLauncherPaths(appBundlePath) {
   const executableDir = NodePath.posix.join(appBundlePath, "Contents", "MacOS");
-  const launcherExecutableName = `${displayName} Launcher`;
+  const launcherExecutableName = "weavra-desktop";
   return {
     launcherExecutableName,
     launcherBinaryPath: NodePath.posix.join(executableDir, launcherExecutableName),
@@ -402,7 +407,7 @@ function buildMacLauncher(electronBinaryPath) {
   if (isDevelopment) {
     // Keep Electron's native executable inside the branded bundle. Launching the
     // node_modules copy makes macOS associate the process (and Dock label) with
-    // Electron.app even though this bundle's Info.plist has the T3 Code name.
+    // Electron.app even though this bundle's Info.plist has the Weavra name.
     // Its conventional executable name also keeps Electron's default-app runtime
     // in development mode instead of making app.isPackaged report true.
     writeDevelopmentEnvironmentScript();

@@ -46,17 +46,10 @@ export const HostProcessExecutablePath = Context.Reference<string>(
   },
 );
 
-export const HostProcessArguments = Context.Reference<ReadonlyArray<string>>(
-  "@t3tools/shared/hostProcess/HostProcessArguments",
-  {
-    defaultValue: () => process.argv,
-  },
-);
-
 /**
  * The command the shell was given, before Node resolved it to the binary:
- * `t3` for a PATH lookup, `./t3` or the launcher symlink for an explicit
- * path. `process.argv[0]` and `execPath` are always the resolved binary.
+ * `weavra-server` for a PATH lookup, or an explicit path to the launcher.
+ * `process.argv[0]` and `execPath` are always the resolved binary.
  */
 export const HostProcessInvokedAs = Context.Reference<string>(
   "@t3tools/shared/hostProcess/HostProcessInvokedAs",

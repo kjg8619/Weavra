@@ -13,7 +13,7 @@
 The app starts the configured absolute executable with `weavra bridge --stdio --project-trusted`. Control uses the existing opt-in `--control` mode. `scripts/weavra-env.sh` resolves the exact executable from its own location; it neither changes cwd nor silently enables control. Set the app's existing trusted-project/control settings separately.
 
 ```text
-T3 Desktop/Web/Host
+Weavra Desktop/Web/Host
   -> production BridgeTransport / ControlTransport / FitnessReader
   -> absolute weavra executable, trusted project cwd
   -> Runtime Host -> RegisteredVerifier -> Kernel
@@ -33,3 +33,9 @@ Production app modules do not import Runtime implementation source. The root cro
 ## Preserved legacy scope
 
 Nested `.github` workflows are historical files, not active Weavra workflows. Nested `t3.json` describes the old standalone T3 checkout setup; it is not discovered at the product root and is not promoted into an automatic product-root worktree installer. For development, explicitly use the two build-root commands documented at the root. Historical upstream URLs, package names, branded assets, vendored reference trees, and manual reference-update tools remain provenance; they do not establish an upstream synchronization policy.
+
+The historical consolidation scope above does not authorize current product
+connections to inherited services. [Product Independence](PRODUCT_INDEPENDENCE.md)
+defines the current CLI, identity, home, update, sharing, analytics and hosted-service
+policy. Historical names remain in internal namespaces and provenance; active
+product behavior must not use them as distribution or tenant authority.

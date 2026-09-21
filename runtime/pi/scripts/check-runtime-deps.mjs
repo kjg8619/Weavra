@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isBuiltin } from "node:module";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import ts from "typescript";
-import { getPublicWorkspacePackages } from "./release-packages.mjs";
+import { getRuntimeArtifactPackages } from "./release-packages.mjs";
 
 const failures = [];
 
@@ -57,7 +57,9 @@ function checkSource(source, manifest) {
 	visit(source);
 }
 
-for (const { directory } of getPublicWorkspacePackages()) {
+const packages = getRuntimeArtifactPackages();
+if (packages.length === 0) throw new Error("No Runtime artifact packages found for dependency validation.");
+for (const { directory } of packages) {
 	const sourceDirectory = resolve(directory, "src");
 	if (!existsSync(sourceDirectory)) continue;
 	const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
@@ -86,8 +88,8 @@ for (const { directory } of getPublicWorkspacePackages()) {
 }
 
 if (failures.length > 0) {
-	console.error("Undeclared runtime imports in public packages:");
+	console.error("Undeclared runtime imports in Runtime artifacts:");
 	for (const failure of failures) console.error(`  ${failure}`);
 	process.exit(1);
 }
-console.log("Public package runtime imports have declared dependencies.");
+console.log(`Runtime imports in ${packages.length} artifact packages have declared dependencies.`);

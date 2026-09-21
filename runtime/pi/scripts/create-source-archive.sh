@@ -113,7 +113,7 @@ if [[ -n "$source_prefix" ]]; then
 fi
 archive_mtime="$(git show -s --format=%ct "$commit")"
 
-archive_root="pi-${version}"
+archive_root="weavra-source-${version}"
 git -C "$git_root" archive --format=tar --prefix="${archive_root}/" --mtime="@${archive_mtime}" "$archive_tree" \
     | gzip -n -9 > "$temporary_archive"
 tar -tzf "$temporary_archive" > "$manifest"

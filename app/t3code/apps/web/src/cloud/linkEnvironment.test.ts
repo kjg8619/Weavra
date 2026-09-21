@@ -1,27 +1,8 @@
-import {
-  type DesktopBridge,
-  EnvironmentId,
-  type RelayClientInstallProgressEvent,
-  WS_METHODS,
-} from "@t3tools/contracts";
-import { RelayWebClientId } from "@t3tools/contracts/relay";
+import { type DesktopBridge } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Stream from "effect/Stream";
-import * as SubscriptionRef from "effect/SubscriptionRef";
-import { HttpClient } from "effect/unstable/http";
+import * as Schema from "effect/Schema";
 import { afterEach, beforeEach, vi } from "vite-plus/test";
-import {
-  AVAILABLE_CONNECTION_STATE,
-  EnvironmentSupervisor,
-  type PreparedConnection,
-  PrimaryConnectionTarget,
-} from "@t3tools/client-runtime/connection";
-import { type RpcSession } from "@t3tools/client-runtime/rpc";
-import { EnvironmentRegistry } from "@t3tools/client-runtime/connection";
-import { ManagedRelay } from "@t3tools/client-runtime/relay";
 import { remoteHttpClientLayer } from "@t3tools/client-runtime/rpc";
 import { __resetDesktopPrimaryAuthForTests } from "../environments/primary/desktopAuth";
 
@@ -39,109 +20,12 @@ const TARGET: CloudLinkTarget = {
   httpBaseUrl: "http://127.0.0.1:3000",
   wsBaseUrl: "ws://127.0.0.1:3000",
 };
-
-const relayClientInstallDialog = vi.hoisted(() => ({
-  requestConfirmation: vi.fn(),
-  reportProgress: vi.fn(),
-  finish: vi.fn(),
-}));
-
-vi.mock("./relayClientInstallDialog", () => ({
-  requestRelayClientInstallConfirmation: relayClientInstallDialog.requestConfirmation,
-  reportRelayClientInstallProgress: relayClientInstallDialog.reportProgress,
-  finishRelayClientInstall: relayClientInstallDialog.finish,
-}));
-
-const createProof = vi.fn(() => Effect.succeed("dpop-proof"));
-const dpopSignerLayer = Layer.succeed(
-  ManagedRelay.ManagedRelayDpopSigner,
-  ManagedRelay.ManagedRelayDpopSigner.of({
-    thumbprint: Effect.succeed("thumbprint"),
-    createProof,
-  }),
+const decodePreferences = Schema.decodeUnknownSync(
+  Schema.fromJsonString(Schema.Struct({ publishAgentActivity: Schema.Boolean })),
 );
 
-function relayLayer() {
-  const http = remoteHttpClientLayer(globalThis.fetch);
-  return Layer.mergeAll(
-    http,
-    ManagedRelay.layer({
-      relayUrl: "https://relay.example.test",
-      clientId: RelayWebClientId,
-    }).pipe(Layer.provideMerge(dpopSignerLayer), Layer.provide(http)),
-  );
-}
-
-function registryLayer(options?: {
-  readonly status?: { readonly status: "available"; readonly version: string };
-  readonly installEvents?: ReadonlyArray<RelayClientInstallProgressEvent>;
-}) {
-  return Layer.effect(
-    EnvironmentRegistry,
-    Effect.gen(function* () {
-      const client = {
-        [WS_METHODS.cloudGetRelayClientStatus]: () =>
-          Effect.succeed(options?.status ?? { status: "available", version: "2026.6.0" }),
-        [WS_METHODS.cloudInstallRelayClient]: () =>
-          Stream.fromIterable(options?.installEvents ?? []),
-      } as unknown as RpcSession["client"];
-      const session: RpcSession = {
-        client,
-        initialConfig: Effect.never,
-        subscribeServerConfig: (input) => client.subscribeServerConfig(input),
-        ready: Effect.void,
-        probe: Effect.void,
-        closed: Effect.never,
-      };
-      const target = new PrimaryConnectionTarget({
-        environmentId: EnvironmentId.make(TARGET.environmentId),
-        label: TARGET.label,
-        httpBaseUrl: TARGET.httpBaseUrl,
-        wsBaseUrl: TARGET.wsBaseUrl,
-      });
-      const supervisor = EnvironmentSupervisor.of({
-        target,
-        state: yield* SubscriptionRef.make(AVAILABLE_CONNECTION_STATE),
-        session: yield* SubscriptionRef.make(Option.some(session)),
-        prepared: yield* SubscriptionRef.make(Option.none<PreparedConnection>()),
-        connect: Effect.void,
-        disconnect: Effect.void,
-        retryNow: Effect.void,
-      } satisfies EnvironmentSupervisor["Service"]);
-      const registry = {
-        run: <A, E, R>(_environmentId: EnvironmentId, effect: Effect.Effect<A, E, R>) =>
-          Effect.provideService(effect, EnvironmentSupervisor, supervisor),
-        runStream: <A, E, R>(_environmentId: EnvironmentId, stream: Stream.Stream<A, E, R>) =>
-          Stream.provideService(stream, EnvironmentSupervisor, supervisor),
-      } as unknown as EnvironmentRegistry["Service"];
-      return EnvironmentRegistry.of(registry);
-    }),
-  );
-}
-
-function services(options?: Parameters<typeof registryLayer>[0]) {
-  return Layer.mergeAll(relayLayer(), registryLayer(options));
-}
-
-function withServices<A, E>(
-  effect: Effect.Effect<
-    A,
-    E,
-    HttpClient.HttpClient | ManagedRelay.ManagedRelayClient | EnvironmentRegistry
-  >,
-  options?: Parameters<typeof registryLayer>[0],
-) {
-  return effect.pipe(Effect.provide(services(options)));
-}
-
-function bodyText(body: BodyInit | null | undefined): string {
-  return body instanceof Uint8Array ? new TextDecoder().decode(body) : String(body ?? "");
-}
-
 beforeEach(() => {
-  vi.clearAllMocks();
-  vi.stubEnv("VITE_T3CODE_RELAY_URL", "https://relay.example.test");
-  relayClientInstallDialog.requestConfirmation.mockResolvedValue(true);
+  vi.stubEnv("VITE_T3CODE_RELAY_URL", "https://relay.t3.codes");
 });
 
 afterEach(() => {
@@ -152,244 +36,113 @@ afterEach(() => {
 });
 
 describe("web cloud link environment client", () => {
-  it.effect("reads primary cloud link state from the explicit target", () =>
+  it.effect("reads saved link metadata only from the explicit local target", () =>
     Effect.gen(function* () {
       const fetchMock = vi.fn().mockResolvedValue(
         Response.json({
           linked: true,
           cloudUserId: "user-1",
-          relayUrl: "https://relay.example.test",
-          relayIssuer: "https://relay.example.test",
+          relayUrl: "https://relay.t3.codes",
+          relayIssuer: "https://relay.t3.codes",
           managedTunnelActive: true,
           publishAgentActivity: false,
         }),
       );
-      vi.stubGlobal("fetch", fetchMock);
-
-      const state = yield* withServices(readPrimaryCloudLinkState({ target: TARGET }));
-
-      expect(Option.fromNullishOr(state)).toEqual(
-        Option.some({
-          linked: true,
-          cloudUserId: "user-1",
-          relayUrl: "https://relay.example.test",
-          relayIssuer: "https://relay.example.test",
-          managedTunnelActive: true,
-          publishAgentActivity: false,
-        }),
+      const state = yield* readPrimaryCloudLinkState({ target: TARGET }).pipe(
+        Effect.provide(remoteHttpClientLayer(fetchMock)),
       );
-      expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      expect(state?.relayUrl).toBe("https://relay.t3.codes");
+      expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
         "http://127.0.0.1:3000/api/connect/link-state",
-      );
+      ]);
     }),
   );
 
-  it.effect("uses desktop bearer auth for primary cloud link state", () =>
+  it.effect("uses desktop bearer auth rather than browser cookies for the local target", () =>
     Effect.gen(function* () {
       const fetchMock = vi.fn().mockResolvedValue(
         Response.json({
-          linked: true,
-          cloudUserId: "user-1",
-          relayUrl: "https://relay.example.test",
-          relayIssuer: "https://relay.example.test",
-          managedTunnelActive: true,
+          linked: false,
+          cloudUserId: null,
+          relayUrl: null,
+          relayIssuer: null,
+          managedTunnelActive: false,
           publishAgentActivity: false,
         }),
       );
-      vi.stubGlobal("fetch", fetchMock);
       vi.stubGlobal("window", {
-        location: { origin: "t3code://app" },
+        location: { origin: "weavra://app" },
         desktopBridge: {
           getLocalEnvironmentBearerToken: vi.fn().mockResolvedValue("desktop-bearer-token"),
-        } as unknown as DesktopBridge,
+        } satisfies Pick<DesktopBridge, "getLocalEnvironmentBearerToken">,
       });
-
-      yield* withServices(readPrimaryCloudLinkState({ target: TARGET }));
-
+      yield* readPrimaryCloudLinkState({ target: TARGET }).pipe(
+        Effect.provide(remoteHttpClientLayer(fetchMock)),
+      );
       const request = new Request(fetchMock.mock.calls[0]?.[0], fetchMock.mock.calls[0]?.[1]);
       expect(request.credentials).not.toBe("include");
       expect(request.headers.get("authorization")).toBe("Bearer desktop-bearer-token");
     }),
   );
 
-  it.effect("updates agent activity publishing for the explicit primary target", () =>
+  it.effect("writes publishing preferences only to the explicit local target", () =>
     Effect.gen(function* () {
       const fetchMock = vi.fn().mockResolvedValue(
         Response.json({
           linked: true,
           cloudUserId: "user-1",
-          relayUrl: "https://relay.example.test",
-          relayIssuer: "https://relay.example.test",
+          relayUrl: "https://relay.t3.codes",
+          relayIssuer: "https://relay.t3.codes",
           managedTunnelActive: true,
           publishAgentActivity: true,
         }),
       );
-      vi.stubGlobal("fetch", fetchMock);
-
-      const state = yield* withServices(
-        updatePrimaryCloudPreferences({
-          target: TARGET,
-          publishAgentActivity: true,
-        }),
+      yield* updatePrimaryCloudPreferences({ target: TARGET, publishAgentActivity: true }).pipe(
+        Effect.provide(remoteHttpClientLayer(fetchMock)),
       );
-
-      expect(state.publishAgentActivity).toBe(true);
-      expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
         "http://127.0.0.1:3000/api/connect/preferences",
-      );
+      ]);
       expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("POST");
-      // @effect-diagnostics-next-line preferSchemaOverJson:off
-      expect(JSON.parse(bodyText(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
-        publishAgentActivity: true,
-      });
+      const body = fetchMock.mock.calls[0]?.[1]?.body;
+      expect(
+        decodePreferences(
+          body instanceof Uint8Array ? new TextDecoder().decode(body) : String(body ?? ""),
+        ),
+      ).toEqual({ publishAgentActivity: true });
     }),
   );
 
-  it.effect("links an available primary environment without invoking installation", () =>
+  it.effect("refuses hosted linking despite saved credentials and legacy configuration", () =>
     Effect.gen(function* () {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValueOnce(
-          Response.json({
-            challenge: "challenge",
-            expiresAt: "2026-06-06T00:05:00.000Z",
-          }),
-        )
-        .mockResolvedValueOnce(Response.json("signed-proof"))
-        .mockResolvedValueOnce(
-          Response.json({
-            ok: true,
-            environmentId: TARGET.environmentId,
-            endpoint: {
-              httpBaseUrl: "https://desktop.example.test",
-              wsBaseUrl: "wss://desktop.example.test",
-              providerKind: "cloudflare_tunnel",
-            },
-            endpointRuntime: null,
-            relayIssuer: "https://relay.example.test",
-            cloudUserId: "user-1",
-            environmentCredential: "environment-credential",
-            cloudMintPublicKey: "public-key",
-          }),
-        )
-        .mockResolvedValueOnce(
-          Response.json({ ok: true, endpointRuntimeStatus: { status: "configured" } }),
-        );
+      const fetchMock = vi.fn();
       vi.stubGlobal("fetch", fetchMock);
-
-      yield* withServices(
-        linkPrimaryEnvironmentToCloud({
-          target: TARGET,
-          clerkToken: "clerk-token",
-        }),
-      );
-
-      expect(relayClientInstallDialog.requestConfirmation).not.toHaveBeenCalled();
-      expect(String(fetchMock.mock.calls[1]?.[0])).toBe(
-        "http://127.0.0.1:3000/api/connect/link-proof",
-      );
-      // @effect-diagnostics-next-line preferSchemaOverJson:off
-      expect(JSON.parse(bodyText(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
-        challenge: "challenge",
-        endpoint: {
-          httpBaseUrl: TARGET.httpBaseUrl,
-          wsBaseUrl: TARGET.wsBaseUrl,
-        },
-      });
+      const error = yield* linkPrimaryEnvironmentToCloud({
+        target: TARGET,
+        clerkToken: "legacy-clerk-token",
+        mode: "publish_only",
+      }).pipe(Effect.flip);
+      expect(error._tag).toBe("CloudEnvironmentLinkError");
+      expect(fetchMock).not.toHaveBeenCalled();
     }),
   );
 
-  it.effect("links publish-only without a managed tunnel", () =>
-    Effect.gen(function* () {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValueOnce(
-          Response.json({
-            challenge: "challenge",
-            expiresAt: "2026-06-06T00:05:00.000Z",
-          }),
-        )
-        .mockResolvedValueOnce(Response.json("signed-proof"))
-        .mockResolvedValueOnce(
-          Response.json({
-            ok: true,
-            environmentId: TARGET.environmentId,
-            endpoint: {
-              httpBaseUrl: TARGET.httpBaseUrl,
-              wsBaseUrl: TARGET.wsBaseUrl,
-              providerKind: "manual",
-            },
-            endpointRuntime: null,
-            relayIssuer: "https://relay.example.test",
-            cloudUserId: "user-1",
-            environmentCredential: "environment-credential",
-            cloudMintPublicKey: "public-key",
-          }),
-        )
-        .mockResolvedValueOnce(
-          Response.json({ ok: true, endpointRuntimeStatus: { status: "disabled" } }),
-        );
-      vi.stubGlobal("fetch", fetchMock);
-
-      yield* withServices(
-        linkPrimaryEnvironmentToCloud({
-          target: TARGET,
-          clerkToken: "clerk-token",
-          mode: "publish_only",
-        }),
-      );
-
-      // @effect-diagnostics-next-line preferSchemaOverJson:off
-      expect(JSON.parse(bodyText(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
-        managedTunnelsEnabled: false,
-      });
-      // @effect-diagnostics-next-line preferSchemaOverJson:off
-      expect(JSON.parse(bodyText(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
-        endpoint: { providerKind: "manual" },
-      });
-    }),
-  );
-
-  it.effect("installs a missing relay client before linking", () =>
-    Effect.gen(function* () {
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ malformed: true })));
-
-      yield* withServices(
-        linkPrimaryEnvironmentToCloud({
-          target: TARGET,
-          clerkToken: "clerk-token",
-        }),
-        {
-          status: { status: "available", version: "2026.6.0" },
-          installEvents: [],
-        },
-      ).pipe(Effect.flip);
-
-      expect(relayClientInstallDialog.requestConfirmation).not.toHaveBeenCalled();
-    }),
-  );
-
-  it.effect("unlinks locally before revoking the relay record", () =>
+  it.effect("unlinks locally without reusing credentials to contact the inherited relay", () =>
     Effect.gen(function* () {
       const fetchMock = vi
         .fn()
         .mockResolvedValueOnce(
           Response.json({ ok: true, endpointRuntimeStatus: { status: "disabled" } }),
-        )
-        .mockResolvedValueOnce(Response.json({ ok: true }));
-      vi.stubGlobal("fetch", fetchMock);
-
-      yield* withServices(
-        unlinkPrimaryEnvironmentFromCloud({
-          target: TARGET,
-          clerkToken: "clerk-token",
-        }),
-      );
-
-      expect(String(fetchMock.mock.calls[0]?.[0])).toBe("http://127.0.0.1:3000/api/connect/unlink");
-      expect(String(fetchMock.mock.calls[1]?.[0])).toContain(
-        `/v1/client/environment-links/${TARGET.environmentId}`,
-      );
+        );
+      yield* unlinkPrimaryEnvironmentFromCloud({
+        target: TARGET,
+        clerkToken: "legacy-clerk-token",
+      }).pipe(Effect.provide(remoteHttpClientLayer(fetchMock)));
+      expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+        "http://127.0.0.1:3000/api/connect/unlink",
+      ]);
+      const request = new Request(fetchMock.mock.calls[0]?.[0], fetchMock.mock.calls[0]?.[1]);
+      expect([...request.headers.values()].join("\n")).not.toContain("legacy-clerk-token");
     }),
   );
 });

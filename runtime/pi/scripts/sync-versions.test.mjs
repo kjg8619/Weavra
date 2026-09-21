@@ -25,21 +25,28 @@ function runSyncVersions(root) {
 	});
 }
 
-test("synchronizes private dependencies without touching registry aliases, generated manifests, or published lockstep", async () => {
+test("enforces private artifact lockstep while preserving source-only versions, aliases, and generated manifests", async () => {
 	const root = await mkdtemp(join(tmpdir(), "pi-sync-versions-"));
 	try {
 		await writeManifest(root, "packages/ai", {
 			name: "@earendil-works/pi-ai",
 			version: "2.0.0",
+			private: true,
+			scripts: { build: "tsc" },
+			main: "dist/index.js",
 		});
 		await writeManifest(root, "packages/coding-agent", {
 			name: "@earendil-works/pi-coding-agent",
 			version: "2.0.0",
+			private: true,
+			scripts: { build: "tsc" },
+			main: "dist/index.js",
 		});
 		await writeManifest(root, "packages/evals", {
 			name: "@earendil-works/pi-evals",
 			version: "9.9.9",
 			private: true,
+			scripts: { build: "tsc --noEmit" },
 			dependencies: {
 				"@earendil-works/pi-coding-agent": "^1.0.0",
 				"@mariozechner/pi-ai": "npm:@earendil-works/pi-ai@1.0.0",
@@ -66,6 +73,9 @@ test("synchronizes private dependencies without touching registry aliases, gener
 		await writeManifest(root, "packages/ai", {
 			name: "@earendil-works/pi-ai",
 			version: "3.0.0",
+			private: true,
+			scripts: { build: "tsc" },
+			main: "dist/index.js",
 		});
 		const lockstepFailure = runSyncVersions(root);
 		assert.equal(lockstepFailure.status, 1, lockstepFailure.stderr);

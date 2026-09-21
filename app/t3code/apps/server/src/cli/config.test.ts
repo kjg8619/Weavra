@@ -78,6 +78,45 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
     );
   });
 
+  it.effect("prefers the canonical app home over explicit legacy configuration", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "weavra-config-home-" });
+      const canonical = path.join(directory, "canonical");
+      const legacy = path.join(directory, "legacy");
+      const config = yield* resolveServerConfig(
+        {
+          mode: Option.some("web"),
+          port: Option.some(8788),
+          host: Option.none(),
+          baseDir: Option.none(),
+          cwd: Option.some(directory),
+          devUrl: Option.none(),
+          noBrowser: Option.none(),
+          bootstrapFd: Option.none(),
+          autoBootstrapProjectFromCwd: Option.none(),
+          logWebSocketEvents: Option.none(),
+          tailscaleServeEnabled: Option.none(),
+          tailscaleServePort: Option.none(),
+        },
+        Option.none(),
+      ).pipe(
+        Effect.provide(
+          ConfigProvider.layer(
+            ConfigProvider.fromEnv({
+              env: {
+                WEAVRA_APP_HOME: canonical,
+                T3CODE_HOME: legacy,
+              },
+            }),
+          ),
+        ),
+      );
+      assert.equal(config.baseDir, canonical);
+    }).pipe(Effect.provide(NetService.layer)),
+  );
+
   it.effect("enables a trimmed reusable auth token only for web dev mode", () =>
     Effect.gen(function* () {
       const baseDir = yield* FileSystem.FileSystem.pipe(

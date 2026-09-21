@@ -1,6 +1,7 @@
 {
 	"name": "@earendil-works/pi-agent-core",
 	"version": "0.85.1",
+	"private": true,
 	"description": "General-purpose agent with transport abstraction, state management, and attachment support",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -52,7 +53,7 @@
 		"test:harness": "vitest --run --config vitest.harness.config.ts",
 		"test:session:conformance": "vitest --run --config vitest.harness.config.ts test/harness/memory-conformance.test.ts",
 		"coverage:harness": "vitest --run --config vitest.harness.config.ts --coverage",
-		"prepublishOnly": "npm run build"
+		"prepublishOnly": "node ../../scripts/publish.mjs"
 	},
 	"dependencies": {
 		"@earendil-works/chord": "^0.85.1",

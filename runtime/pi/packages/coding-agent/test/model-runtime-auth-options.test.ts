@@ -123,7 +123,7 @@ describe("ModelRuntime auth options", () => {
 		expect(await runtime.checkAuth("anthropic")).toMatchObject({ type: "oauth" });
 	});
 
-	it("distinguishes subscription OAuth from generic OAuth sign-in", async () => {
+	it("distinguishes subscription OAuth without activating removed providers", async () => {
 		const runtime = await ModelRuntime.create({
 			credentials: AuthStorage.inMemory({
 				anthropic: {
@@ -152,7 +152,7 @@ describe("ModelRuntime auth options", () => {
 		expect(runtime.isUsingSubscription("anthropic")).toBe(true);
 		expect(runtime.isUsingOAuth("openrouter")).toBe(true);
 		expect(runtime.isUsingSubscription("openrouter")).toBe(false);
-		expect(runtime.isUsingOAuth("radius")).toBe(true);
+		expect(runtime.isUsingOAuth("radius")).toBe(false);
 		expect(runtime.isUsingSubscription("radius")).toBe(false);
 	});
 

@@ -58,30 +58,6 @@ const zoomMainWindow = Effect.fn("desktop.menu.zoomMainWindow")(function* (
   yield* desktopWindow.zoomMain(direction);
 });
 
-const checkForUpdatesFromMenu = Effect.gen(function* () {
-  const updates = yield* DesktopUpdates.DesktopUpdates;
-  const electronDialog = yield* ElectronDialog.ElectronDialog;
-  const result = yield* updates.check("menu");
-  const updateState = result.state;
-
-  if (updateState.status === "up-to-date") {
-    yield* electronDialog.showMessageBox({
-      type: "info",
-      title: "You're up to date!",
-      message: `T3 Code ${updateState.currentVersion} is currently the newest version available.`,
-      buttons: ["OK"],
-    });
-  } else if (updateState.status === "error") {
-    yield* electronDialog.showMessageBox({
-      type: "warning",
-      title: "Update check failed",
-      message: "Could not check for updates.",
-      detail: updateState.message ?? "An unknown error occurred. Please try again later.",
-      buttons: ["OK"],
-    });
-  }
-}).pipe(Effect.withSpan("desktop.menu.checkForUpdates"));
-
 const handleCheckForUpdatesMenuClick = Effect.gen(function* () {
   const updates = yield* DesktopUpdates.DesktopUpdates;
   const electronDialog = yield* ElectronDialog.ElectronDialog;
@@ -93,16 +69,20 @@ const handleCheckForUpdatesMenuClick = Effect.gen(function* () {
     yield* electronDialog.showMessageBox({
       type: "info",
       title: "Updates unavailable",
-      message: "Automatic updates are not available right now.",
+      message: "Weavra updates are unavailable.",
       detail: disabledReason.value,
       buttons: ["OK"],
     });
     return;
   }
 
-  const desktopWindow = yield* DesktopWindow.DesktopWindow;
-  yield* desktopWindow.ensureMain;
-  yield* checkForUpdatesFromMenu;
+  yield* electronDialog.showMessageBox({
+    type: "info",
+    title: "Updates unavailable",
+    message: "Weavra updates are unavailable.",
+    detail: DesktopUpdates.UNAVAILABLE_REASON,
+    buttons: ["OK"],
+  });
 }).pipe(Effect.withSpan("desktop.menu.handleCheckForUpdatesClick"));
 
 /** @public Service construction is part of the canonical Effect module API. */

@@ -13,6 +13,7 @@
 		]
 	},
 	"scripts": {
+		"prepublishOnly": "node ../../scripts/publish.mjs",
 		"clean": "shx rm -rf dist",
 		"test": "vitest --run"
 	},

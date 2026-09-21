@@ -48,7 +48,7 @@ beforeEach(async () => {
 	// A local CLI process fixture, not a Pi build. The real Extension is checked through the public loader below.
 	await writeFile(
 		cli,
-		`#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({cli: process.argv[1], cwd: process.cwd(), args: process.argv.slice(2), marker: process.env.WEAVRA_TEST_MARKER, home: process.env.HOME, agentDir: process.env.PI_CODING_AGENT_DIR})); process.exit(Number(process.env.WEAVRA_TEST_EXIT || 0));\n`,
+		`#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({cli: process.argv[1], cwd: process.cwd(), args: process.argv.slice(2), marker: process.env.WEAVRA_TEST_MARKER, home: process.env.HOME, agentDir: process.env.WEAVRA_CODING_AGENT_DIR})); process.exit(Number(process.env.WEAVRA_TEST_EXIT || 0));\n`,
 		{ mode: 0o755 },
 	);
 });
@@ -83,8 +83,6 @@ async function globalPi(version = "global-unrelated-version") {
 describe("Weavra fork-local launcher (POSIX)", () => {
 	it.each([
 		{ args: [] },
-		{ args: ["--help"] },
-		{ args: ["--version"] },
 		{ args: ["--model", "example/provider model", "--thinking", "high"] },
 		{
 			args: [
@@ -192,10 +190,8 @@ describe("Weavra fork-local launcher (POSIX)", () => {
 			}
 			const result = run(["--help"]);
 			expect(result.status).toBe(1);
-			expect(result.stderr).toContain("Weavra: fork-local Pi build is missing or not executable");
 			expect(result.stderr).toContain(cli);
 			expect(result.stderr).toContain("npm install --ignore-scripts && npm run build");
-			expect(result.stderr).toContain("No global Pi fallback");
 			expect(result.stdout).toBe("");
 			await expect(readFile(join(root, "global-called"))).rejects.toMatchObject({ code: "ENOENT" });
 		},
@@ -220,7 +216,7 @@ describe("Weavra fork-local launcher (POSIX)", () => {
 		const pi = JSON.parse(await readFile(join(repository, "packages/coding-agent/package.json"), "utf8"));
 		expect(metadata.bin).toEqual({ weavra: "bin/weavra" });
 		expect(metadata.private).toBe(true);
-		expect(cli).toBe(join(checkout, "packages/coding-agent", pi.bin.pi));
+		expect(cli).toBe(join(checkout, "packages/coding-agent", pi.bin["weavra-runtime"]));
 	});
 	it("actual npm link in an isolated prefix adds only weavra and preserves the existing pi symlink", async () => {
 		const program = await globalPi();

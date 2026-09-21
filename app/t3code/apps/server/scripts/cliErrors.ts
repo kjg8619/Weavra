@@ -58,3 +58,12 @@ export class ServerCliExecutableImportError extends Schema.TaggedError<ServerCli
     return `${this.bundlePath} imports file-backed packages that a single-executable cannot resolve: ${this.specifiers.join(", ")}. Load them through createRequire instead.`;
   }
 }
+
+export class ServerCliPublicationUnavailableError extends Schema.TaggedError<ServerCliPublicationUnavailableError>()(
+  "ServerCliPublicationUnavailableError",
+  {},
+) {
+  override get message(): string {
+    return "Weavra server publication is unavailable: no independent release infrastructure is configured. Use build-exe and scripts/build-cli-archive.ts for local artifacts.";
+  }
+}

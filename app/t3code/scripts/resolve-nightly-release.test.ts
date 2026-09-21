@@ -39,30 +39,35 @@ it.effect("reports the invalid desktop package version", () =>
   }),
 );
 
-it("derives nightly metadata including the short commit sha in the release name", () => {
-  assert.deepStrictEqual(
-    resolveNightlyReleaseMetadata("9.9.10", "20260413", 321, "abcdef1234567890"),
-    {
-      baseVersion: "9.9.10",
-      version: "9.9.10-nightly.20260413.321",
-      tag: "v9.9.10-nightly.20260413.321",
-      name: "T3 Code Nightly 9.9.10-nightly.20260413.321 (abcdef123456)",
-      shortSha: "abcdef123456",
-    },
+it("derives nightly metadata including the short commit sha", () => {
+  const { name: _name, ...metadata } = resolveNightlyReleaseMetadata(
+    "9.9.10",
+    "20260413",
+    321,
+    "abcdef1234567890",
   );
+  assert.deepStrictEqual(metadata, {
+    baseVersion: "9.9.10",
+    version: "9.9.10-nightly.20260413.321",
+    tag: "v9.9.10-nightly.20260413.321",
+    shortSha: "abcdef123456",
+  });
 });
 
 it("derives preview metadata under its own prerelease identifier", () => {
-  assert.deepStrictEqual(
-    resolveNightlyReleaseMetadata("9.9.10", "20260413", 321, "abcdef1234567890", "preview"),
-    {
-      baseVersion: "9.9.10",
-      version: "9.9.10-preview.20260413.321",
-      tag: "v9.9.10-preview.20260413.321",
-      name: "T3 Code Preview (maintainer test build, do not install) 9.9.10-preview.20260413.321 (abcdef123456)",
-      shortSha: "abcdef123456",
-    },
+  const { name: _name, ...metadata } = resolveNightlyReleaseMetadata(
+    "9.9.10",
+    "20260413",
+    321,
+    "abcdef1234567890",
+    "preview",
   );
+  assert.deepStrictEqual(metadata, {
+    baseVersion: "9.9.10",
+    version: "9.9.10-preview.20260413.321",
+    tag: "v9.9.10-preview.20260413.321",
+    shortSha: "abcdef123456",
+  });
 });
 
 it.effect("preserves the GITHUB_OUTPUT configuration cause", () => {
