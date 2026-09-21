@@ -19,6 +19,16 @@ Weavra
 - No root workspace, merged lockfile, shared dependency catalog, or direct runtime source import from the app.
 - The host invokes `weavra bridge --stdio --project-trusted`, optionally with `--control`, through the trusted `T3_WEAVRA_EXECUTABLE` startup configuration.
 
+Use Node 24.19.0 for the consolidation validation environment. Install/build inside each build root, not at product root; complete commands and evidence are in the [consolidation record](docs/migration/REPOSITORY_CONSOLIDATION.md).
+
+```sh
+# From product root: configure the exact executable without enabling control.
+source scripts/weavra-env.sh
+# Then run the existing T3 development command from app/t3code.
+```
+
+See [architecture boundaries](docs/architecture/BOUNDARIES.md) for project/source-root semantics and C08 authority.
+
 ## Consolidation provenance
 
 Consolidation date: 2026-09-21. Development harness: OMP / GPT-6 Astra.

@@ -1,0 +1,84 @@
+# Repository consolidation record
+
+Status: VALIDATION IN PROGRESS. Do not interpret source historical results as consolidated validation.
+
+Date: 2026-09-21. Target: independent public [kjg8619/Weavra](https://github.com/kjg8619/Weavra). Harness: OMP / GPT-6 Astra. Scope: repository consolidation only; no C09/V0.6D feature work.
+
+## Immutable import evidence
+
+| Source | Source commit | Import commit | Imported subtree | Entries |
+| --- | --- | --- | --- | ---: |
+| Pi | `19184e387733dd3558dffff874c58a8e67748e40` | `89d917c312f52c028a3f7d5183ba602faef19dd1` | `b7bb09f505ce3f604e401ca1e70d376cdbbca9cd` | 1918 |
+| T3Code | `f6ff0ae0f1ae0f54aee055c64b82dd8e2b9eebdf` | `8fdde3c574c7ad7919810c67d1ab86de0f18ddc6` | `9d2146522f03104f605b421828582464e97cb610` | 23069 |
+
+`node scripts/verify-imports.mjs` compares the committed source manifests against each immutable import subtree: relative path, Git mode, object type and blob ID. Symlink target bytes are blob content; executable modes are included. It also asserts the complete source tree object identity. It passed locally for all 24,987 entries. Compatibility commits are subsequent history, never edits to the import commits.
+
+An initial `git archive` extraction changed the batch file's newline representation through attributes. It was rejected before import commit creation. Raw source objects and indexed modes were used instead; the committed trees match byte-for-byte. Source Git histories were not attached as parents.
+
+## Categories
+
+### Root ownership and policy
+
+New README, root AGENTS, NOTICE, architecture/migration/work-log documentation, root CI and validation/development helpers. No root package workspace, package manifest, dependency catalog or merged lockfile. Original repositories stay public, unarchived and unmodified; no transfer, rename, branch/tag rewrite, mirror, scheduled merge, subtree pull or sync bot.
+
+### Required Pi path compatibility
+
+| File | Problem after nesting | Correction / proof |
+| --- | --- | --- |
+| `runtime/pi/scripts/create-source-archive.sh` | Git tree paths assumed Pi at repository root; invoking archive from nested cwd could filter out the selected subtree | Prefix source paths, select Pi subtree, archive from product Git root; source archive smoke succeeds |
+| `runtime/pi/scripts/diff-model-catalog.mjs` | Git root incorrectly used as generator/package checkout; baseline worktree omitted Pi prefix | Resolve checkout from module location, preserve prefix in temporary baseline worktree; `--thinking openai` smoke succeeds |
+| `runtime/pi/scripts/check-lockfile-commit.mjs` | HEAD/index lookups assumed root `package-lock.json` | Resolve local build root and prefix Git index paths; standalone+nested policy regression passes |
+| `runtime/pi/packages/company-runtime/src/provenance.ts` | Git root used to find CLI bundle, so nested provenance lost bundle identity | Separate source/build checkout path from containing Git commit; regression checks exact bundle path/hash and actual Git commit |
+| `runtime/pi/packages/coding-agent/test/suite/company-runtime-status.test.ts` | Whole serialized state forbidden from containing literal `Weavra`, including valid provenance filesystem paths | Remove incidental substring assertion; retain state/status/authority checks |
+
+These are path/fixture compatibility changes, not runtime authority or protocol redesign. T3 production source remains unchanged.
+
+### Audited, intentionally unchanged
+
+- Launcher module-relative checkout and bundle lookup already resolve `runtime/pi` correctly.
+- Runtime GitWorkspace, launcher project trust and target execution cwd retain actual project Git-root semantics.
+- T3 RepositoryIdentityResolver/GitVcsDriverCore and linked-worktree identity retain product/project Git-root semantics.
+- T3 build, assets, native helpers and dev scripts resolve relative to their own source/package root.
+- T3 linked-worktree `.t3` state belongs to the containing worktree; root ignores it.
+- Nested workflows, source READMEs, historical worklogs, license/notice files, generated namespaces and vendored trees are preserved. Historical standalone commands that use Git root for node_modules must instead run from the appropriate build root here.
+- Nested `t3.json` is not an active root setup hook; see architecture boundaries.
+- Duplicated Runtime/T3 protocol definitions and C08 authority paths are unchanged.
+
+### Deferred by scope
+
+C09/V0.6D, UI redesign, branding/package/namespace rename, protocol consolidation, workspace/toolchain unification, architectural refactoring, release/publishing automation and future upstream adoption. None is implied by this baseline.
+
+## Reproducible validation
+
+Run installation/build commands in the named build root; do not run package-manager installation at product root.
+
+```sh
+# runtime/pi (Node >=22.19; current consolidation uses Node 24.19.0)
+npm install --ignore-scripts
+npm run hydrate:model-data
+npm run build
+# product root
+node scripts/validate.mjs pi
+node --test runtime/pi/scripts/check-lockfile-commit.test.mjs
+node scripts/verify-imports.mjs
+
+# app/t3code (Node 24.19.0, pnpm 11.10.0)
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm exec effect-tsgo patch
+pnpm --filter @t3tools/desktop run ensure:electron
+# product root
+node scripts/validate.mjs t3
+
+# product root, with an actual owned Chromium installation
+WEAVRA_CHROMIUM=/absolute/path/to/chromium node scripts/run-cross-boundary.mjs
+```
+
+`validate.mjs pi` runs check, check:ci, shrinkwrap and install-lock gates, npm test, test.sh, launcher syntax and whitespace checks. `validate.mjs t3` runs all recursive workspace tests serially, focused control regressions, typecheck, lint, fmt:check, knip:check, build and whitespace checks. No test is selected by changed paths. Private HOME/temp/config are created and removed; provider credentials and personal sessions are not inherited. Darwin temp paths are canonical and short to respect Unix socket limits. `fd`/`fdfind` and `rg` are test prerequisites.
+
+Root `Weavra CI` has independent `runtime/pi`, `app/t3code`, and `cross-boundary` jobs. Nested source workflows are inactive. Browser smoke uses actual production T3 transports and the actual executable; only the worker's pending inference peer is an owned loopback fixture, with no paid inference. Fresh Chromium observations and verifier results are real, not mocked.
+
+## Current validation evidence
+
+Final local gate counts, exact root CI run/SHA, final refs and provenance tag are recorded only after execution. They are not yet claimed here.
+
+Historical source results remain in [SPLIT_REPOSITORY_BASELINE.md](SPLIT_REPOSITORY_BASELINE.md). New local failures and resolutions are recorded in [../WORK_LOG.md](../WORK_LOG.md).
