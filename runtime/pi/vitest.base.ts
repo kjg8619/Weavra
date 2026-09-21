@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
@@ -26,6 +27,8 @@ export const workspaceSourcePaths = {
 } as const;
 
 export default defineConfig({
+	// Bound subprocess-heavy suites on large developer machines; keep every test and timeout unchanged.
+	test: { maxWorkers: Math.max(1, Math.min(4, availableParallelism() - 1)) },
 	resolve: {
 		alias: [
 			{ find: /^@earendil-works\/chord$/, replacement: workspaceSourcePaths.chordIndex },

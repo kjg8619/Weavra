@@ -16,7 +16,7 @@ import {
 	type TextContent,
 } from "@earendil-works/pi-ai/compat";
 import { Type } from "typebox";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentSession } from "../src/core/agent-session.ts";
 import { AuthStorage } from "../src/core/auth-storage.ts";
 import { SessionManager } from "../src/core/session-manager.ts";
@@ -133,11 +133,7 @@ describe("AgentSession concurrent prompt guard", () => {
 		// Start first prompt (don't await, it will block until abort)
 		const firstPrompt = session.prompt("First message");
 
-		// Wait a tick for isStreaming to be set
-		await new Promise((resolve) => setTimeout(resolve, 10));
-
-		// Verify we're streaming
-		expect(session.isStreaming).toBe(true);
+		await vi.waitFor(() => expect(session.isStreaming).toBe(true));
 
 		// Second prompt should reject
 		await expect(session.prompt("Second message")).rejects.toThrow(
@@ -154,7 +150,7 @@ describe("AgentSession concurrent prompt guard", () => {
 
 		// Start first prompt
 		const firstPrompt = session.prompt("First message");
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await vi.waitFor(() => expect(session.isStreaming).toBe(true));
 
 		// steer should work while streaming
 		await expect(session.steer("Steering message")).resolves.toBeUndefined();
@@ -170,7 +166,7 @@ describe("AgentSession concurrent prompt guard", () => {
 
 		// Start first prompt
 		const firstPrompt = session.prompt("First message");
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await vi.waitFor(() => expect(session.isStreaming).toBe(true));
 
 		// followUp should work while streaming
 		await expect(session.followUp("Follow-up message")).resolves.toBeUndefined();

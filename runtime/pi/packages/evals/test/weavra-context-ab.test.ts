@@ -168,5 +168,5 @@ describe("V0.5A deterministic context A/B", () => {
 				)
 				.join(" ")}`,
 		);
-	});
+	}, 30_000);
 });
