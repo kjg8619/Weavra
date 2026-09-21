@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const checkoutRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const allowValue = process.env.PI_ALLOW_LOCKFILE_CHANGE;
 const allowed = allowValue === "1" || allowValue === "true" || allowValue === "yes";
 
 function git(args) {
-	return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+	return execFileSync("git", args, { cwd: checkoutRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
+
+const lockfilePath = `${git(["rev-parse", "--show-prefix"]).trim()}package-lock.json`;
 
 function readJsonFromGit(ref) {
 	try {
@@ -31,8 +37,8 @@ function packageLabel(lockPath, entry) {
 }
 
 function getLockfilePackageChanges() {
-	const before = readJsonFromGit("HEAD:package-lock.json");
-	const after = readJsonFromGit(":package-lock.json");
+	const before = readJsonFromGit(`HEAD:${lockfilePath}`);
+	const after = readJsonFromGit(`:${lockfilePath}`);
 	if (!before?.packages || !after?.packages) return undefined;
 
 	const changes = [];
@@ -79,7 +85,7 @@ const stagedFiles = git(["diff", "--cached", "--name-only"])
 	.map((line) => line.trim())
 	.filter(Boolean);
 
-if (!stagedFiles.includes("package-lock.json")) {
+if (!stagedFiles.includes(lockfilePath)) {
 	process.exit(0);
 }
 

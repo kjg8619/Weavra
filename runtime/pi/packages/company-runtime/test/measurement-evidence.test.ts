@@ -1,6 +1,9 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BudgetController, BudgetDenied, budgetLimitsFromConfig } from "../src/budget.ts";
 import { type Run, RunSchema, validateContract } from "../src/contracts.ts";
@@ -153,11 +156,18 @@ describe("V0.3F provenance", () => {
 			configDigest: "config-digest",
 			taskContractDigest: `sha256:${"a".repeat(64)}`,
 		});
-		expect(provenance.runtimeSource?.path).toBeDefined();
-		expect(provenance.runtimeSource?.commit).toMatch(/^[0-9a-f]{40}$/);
-		expect(provenance.cliBundle?.sha256).toMatch(/^[0-9a-f]{64}$/);
-		expect(provenance.cliBundle?.bytes).toBeGreaterThan(0);
-		expect(provenance.cliBundle?.version).toBeDefined();
+		const checkout = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+		const bundle = join(checkout, "packages/coding-agent/dist/bundle/cli.js");
+		expect(provenance.runtimeSource?.path).toBe(checkout);
+		expect(provenance.runtimeSource?.commit).toBe(
+			execFileSync("git", ["rev-parse", "HEAD"], { cwd: checkout, encoding: "utf8" }).trim(),
+		);
+		expect(provenance.cliBundle?.path).toBe(bundle);
+		expect(provenance.cliBundle?.sha256).toBe(
+			createHash("sha256")
+				.update(await readFile(bundle))
+				.digest("hex"),
+		);
 		expect(provenance.configDigest).toBe("config-digest");
 		expect(provenance.targetWorkspaceCommit).toMatch(/^[0-9a-f]{40}$/);
 

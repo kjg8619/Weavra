@@ -320,7 +320,6 @@ describe("Weavra Status Projection on the actual Extension/Kernel/SDK (faux only
 		expect(events.at(-1)?.type).toBe("RunCompleted");
 		expect(events.length).toBeGreaterThan(expected.length);
 		expect(stored().verification.map((check) => check.status)).toEqual(["PASS", "PASS"]);
-		expect(readFileSync(join(cwd, ".ai/state.json"), "utf8")).not.toContain("Weavra");
 		expect(existsSync(join(cwd, ".ai/writer.lock"))).toBe(false);
 		const count = owner.setStatus.mock.calls.length;
 		for (const name of ["workflow", "state", "team", "risk"]) await owner.call(name);

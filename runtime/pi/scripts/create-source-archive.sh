@@ -66,8 +66,10 @@ repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
 
 commit="$(git rev-parse --verify --end-of-options "${source_ref}^{commit}")"
+source_prefix="$(git rev-parse --show-prefix)"
+git_root="$(git rev-parse --show-toplevel)"
 
-package_version="$(git show "${commit}:packages/coding-agent/package.json" | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).version')"
+package_version="$(git show "${commit}:${source_prefix}packages/coding-agent/package.json" | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).version')"
 if [[ "$package_version" != "$version" ]]; then
     echo "Version ${version} does not match package version ${package_version} at ${source_ref}" >&2
     exit 1
@@ -106,10 +108,13 @@ trap 'rm -f "$temporary_archive" "$temporary_index" "$manifest"; rm -rf "$valida
 GIT_INDEX_FILE="$temporary_index" git read-tree "$commit"
 GIT_INDEX_FILE="$temporary_index" git add -f -- "${model_data_files[@]}"
 archive_tree="$(GIT_INDEX_FILE="$temporary_index" git write-tree)"
+if [[ -n "$source_prefix" ]]; then
+    archive_tree="$(git rev-parse "${archive_tree}:${source_prefix%/}")"
+fi
 archive_mtime="$(git show -s --format=%ct "$commit")"
 
 archive_root="pi-${version}"
-git archive --format=tar --prefix="${archive_root}/" --mtime="@${archive_mtime}" "$archive_tree" \
+git -C "$git_root" archive --format=tar --prefix="${archive_root}/" --mtime="@${archive_mtime}" "$archive_tree" \
     | gzip -n -9 > "$temporary_archive"
 tar -tzf "$temporary_archive" > "$manifest"
 

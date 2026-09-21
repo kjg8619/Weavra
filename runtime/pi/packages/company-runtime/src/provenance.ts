@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Provenance } from "./provenance-types.ts";
 
@@ -48,8 +48,9 @@ export interface CaptureProvenanceInput {
  */
 export function captureProvenance(input: CaptureProvenanceInput): Provenance {
 	const now = input.now ?? Date.now;
-	const runtimeSourcePath = dirname(fileURLToPath(new URL(".", import.meta.url)));
-	const checkout = checkoutRoot(runtimeSourcePath);
+	const sourceCheckout = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+	// Git identity belongs to the containing product; build assets belong to this Pi checkout.
+	const checkout = checkoutRoot(sourceCheckout) ? sourceCheckout : null;
 	const commit = checkout ? git(checkout, ["rev-parse", "HEAD"]) : null;
 	let cliBundle: Provenance["cliBundle"];
 	if (checkout) {

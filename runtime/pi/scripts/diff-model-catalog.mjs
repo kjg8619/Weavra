@@ -2,7 +2,8 @@
 
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 function printUsage() {
@@ -53,9 +54,11 @@ if (requestedProviders.some((arg) => arg.startsWith("-"))) {
 	process.exit(1);
 }
 
-const repoRoot = run("git", ["rev-parse", "--show-toplevel"], { capture: true }).trim();
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const sourcePrefix = run("git", ["rev-parse", "--show-prefix"], { cwd: repoRoot, capture: true }).trim();
 const temporaryRoot = mkdtempSync(join(tmpdir(), "pi-model-catalog-diff-"));
 const baselineWorktree = join(temporaryRoot, "baseline-worktree");
+const baselineCheckout = join(baselineWorktree, sourcePrefix);
 const baselineOutput = join(temporaryRoot, "before");
 const currentOutput = join(temporaryRoot, "after");
 const baselineThinkingOutput = join(temporaryRoot, "before-thinking");
@@ -149,16 +152,16 @@ try {
 	worktreeAdded = true;
 	copyFileSync(
 		join(repoRoot, "scripts", "generate-thinking-capabilities.mjs"),
-		join(baselineWorktree, "scripts", "generate-thinking-capabilities.mjs"),
+		join(baselineCheckout, "scripts", "generate-thinking-capabilities.mjs"),
 	);
 
 	const nodeModules = join(repoRoot, "node_modules");
 	if (existsSync(nodeModules)) {
-		symlinkSync(nodeModules, join(baselineWorktree, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+		symlinkSync(nodeModules, join(baselineCheckout, "node_modules"), process.platform === "win32" ? "junction" : "dir");
 	}
 
 	console.log("Generating catalog from HEAD...");
-	generateCatalog(baselineWorktree, baselineOutput);
+	generateCatalog(baselineCheckout, baselineOutput);
 	formatProviderCatalogs(baselineOutput);
 	console.log("Generating catalog from the current worktree...");
 	generateCatalog(repoRoot, currentOutput, true);
@@ -166,7 +169,7 @@ try {
 
 	if (thinkingOnly) {
 		console.log("Computing effective thinking capabilities...");
-		generateThinkingCatalog(baselineWorktree, join(baselineOutput, "models.json"), baselineThinkingOutput);
+		generateThinkingCatalog(baselineCheckout, join(baselineOutput, "models.json"), baselineThinkingOutput);
 		generateThinkingCatalog(repoRoot, join(currentOutput, "models.json"), currentThinkingOutput);
 	}
 
