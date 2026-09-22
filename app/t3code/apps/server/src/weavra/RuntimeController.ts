@@ -84,6 +84,9 @@ function consistent(response: WeavraControlResponse, previous: WeavraControlStat
     (!state.browserPreview ||
       (state.browserPreview.ownerId === state.ownerId &&
         state.browserPreview.projectRevision === state.projectRevision)) &&
+    (!state.factPreview ||
+      (state.factPreview.ownerId === state.ownerId &&
+        state.factPreview.projectRevision === state.projectRevision)) &&
     (!approval ||
       (approval.runId === run?.runId &&
         run.status === "WAITING_APPROVAL" &&
@@ -385,9 +388,17 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
                     data.preview.check.checkId === request.registration.checkId
                   : request.type === "browser.confirm"
                     ? data.kind === "browser-registered"
-                    : data.kind === "accepted" &&
-                      data.command === request.type &&
-                      data.requestId === request.id;
+                    : request.type === "facts.prepare"
+                      ? data.kind === "fact-prepared" &&
+                        data.preview.ownerId === request.ownerId &&
+                        data.preview.projectRevision === request.expectedProjectRevision &&
+                        data.preview.sourceRef === request.sourceRef &&
+                        data.preview.statement === request.statement
+                      : request.type === "facts.confirm"
+                        ? data.kind === "fact-confirmed"
+                        : data.kind === "accepted" &&
+                          data.command === request.type &&
+                          data.requestId === request.id;
           if (!valid) return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
         }
         yield* refresh.pipe(Effect.catch((error) => unavailable(entry, error)));

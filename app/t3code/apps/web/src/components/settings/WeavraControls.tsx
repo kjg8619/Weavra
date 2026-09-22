@@ -11,6 +11,7 @@ import {
   type WeavraBrowserState,
   WeavraControlMutation,
   type WeavraControlPreview,
+  type WeavraFactPreview,
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -77,6 +78,10 @@ export function WeavraControls({
   const [expectedValue, setExpectedValue] = useState("");
   const [browserPreview, setBrowserPreview] = useState<WeavraBrowserPreview | null>(null);
   const [preparedBrowserDraft, setPreparedBrowserDraft] = useState<string | null>(null);
+  const [factSource, setFactSource] = useState("");
+  const [factStatement, setFactStatement] = useState("");
+  const [factPreview, setFactPreview] = useState<WeavraFactPreview | null>(null);
+  const [preparedFactDraft, setPreparedFactDraft] = useState<string | null>(null);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -120,10 +125,42 @@ export function WeavraControls({
     browserPreview.candidate.candidateId === candidate?.candidateId &&
     browserPreview.candidate.candidateDigest === candidate?.candidateDigest &&
     preparedBrowserDraft === browserDraftIdentity;
-  const latest = useRef({ fresh, state, browserPreviewCurrent, browserDraftIdentity });
+  const factDraftIdentity = JSON.stringify([factSource, factStatement]);
+  const factPreviewCurrent =
+    fresh &&
+    factPreview !== null &&
+    state?.factPreview?.previewId === factPreview.previewId &&
+    state.factPreview.previewDigest === factPreview.previewDigest &&
+    state.ownerId === factPreview.ownerId &&
+    state.projectRevision === factPreview.projectRevision &&
+    factPreview.expiresAt > observedAt &&
+    preparedFactDraft === factDraftIdentity;
+  const latest = useRef({
+    fresh,
+    state,
+    browserPreviewCurrent,
+    browserDraftIdentity,
+    factPreviewCurrent,
+    factDraftIdentity,
+  });
   useLayoutEffect(() => {
-    latest.current = { fresh, state, browserPreviewCurrent, browserDraftIdentity };
-  }, [fresh, state, browserPreviewCurrent, browserDraftIdentity, latest]);
+    latest.current = {
+      fresh,
+      state,
+      browserPreviewCurrent,
+      browserDraftIdentity,
+      factPreviewCurrent,
+      factDraftIdentity,
+    };
+  }, [
+    fresh,
+    state,
+    browserPreviewCurrent,
+    browserDraftIdentity,
+    factPreviewCurrent,
+    factDraftIdentity,
+    latest,
+  ]);
   const run = state?.snapshot.status.run;
   const submitting = commandState.status === "submitting";
   const draftIdentity = JSON.stringify([goal, recipeId, recipeInputs]);
@@ -192,7 +229,12 @@ export function WeavraControls({
           (!current.browserPreviewCurrent ||
             current.browserDraftIdentity !== browserDraftIdentity ||
             current.state.browserPreview?.previewId !== request.previewId ||
-            current.state.browserPreview.previewDigest !== request.previewDigest))
+            current.state.browserPreview.previewDigest !== request.previewDigest)) ||
+        (request.type === "facts.confirm" &&
+          (!current.factPreviewCurrent ||
+            current.factDraftIdentity !== factDraftIdentity ||
+            current.state.factPreview?.previewId !== request.previewId ||
+            current.state.factPreview.previewDigest !== request.previewDigest))
       ) {
         setCommandState({
           status: "rejected",
@@ -219,6 +261,8 @@ export function WeavraControls({
         return;
       }
       if (response.data.kind === "prepared") {
+        setFactPreview(null);
+        setPreparedFactDraft(null);
         setPreview(response.data.preview);
         setPreparedDraft(draftIdentity);
         setBrowserPreview(null);
@@ -249,6 +293,8 @@ export function WeavraControls({
             "Recorded browser candidates and evidence loaded from Runtime. Historical captures are not a live page check.",
         });
       } else if (response.data.kind === "browser-prepared") {
+        setFactPreview(null);
+        setPreparedFactDraft(null);
         setBrowserPreview(response.data.preview);
         setPreparedBrowserDraft(browserDraftIdentity);
         setPreview(null);
@@ -266,6 +312,26 @@ export function WeavraControls({
           status: "accepted",
           message:
             "Runtime acknowledged registration. Refresh browser evidence to read the registry. Registration is not PASS or COMPLETE; each verification requires a new isolated capture.",
+        });
+      } else if (response.data.kind === "fact-prepared") {
+        setFactPreview(response.data.preview);
+        setPreparedFactDraft(factDraftIdentity);
+        setPreview(null);
+        setPreparedDraft(null);
+        setBrowserPreview(null);
+        setPreparedBrowserDraft(null);
+        setCommandState({
+          status: "accepted",
+          message:
+            "Fact candidate prepared by Runtime. Review source and statement; nothing is durable until you confirm.",
+        });
+      } else if (response.data.kind === "fact-confirmed") {
+        setFactPreview(null);
+        setPreparedFactDraft(null);
+        setCommandState({
+          status: "accepted",
+          message:
+            "Review recorded. Waiting for canonical fact state; this acknowledgement is not VALID, PASS or COMPLETE.",
         });
       } else {
         setCommandState({
@@ -411,6 +477,39 @@ export function WeavraControls({
         previewDigest: browserPreview.previewDigest,
       },
       `Register this exact browser check for ${workspaceRoot}?\nCheck: ${browserPreview.check.checkId}\nDocument: ${browserPreview.check.documentIdentity}\nTarget: ${browserPreview.check.target.selector}\nAssertion: ${JSON.stringify(browserPreview.check.assertion)}\nRegistration digest: ${browserPreview.check.registrationDigest}\nThis records an expectation, not PASS. Runtime must capture a new isolated browser document for every SELF_CHECK and TEST. Browser failures never trigger automatic repair.`,
+    );
+  };
+  const prepareFact = () => {
+    const fields = common();
+    if (!fields || !canPrepare) return;
+    try {
+      void submit(
+        decodeMutation({
+          ...fields,
+          type: "facts.prepare",
+          sourceRef: factSource.trim(),
+          statement: factStatement.trim(),
+        }),
+      );
+    } catch {
+      setCommandState({
+        status: "rejected",
+        message:
+          "Use a project-relative source (up to 256 characters) and a short statement (up to 500 characters).",
+      });
+    }
+  };
+  const confirmFact = () => {
+    const fields = common();
+    if (!fields || !canPrepare || !factPreviewCurrent || !factPreview) return;
+    void submit(
+      {
+        ...fields,
+        type: "facts.confirm",
+        previewId: factPreview.previewId,
+        previewDigest: factPreview.previewDigest,
+      },
+      `Record this reviewed advisory fact for ${workspaceRoot}?\nSource: ${factPreview.sourceRef}\nDigest: ${factPreview.sourceDigest}\nStatement: ${factPreview.statement}\nConfirm that this statement is supported by the source and contains no secrets, raw reasoning, transcript or tool output. This is not Policy, Approval, verification or completion.`,
     );
   };
   return (
@@ -622,6 +721,124 @@ export function WeavraControls({
             </Button>
           </section>
         )}
+        <section
+          aria-label="Reviewed Project Facts"
+          className="space-y-4 border-t border-border pt-5"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-medium">Reviewed Project Facts</h3>
+            <Badge variant="outline">ADVISORY ONLY</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Review a short statement against one allowed local source. No automatic extraction or
+            provider calls. Never include secrets, raw reasoning, transcripts or tool output. Facts
+            cannot grant permissions, replace checks or review, or complete a Run. Kernel remains
+            the completion authority.
+          </p>
+          <form
+            className="space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              prepareFact();
+            }}
+          >
+            <label className="block space-y-1 text-sm">
+              <span>Fact source · project-relative file</span>
+              <Textarea
+                aria-label="Fact source"
+                rows={1}
+                maxLength={256}
+                value={factSource}
+                disabled={!canPrepare}
+                onChange={(event) => {
+                  setFactSource(event.target.value);
+                  setFactPreview(null);
+                  setPreparedFactDraft(null);
+                }}
+                placeholder="src/project-notes.txt"
+              />
+            </label>
+            <label className="block space-y-1 text-sm">
+              <span>Fact statement</span>
+              <Textarea
+                aria-label="Fact statement"
+                maxLength={500}
+                value={factStatement}
+                disabled={!canPrepare}
+                onChange={(event) => {
+                  setFactStatement(event.target.value);
+                  setFactPreview(null);
+                  setPreparedFactDraft(null);
+                }}
+                placeholder="One concise, source-supported statement"
+              />
+            </label>
+            <Button
+              size="sm"
+              type="submit"
+              disabled={!canPrepare || !factSource.trim() || !factStatement.trim()}
+            >
+              Prepare fact
+            </Button>
+          </form>
+          {factPreview && (
+            <section
+              aria-label="Runtime Fact Preview"
+              className="space-y-3 rounded-md border border-border p-3"
+            >
+              <Badge variant={factPreviewCurrent ? "info" : "warning"}>
+                {factPreviewCurrent
+                  ? "REVIEW REQUIRED · NOT SAVED"
+                  : "PREVIEW CHANGED · PREPARE AGAIN"}
+              </Badge>
+              <p className="text-sm">{factPreview.statement}</p>
+              <p className="break-all text-xs">Source: {factPreview.sourceRef}</p>
+              <p className="break-all font-mono text-xs">Digest: {factPreview.sourceDigest}</p>
+              <Button size="sm" disabled={!canPrepare || !factPreviewCurrent} onClick={confirmFact}>
+                Confirm reviewed fact
+              </Button>
+            </section>
+          )}
+          <div aria-label="Canonical Project Facts" className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Runtime checks source identity and digest at each observation and worker use.
+              Re-reviewing the same source replaces its review, preserving the fact ID. Up to 16
+              sources.
+            </p>
+            {!fresh || state?.projectFacts.status !== "available" ? (
+              <p className="text-xs text-muted-foreground">
+                Facts unavailable or observation stale. No current VALID fact is established.
+              </p>
+            ) : state.projectFacts.entries.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No reviewed facts for this checkout.</p>
+            ) : (
+              state.projectFacts.entries.map((fact) => (
+                <article
+                  key={fact.id}
+                  className="space-y-2 rounded-md border border-border bg-muted/20 p-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <code className="break-all text-xs">{fact.sourceRef}</code>
+                    <Badge variant={fact.status === "VALID" ? "info" : "warning"}>
+                      {fact.status}
+                    </Badge>
+                  </div>
+                  <p className="text-sm">
+                    {fact.status === "VALID"
+                      ? fact.statement
+                      : "Source changed or cannot be verified. Statement withheld; not injected as current context. Review again explicitly."}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Reviewed: {new Date(fact.reviewedAt).toLocaleString()} · Status at last Runtime
+                    observation
+                  </p>
+                  <p className="break-all font-mono text-xs">ID: {fact.id}</p>
+                  <p className="break-all font-mono text-xs">Digest: {fact.sourceDigest}</p>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
         <section
           aria-label="Browser evidence and registration"
           className="space-y-4 border-t border-border pt-5"

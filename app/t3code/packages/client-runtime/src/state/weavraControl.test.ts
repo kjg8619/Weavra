@@ -132,6 +132,8 @@ function canonicalState(
       },
     },
     browserPreview: null,
+    factPreview: null,
+    projectFacts: { status: "available", entries: [] },
     pendingApproval: {
       approvalId: "approval",
       runId,

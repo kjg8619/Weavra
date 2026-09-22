@@ -66,6 +66,8 @@ const helloResponse = {
         "browser.inspect",
         "browser.prepare",
         "browser.confirm",
+        "facts.prepare",
+        "facts.confirm",
       ],
       maxRequestBytes: 32768,
       maxResponseBytes: 65536,
@@ -113,6 +115,8 @@ const snapshotResponse = {
       startFailure: null,
       preview: null,
       browserPreview: null,
+      factPreview: null,
+      projectFacts: { status: "available", entries: [] },
       pendingApproval: null,
       snapshot: {
         status: {

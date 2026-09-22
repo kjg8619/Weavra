@@ -136,6 +136,33 @@ const browserState = {
 } as const satisfies WeavraBrowserState;
 
 describe("Weavra control has a closed Runtime authority boundary", () => {
+  it("accepts only reviewed fact inputs and rejects client-supplied validity or review metadata", () => {
+    const fact = {
+      ...browserMutation,
+      type: "facts.prepare",
+      sourceRef: "src/notes.txt",
+      statement: "Reviewed statement",
+    };
+    expect(decodeRpc({ projectId: "project", request: fact }).request).toEqual(fact);
+    for (const extra of [
+      { status: "VALID" },
+      { reviewedAt: 1 },
+      { sourceDigest: browserDigest },
+      { sourceGeneration: browserDigest },
+      { id: "forged-id", factId: "forged" },
+    ]) {
+      expect(() => decodeRpc({ projectId: "project", request: { ...fact, ...extra } })).toThrow();
+    }
+    expect(() =>
+      decodeWire({
+        ...browserMutation,
+        type: "facts.confirm",
+        previewId: "preview",
+        previewDigest: browserDigest,
+        statement: "Changed after preview",
+      }),
+    ).toThrow();
+  });
   it("accepts only the bounded typed preparation input", () => {
     expect(decodeRpc({ projectId: "project", request })).toEqual({ projectId: "project", request });
     expect(decodeWire({ protocolVersion: 1, id: "hello", type: "control.hello" })).toEqual({
@@ -458,6 +485,8 @@ describe("Weavra control has a closed Runtime authority boundary", () => {
       startFailure: null,
       preview: null,
       browserPreview: null,
+      factPreview: null,
+      projectFacts: { status: "available", entries: [] },
       pendingApproval: null,
       snapshot: {
         status: {
@@ -491,6 +520,8 @@ describe("Weavra control has a closed Runtime authority boundary", () => {
         "browser.inspect",
         "browser.prepare",
         "browser.confirm",
+        "facts.prepare",
+        "facts.confirm",
       ],
       maxRequestBytes: 32768,
       maxResponseBytes: 65536,

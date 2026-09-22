@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -146,6 +146,28 @@ try {
     assert.equal(final.snapshot.status.run.status, "CANCELLED");
     assert.equal(final.snapshot.status.writerPresent, false);
     console.log("PASS actual Runtime workflow prepare/invalidation/confirm/cancel; canonical CANCELLED, writer released");
+    const factSource = "src/status.html";
+    const factStatement = "The local status document initially contains Ready.";
+    const factPrepared = yield* mutate({ type: "facts.prepare", sourceRef: factSource, statement: factStatement });
+    assert.equal(factPrepared.success, true, JSON.stringify(factPrepared));
+    assert.equal(factPrepared.data.kind, "fact-prepared");
+    assert.deepEqual((yield* snapshot()).projectFacts.entries, []);
+    const factConfirmed = yield* mutate({ type: "facts.confirm", previewId: factPrepared.data.preview.previewId, previewDigest: factPrepared.data.preview.previewDigest });
+    assert.equal(factConfirmed.success, true, JSON.stringify(factConfirmed));
+    const validFacts = (yield* snapshot()).projectFacts;
+    assert.equal(validFacts.status, "available");
+    assert.equal(validFacts.entries[0].status, "VALID");
+    assert.equal(validFacts.entries[0].statement, factStatement);
+    const original = yield* Effect.promise(() => readFile(join(project, factSource), "utf8"));
+    yield* Effect.promise(() => writeFile(join(project, factSource), "<p>Changed</p>\n"));
+    const staleFact = (yield* snapshot()).projectFacts.entries[0];
+    assert.equal(staleFact.id, validFacts.entries[0].id);
+    assert.equal(staleFact.status, "STALE");
+    assert.equal(staleFact.statement, null);
+    yield* Effect.promise(async () => { await unlink(join(project, factSource)); await writeFile(join(project, factSource), original); });
+    assert.equal((yield* snapshot()).projectFacts.entries[0].status, "STALE");
+    assert.equal((yield* snapshot()).snapshot.status.run.status, "CANCELLED");
+    console.log("PASS production stdio Facts prepare/review/confirm → durable VALID → changed source STALE → identical recreation STALE; no completion authority");
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer), Effect.timeout("90 seconds")));
 
   const config = parseRuntimeConfig(await readFile(configPath, "utf8"));

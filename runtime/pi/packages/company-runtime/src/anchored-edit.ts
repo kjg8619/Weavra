@@ -53,10 +53,10 @@ interface Line {
 }
 
 /** Strict, byte-preserving UTF-8, including BOM and exact line endings. No filesystem or SDK dependency. */
-export function decodeAnchoredText(bytes: Uint8Array): string {
+export function decodeAnchoredText(bytes: Uint8Array, maxBytes = ANCHORED_MAX_BYTES): string {
 	const buffer = Buffer.from(bytes);
 	const text = buffer.toString("utf8");
-	if (buffer.length > ANCHORED_MAX_BYTES || buffer.includes(0) || !Buffer.from(text, "utf8").equals(buffer))
+	if (buffer.length > maxBytes || buffer.includes(0) || !Buffer.from(text, "utf8").equals(buffer))
 		throw new Error("Anchored operations require bounded non-binary strict UTF-8 text");
 	return text;
 }

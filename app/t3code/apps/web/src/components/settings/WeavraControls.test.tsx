@@ -10,6 +10,7 @@ import {
   type WeavraControlPreview,
   type WeavraControlResponse,
   type WeavraControlState,
+  type WeavraFactPreview,
 } from "@t3tools/contracts";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -104,6 +105,8 @@ function state(): WeavraControlState {
     startFailure: null,
     preview: null,
     browserPreview: null,
+    factPreview: null,
+    projectFacts: { status: "available", entries: [] },
     pendingApproval: null,
     snapshot: {
       status: {
@@ -273,6 +276,8 @@ beforeEach(() => {
         "browser.inspect",
         "browser.prepare",
         "browser.confirm",
+        "facts.prepare",
+        "facts.confirm",
       ],
       maxRequestBytes: 32768,
       maxResponseBytes: 65536,
@@ -294,6 +299,99 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue(AsyncResult.success(response({ kind: "prepared", preview })));
   data.confirm.mockReset().mockResolvedValue(true);
+});
+
+const factPreview: WeavraFactPreview = {
+  previewId: "fact-preview",
+  previewDigest: digest,
+  ownerId: "owner",
+  projectRevision: 0,
+  expiresAt: 9999999999999,
+  sourceRef: "src/notes.txt",
+  sourceDigest: digest,
+  statement: "Reviewed statement",
+};
+async function prepareFact() {
+  data.invoke.mockResolvedValue(
+    AsyncResult.success(response({ kind: "fact-prepared", preview: factPreview })),
+  );
+  change("Fact source", factPreview.sourceRef);
+  change("Fact statement", factPreview.statement);
+  const section = control(render(), "Reviewed Project Facts");
+  const form = visitElements(section, (node) => node.type === "form")!;
+  (form.props.onSubmit as (event: { preventDefault: () => void }) => void)({ preventDefault() {} });
+  await flush();
+  update({ factPreview, nextRequestId: "owner:2" });
+}
+describe("Reviewed Project Facts authority and freshness", () => {
+  it("requires explicit review and waits for canonical validity rather than promoting an ACK", async () => {
+    await prepareFact();
+    data.confirm.mockResolvedValueOnce(false);
+    await click("Confirm reviewed fact");
+    expect(data.invoke).toHaveBeenCalledTimes(1);
+    data.invoke.mockResolvedValue(
+      AsyncResult.success(response({ kind: "fact-confirmed", factId: "fact-1" })),
+    );
+    await click("Confirm reviewed fact");
+    expect(data.confirm).toHaveBeenLastCalledWith(
+      expect.stringContaining(factPreview.sourceDigest),
+    );
+    expect(text(control(render(), "Canonical Project Facts"))).not.toContain("Reviewed statement");
+    update({
+      factPreview: null,
+      projectFacts: {
+        status: "available",
+        entries: [
+          {
+            id: "fact-1",
+            sourceRef: factPreview.sourceRef,
+            sourceDigest: digest,
+            reviewedAt: 1,
+            status: "VALID",
+            statement: factPreview.statement,
+          },
+        ],
+      },
+    });
+    expect(text(control(render(), "Canonical Project Facts"))).toContain("Reviewed statement");
+    update({
+      projectFacts: {
+        status: "available",
+        entries: [
+          {
+            id: "fact-1",
+            sourceRef: factPreview.sourceRef,
+            sourceDigest: digest,
+            reviewedAt: 1,
+            status: "STALE",
+            statement: null,
+          },
+        ],
+      },
+    });
+    expect(text(control(render(), "Canonical Project Facts"))).not.toContain("Reviewed statement");
+    expect(text(control(render(), "Canonical Project Facts"))).toContain("STALE");
+  });
+  it("rejects changed drafts and disconnected observations across an outstanding confirmation modal", async () => {
+    await prepareFact();
+    let resolve!: (value: boolean) => void;
+    data.confirm.mockReturnValue(
+      new Promise<boolean>((done) => {
+        resolve = done;
+      }),
+    );
+    await click("Confirm reviewed fact");
+    data.phase = "disconnected";
+    render();
+    resolve(true);
+    await flush();
+    expect(data.invoke).toHaveBeenCalledTimes(1);
+    data.phase = "connected";
+    change("Fact statement", "Changed after review");
+    expect(
+      visitElements(render(), (node) => node.props["aria-label"] === "Runtime Fact Preview"),
+    ).toBeNull();
+  });
 });
 
 describe("Weavra workflow control interactions", () => {
