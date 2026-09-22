@@ -104,5 +104,7 @@ jobs:
           appendFileSync(process.env.GITHUB_ENV, `WEAVRA_CHROMIUM=${chromium.executablePath()}\n`);'
       - name: Exercise real stdio boundary and fresh browser verifier
         run: node scripts/run-cross-boundary.mjs
+      - name: Verify combined Broker authority and activation boundaries
+        run: node scripts/run-capability-boundary.mjs
       - name: Require unchanged tracked source
         run: git diff --exit-code HEAD --
