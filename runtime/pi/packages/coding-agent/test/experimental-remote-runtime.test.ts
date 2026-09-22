@@ -1,5 +1,6 @@
 import { lstat, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { setImmediate as nextTurn } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { type Context, createFacetHost, defineFacet, defineService } from "@earendil-works/chord";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -621,42 +622,135 @@ describe("experimental durable server composition", () => {
 		await expect(services.dispose(BACKGROUND_CONTEXT)).resolves.toBeUndefined();
 	});
 
-	test("streams prompt events through the worker-owned service provider", async ({ onTestFinished }) => {
-		const spawn = vi
-			.spyOn(processRuntime, "spawnInternalProcess")
-			.mockImplementation((role, args, options) =>
-				realSpawnInternalProcess(
-					role,
-					args,
-					role === "session-worker" ? { ...options, entryUrl: fauxWorkerEntryUrl } : options,
-				),
-			);
-		onTestFinished(() => spawn.mockRestore());
-		const { directory } = await makeServer();
-		const eventTypes: string[] = [];
+	for (const scenario of [
+		"late terminal",
+		"early terminal",
+		"attachment loss",
+		"callback failure",
+		"rejected prompt",
+	] as const) {
+		test(`streams prompt events through the worker-owned service provider (${scenario})`, async ({
+			onTestFinished,
+		}) => {
+			const spawn = vi
+				.spyOn(processRuntime, "spawnInternalProcess")
+				.mockImplementation((role, args, options) =>
+					realSpawnInternalProcess(
+						role,
+						args,
+						role === "session-worker" ? { ...options, entryUrl: fauxWorkerEntryUrl } : options,
+					),
+				);
+			onTestFinished(() => spawn.mockRestore());
+			let releaseResponse!: () => void;
+			const responseReady = new Promise<void>((resolve) => {
+				releaseResponse = resolve;
+			});
+			let releaseTerminal!: () => void;
+			const terminalReady = new Promise<void>((resolve) => {
+				releaseTerminal = resolve;
+			});
+			const callbackError = new Error("Consumer event delivery failed");
+			const activate = activateBuiltinClientServices;
+			const activation = vi
+				.spyOn(await import("../src/experimental/client-runtime.ts"), "activateBuiltinClientServices")
+				.mockImplementation(async (server): ReturnType<typeof activate> => {
+					const services = await activate(server);
+					return {
+						...services,
+						agent: {
+							...services.agent,
+							async prompt(request, context) {
+								if (scenario === "rejected prompt") {
+									return {
+										accepted: false,
+										operationId: null,
+										error: { code: "busy", message: "Already running" },
+									};
+								}
+								const response = await services.agent.prompt(request, context);
+								if (scenario === "early terminal") await terminalReady;
+								releaseResponse();
+								return response;
+							},
+						},
+						transcript: {
+							get state() {
+								const state = services.transcript.state;
+								return {
+									get value() {
+										return state.value;
+									},
+									subscribe(listener: Parameters<Transcript["state"]["subscribe"]>[0]) {
+										let active = true;
+										const stop = state.subscribe((value, context, delivery) => {
+											if (delivery.kind === "update" && value.event?.type === "run_end") {
+												if (scenario === "early terminal") {
+													listener(value, context, delivery);
+													releaseTerminal();
+												} else {
+													// Force the response continuation to run before terminal delivery.
+													void responseReady.then(nextTurn).then(() => {
+														if (scenario === "attachment loss") services.client.disconnect();
+														else if (active) listener(value, context, delivery);
+													});
+												}
+											} else {
+												listener(value, context, delivery);
+											}
+										});
+										return () => {
+											active = false;
+											stop();
+										};
+									},
+								};
+							},
+						},
+					};
+				});
+			onTestFinished(() => activation.mockRestore());
+			const { directory } = await makeServer();
+			const eventTypes: string[] = [];
 
-		const result = await runClient(
-			{ command: "client", sessionId: "demo-1", prompt: "question" },
-			{
-				directory,
-				onEvent(event) {
-					eventTypes.push(event.type);
+			const pending = runClient(
+				{ command: "client", sessionId: "demo-1", prompt: "question" },
+				{
+					directory,
+					async onEvent(event) {
+						await nextTurn();
+						if (scenario === "callback failure") throw callbackError;
+						eventTypes.push(event.type);
+					},
 				},
-			},
-		);
+			);
 
-		expect(result).toMatchObject({ kind: "prompted", text: "deterministic remote answer" });
-		expect(eventTypes).toEqual(
-			expect.arrayContaining([
-				"run_start",
-				"message_start",
-				"message_update",
-				"message_end",
-				"entry_added",
-				"run_end",
-			]),
-		);
-	});
+			if (scenario === "attachment loss") {
+				await expect(pending).rejects.toThrow(Error);
+				return;
+			}
+			if (scenario === "callback failure") {
+				await expect(pending).rejects.toBe(callbackError);
+				return;
+			}
+			if (scenario === "rejected prompt") {
+				await expect(pending).rejects.toThrow("Already running");
+				return;
+			}
+			const result = await pending;
+			expect(result).toMatchObject({ kind: "prompted", text: "deterministic remote answer" });
+			expect(eventTypes).toEqual(
+				expect.arrayContaining([
+					"run_start",
+					"message_start",
+					"message_update",
+					"message_end",
+					"entry_added",
+					"run_end",
+				]),
+			);
+		});
+	}
 
 	test("replicates terminal operation state after consecutive prompts", async ({ onTestFinished }) => {
 		const spawn = vi
