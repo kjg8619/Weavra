@@ -5,6 +5,7 @@ import {
   type WeavraControlResponse,
   type WeavraControlState,
   WeavraControlTransportError,
+  WeavraCapabilityInventory,
   WEAVRA_CONTROL_MAX_REQUEST_BYTES,
   WEAVRA_CONTROL_MAX_RESPONSE_BYTES,
 } from "@t3tools/contracts";
@@ -20,6 +21,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PubSub from "effect/PubSub";
+import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
@@ -27,6 +29,8 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import { ProjectionSnapshotQuery } from "../orchestration/Services/ProjectionSnapshotQuery.ts";
 import { subscribeBeforeSnapshotWithoutMutex } from "../utils/subscribeBeforeSnapshot.ts";
 import { type ControlTransport, openControlTransport } from "./ControlTransport.ts";
+
+const sameInventory = Schema.toEquivalence(WeavraCapabilityInventory);
 
 export class RuntimeController extends Context.Service<
   RuntimeController,
@@ -55,6 +59,8 @@ interface Entry {
   refresh?: Effect.Effect<void, WeavraControlTransportError>;
   pending: number;
   stopped: boolean;
+  inventory?: NonNullable<WeavraControlState["capabilityInventory"]>;
+  retiredInventoryEpochs: Set<string>;
 }
 function consistent(response: WeavraControlResponse, previous: WeavraControlState | null): boolean {
   if (!response.success || response.data.kind !== "snapshot") return false;
@@ -62,6 +68,7 @@ function consistent(response: WeavraControlResponse, previous: WeavraControlStat
   const snapshot = state.snapshot;
   const run = snapshot.status.run;
   const approval = state.pendingApproval;
+  const inventory = state.capabilityInventory;
   return (
     response.ownerId === state.ownerId &&
     response.runId === (run?.runId ?? null) &&
@@ -87,6 +94,9 @@ function consistent(response: WeavraControlResponse, previous: WeavraControlStat
     (!state.factPreview ||
       (state.factPreview.ownerId === state.ownerId &&
         state.factPreview.projectRevision === state.projectRevision)) &&
+    (!inventory ||
+      (inventory.ownerId === state.ownerId &&
+        inventory.projectRevision === state.projectRevision)) &&
     (!approval ||
       (approval.runId === run?.runId &&
         run.status === "WAITING_APPROVAL" &&
@@ -196,6 +206,27 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
     });
     if (capabilities.readiness !== "READY") return;
     const refreshMutex = yield* Semaphore.make(1);
+    const acceptsInventory = (state: WeavraControlState) => {
+      const next = state.capabilityInventory;
+      if (!next) return true;
+      const key = `${next.ownerId}/${next.brokerEpoch}`;
+      if (entry.retiredInventoryEpochs.has(key)) return false;
+      const previous = entry.inventory;
+      if (previous) {
+        const previousKey = `${previous.ownerId}/${previous.brokerEpoch}`;
+        if (key === previousKey) {
+          if (
+            next.generation < previous.generation ||
+            (next.generation === previous.generation && !sameInventory(next, previous))
+          )
+            return false;
+        } else {
+          entry.retiredInventoryEpochs.add(previousKey);
+        }
+      }
+      entry.inventory = next;
+      return true;
+    };
     const refresh = Effect.fn("weavra.refreshControlSnapshot")(function* () {
       yield* validate(entry);
       const response = yield* bridge.exchange({
@@ -204,11 +235,15 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
         type: "control.snapshot",
       });
       yield* validate(entry);
+      // An exchange from a retired connection cannot publish into its replacement.
+      if (entry.bridge !== bridge)
+        return yield* new WeavraControlTransportError({ code: "TRANSPORT_CLOSED" });
       if (
         response.ownerId !== capabilities.ownerId ||
         !consistent(response, entry.latest.state) ||
         !response.success ||
-        response.data.kind !== "snapshot"
+        response.data.kind !== "snapshot" ||
+        !acceptsInventory(response.data.state)
       )
         return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
       yield* publish(entry, {
@@ -309,6 +344,7 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
           changes: yield* PubSub.sliding<WeavraControlObservation>(8),
           pending: 0,
           stopped: false,
+          retiredInventoryEpochs: new Set(),
         };
         entries.set(root, entry);
         yield* run(entry).pipe(

@@ -407,6 +407,129 @@ export const WeavraControlApproval = Schema.Struct({
 });
 export type WeavraControlApproval = typeof WeavraControlApproval.Type;
 
+const capabilityOperations = {
+  runtime_read: "read",
+  runtime_search: "search",
+  runtime_list_files: "list",
+  runtime_write: "write",
+  runtime_edit: "edit",
+  runtime_delete: "delete",
+  runtime_lsp_diagnostics: "read",
+  runtime_lsp_definition: "read",
+  runtime_lsp_references: "read",
+  runtime_lsp_symbols: "read",
+} as const;
+const capabilityEntry = Schema.Struct({
+  descriptor: Schema.Struct({
+    id: Schema.String.check(Schema.isMaxLength(96)),
+    kind: Schema.Literal("worker-tool"),
+    name: Schema.Literals([
+      "runtime_read",
+      "runtime_search",
+      "runtime_list_files",
+      "runtime_write",
+      "runtime_edit",
+      "runtime_delete",
+      "runtime_lsp_diagnostics",
+      "runtime_lsp_definition",
+      "runtime_lsp_references",
+      "runtime_lsp_symbols",
+    ]),
+    origin: Schema.Literal("weavra-runtime"),
+    transport: Schema.Literal("in-process"),
+    schemaDigest: digest,
+    fingerprint: digest,
+    source: Schema.Literal("runtime-static"),
+  }),
+  requirements: Schema.Struct({
+    operation: Schema.Literals(["read", "search", "list", "write", "edit", "delete"]),
+    mode: Schema.Literals(["READ_OR_EDIT", "EDIT_ONLY"]),
+    policy: Schema.Literal("PER_ACTION"),
+    approval: Schema.Literals(["RUNTIME_DECIDES", "EXACT_R3_ACTION"]),
+  }),
+  observation: Schema.Struct({
+    availability: Schema.Literals(["UNKNOWN", "NEEDS_REFRESH", "AVAILABLE", "UNAVAILABLE"]),
+    reason: Schema.Literals([
+      "DEFINITION_PRESENT",
+      "LSP_DISABLED",
+      "LSP_NOT_OBSERVED",
+      "CONFIG_UNAVAILABLE",
+      "SOURCE_CHANGED",
+    ]),
+    source: Schema.Literals(["runtime-static", "operator-config"]),
+    observedAt: Schema.NullOr(counter),
+  }),
+}).check(
+  Schema.makeFilter(({ descriptor: d, requirements: r, observation: o }) => {
+    const operation = capabilityOperations[d.name];
+    return (
+      d.id === `weavra.worker.${d.name}` &&
+      r.operation === operation &&
+      r.mode === (["write", "edit", "delete"].includes(operation) ? "EDIT_ONLY" : "READ_OR_EDIT") &&
+      r.approval === (operation === "delete" ? "EXACT_R3_ACTION" : "RUNTIME_DECIDES") &&
+      (d.name.startsWith("runtime_lsp_")
+        ? o.source === "operator-config" &&
+          ((o.availability === "UNKNOWN" && o.reason === "LSP_NOT_OBSERVED") ||
+            (o.availability === "UNAVAILABLE" && o.reason === "LSP_DISABLED"))
+        : o.source === "runtime-static" &&
+          o.availability === "AVAILABLE" &&
+          o.reason === "DEFINITION_PRESENT")
+    );
+  }),
+);
+const capabilityEncoder = new TextEncoder();
+export const WeavraCapabilityInventory = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  coverage: Schema.Literal("RUNTIME_ACTION_TOOLS"),
+  ownerId: identifier,
+  projectRevision: counter,
+  brokerEpoch: browserCaptureId,
+  generation: counter,
+  status: Schema.Literals(["CURRENT", "NEEDS_REFRESH", "UNKNOWN"]),
+  reason: Schema.Literals(["OBSERVED", "SOURCE_CHANGED", "CONFIG_UNAVAILABLE", "INVALID_REGISTRY"]),
+  observedAt: Schema.NullOr(counter),
+  entries: Schema.Array(capabilityEntry).check(Schema.isMaxLength(32)),
+  total: Schema.NullOr(counter.check(Schema.isLessThanOrEqualTo(32))),
+  omitted: counter.check(Schema.isLessThanOrEqualTo(32)),
+})
+  .check(
+    Schema.makeFilter((inventory) => {
+      if (capabilityEncoder.encode(JSON.stringify(inventory)).byteLength > 16_384) return false;
+      if (inventory.generation === 0) {
+        if (
+          inventory.status !== "UNKNOWN" ||
+          inventory.reason !== "CONFIG_UNAVAILABLE" ||
+          inventory.observedAt !== null
+        )
+          return false;
+      } else if (inventory.observedAt === null) return false;
+      if (inventory.status !== "CURRENT") {
+        return (
+          inventory.entries.length === 0 &&
+          inventory.total === null &&
+          inventory.omitted === 0 &&
+          (inventory.status === "NEEDS_REFRESH"
+            ? inventory.reason === "SOURCE_CHANGED"
+            : inventory.reason === "CONFIG_UNAVAILABLE" || inventory.reason === "INVALID_REGISTRY")
+        );
+      }
+      return (
+        inventory.reason === "OBSERVED" &&
+        inventory.generation >= 1 &&
+        inventory.total !== null &&
+        inventory.total >= inventory.entries.length &&
+        inventory.omitted === inventory.total - inventory.entries.length &&
+        inventory.entries.every(
+          (entry, index, entries) =>
+            entry.observation.observedAt === inventory.observedAt &&
+            (index === 0 || entries[index - 1]!.descriptor.id < entry.descriptor.id),
+        )
+      );
+    }),
+  )
+  .pipe(closedRpcInput);
+export type WeavraCapabilityInventory = typeof WeavraCapabilityInventory.Type;
+
 export const WeavraControlState = Schema.Struct({
   ownerId: identifier,
   nextRequestId: identifier,
@@ -424,8 +547,16 @@ export const WeavraControlState = Schema.Struct({
     entries: Schema.Array(projectFact).check(Schema.isMaxLength(16)),
   }),
   pendingApproval: Schema.NullOr(WeavraControlApproval),
+  capabilityInventory: Schema.optional(WeavraCapabilityInventory),
   snapshot: WeavraSnapshotSummary,
-});
+}).check(
+  Schema.makeFilter(
+    (state) =>
+      state.capabilityInventory === undefined ||
+      (state.capabilityInventory.ownerId === state.ownerId &&
+        state.capabilityInventory.projectRevision === state.projectRevision),
+  ),
+);
 export type WeavraControlState = typeof WeavraControlState.Type;
 
 export const WeavraControlCapabilities = Schema.Struct({
