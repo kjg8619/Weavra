@@ -25,6 +25,7 @@ import { make } from "./RuntimeController.ts";
 
 const projectId = ProjectId.make("control-project");
 const decodeCanonical = Schema.decodeEffect(Schema.fromJsonString(WeavraControlState));
+const encodeJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 const browserCandidate: WeavraBrowserCandidateSummary = {
   schemaVersion: 2,
   kind: "BROWSER_OBSERVATION_CANDIDATE",
@@ -71,7 +72,7 @@ writeFileSync('launch-count',String(launch));
 const ownerId='owner-'+launch;
 process.on('SIGTERM',()=>{writeFileSync('closed',String(launch));process.exit(0)});
 const digest='sha256:'+'a'.repeat(64);
-const candidate=${JSON.stringify(browserCandidate)};
+const candidate=${encodeJson(browserCandidate)};
 let sequence=1;
 const receipts=new Map();
 const empty={status:{source:'durable-canonical-state',ownerObserved:false,state:'missing',writerPresent:false,run:null},graph:null,graphAvailable:false,evidence:null,configuration:{source:'project-config-not-frozen-run-config',status:'missing'}};
@@ -84,6 +85,12 @@ for await(const line of createInterface({input:process.stdin})){
  const request=JSON.parse(line);let response;
  if(request.type==='control.hello')response=reply(request,{kind:'capabilities',capabilities});
  else if(request.type==='control.snapshot'){
+  if(mode==='broker'){
+   if(existsSync('disconnect')&&launch===1)process.exit(0);
+   const inventory=existsSync('broker.json')?JSON.parse(readFileSync('broker.json','utf8')):{schemaVersion:1,coverage:'RUNTIME_ACTION_TOOLS',ownerId,projectRevision:state.projectRevision,brokerEpoch:'12345678-1234-1234-1234-123456789abc',generation:1,status:'CURRENT',reason:'OBSERVED',observedAt:1,entries:[],total:0,omitted:0};
+   if(inventory===null)delete state.capabilityInventory;else state.capabilityInventory=inventory;
+   if(existsSync('state-patch.json'))Object.assign(state,JSON.parse(readFileSync('state-patch.json','utf8')));
+  }
   if(existsSync('settle')&&state.busy){state.snapshot.status.run.status=state.cancelling?'CANCELLED':existsSync('decision')&&readFileSync('decision','utf8')==='reject'?'BLOCKED':'COMPLETED';state.snapshot.status.run.phase='COMPLETE';state.snapshot.status.writerPresent=false;state.busy=false;state.cancelling=false;state.pendingApproval=null;state.projectRevision++;state.stateRevision++;save();}
   response=reply(request,{kind:'snapshot',state});
  }else{
@@ -567,5 +574,128 @@ it.effect("rejects a browser preview bound to a different candidate", () =>
       .pipe(Effect.result);
     expect(result).toMatchObject({ _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } });
     expect(yield* fixture.fs.exists(`${fixture.root}/browser-check.json`)).toBe(false);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+for (const patch of [
+  { generation: 0, status: "UNKNOWN", reason: "CONFIG_UNAVAILABLE", observedAt: null, total: null },
+  { total: 1, omitted: 1 },
+  { ownerId: "other-owner" },
+  { projectRevision: 20 },
+  { enabled: true },
+  { approved: true },
+  { permission: "runtime_delete" },
+] as const) {
+  it.effect(
+    `rejects inconsistent Broker replacement ${encodeJson(patch)} without changing canonical workflow`,
+    () =>
+      Effect.gen(function* () {
+        const fixture = yield* setup("broker");
+        const original = fixture.initial.state!;
+        yield* fixture.fs.writeFileString(
+          `${fixture.root}/broker.json`,
+          encodeJson({ ...original.capabilityInventory, ...patch }),
+        );
+        yield* TestClock.adjust("2 seconds");
+        const failed = yield* next(fixture.queue, (value) => value.status === "ERROR");
+        expect(failed).toMatchObject({ stale: true, errorCode: "INVALID_PAYLOAD" });
+        expect(failed.state?.snapshot).toEqual(original.snapshot);
+        expect(failed.state?.pendingApproval).toBeNull();
+        expect(yield* fixture.fs.exists(`${fixture.root}/requests`)).toBe(false);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+it.effect(
+  "replaces epochs, rejects late retired epochs, and never manufactures Kernel evidence",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup("broker");
+      const original = fixture.initial.state!.capabilityInventory!;
+      const replacement = { ...original, brokerEpoch: "aaaaaaaa-1234-1234-1234-123456789abc" };
+      yield* fixture.fs.writeFileString(`${fixture.root}/broker.json`, encodeJson(replacement));
+      yield* TestClock.adjust("2 seconds");
+      expect((yield* connected(fixture.queue)).state?.capabilityInventory).toEqual(replacement);
+      yield* fixture.fs.writeFileString(
+        `${fixture.root}/broker.json`,
+        encodeJson({ ...original, generation: 99 }),
+      );
+      yield* TestClock.adjust("2 seconds");
+      const stale = yield* next(fixture.queue, (value) => value.status === "ERROR");
+      expect(stale.stale).toBe(true);
+      expect(stale.state?.capabilityInventory).toEqual(replacement);
+      expect(stale.state?.snapshot.evidence).toBeNull();
+      expect(stale.state?.snapshot.status.run).toBeNull();
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect(
+  "field omission replaces exposed inventory without secondary discovery and failed inventory has no fallback",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup("broker");
+      const original = fixture.initial.state!.capabilityInventory!;
+      yield* fixture.fs.writeFileString(`${fixture.root}/broker.json`, "null");
+      yield* TestClock.adjust("2 seconds");
+      expect((yield* connected(fixture.queue)).state?.capabilityInventory).toBeUndefined();
+      const failed = {
+        ...original,
+        generation: 2,
+        status: "UNKNOWN",
+        reason: "CONFIG_UNAVAILABLE",
+        total: null,
+      };
+      yield* fixture.fs.writeFileString(`${fixture.root}/broker.json`, encodeJson(failed));
+      yield* TestClock.adjust("2 seconds");
+      expect((yield* connected(fixture.queue)).state?.capabilityInventory).toEqual(failed);
+      expect(yield* fixture.fs.exists(`${fixture.root}/requests`)).toBe(false);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect(
+  "disconnect retains only a stale observation until a checked replacement owner snapshot",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup("broker");
+      yield* fixture.fs.writeFileString(`${fixture.root}/disconnect`, "yes");
+      yield* TestClock.adjust("2 seconds");
+      const disconnected = yield* next(fixture.queue, (value) => value.status === "DISCONNECTED");
+      expect(disconnected.stale).toBe(true);
+      expect(disconnected.state?.capabilityInventory?.ownerId).toBe("owner-1");
+      yield* TestClock.adjust("5 seconds");
+      const replacement = yield* connected(fixture.queue);
+      expect(replacement.state?.capabilityInventory?.ownerId).toBe("owner-2");
+      expect(yield* fixture.fs.exists(`${fixture.root}/requests`)).toBe(false);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("inventory cannot make an approval from another project canonical", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("broker");
+    yield* fixture.fs.writeFileString(
+      `${fixture.root}/state-patch.json`,
+      encodeJson({
+        pendingApproval: {
+          approvalId: "other-approval",
+          runId: "other-run",
+          stateRevision: 1,
+          projectRevision: 99,
+          risk: "R3",
+          operation: "delete-file",
+          role: "Developer",
+          step: { stepId: "implement", attempt: 0 },
+          path: "src/file",
+          bytes: 1,
+          preconditionDigest: "a".repeat(64),
+          expiresAt: 9999999999,
+          explanation: "another scope",
+        },
+      }),
+    );
+    yield* TestClock.adjust("2 seconds");
+    const rejected = yield* next(fixture.queue, (value) => value.status === "ERROR");
+    expect(rejected.errorCode).toBe("INVALID_PAYLOAD");
+    expect(rejected.state?.pendingApproval).toBeNull();
+    expect(yield* fixture.fs.exists(`${fixture.root}/decision`)).toBe(false);
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );

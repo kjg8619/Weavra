@@ -26,6 +26,7 @@ import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { SettingsGroup } from "./SettingsGroup";
 import { SettingsSection } from "./settingsLayout";
+import { CapabilityInventory } from "./CapabilityInventory";
 
 const observations = createEnvironmentWeavraControlStateAtoms(connectionAtomRuntime);
 const command = createEnvironmentWeavraControlCommand(connectionAtomRuntime);
@@ -532,6 +533,11 @@ export function WeavraControls({
             reconnect.{observation?.errorCode ? ` Connection error: ${observation.errorCode}.` : ""}
           </p>
         )}
+        <CapabilityInventory
+          view={view?.capabilityInventory}
+          connected={fresh}
+          scope={`${environmentId} / ${projectId} / ${workspaceRoot}`}
+        />
         <div role="status" aria-live="polite" className="space-y-2 text-sm">
           <Badge
             variant={

@@ -1,7 +1,15 @@
 import { expect, it } from "@effect/vitest";
 import { NodeHttpServer } from "@effect/platform-node";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { EnvironmentId, PreviewTabId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  PreviewTabId,
+  ProviderInstanceId,
+  ThreadId,
+  WeavraCapabilityInventory,
+  WeavraControlInput,
+  WeavraControlObserveInput,
+} from "@t3tools/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -25,6 +33,9 @@ const threadId = ThreadId.make("thread-mcp-test");
 const tabId = PreviewTabId.make("tab-mcp-test");
 const alternateTabId = PreviewTabId.make("tab-mcp-alternate");
 const decodeJsonText = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
+const decodeControlInput = Schema.decodeUnknownSync(WeavraControlInput);
+const decodeObserveInput = Schema.decodeUnknownSync(WeavraControlObserveInput);
+const decodeInventory = Schema.decodeUnknownSync(WeavraCapabilityInventory);
 const invocation = {
   environmentId,
   threadId,
@@ -62,6 +73,56 @@ const PullRequestsTestLayer = McpHttpServer.PullRequestsToolkitRegistrationLive.
       NodeServices.layer,
     ),
   ),
+);
+
+it.effect("actual App MCP advertisements cannot enter Runtime inventory or authority inputs", () =>
+  Effect.gen(function* () {
+    const server = yield* McpServer.McpServer;
+    const tool = server.tools.find(({ tool }) => tool.name === "preview_snapshot")!.tool;
+    expect(tool.annotations?.readOnlyHint).toBe(true);
+    const command = {
+      protocolVersion: 1,
+      id: "owner:1",
+      ownerId: "owner",
+      expectedProjectRevision: 0,
+      type: "workflow.prepare",
+      goal: "ordinary request",
+    };
+    for (const metadata of [
+      { ...tool.annotations },
+      { toolkit: tool },
+      { permissions: tool.annotations },
+      { policyEligible: tool.annotations?.readOnlyHint },
+      { approved: tool.annotations?.readOnlyHint },
+      { workerTools: [tool] },
+      { evidence: { status: "PASS", source: tool } },
+      { status: "COMPLETE", source: tool },
+    ]) {
+      expect(() =>
+        decodeControlInput({
+          projectId: "project",
+          request: { ...command, ...metadata },
+        }),
+      ).toThrow();
+      expect(() => decodeObserveInput({ projectId: "project", ...metadata })).toThrow();
+    }
+    expect(() =>
+      decodeInventory({
+        schemaVersion: 1,
+        coverage: "RUNTIME_ACTION_TOOLS",
+        ownerId: "owner",
+        projectRevision: 0,
+        brokerEpoch: "12345678-1234-1234-1234-123456789abc",
+        generation: 1,
+        status: "CURRENT",
+        reason: "OBSERVED",
+        observedAt: 1,
+        entries: [tool],
+        total: 1,
+        omitted: 0,
+      }),
+    ).toThrow();
+  }).pipe(Effect.scoped, Effect.provide(TestLayer)),
 );
 
 const snapshotResult = {

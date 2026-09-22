@@ -15,10 +15,15 @@ import { EnvironmentSupervisor } from "../connection/supervisor.ts";
 import { request, subscribeDynamicWithSession } from "../rpc/client.ts";
 import type { RpcSession } from "../rpc/session.ts";
 import { createEnvironmentRpcCommand, followStreamInEnvironment } from "./runtime.ts";
+import {
+  makeCapabilityInventoryTracker,
+  type CapabilityInventoryView,
+} from "./capabilityInventory.ts";
 
 export interface WeavraControlViewState {
   readonly support: "unknown" | "supported" | "unsupported";
   readonly observation: WeavraControlObservation;
+  readonly capabilityInventory: CapabilityInventoryView;
 }
 interface WeavraControlCache {
   observation?: WeavraControlObservation;
@@ -32,7 +37,11 @@ const empty: WeavraControlObservation = {
   observedAt: null,
   errorCode: null,
 };
-const initial: WeavraControlViewState = { support: "unknown", observation: empty };
+const initial: WeavraControlViewState = {
+  support: "unknown",
+  observation: empty,
+  capabilityInventory: { status: "NOT_EXPOSED", inventory: null },
+};
 
 /** Each session must receive canonical control state before cached data becomes current. */
 export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraControlState.make")(
@@ -40,18 +49,23 @@ export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraCon
     const supervisor = yield* EnvironmentSupervisor;
     const owner = Symbol();
     cache.owner = owner;
+    const inventory = makeCapabilityInventoryTracker();
     let current: WeavraControlViewState = {
       support: "unknown",
       observation: { ...(cache.observation ?? empty), status: "DISCONNECTED", stale: true },
+      capabilityInventory: inventory.view(performance.now()),
     };
     let producer: RpcSession | undefined;
     const state = yield* SubscriptionRef.make(current);
-    const update = (next: WeavraControlViewState) =>
+    const update = (next: Omit<WeavraControlViewState, "capabilityInventory">) =>
       Effect.gen(function* () {
         if (cache.owner !== owner) return;
-        current = next;
+        if (next.observation.stale || next.observation.status !== "CONNECTED") {
+          inventory.stale(next.observation.state === null);
+        }
+        current = { ...next, capabilityInventory: inventory.view(performance.now()) };
         cache.observation = next.observation;
-        yield* SubscriptionRef.set(state, next);
+        yield* SubscriptionRef.set(state, current);
       });
     const unavailable = () =>
       update({
@@ -67,6 +81,7 @@ export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraCon
       Stream.runForEach((session) => {
         if (Option.isSome(session) && producer === session.value) return Effect.void;
         producer = Option.getOrUndefined(session);
+        inventory.restart();
         return update({
           support: "unknown",
           observation: {
@@ -87,6 +102,7 @@ export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraCon
           if (Option.isNone(active) || active.value !== session || cache.owner !== owner)
             return yield* Effect.never;
           producer = session;
+          inventory.restart();
           const supported = config?.environment.capabilities.weavraControl === true;
           yield* update({
             support: supported ? "supported" : "unsupported",
@@ -110,6 +126,7 @@ export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraCon
             observation.errorCode === "PROJECT_CHANGED" ||
             observation.errorCode === "PROJECT_UNAVAILABLE"
           ) {
+            inventory.stale(true);
             yield* update({
               support: "supported",
               observation: { ...observation, state: null, capabilities: null, stale: true },
@@ -130,6 +147,7 @@ export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraCon
                 (nextState.stateRevision === null ||
                   nextState.stateRevision < oldState.stateRevision)))
           ) {
+            inventory.stale(ownerChanged);
             yield* update({
               support: "supported",
               observation: {
@@ -146,6 +164,19 @@ export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraCon
             nextState === null && observation.stale && oldState !== null && !ownerChanged
               ? { ...observation, state: oldState, observedAt: previous.observedAt }
               : observation;
+          const before = inventory.view(performance.now());
+          const after = inventory.receive(observation, performance.now());
+          if (
+            after.status === "CURRENT" &&
+            (before.status !== "CURRENT" ||
+              before.inventory?.generation !== after.inventory?.generation ||
+              before.inventory?.brokerEpoch !== after.inventory?.brokerEpoch)
+          ) {
+            yield* Effect.sleep(5_000).pipe(
+              Effect.andThen(Effect.suspend(() => update(current))),
+              Effect.forkScoped,
+            );
+          }
           yield* update({ support: "supported", observation: retained });
         }),
       ),

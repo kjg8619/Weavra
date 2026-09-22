@@ -182,6 +182,7 @@ for await (const line of createInterface({input:process.stdin})) {
  if (mode==='oversized') { process.stdout.write('x'.repeat(${WEAVRA_CONTROL_MAX_RESPONSE_BYTES})); continue; }
  const response = structuredClone(responses[request.type]);
  if (!response) process.exit(42);
+ if(mode==='broker' && process.env.BROKER)response.data.state.capabilityInventory=JSON.parse(process.env.BROKER);
  if (mode==='version') response.protocolVersion=2;
  if (mode==='wrong-id') response.id='owner-2:1';
  if (mode==='wrong-command') response.command='workflow.cancel';
@@ -322,6 +323,62 @@ for (const [mode, code] of [
       if (mode !== "exit") {
         expect(yield* fs.readFileString(`${cwd}/control-closed`)).toBe("closed");
       }
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+for (const [label, patch] of [
+  ["current", {}],
+  ["unknown field", { enabled: true }],
+  ["unknown schema", { schemaVersion: 2 }],
+  ["null", null],
+  ["oversized secret", { rawConfig: "PRIVATE_SECRET".repeat(6000) }],
+] as const) {
+  it.effect(`decodes Broker ${label} through the real bounded JSONL transport`, () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "weavra-broker-transport-" });
+      const inventory =
+        patch === null
+          ? null
+          : {
+              schemaVersion: 1,
+              coverage: "RUNTIME_ACTION_TOOLS",
+              ownerId: "owner-1",
+              projectRevision: 8,
+              brokerEpoch: "12345678-1234-1234-1234-123456789abc",
+              generation: 1,
+              status: "CURRENT",
+              reason: "OBSERVED",
+              observedAt: 1,
+              entries: [],
+              total: 0,
+              omitted: 0,
+              ...patch,
+            };
+      const executable = writeFakeCli({
+        directory: cwd,
+        name: "controller",
+        source,
+        env: { MODE: "broker", BROKER: encodeJson(inventory) },
+      });
+      const result = yield* Effect.gen(function* () {
+        const bridge = yield* openControlTransport(executable, cwd, env);
+        return yield* bridge.exchange(snapshotRequest);
+      }).pipe(Effect.scoped, Effect.result);
+      if (label === "current") {
+        expect(result).toMatchObject({
+          _tag: "Success",
+          success: { data: { state: { capabilityInventory: inventory } } },
+        });
+      } else {
+        expect(result).toMatchObject({
+          _tag: "Failure",
+          failure: { code: label === "oversized secret" ? "OVERSIZED_PAYLOAD" : "INVALID_PAYLOAD" },
+        });
+        expect(encodeJson(result)).not.toContain("PRIVATE_SECRET");
+      }
+      expect(yield* fs.readFileString(`${cwd}/request-lines`)).toBe(requestLines(snapshotRequest));
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 }
