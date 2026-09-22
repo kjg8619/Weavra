@@ -1,4 +1,4 @@
-import { loadRuntimeConfig } from "./config.ts";
+import { type LoadedConfig, loadRuntimeConfig } from "./config.ts";
 import type { Run } from "./contracts.ts";
 import { projectEvidencePack } from "./evidence.ts";
 import { projectRunGraph } from "./graph.ts";
@@ -149,31 +149,36 @@ export function projectHostEvidence(run: Run): HostEvidenceSummary {
 
 /** This is current project configuration, not the frozen configuration of a selected Run. */
 export async function readHostConfiguration(cwd: string): Promise<HostConfigSummary> {
-	const source = "project-config-not-frozen-run-config";
 	try {
-		const loaded = await loadRuntimeConfig(cwd);
-		if (loaded.status === "missing") return { source, status: "missing" };
-		const config = loaded.config;
-		return {
-			source,
-			status: "configured",
-			modes: {
-				workflow: config.runtime.workflow,
-				mutation: config.mutation.mode,
-				verifierTrust: config.verification.trust.mode,
-				verifierSandbox: config.verification.sandbox.mode,
-				verificationRepair: config.verification.repair.mode,
-				taskContext: config.agents.context_pack.mode,
-				impact: config.review.context?.impact ?? "disabled",
-				documentation: config.review.context?.documentation?.mode ?? "disabled",
-			},
-			allowedRootCount: config.files.allowed_paths.length,
-			registeredCheckCount: config.verification.checks.length,
-			requiredCheckCount: config.verification.checks.filter((check) => check.required).length,
-			documentationEntryCount: config.review.context?.documentation?.entries.length ?? 0,
-			budgetConfigured: config.budget !== undefined,
-		};
+		return projectHostConfiguration(await loadRuntimeConfig(cwd));
 	} catch {
-		return { source, status: "unavailable" };
+		return projectHostConfiguration(null);
 	}
+}
+
+/** Project the same validated sample used by the control inventory; never reread here. */
+export function projectHostConfiguration(loaded: LoadedConfig | null): HostConfigSummary {
+	const source = "project-config-not-frozen-run-config";
+	if (!loaded) return { source, status: "unavailable" };
+	if (loaded.status === "missing") return { source, status: "missing" };
+	const config = loaded.config;
+	return {
+		source,
+		status: "configured",
+		modes: {
+			workflow: config.runtime.workflow,
+			mutation: config.mutation.mode,
+			verifierTrust: config.verification.trust.mode,
+			verifierSandbox: config.verification.sandbox.mode,
+			verificationRepair: config.verification.repair.mode,
+			taskContext: config.agents.context_pack.mode,
+			impact: config.review.context?.impact ?? "disabled",
+			documentation: config.review.context?.documentation?.mode ?? "disabled",
+		},
+		allowedRootCount: config.files.allowed_paths.length,
+		registeredCheckCount: config.verification.checks.length,
+		requiredCheckCount: config.verification.checks.filter((check) => check.required).length,
+		documentationEntryCount: config.review.context?.documentation?.entries.length ?? 0,
+		budgetConfigured: config.budget !== undefined,
+	};
 }

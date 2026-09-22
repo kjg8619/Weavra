@@ -13,6 +13,7 @@ import {
 import { join } from "node:path";
 import { defineTool, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { ACTION_TOOL_SCHEMAS } from "./action-tool-schemas.ts";
 import { ANCHORED_EDIT_GUIDANCE, mintReadReceipt, StaleAnchorError, StaleMutationError } from "./anchored-edit.ts";
 import {
 	type AnchoredFileIdentity,
@@ -43,7 +44,6 @@ import {
 } from "./policy.ts";
 import type { AgentExecutionRequest, AgentExecutionResult } from "./ports.ts";
 
-const text = Type.String({ minLength: 1, maxLength: 262144 });
 const pathSchema = Type.String({ minLength: 1, maxLength: 4096 });
 const strict = { additionalProperties: false } as const;
 const MAX_BYTES = 262144;
@@ -271,7 +271,7 @@ export function createWorkerTools(options: {
 			description:
 				"Read one allowed workspace text file (maximum 256 KiB). anchors:true returns a fileDigest and opaque line anchors with JSON-escaped text; copy tokens unchanged into runtime_edit. Long previews/output may be explicitly truncated.",
 			executionMode: "sequential",
-			parameters: Type.Object({ path: pathSchema, anchors: Type.Optional(Type.Boolean()) }, strict),
+			parameters: ACTION_TOOL_SCHEMAS.runtime_read,
 			execute: async (_id, input) => {
 				const params = structuredClone(input);
 				return fileAction("runtime_read", [params.path], params, () => {
@@ -295,10 +295,7 @@ export function createWorkerTools(options: {
 			label: "Runtime search",
 			description: "Literal text search in explicit allowed files. No recursive directory traversal or shell.",
 			executionMode: "sequential",
-			parameters: Type.Object(
-				{ paths: Type.Array(pathSchema, { minItems: 1, maxItems: 32, uniqueItems: true }), query: text },
-				strict,
-			),
+			parameters: ACTION_TOOL_SCHEMAS.runtime_search,
 			execute: async (_id, params) =>
 				fileAction("runtime_search", params.paths, params, () => {
 					const matches: string[] = [];
@@ -329,17 +326,7 @@ export function createWorkerTools(options: {
 										"create never overwrites and replace never creates. Stale preconditions never write."
 									: ""),
 							executionMode: "sequential",
-							parameters: Type.Object(
-								{
-									path: pathSchema,
-									content: Type.String({ maxLength: MAX_BYTES }),
-									operation: Type.Optional(Type.Union([Type.Literal("create"), Type.Literal("replace")])),
-									mustNotExist: Type.Optional(Type.Boolean()),
-									readReceipt: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
-									fileDigest: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
-								},
-								strict,
-							),
+							parameters: ACTION_TOOL_SCHEMAS.runtime_write,
 							execute: async (id, input) => {
 								const params = structuredClone(input);
 								try {
@@ -404,17 +391,7 @@ export function createWorkerTools(options: {
 									: "") +
 								(request.role === "Executor" && request.scope.risk === "R1" ? ANCHORED_EDIT_GUIDANCE : ""),
 							executionMode: "sequential",
-							parameters: Type.Object(
-								{
-									path: pathSchema,
-									oldText: text,
-									newText: Type.String({ maxLength: MAX_BYTES }),
-									anchor: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
-									fileDigest: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
-									readReceipt: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
-								},
-								strict,
-							),
+							parameters: ACTION_TOOL_SCHEMAS.runtime_edit,
 							execute: async (id, input) => {
 								const params = structuredClone(input);
 								if (strictMutation) {
@@ -655,7 +632,7 @@ export function createWorkerTools(options: {
 					"No separate approval tool or prior grant is needed to call it. The tool waits for the user's Deny/Approve once decision and deletes only after valid one-use consent. " +
 					"Denial or approval timeout does not delete. You cannot approve or bypass approval; do not claim consent before the tool confirms it. No other paths, directories, globs or mutations.",
 				executionMode: "sequential",
-				parameters: Type.Object({ path: pathSchema }, strict),
+				parameters: ACTION_TOOL_SCHEMAS.runtime_delete,
 				execute: async (_id, params) => {
 					assertActive();
 					const action = {
