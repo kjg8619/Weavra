@@ -30,6 +30,10 @@ Production app modules do not import Runtime implementation source. The root cro
 - Kernel owns state transitions and completion. UI preview, transport success, worker text, and registration success cannot manufacture PASS/COMPLETE.
 - Owned loopback static documents and fresh profiles only. No authenticated user profile, personal browser session, remote crawling, action loop, automatic browser repair, or C09/V0.6D work.
 
+## C09 reviewed Project Facts
+
+[Reviewed Project Facts](PROJECT_FACTS.md) is the separately authorized V0.6D scope after consolidation; the C08 capture boundary above is unchanged. Explicit Host prepare → human review/confirm stores bounded advisory statements in the existing canonical state under its writer lease. Runtime derives source freshness at observation and each worker provider-use boundary. The App neither asserts validity nor persists independent facts. Source change/recreation/read failure withholds stale content. Facts cannot widen scope, grant permissions/approval, replace registered checks or Reviewer PASS, or produce Kernel COMPLETE.
+
 ## Preserved legacy scope
 
 Nested `.github` workflows are historical files, not active Weavra workflows. Nested `t3.json` describes the old standalone T3 checkout setup; it is not discovered at the product root and is not promoted into an automatic product-root worktree installer. For development, explicitly use the two build-root commands documented at the root. Historical upstream URLs, package names, branded assets, vendored reference trees, and manual reference-update tools remain provenance; they do not establish an upstream synchronization policy.

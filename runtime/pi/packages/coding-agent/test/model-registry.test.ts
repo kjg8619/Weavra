@@ -692,6 +692,12 @@ describe("ModelRegistry", () => {
 	});
 
 	describe("modelOverrides (per-model customization)", () => {
+		// Override semantics must not depend on a live catalog retaining a particular model ID.
+		const overrideModels: ModelsJsonProvider = {
+			baseUrl: "https://fixture.example/v1",
+			api: "openai-completions",
+			models: [{ id: "anthropic/claude-sonnet-4" }, { id: "anthropic/claude-opus-4" }],
+		};
 		test("model override applies to a single built-in model", async () => {
 			writeRawModelsJson({
 				openrouter: {
@@ -741,10 +747,6 @@ describe("ModelRegistry", () => {
 
 			const sonnet = models.find((m) => m.id === "anthropic/claude-sonnet-4");
 			expect(sonnet?.samplingParams).toEqual({ top_p: 0.9 });
-
-			// Models without sampling config keep it unset.
-			const opus = models.find((m) => m.id === "anthropic/claude-opus-4");
-			expect(opus?.samplingParams).toBeUndefined();
 		});
 
 		test("model override with compat.openRouterRouting", async () => {
@@ -770,6 +772,7 @@ describe("ModelRegistry", () => {
 
 		test("supportsFinishReason can be configured at provider and model levels", async () => {
 			const provider: ModelsJsonProvider = {
+				...overrideModels,
 				compat: { supportsFinishReason: true },
 				modelOverrides: {
 					"anthropic/claude-sonnet-4": {
@@ -813,6 +816,7 @@ describe("ModelRegistry", () => {
 		test("multiple model overrides on same provider", async () => {
 			writeRawModelsJson({
 				openrouter: {
+					...overrideModels,
 					modelOverrides: {
 						"anthropic/claude-sonnet-4": {
 							compat: { openRouterRouting: { only: ["amazon-bedrock"] } },
@@ -839,6 +843,7 @@ describe("ModelRegistry", () => {
 		test("model override combined with baseUrl override", async () => {
 			writeRawModelsJson({
 				openrouter: {
+					...overrideModels,
 					baseUrl: "https://my-proxy.example.com/v1",
 					modelOverrides: {
 						"anthropic/claude-sonnet-4": {

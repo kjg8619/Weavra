@@ -147,3 +147,43 @@
 - 첫 Ubuntu run의 sandbox suite는 OS backend unavailable을 명시하고 8개를 skip했다. 해당 Linux OS sandbox 실제 경계를 검증했다고 주장하지 않는다. macOS 실제 cross-boundary 결과와 별개 제한사항이다.
 - 최종 head의 전체 Root CI 결과와 job 링크는 PR 본문에 기록한다. 이 기록 시점에서 아직 완료되지 않은 원격 gate를 PASS로 선기록하지 않으며, PR은 OPEN으로 유지한다.
 - Timing 수정 후 Runtime `npm run check`도 6.50초에 PASS했다. Biome은 1,465개 파일에 추가 수정이 없었고, 10 artifact package dependency 검사, import/entry graph, shrinkwrap/install-lock, TypeScript 및 browser smoke gate를 유지했다.
+
+## 2026-09-22 KST — C09 착수 기준 및 변경 전 first-use baseline
+
+- Canonical scope는 GitHub issue #6이다. `git fetch origin` 및 실제 `ls-remote`에서 `origin/devlop`과 `origin/feat/v0.6d-project-facts`가 모두 `1b2bd177cf2c9248115443cc31948861a4789d16`임을 확인했다. 기존 local devlop은 5 commits 뒤였고 clean이었다. 원격 feature branch를 tracking checkout했으며 HEAD/merge-base가 정확한 baseline과 일치한다. main/devlop 또는 역사적 원본 저장소에는 구현하지 않는다.
+- Root README/경계/독립성/hosted audit/작업 기록, 현재 Runtime roadmap/architecture/company-runtime 및 App Host Control/Project panel을 재감사했다. 과거 split-repository 결과는 현재 검증으로 승계하지 않는다.
+- 구현 코드 변경 전에 Node 24.19.0, Runtime `npm ci --ignore-scripts`·hydrate·build, App pnpm 11.10.0 frozen install·명시적 bootstrap·build를 실제 실행해 성공했다. Model catalog 다운로드는 명시적 빌드 작업이며 paid inference가 아니다.
+- 격리 HOME/WEAVRA_HOME/WEAVRA_APP_HOME 및 disposable Git 프로젝트에서 실제 setup/doctor, built App server, trusted absolute launcher와 `T3_WEAVRA_CONTROL=1`, 로컬 pairing, Settings → exact Project scope → Project UI를 실행했다. 설정·provider profile·allowed paths·registered check는 명시적으로 작성했으며 자동 repair/setup은 하지 않았다.
+- 실제 UI goal/AC 수정/Plan Preview/confirm 뒤 STANDARD·READ_ONLY·R0 run `37c7cb76-2710-43bc-b370-85f91a35d6f6`이 COMPLETED다. 서로 다른 SDK Developer/Reviewer session, 실제 Node SELF_CHECK/TEST 2 PASS, AC 1 MET, Review PASS, activeAgents 0 및 writer 해제를 canonical state와 UI 양쪽에서 확인했다. Prepare와 AC preview 갱신 전후 local provider 요청은 0이었다.
+- Provider `c09-local/fixture`는 owned loopback deterministic SSE 응답기다. 위 성공 run의 응답 2개는 **faux**이며 실제 유료 모델 호출/추론 품질 검증이 아니다. App/stdio/SDK/파일시스템/registered process/Kernel은 actual이다. paid inference 0.
+- 별도 paused run `001bebf5-c379-443f-8d46-2ccf7a129c25`에서 browser 이탈·재접속 전후 동일 RUNNING/writer identity를 관찰했다. UI 명시적 cancel 뒤 CANCELLED·writer false·activeAgents 0이다. Broken source를 fixture commit한 negative run `07e55fdc-6b2d-474a-a236-be7a6192bb05`은 실제 SELF_CHECK FAIL로 BLOCKED이며 Reviewer/COMPLETE에 도달하지 않았다. UI와 canonical state가 일치했다.
+- 무관한 first-use friction은 `docs/architecture/PROJECT_FACTS.md`에 별도 backlog로 분리했다: 수동 project config/분산 setup 안내, scope 선택 전 Project 숨김, local READY/provider readiness 혼동, control-connected와 read-only owner UNKNOWN 병기, 완료 뒤 ACK/consumed preview 잔존, 내부 runtime version 표시, Codex update 알림. C09에서 묵시적으로 수정하지 않는다.
+- Persistence 결정: 별도 저장소 대신 기존 `.ai/state.json` optional projectFacts, 기존 writer/revision/atomic commit을 사용한다. App는 review/confirm과 Runtime freshness 표시만 담당한다. Facts는 권한·검증·완료 근거가 아니다. 세부 freshness/legacy/책임은 architecture 문서에 명시했다.
+- 이 시점 Facts 구현·회귀·최종 전체 gate·PR은 아직 NOT VERIFIED다. macOS web/owned local deterministic provider 이외 OS/provider/native mobile 조합도 NOT VERIFIED다.
+
+## 2026-09-22 KST — C09 계약 구현과 경계 회귀
+
+- Runtime optional `projectFacts`를 기존 FileStateStore schema에 추가했다. 최대 16 sources, 500자 statement, 256자 relative source, 64 KiB strict UTF-8 source다. Legacy state는 read migration 없이 유지된다. Draft는 Host 메모리에만 있고, exact owner/request/revision/digest/expiry를 가진 명시적 confirm 뒤 기존 writer lease와 atomic state commit으로 저장한다. 같은 source 재리뷰는 stable ID를 유지한다.
+- Runtime-issued source digest와 root/ancestor/file generation으로 content 변경, 삭제 후 같은 bytes 재생성, symlink/hardlink/unreadable source를 판별한다. Public STALE statement는 null이고 worker에는 VALID만 주입한다. Final canonical schema/registry/config/source 검사는 모든 SDK provider 호출 직전에 다시 수행한다. Tool turn 중 source가 바뀌어도 다음 provider 호출 전에 fail-closed한다.
+- 별도 read-only authority/security review에서 canonical state 삭제/손상 후 last-good 재사용과 존재 여부에 따라 누락될 수 있는 configured verifier/LSP 보호 경로를 발견해 수정했다. 모든 configured executable/argv 후보는 임시로 없어도 보호하며 browser executable도 포함한다. 두 reviewer의 최종 static review에 남은 finding은 없다. 이 review 자체는 실행 검증이 아니다.
+- App duplicated Effect contract와 기존 trusted ControlTransport 경계를 유지했다. Project panel에서 source/statement 준비, Runtime preview, 명시적 review modal, canonical VALID/STALE read-only 표시를 제공한다. ACK를 VALID로 승격하지 않고 draft·owner·revision·disconnect 변경 시 confirmation을 무효화한다.
+- 새 Runtime Facts 회귀 9개, SDK 실제 prompt/provider 경계 회귀 4개가 PASS다. 후자는 canonical VALID만 전달, stale/forged input 제외, prompt preflight 및 tool 후 source 변화에서 provider 호출 차단, Fact 지시문으로 protected Policy/Kernel 완료를 우회하지 못함을 확인했다. Control stream 포함 focused Runtime 실행은 2 files / 11 tests PASS다.
+- 실제 production stdio cross-boundary smoke가 PASS다: App transport → Runtime Facts prepare/confirm → durable VALID → source 변경 STALE → 동일 bytes 재생성 STALE. 같은 실행에서 C08 actual isolated Chromium candidate/registration/fresh SELF_CHECK·TEST와 retained Ready candidate + fresh Broken = FAIL을 유지했다. Paid provider requests=0, owned pending loopback request=1이다.
+- 개발 중 새 fixture의 setup 순서/필수 agent directory, 외부 오류 wording assertion, UI confirm API 형태를 바로잡았다. Runtime 전체 compiler/check는 PASS했고 App schema 16 tests는 PASS다. 이 시점 두 root의 전체 validator 및 새 UI actual proof는 진행 중이며 아직 최종 PASS로 기록하지 않는다.
+- GitHub #23/#8의 현재 실행 규칙도 확인했다. Open PR은 0이며 다른 worktree는 기존 independence/audit branches다. 본 요청의 통합 feature branch만 수정하며, 원격 feature/devlop 통합은 PR review 뒤 사용자 결정으로 남긴다.
+
+## 2026-09-22 KST — C09 새 UI actual proof 및 전체 gate 중간 결과
+
+- App 전체 `scripts/validate.mjs t3`가 453.05초에 ALL GATES PASS다. 모든 workspace tests, focused contracts/server/client/web 회귀, typecheck, lint, fmt:check, knip:check, 전체 build, diff whitespace gate를 포함한다. 기존 build의 chunk-size, optional x11, CJS import.meta warning은 숨기지 않았고 native 플랫폼 성공으로 확대 해석하지 않는다.
+- 새 App/Runtime을 재기동해 actual Project panel에서 review modal, canonical VALID, 원본 변경 STALE, 동일 bytes 재생성 및 reload 뒤 STALE 유지 화면을 확인했다. 준비/리뷰 전에는 durable Fact가 없고 provider call도 0이다. Fact `74388c50-b59b-410c-bf3c-88b267e33d96`은 명시적 재리뷰 뒤 같은 ID와 새 reviewedAt을 유지했다.
+- Stale-context run `600307aa-d241-4e72-bfa1-ab180bf34241`은 새 UI goal/AC/preview/confirm 뒤 COMPLETED이며 실제 checks 2 PASS, 독립 Reviewer PASS, activeAgents 0/writer false다. Owned provider가 받은 Developer/Reviewer 요청 양쪽에서 facts=[]를 확인했다. 이후 valid-context run `56de66b2-7768-48cc-883a-89c686775958`은 양쪽 worker에 Runtime VALID fact 1개를 전달하되 READ_ONLY/R0와 registered-check/Review/Kernel 경계를 그대로 유지해 COMPLETED다.
+- Post-Facts negative run `ac7fc70d-7a46-456e-8c4c-c0a9b299d8c8`은 fixture source Broken에서 실제 SELF_CHECK FAIL → BLOCKED다. Stale Fact는 prompt에 없고 Reviewer/PASS/COMPLETE를 만들어내지 않았다. UI와 canonical state가 일치한다. 이 단계 provider responses 5개는 모두 `c09-local/fixture` **faux**, paid inference 0이다.
+- Runtime 전체 첫 시도에서 기존 model-registry override 테스트 3개가 hydrated catalog에서 삭제된 `anthropic/claude-opus-4`에 의존해 실패했다. 제품 model 선택/metadata를 바꾸지 않고 해당 override tests에 명시적 model fixture를 제공했다. 존재하지 않는 모델의 optional field가 undefined라는 무의미한 assertion도 제거했다. Focused 83 tests PASS 후 typed models.json fixture로 정리했으며 전체 Runtime gate를 다시 실행 중이다. 실패를 skip하거나 PASS로 기록하지 않는다.
+
+## 2026-09-22 KST — C09 최종 local gate 완료
+
+- Typed fixture 수정 후 `node scripts/validate.mjs pi`가 514.39초에 **ALL GATES PASS**다. check/check:ci, pinned/runtime deps·TS imports·entry graphs, shrinkwrap/install-lock, product-independence 4 tests, 전체 workspace npm test, 별도 isolated `bash test.sh` 재실행, launcher syntax, diff whitespace를 모두 통과했다. Current company-runtime은 57 files / 1,506 tests PASS, coding-agent는 279 files / 2,749 tests PASS이며 기존 environment-gated 6 files / 50 tests는 skipped다. 이 skipped 항목을 실제 Provider 검증으로 주장하지 않는다.
+- Final shared canonical-size bound 정리 후 별도 `npm run check:ci`도 PASS다. Runtime build, immutable imports 검증, consolidation/source-archive 및 staged lock regression 3 tests, nested model catalog tool도 PASS다. Generated model metadata와 빌드 산출물은 tracked source 변경을 만들지 않았다.
+- App 전체 gate PASS와 결합해 최종 production cross-boundary를 다시 실행했고 10.74초에 PASS다. 실제 Chromium·stdio·Runtime Facts·fresh verification/CANCELLED 경계를 포함하며 paid requests=0이다. 정확한 current proof와 한계는 `docs/architecture/PROJECT_FACTS.md`에 정리했다.
+- Smoke 완료 뒤 owned App/provider processes를 정지하고 browser tab과 disposable project/HOME/helper scripts를 제거했다. Root 작업 기록만 수정했고 역사적 원본 저장소 기록·license·notice는 그대로다.
+- 구현·검증은 dedicated feature branch에서 완료했다. 이제 정상 commit/push 및 `devlop` 대상 OPEN PR로 전달한다. 자동 merge, hook 우회, force-push, history rewrite 또는 C09 CLOSED 선언은 하지 않는다.

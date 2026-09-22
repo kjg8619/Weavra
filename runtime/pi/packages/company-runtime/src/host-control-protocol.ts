@@ -7,6 +7,7 @@ import {
 } from "./browser-types.ts";
 import type { CheckResult, StepReference } from "./contracts.ts";
 import type { HostBridgeIdentity, HostSnapshotSummary } from "./host-bridge-protocol.ts";
+import type { ProjectFactsProjection } from "./project-fact-types.ts";
 
 /** Opt-in control transport. The existing read-only v1 endpoint and its capabilities are unchanged. */
 export const HOST_CONTROL_PROTOCOL_VERSION = 1;
@@ -24,6 +25,8 @@ export const HOST_CONTROL_COMMANDS = [
 	"browser.inspect",
 	"browser.prepare",
 	"browser.confirm",
+	"facts.prepare",
+	"facts.confirm",
 ] as const;
 const strict = { additionalProperties: false } as const;
 const identifier = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" });
@@ -34,6 +37,19 @@ const mutation = { ...envelope, ownerId: identifier, expectedProjectRevision: co
 export const HostControlRequestSchema = Type.Union([
 	Type.Object({ ...envelope, type: Type.Literal("control.hello") }, strict),
 	Type.Object({ ...envelope, type: Type.Literal("control.snapshot") }, strict),
+	Type.Object(
+		{
+			...mutation,
+			type: Type.Literal("facts.prepare"),
+			sourceRef: Type.String({ minLength: 1, maxLength: 256 }),
+			statement: Type.String({ minLength: 1, maxLength: 500 }),
+		},
+		strict,
+	),
+	Type.Object(
+		{ ...mutation, type: Type.Literal("facts.confirm"), previewId: identifier, previewDigest: digest },
+		strict,
+	),
 	Type.Object({ ...mutation, type: Type.Literal("browser.inspect") }, strict),
 	Type.Object(
 		{ ...mutation, type: Type.Literal("browser.prepare"), registration: BrowserRegistrationRequestSchema },
@@ -126,6 +142,10 @@ export const HOST_CONTROL_ERROR_CODES = [
 	"CANDIDATE_CHANGED",
 	"INVALID_BROWSER_CHECK",
 	"CHECK_EXISTS",
+	"FACT_SOURCE_UNAVAILABLE",
+	"FACT_SOURCE_CHANGED",
+	"INVALID_FACT",
+	"FACT_LIMIT",
 ] as const;
 export type HostControlErrorCode = (typeof HOST_CONTROL_ERROR_CODES)[number];
 
@@ -197,6 +217,16 @@ export interface HostBrowserState {
 	}>;
 	omittedEvidence: number;
 }
+export interface HostFactPreview {
+	previewId: string;
+	previewDigest: string;
+	ownerId: string;
+	projectRevision: number;
+	expiresAt: number;
+	sourceRef: string;
+	sourceDigest: string;
+	statement: string;
+}
 export interface HostControlState {
 	ownerId: string;
 	/** Host-issued monotonic command ID; old IDs never execute again after cache eviction. */
@@ -209,6 +239,8 @@ export interface HostControlState {
 	startFailure: "START_FAILED" | null;
 	preview: HostControlPreview | null;
 	browserPreview: HostBrowserPreview | null;
+	factPreview: HostFactPreview | null;
+	projectFacts: ProjectFactsProjection;
 	pendingApproval: HostControlApproval | null;
 	snapshot: HostSnapshotSummary;
 }
@@ -232,6 +264,8 @@ export type HostControlData =
 	| { kind: "browser-state"; state: HostBrowserState }
 	| { kind: "browser-prepared"; preview: HostBrowserPreview }
 	| { kind: "browser-registered"; check: RegisteredBrowserCheck }
+	| { kind: "fact-prepared"; preview: HostFactPreview }
+	| { kind: "fact-confirmed"; factId: string }
 	| {
 			kind: "accepted";
 			requestId: string;

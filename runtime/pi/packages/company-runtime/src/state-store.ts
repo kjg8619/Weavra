@@ -3,12 +3,14 @@ import { constants } from "node:fs";
 import { type FileHandle, lstat, mkdir, open, realpath, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { type Static, Type } from "typebox";
+import { readAnchoredSource } from "./anchored-files.ts";
 import { type PolicyDecision, PolicyDecisionSchema, type Run, RunSchema, validateContract } from "./contracts.ts";
 import { createRuntimeEvent, type EventDeliveryFailure, type RuntimeEvent, type RuntimeEventSink } from "./events.ts";
 import { isExecutionMode } from "./execution-contract.ts";
-import { readRuntimeFile, writeObservationFiles } from "./observation-files.ts";
+import { OBSERVATION_MAX_BYTES, readRuntimeFile, writeObservationFiles } from "./observation-files.ts";
 import type { ActionAudit, ActionOutcome } from "./policy.ts";
 import type { StateStore } from "./ports.ts";
+import { PROJECT_FACT_LIMIT, type ProjectFact, ProjectFactSchema } from "./project-fact-types.ts";
 
 const counter = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
 const ActionRecordSchema = Type.Object(
@@ -25,6 +27,7 @@ const StateSchema = Type.Object(
 		revision: counter,
 		runs: Type.Array(RunSchema),
 		actions: Type.Array(ActionRecordSchema),
+		projectFacts: Type.Optional(Type.Array(ProjectFactSchema, { maxItems: PROJECT_FACT_LIMIT })),
 	},
 	{ additionalProperties: false },
 );
@@ -57,6 +60,12 @@ function active(run: Run): boolean {
 function assertState(value: unknown): FileRuntimeState {
 	const state = validateContract(StateSchema, value);
 	const runIds = new Set(state.runs.map((run) => run.runId));
+	const facts = state.projectFacts ?? [];
+	if (
+		new Set(facts.map((fact) => fact.id)).size !== facts.length ||
+		new Set(facts.map((fact) => fact.sourceRef)).size !== facts.length
+	)
+		throw new Error("Conflicting project facts");
 	if (runIds.size !== state.runs.length || state.runs.filter(active).length > 1) throw new Error("Conflicting runs");
 	for (const run of state.runs) {
 		const taskIds = new Set(run.tasks.map((task) => task.id));
@@ -144,6 +153,13 @@ export class FileStateStore implements StateStore, ActionAudit {
 			}
 			throw failure;
 		}
+	}
+	/** Final-use canonical validation for advisory inputs; no recovery, migration or lock mutation. */
+	static readProjectFacts(projectPath: string): ProjectFact[] {
+		return (
+			assertState(JSON.parse(readAnchoredSource(projectPath, ".ai/state.json", OBSERVATION_MAX_BYTES).text))
+				.projectFacts ?? []
+		);
 	}
 	/** Reads a point-in-time atomic source snapshot without acquiring/stealing a writer or repairing projections. */
 	static async readSnapshot(
@@ -324,7 +340,7 @@ export class FileStateStore implements StateStore, ActionAudit {
 			await handle.close();
 		}
 	}
-	private async atomicReplace(file: StateFile, value: unknown): Promise<void> {
+	private async atomicReplace(file: StateFile, value: unknown, beforeRename?: () => void): Promise<void> {
 		const content = `${JSON.stringify(value, null, 2)}\n`;
 		if (Buffer.byteLength(content, "utf8") > 16 * 1024 * 1024) throw new StateStoreError("state size limit");
 		await this.checkOwnership();
@@ -348,6 +364,7 @@ export class FileStateStore implements StateStore, ActionAudit {
 			}
 			await this.checkOwnership();
 			this.options.beforeAtomicStep?.(file, "rename");
+			beforeRename?.();
 			await rename(temporary, target);
 			// File data is flushed before rename. Directory fsync/power-loss durability is not promised.
 		} finally {
@@ -356,11 +373,11 @@ export class FileStateStore implements StateStore, ActionAudit {
 			});
 		}
 	}
-	private async commit(next: FileRuntimeState): Promise<void> {
+	private async commit(next: FileRuntimeState, beforeStateRename?: () => void): Promise<void> {
 		next.revision = this.state.revision + 1;
 		assertState(next);
 		try {
-			await this.atomicReplace("state.json", next);
+			await this.atomicReplace("state.json", next, beforeStateRename);
 		} catch {
 			throw new StateStoreError("state.json", false);
 		}
@@ -425,19 +442,42 @@ export class FileStateStore implements StateStore, ActionAudit {
 			}
 		}
 	}
-	private async mutate(change: (next: FileRuntimeState) => void): Promise<void> {
+	private async mutate(change: (next: FileRuntimeState) => void, beforeStateRename?: () => void): Promise<void> {
 		if (this.closed || this.busy) throw new StateStoreError("closed or concurrent operation");
 		this.busy = true;
 		try {
 			await this.assertWritable();
 			const next = structuredClone(this.state);
 			change(next);
-			await this.commit(next);
+			await this.commit(next, beforeStateRename);
 		} catch (error) {
 			await this.fail(error);
 		} finally {
 			this.busy = false;
 		}
+	}
+	/** Host review only; never exposed as a worker tool or Kernel permission. */
+	async saveProjectFact(fact: ProjectFact, expectedRevision: number, assertFresh: () => void): Promise<void> {
+		fact = structuredClone(validateContract(ProjectFactSchema, fact));
+		await this.mutate((next) => {
+			if (
+				next.revision !== expectedRevision ||
+				next.runs.some(active) ||
+				next.actions.some((action) => action.status === "PREPARED")
+			)
+				throw new Error("Project facts require the exact idle project revision");
+			assertFresh();
+			const facts = next.projectFacts ?? [];
+			const index = facts.findIndex((item) => item.sourceRef === fact.sourceRef);
+			if (index >= 0) {
+				if (facts[index].id !== fact.id) throw new Error("Fact identity cannot change on re-review");
+				facts[index] = fact;
+			} else {
+				if (facts.length >= PROJECT_FACT_LIMIT) throw new Error("Project fact capacity reached");
+				facts.push(fact);
+			}
+			next.projectFacts = facts;
+		}, assertFresh);
 	}
 	async load(runId: string): Promise<Run | undefined> {
 		await this.assertWritable();

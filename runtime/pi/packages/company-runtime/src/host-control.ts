@@ -41,6 +41,7 @@ import {
 	type HostControlRequest,
 	HostControlRequestSchema,
 	type HostControlResponse,
+	type HostFactPreview,
 } from "./host-control-protocol.ts";
 import {
 	applyHostWorkflowRecipe,
@@ -49,6 +50,15 @@ import {
 	HostWorkflowError,
 	prepareHostWorkflowDraft,
 } from "./host-workflow.ts";
+import type { ProjectFactSummary, ProjectFactsProjection } from "./project-fact-types.ts";
+import {
+	confirmProjectFact,
+	loadProjectFactProjection,
+	type PreparedProjectFact,
+	ProjectFactError,
+	prepareProjectFact,
+	projectFactStillCurrent,
+} from "./project-facts.ts";
 import { FileStateStore } from "./state-store.ts";
 import { listTaskRecipes, recipeInputTemplate } from "./task-recipes.ts";
 import type { StandardWorkflow } from "./workflow.ts";
@@ -103,6 +113,7 @@ export class HostControlBridge {
 	private queued = 0;
 	private disposed = false;
 	private prepared?: Prepared;
+	private factPrepared?: { prepared: PreparedProjectFact; preview: HostFactPreview; consumed: boolean };
 	private browserPrepared?: {
 		registration: PreparedBrowserRegistration;
 		preview: HostBrowserPreview;
@@ -318,6 +329,28 @@ export class HostControlBridge {
 				browserPreview = null;
 			}
 		}
+		const factPrepared = this.factPrepared;
+		const factPreview =
+			factPrepared &&
+			!factPrepared.consumed &&
+			factPrepared.preview.expiresAt > this.now() &&
+			factPrepared.preview.projectRevision === projectRevision &&
+			(await projectFactStillCurrent(this.root.path, factPrepared.prepared))
+				? factPrepared.preview
+				: null;
+		let projectFacts: ProjectFactsProjection = { status: "unavailable", entries: [] };
+		let factsProjection: (() => ProjectFactSummary[]) | undefined;
+		try {
+			factsProjection = await loadProjectFactProjection(this.root.path);
+		} catch {
+			/* No last-good facts when configuration/source state is unavailable. */
+		}
+		const finalState = await this.canonical();
+		if ((finalState.state?.revision ?? 0) !== projectRevision) {
+			if (attempt >= 2) throw new ControlError("STATE_UNAVAILABLE");
+			return this.snapshot(request, attempt + 1);
+		}
+		if (factsProjection) projectFacts = { status: "available", entries: factsProjection() };
 		// File reads yield while the owner may finish/release its writer. Never combine
 		// an earlier durable snapshot with a later idle owner and advertise it as coherent.
 		if (this.execution !== execution) {
@@ -339,6 +372,8 @@ export class HostControlBridge {
 					startFailure: this.startFailure,
 					preview,
 					browserPreview,
+					factPreview,
+					projectFacts,
 					pendingApproval,
 					snapshot: {
 						status: observation.status,
@@ -354,6 +389,51 @@ export class HostControlBridge {
 	}
 	private async mutate(request: HostControlMutation): Promise<HostControlResponse> {
 		if ((this.options.readiness ?? "READY") !== "READY") throw new ControlError("CONTROL_UNAVAILABLE");
+		if (request.type === "facts.prepare") {
+			await this.idleRevision(request.expectedProjectRevision);
+			const prepared = await prepareProjectFact(this.root.path, request.sourceRef, request.statement);
+			if (prepared.projectRevision !== request.expectedProjectRevision) throw new ControlError("STALE_PROJECT");
+			const fields = {
+				previewId: randomUUID(),
+				ownerId: this.ownerId,
+				projectRevision: prepared.projectRevision,
+				expiresAt: this.now() + HOST_CONTROL_PREVIEW_TTL_MS,
+				sourceRef: prepared.fact.sourceRef,
+				sourceDigest: prepared.fact.sourceDigest,
+				statement: prepared.fact.statement,
+			};
+			const preview = { ...fields, previewDigest: fingerprint({ fields, prepared, root: this.root }) };
+			await this.idleRevision(request.expectedProjectRevision);
+			if (this.disposed) throw new ControlError("CONTROL_UNAVAILABLE");
+			this.prepared = undefined;
+			this.browserPrepared = undefined;
+			this.factPrepared = { prepared, preview, consumed: false };
+			return this.success(
+				request,
+				{ kind: "fact-prepared", preview },
+				{ projectRevision: prepared.projectRevision },
+			);
+		}
+		if (request.type === "facts.confirm") {
+			const prepared = this.factPrepared;
+			if (!prepared || prepared.preview.previewId !== request.previewId) throw new ControlError("PLAN_NOT_FOUND");
+			if (prepared.consumed) throw new ControlError("PLAN_CONSUMED");
+			if (prepared.preview.expiresAt <= this.now()) throw new ControlError("PLAN_EXPIRED");
+			if (prepared.preview.previewDigest !== request.previewDigest) throw new ControlError("PLAN_CHANGED");
+			if (prepared.preview.projectRevision !== request.expectedProjectRevision)
+				throw new ControlError("STALE_PROJECT");
+			await this.idleRevision(request.expectedProjectRevision);
+			prepared.consumed = true;
+			const factId = await confirmProjectFact(this.root.path, prepared.prepared, this.now(), () => {
+				if (this.disposed) throw new ControlError("CONTROL_UNAVAILABLE");
+				if (prepared.preview.expiresAt <= this.now()) throw new ControlError("PLAN_EXPIRED");
+			});
+			return this.success(
+				request,
+				{ kind: "fact-confirmed", factId },
+				{ projectRevision: request.expectedProjectRevision + 1 },
+			);
+		}
 		if (request.type === "browser.inspect") {
 			const before = await this.canonical();
 			if ((before.state?.revision ?? 0) !== request.expectedProjectRevision) throw new ControlError("STALE_PROJECT");
@@ -425,6 +505,7 @@ export class HostControlBridge {
 			await this.idleRevision(request.expectedProjectRevision);
 			if (this.disposed) throw new ControlError("CONTROL_UNAVAILABLE");
 			this.prepared = undefined;
+			this.factPrepared = undefined;
 			this.browserPrepared = { registration, preview, consumed: false };
 			return response;
 		}
@@ -495,6 +576,7 @@ export class HostControlBridge {
 			await this.idleRevision(request.expectedProjectRevision);
 			this.prepared = { plan, preview, configurationDigest: fingerprint(config), consumed: false };
 			this.browserPrepared = undefined;
+			this.factPrepared = undefined;
 			return response;
 		}
 		if (request.type === "workflow.confirm") {
@@ -634,7 +716,8 @@ export class HostControlBridge {
 			response = this.failure(
 				error instanceof ControlError ||
 					error instanceof HostWorkflowError ||
-					error instanceof BrowserRegistrationError
+					error instanceof BrowserRegistrationError ||
+					error instanceof ProjectFactError
 					? error.code
 					: "CONTROL_UNAVAILABLE",
 				request.id,
@@ -742,6 +825,7 @@ export class HostControlBridge {
 		await this.execution;
 		this.prepared = undefined;
 		this.browserPrepared = undefined;
+		this.factPrepared = undefined;
 		this.receipts.clear();
 	}
 }

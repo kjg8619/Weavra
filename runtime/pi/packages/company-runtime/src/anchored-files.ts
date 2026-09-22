@@ -84,18 +84,17 @@ function staleIfMissing(error: unknown, action: string): never {
 	throw error;
 }
 
-function readBounded(fd: number): Buffer {
+function readBounded(fd: number, maxBytes = ANCHORED_MAX_BYTES): Buffer {
 	const stat = fstatSync(fd);
-	if (!stat.isFile() || stat.nlink !== 1 || stat.size > ANCHORED_MAX_BYTES)
-		throw new Error("Unsupported anchored file");
-	const buffer = Buffer.alloc(ANCHORED_MAX_BYTES + 1);
+	if (!stat.isFile() || stat.nlink !== 1 || stat.size > maxBytes) throw new Error("Unsupported anchored file");
+	const buffer = Buffer.alloc(stat.size + 1);
 	let length = 0;
 	while (length < buffer.length) {
 		const count = readSync(fd, buffer, length, buffer.length - length, length);
 		if (!count) break;
 		length += count;
 	}
-	if (length > ANCHORED_MAX_BYTES) throw new Error("Anchored file exceeds size limit");
+	if (length > stat.size) throw new StaleAnchorError("file grew while it was read");
 	return buffer.subarray(0, length);
 }
 
@@ -104,15 +103,16 @@ function readBounded(fd: number): Buffer {
  * (changed dev/ino/mode/size/mtime/ctime between the two stats, or a path that no longer points at the
  * opened object) never produces a snapshot, so no receipt is issued for it.
  */
-export function readAnchoredSnapshot(
+export function readAnchoredSource(
 	cwd: string,
 	path: string,
-): { snapshot: string; fileDigest: string; identity: AnchoredFileIdentity } {
+	maxBytes = ANCHORED_MAX_BYTES,
+): { text: string; fileDigest: string; identity: AnchoredFileIdentity } {
 	const identity = assertPath(cwd, path);
 	const fd = openSync(identity, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
 	try {
 		const before = fstatSync(fd, { bigint: true });
-		const text = decodeAnchoredText(readBounded(fd));
+		const text = decodeAnchoredText(readBounded(fd, maxBytes), maxBytes);
 		const after = fstatSync(fd, { bigint: true });
 		const pathStat = lstatSync(identity, { bigint: true });
 		if (
@@ -128,10 +128,22 @@ export function readAnchoredSnapshot(
 			after.ctimeNs !== before.ctimeNs
 		)
 			throw new StaleAnchorError("file changed while it was read");
-		return { snapshot: snapshotText(identity, text), fileDigest: fileDigest(text), identity: identityOf(after) };
+		return { text, fileDigest: fileDigest(text), identity: identityOf(after) };
 	} finally {
 		closeSync(fd);
 	}
+}
+
+export function readAnchoredSnapshot(
+	cwd: string,
+	path: string,
+): { snapshot: string; fileDigest: string; identity: AnchoredFileIdentity } {
+	const source = readAnchoredSource(cwd, path);
+	return {
+		snapshot: snapshotText(join(cwd, path), source.text),
+		fileDigest: source.fileDigest,
+		identity: source.identity,
+	};
 }
 
 export function readAnchoredFile(cwd: string, path: string): string {

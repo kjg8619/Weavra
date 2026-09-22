@@ -21,6 +21,8 @@ export const WEAVRA_CONTROL_COMMANDS = [
   "browser.inspect",
   "browser.prepare",
   "browser.confirm",
+  "facts.prepare",
+  "facts.confirm",
 ] as const;
 
 const identifier = WeavraRunSummary.fields.runId;
@@ -206,7 +208,43 @@ export const WeavraBrowserState = Schema.Struct({
 });
 export type WeavraBrowserState = typeof WeavraBrowserState.Type;
 
+const factSource = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256));
+const factStatement = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500));
+export const WeavraFactPreview = Schema.Struct({
+  previewId: identifier,
+  previewDigest: digest,
+  ownerId: identifier,
+  projectRevision: counter,
+  expiresAt: counter,
+  sourceRef: factSource,
+  sourceDigest: digest,
+  statement: factStatement,
+});
+export type WeavraFactPreview = typeof WeavraFactPreview.Type;
+const factIdentity = {
+  id: identifier,
+  sourceRef: factSource,
+  sourceDigest: digest,
+  reviewedAt: counter,
+};
+const projectFact = Schema.Union([
+  Schema.Struct({ ...factIdentity, status: Schema.Literal("VALID"), statement: factStatement }),
+  Schema.Struct({ ...factIdentity, status: Schema.Literal("STALE"), statement: Schema.Null }),
+]);
+
 export const WeavraControlMutation = Schema.Union([
+  Schema.Struct({
+    ...mutation,
+    type: Schema.Literal("facts.prepare"),
+    sourceRef: factSource,
+    statement: factStatement,
+  }),
+  Schema.Struct({
+    ...mutation,
+    type: Schema.Literal("facts.confirm"),
+    previewId: identifier,
+    previewDigest: digest,
+  }),
   Schema.Struct({ ...mutation, type: Schema.Literal("browser.inspect") }),
   Schema.Struct({
     ...mutation,
@@ -305,6 +343,10 @@ export const WeavraControlErrorCode = Schema.Literals([
   "CANDIDATE_CHANGED",
   "INVALID_BROWSER_CHECK",
   "CHECK_EXISTS",
+  "FACT_SOURCE_UNAVAILABLE",
+  "FACT_SOURCE_CHANGED",
+  "INVALID_FACT",
+  "FACT_LIMIT",
 ]);
 export type WeavraControlErrorCode = typeof WeavraControlErrorCode.Type;
 
@@ -376,6 +418,11 @@ export const WeavraControlState = Schema.Struct({
   startFailure: Schema.NullOr(Schema.Literal("START_FAILED")),
   preview: Schema.NullOr(WeavraControlPreview),
   browserPreview: Schema.NullOr(WeavraBrowserPreview),
+  factPreview: Schema.NullOr(WeavraFactPreview),
+  projectFacts: Schema.Struct({
+    status: Schema.Literals(["available", "unavailable"]),
+    entries: Schema.Array(projectFact).check(Schema.isMaxLength(16)),
+  }),
   pendingApproval: Schema.NullOr(WeavraControlApproval),
   snapshot: WeavraSnapshotSummary,
 });
@@ -395,6 +442,8 @@ export const WeavraControlCapabilities = Schema.Struct({
     Schema.Literal(WEAVRA_CONTROL_COMMANDS[6]),
     Schema.Literal(WEAVRA_CONTROL_COMMANDS[7]),
     Schema.Literal(WEAVRA_CONTROL_COMMANDS[8]),
+    Schema.Literal(WEAVRA_CONTROL_COMMANDS[9]),
+    Schema.Literal(WEAVRA_CONTROL_COMMANDS[10]),
   ]),
   maxRequestBytes: counter,
   maxResponseBytes: counter,
@@ -419,6 +468,8 @@ const controlData = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("prepared"), preview: WeavraControlPreview }),
   Schema.Struct({ kind: Schema.Literal("browser-state"), state: WeavraBrowserState }),
   Schema.Struct({ kind: Schema.Literal("browser-prepared"), preview: WeavraBrowserPreview }),
+  Schema.Struct({ kind: Schema.Literal("fact-prepared"), preview: WeavraFactPreview }),
+  Schema.Struct({ kind: Schema.Literal("fact-confirmed"), factId: identifier }),
   Schema.Struct({
     kind: Schema.Literal("browser-registered"),
     check: WeavraRegisteredBrowserCheck,
