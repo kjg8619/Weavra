@@ -21,8 +21,9 @@ import * as Queue from "effect/Queue";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
+import * as TestClock from "effect/testing/TestClock";
 import { AsyncResult, Atom, AtomRegistry } from "effect/unstable/reactivity";
-import { expect } from "vite-plus/test";
+import { expect, vi } from "vite-plus/test";
 import {
   AVAILABLE_CONNECTION_STATE,
   PrimaryConnectionTarget,
@@ -38,6 +39,7 @@ import {
   makeEnvironmentWeavraControlState,
   type WeavraControlViewState,
 } from "./weavraControl.ts";
+import { makeCapabilityInventoryTracker } from "./capabilityInventory.ts";
 
 const target = new PrimaryConnectionTarget({
   environmentId: EnvironmentId.make("weavra-control-env"),
@@ -816,3 +818,256 @@ it.effect(
       );
     }).pipe(Effect.scoped),
 );
+
+function brokerObservation(
+  generation: number,
+  brokerEpoch = "12345678-1234-1234-1234-123456789abc",
+): WeavraControlObservation {
+  const observation = observed(10);
+  return {
+    ...observation,
+    state: {
+      ...observation.state!,
+      capabilityInventory: {
+        schemaVersion: 1,
+        coverage: "RUNTIME_ACTION_TOOLS",
+        ownerId: "owner",
+        projectRevision: 10,
+        brokerEpoch,
+        generation,
+        status: "CURRENT",
+        reason: "OBSERVED",
+        observedAt: 1,
+        entries: [
+          {
+            descriptor: {
+              id: "weavra.worker.runtime_read",
+              name: "runtime_read",
+              kind: "worker-tool",
+              origin: "weavra-runtime",
+              transport: "in-process",
+              schemaDigest: digest,
+              fingerprint: digest,
+              source: "runtime-static",
+            },
+            requirements: {
+              operation: "read",
+              mode: "READ_OR_EDIT",
+              policy: "PER_ACTION",
+              approval: "RUNTIME_DECIDES",
+            },
+            observation: {
+              availability: "AVAILABLE",
+              reason: "DEFINITION_PRESENT",
+              source: "runtime-static",
+              observedAt: 1,
+            },
+          },
+        ],
+        total: 1,
+        omitted: 0,
+      },
+    },
+  };
+}
+
+it("treats every subscription first emission as stale even when CONNECTED and previously unseen", () => {
+  const tracker = makeCapabilityInventoryTracker();
+  expect(tracker.receive(brokerObservation(20), 100).status).toBe("NEEDS_REFRESH");
+  expect(tracker.receive(brokerObservation(20), 200).status).toBe("NEEDS_REFRESH");
+  expect(tracker.receive(brokerObservation(21), 300).status).toBe("CURRENT");
+  tracker.restart();
+  expect(tracker.view(400).inventory).toBeNull();
+  expect(tracker.receive(brokerObservation(99), 500).status).toBe("NEEDS_REFRESH");
+  expect(tracker.receive(brokerObservation(99), 600).status).toBe("NEEDS_REFRESH");
+  expect(tracker.receive(brokerObservation(100), 700).status).toBe("CURRENT");
+});
+
+it("uses local monotonic receipt age, never Host time or equal generation as a lease", () => {
+  const tracker = makeCapabilityInventoryTracker();
+  tracker.receive(brokerObservation(1), 0);
+  tracker.receive(brokerObservation(2), 100);
+  expect(tracker.receive(brokerObservation(2), 5_099).status).toBe("CURRENT");
+  expect(tracker.view(5_100).status).toBe("NEEDS_REFRESH");
+  expect(tracker.receive(brokerObservation(2), 6_000).status).toBe("NEEDS_REFRESH");
+  expect(tracker.receive(brokerObservation(3), 6_001).status).toBe("CURRENT");
+});
+
+it("invalidates equal changed payload and regression without last-good promotion", () => {
+  for (const generation of [1, 2]) {
+    const tracker = makeCapabilityInventoryTracker();
+    tracker.receive(brokerObservation(1), 0);
+    tracker.receive(brokerObservation(2), 1);
+    const original = brokerObservation(generation);
+    const changed = {
+      ...original,
+      state: {
+        ...original.state!,
+        capabilityInventory: { ...original.state!.capabilityInventory!, entries: [], total: 0 },
+      },
+    };
+    expect(tracker.receive(changed, 2).status).toBe("NEEDS_REFRESH");
+    expect(tracker.view(2).inventory).toBeNull();
+    expect(tracker.receive(brokerObservation(2), 3).status).toBe("NEEDS_REFRESH");
+  }
+});
+
+it("replaces removed rows and failed inventories, and absence never means an empty current catalog", () => {
+  const tracker = makeCapabilityInventoryTracker();
+  expect(tracker.receive(observed(10), 0).status).toBe("NOT_EXPOSED");
+  expect(tracker.receive(brokerObservation(1), 1).status).toBe("CURRENT");
+  const original = brokerObservation(2);
+  const removed = {
+    ...original,
+    state: {
+      ...original.state!,
+      capabilityInventory: { ...original.state!.capabilityInventory!, entries: [], total: 0 },
+    },
+  };
+  expect(tracker.receive(removed, 2)).toMatchObject({
+    status: "CURRENT",
+    inventory: { entries: [], total: 0 },
+  });
+  for (const [status, reason] of [
+    ["UNKNOWN", "CONFIG_UNAVAILABLE"],
+    ["NEEDS_REFRESH", "SOURCE_CHANGED"],
+  ] as const) {
+    const originalFailure = brokerObservation(status === "UNKNOWN" ? 3 : 4);
+    const failed = {
+      ...originalFailure,
+      state: {
+        ...originalFailure.state!,
+        capabilityInventory: {
+          ...originalFailure.state!.capabilityInventory!,
+          status,
+          reason,
+          entries: [],
+          total: null,
+        },
+      },
+    };
+    expect(tracker.receive(failed, 3)).toMatchObject({
+      status,
+      inventory: { entries: [], total: null },
+    });
+  }
+  expect(tracker.receive(observed(10), 4)).toEqual({ status: "NOT_EXPOSED", inventory: null });
+});
+
+it("disconnect, scope mismatches and retired epochs cannot restore current rows or borrow approval", () => {
+  const tracker = makeCapabilityInventoryTracker();
+  tracker.receive(brokerObservation(1), 0);
+  const approvedElsewhere = brokerObservation(2);
+  tracker.receive(approvedElsewhere, 1);
+  tracker.stale();
+  expect(tracker.view(2)).toMatchObject({ status: "NEEDS_REFRESH", inventory: { generation: 2 } });
+  expect(tracker.receive(brokerObservation(2), 3).status).toBe("NEEDS_REFRESH");
+  const replacement = brokerObservation(1, "aaaaaaaa-1234-1234-1234-123456789abc");
+  expect(tracker.receive(replacement, 4).status).toBe("CURRENT");
+  expect(tracker.receive(brokerObservation(999), 5)).toEqual({
+    status: "NEEDS_REFRESH",
+    inventory: null,
+  });
+  for (const mismatch of [
+    { ...replacement, capabilities: { ...replacement.capabilities!, ownerId: "other" } },
+    { ...replacement, state: { ...replacement.state!, projectRevision: 11 } },
+  ]) {
+    expect(tracker.receive(mismatch, 6).status).toBe("NEEDS_REFRESH");
+  }
+  expect(approvedElsewhere.state!.snapshot.evidence).toBeNull();
+});
+
+it.effect(
+  "keeps workflow freshness independent while inventory waits for a second checked generation",
+  () =>
+    Effect.gen(function* () {
+      const remote = yield* makeSession();
+      const supervisor = yield* setup(remote.session);
+      const state = yield* makeEnvironmentWeavraControlState(projectId).pipe(
+        Effect.provideService(EnvironmentSupervisor, supervisor),
+      );
+      const subscription = yield* Queue.take(remote.subscriptions);
+      yield* Queue.offer(subscription.events, Effect.succeed(brokerObservation(10)));
+      const baseline = yield* waitFor(state, (view) => !view.observation.stale);
+      expect(baseline.capabilityInventory.status).toBe("NEEDS_REFRESH");
+      yield* Queue.offer(subscription.events, Effect.succeed(brokerObservation(11)));
+      const current = yield* waitFor(
+        state,
+        (view) => view.capabilityInventory.status === "CURRENT",
+      );
+      expect(current.observation.state?.snapshot).toEqual(baseline.observation.state?.snapshot);
+      expect(current.observation.state?.pendingApproval).toEqual(
+        baseline.observation.state?.pendingApproval,
+      );
+      expect(remote.sent).toEqual([]);
+      yield* SubscriptionRef.set(supervisor.session, Option.none());
+      const disconnected = yield* waitFor(
+        state,
+        (view) => view.observation.status === "DISCONNECTED",
+      );
+      expect(disconnected.capabilityInventory.status).not.toBe("CURRENT");
+      const replacement = yield* makeSession();
+      yield* SubscriptionRef.set(supervisor.session, Option.some(replacement.session));
+      const newSubscription = yield* Queue.take(replacement.subscriptions);
+      yield* Queue.offer(subscription.events, Effect.succeed(brokerObservation(999)));
+      yield* Queue.offer(newSubscription.events, Effect.succeed(brokerObservation(12)));
+      const reconnected = yield* waitFor(
+        state,
+        (view) =>
+          !view.observation.stale && view.observation.state?.capabilityInventory?.generation === 12,
+      );
+      expect(reconnected.capabilityInventory.status).toBe("NEEDS_REFRESH");
+      yield* Queue.offer(newSubscription.events, Effect.succeed(brokerObservation(13)));
+      yield* waitFor(state, (view) => view.capabilityInventory.status === "CURRENT");
+      expect(replacement.sent).toEqual([]);
+    }).pipe(Effect.scoped),
+);
+
+it.effect(
+  "expires inventory without a further server emission while leaving workflow observation fresh",
+  () =>
+    Effect.gen(function* () {
+      const monotonic = vi.spyOn(performance, "now").mockReturnValue(100);
+      yield* Effect.addFinalizer(() => Effect.sync(() => monotonic.mockRestore()));
+      const remote = yield* makeSession();
+      const supervisor = yield* setup(remote.session);
+      const state = yield* makeEnvironmentWeavraControlState(projectId).pipe(
+        Effect.provideService(EnvironmentSupervisor, supervisor),
+      );
+      const subscription = yield* Queue.take(remote.subscriptions);
+      yield* Queue.offer(subscription.events, Effect.succeed(brokerObservation(1)));
+      yield* waitFor(state, (view) => view.capabilityInventory.inventory?.generation === 1);
+      yield* Queue.offer(subscription.events, Effect.succeed(brokerObservation(2)));
+      const current = yield* waitFor(
+        state,
+        (view) => view.capabilityInventory.status === "CURRENT",
+      );
+      monotonic.mockReturnValue(5_100);
+      yield* TestClock.adjust("5 seconds");
+      const expired = yield* waitFor(
+        state,
+        (view) => view.capabilityInventory.status === "NEEDS_REFRESH",
+      );
+      expect(expired.observation).toEqual(current.observation);
+      expect(expired.capabilityInventory.inventory?.observedAt).toBe(1);
+      expect(remote.sent).toEqual([]);
+    }).pipe(Effect.scoped),
+);
+
+it("does not interpret JSON key order as a generation change or renew freshness", () => {
+  const tracker = makeCapabilityInventoryTracker();
+  tracker.receive(brokerObservation(1), 0);
+  const original = brokerObservation(2);
+  tracker.receive(original, 100);
+  const reordered = {
+    ...original,
+    state: {
+      ...original.state!,
+      capabilityInventory: Object.fromEntries(
+        Object.entries(original.state!.capabilityInventory!).toReversed(),
+      ) as NonNullable<WeavraControlState["capabilityInventory"]>,
+    },
+  };
+  expect(tracker.receive(reordered, 5_099).status).toBe("CURRENT");
+  expect(tracker.view(5_100).status).toBe("NEEDS_REFRESH");
+});
