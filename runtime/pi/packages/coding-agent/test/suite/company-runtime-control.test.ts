@@ -573,6 +573,11 @@ describe("C07 existing scoped R3 approval", () => {
 			harness.setResponses([remove(), handoff]);
 			await start(`Delete file ${target}`);
 			const approval = await pendingApproval();
+			expect(
+				(await client.state()).capabilityInventory?.entries.find(
+					(entry) => entry.descriptor.name === "runtime_delete",
+				)?.observation.availability,
+			).toBe("AVAILABLE");
 			const response = (
 				await mutation({
 					type: "approval.resolve",
@@ -596,6 +601,10 @@ describe("C07 existing scoped R3 approval", () => {
 		harness.setResponses([remove(), handoff]);
 		await start(`Delete file ${target}`);
 		const approval = await pendingApproval();
+		expect(
+			(await client.state()).capabilityInventory?.entries.find((entry) => entry.descriptor.name === "runtime_delete")
+				?.observation.availability,
+		).toBe("AVAILABLE");
 		expect(
 			(
 				await mutation({

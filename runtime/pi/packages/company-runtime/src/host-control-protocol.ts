@@ -5,6 +5,7 @@ import {
 	type BrowserVerificationEvidence,
 	type RegisteredBrowserCheck,
 } from "./browser-types.ts";
+import type { CapabilityInventory } from "./capability-types.ts";
 import type { CheckResult, StepReference } from "./contracts.ts";
 import type { HostBridgeIdentity, HostSnapshotSummary } from "./host-bridge-protocol.ts";
 import type { ProjectFactsProjection } from "./project-fact-types.ts";
@@ -243,6 +244,7 @@ export interface HostControlState {
 	projectFacts: ProjectFactsProjection;
 	pendingApproval: HostControlApproval | null;
 	snapshot: HostSnapshotSummary;
+	capabilityInventory?: CapabilityInventory;
 }
 export interface HostControlCapabilities {
 	authority: "Runtime/Kernel";

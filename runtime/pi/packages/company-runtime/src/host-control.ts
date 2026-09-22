@@ -12,15 +12,17 @@ import {
 	prepareBrowserRegistration,
 } from "./browser-registry.ts";
 import { browserDigest, browserProjectId } from "./browser-types.ts";
+import { boundCapabilityInventory, createCapabilityBroker, type RuntimeCapabilityBroker } from "./capability-broker.ts";
+import { capabilityJson } from "./capability-catalog.ts";
 import { loadRuntimeConfig } from "./config.ts";
 import type { ApprovalDecision, ApprovalRequest, Run } from "./contracts.ts";
 import { taskContractDigest } from "./criterion-evidence.ts";
 import type { RuntimeEventSink } from "./events.ts";
 import type { HostBridgeConnection } from "./host-bridge.ts";
 import {
+	projectHostConfiguration,
 	projectHostEvidence,
 	projectHostGraph,
-	readHostConfiguration,
 	readHostObservation,
 } from "./host-bridge-projections.ts";
 import type { HostBridgeIdentity, HostSnapshotSummary } from "./host-bridge-protocol.ts";
@@ -106,6 +108,7 @@ export class HostControlBridge {
 	readonly ownerId = randomUUID();
 	private readonly options: HostControlOptions;
 	private readonly root: { path: string; dev: number; ino: number };
+	private readonly capabilities: RuntimeCapabilityBroker;
 	private readonly connections = new Set<HostBridgeConnection>();
 	private sequence = 0;
 	private readonly receipts = new Map<number, { fingerprint: string; response: HostControlResponse }>();
@@ -129,6 +132,7 @@ export class HostControlBridge {
 	private constructor(options: HostControlOptions, root: { path: string; dev: number; ino: number }) {
 		this.options = { ...options, cwd: root.path };
 		this.root = root;
+		this.capabilities = createCapabilityBroker({ ownerId: this.ownerId, projectRevision: 0, now: options.now });
 	}
 	static async create(options: HostControlOptions): Promise<HostControlBridge> {
 		if (options.projectTrusted !== true) throw new ControlError("CONTROL_UNAVAILABLE");
@@ -255,8 +259,17 @@ export class HostControlBridge {
 			if (signal?.aborted || this.disposed) abort();
 		});
 	}
-	private async snapshot(request: HostControlRequest, attempt = 0): Promise<HostControlResponse> {
-		await this.assertRoot();
+	private async snapshot(
+		request: HostControlRequest,
+		attempt = 0,
+		sourceChanged = false,
+	): Promise<HostControlResponse> {
+		try {
+			await this.assertRoot();
+		} catch (error) {
+			this.capabilities.prepare(null)({ projectRevision: 0, sourceChanged: true });
+			throw error;
+		}
 		const execution = this.execution;
 		const observation = await readHostObservation(this.root.path);
 		if (observation.status.state === "unavailable") throw new ControlError("STATE_UNAVAILABLE");
@@ -268,8 +281,10 @@ export class HostControlBridge {
 				/* Do not reconstruct unavailable evidence. */
 			}
 		}
-		const configuration = await readHostConfiguration(this.root.path);
-		await this.assertRoot();
+		const loaded = await loadRuntimeConfig(this.root.path).catch(() => null);
+		const config = loaded?.status === "configured" ? loaded.config : null;
+		let publishInventory = this.capabilities.prepare(config);
+		const configuration = projectHostConfiguration(loaded);
 		const run = observation.run;
 		const projectRevision = observation.identity.projectRevision ?? 0;
 		const pending = this.approval?.request;
@@ -345,18 +360,34 @@ export class HostControlBridge {
 		} catch {
 			/* No last-good facts when configuration/source state is unavailable. */
 		}
-		const finalState = await this.canonical();
+		const finalLoaded = await loadRuntimeConfig(this.root.path).catch(() => null);
+		const finalConfig = finalLoaded?.status === "configured" ? finalLoaded.config : null;
+		// Complete normalized config, not a selected LSP flag or the frozen active-run policy.
+		// These private bytes are never a public fingerprint or diagnostic.
+		if (!finalConfig) publishInventory = this.capabilities.prepare(null);
+		else if (capabilityJson(config) !== capabilityJson(finalConfig)) sourceChanged = true;
+		const finalState = await this.canonical().catch((error: unknown) => {
+			publishInventory({ projectRevision, sourceChanged: true });
+			throw error;
+		});
 		if ((finalState.state?.revision ?? 0) !== projectRevision) {
+			publishInventory({ projectRevision, sourceChanged: true });
 			if (attempt >= 2) throw new ControlError("STATE_UNAVAILABLE");
-			return this.snapshot(request, attempt + 1);
+			return this.snapshot(request, attempt + 1, true);
 		}
 		if (factsProjection) projectFacts = { status: "available", entries: factsProjection() };
 		// File reads yield while the owner may finish/release its writer. Never combine
 		// an earlier durable snapshot with a later idle owner and advertise it as coherent.
 		if (this.execution !== execution) {
+			publishInventory({ projectRevision, sourceChanged: true });
 			if (attempt >= 2) throw new ControlError("STATE_UNAVAILABLE");
-			return this.snapshot(request, attempt + 1);
+			return this.snapshot(request, attempt + 1, true);
 		}
+		publishInventory({ projectRevision, sourceChanged });
+		const inventory = this.capabilities.reader.list({ limit: 32 });
+		const capabilityInventory = inventory.ok
+			? inventory.inventory
+			: this.capabilities.prepare(null, "INVALID_REGISTRY")({ projectRevision });
 		return this.success(
 			request,
 			{
@@ -375,6 +406,7 @@ export class HostControlBridge {
 					factPreview,
 					projectFacts,
 					pendingApproval,
+					capabilityInventory,
 					snapshot: {
 						status: observation.status,
 						graph,
@@ -745,6 +777,22 @@ export class HostControlBridge {
 		const send = (response: HostControlResponse) => {
 			if (closed) return;
 			let line = `${JSON.stringify(response)}\n`;
+			if (
+				Buffer.byteLength(line) > HOST_CONTROL_MAX_RESPONSE_BYTES &&
+				response.success &&
+				response.data.kind === "snapshot" &&
+				response.data.state.capabilityInventory
+			) {
+				const inventory = response.data.state.capabilityInventory;
+				const remaining =
+					HOST_CONTROL_MAX_RESPONSE_BYTES - Buffer.byteLength(line) + Buffer.byteLength(JSON.stringify(inventory));
+				const bounded = boundCapabilityInventory(inventory, remaining);
+				if (bounded)
+					line = `${JSON.stringify({
+						...response,
+						data: { ...response.data, state: { ...response.data.state, capabilityInventory: bounded } },
+					})}\n`;
+			}
 			if (Buffer.byteLength(line) > HOST_CONTROL_MAX_RESPONSE_BYTES)
 				line = `${JSON.stringify(this.failure("RESPONSE_TOO_LARGE", response.id, response.command))}\n`;
 			try {

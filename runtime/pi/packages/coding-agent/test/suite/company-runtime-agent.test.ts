@@ -4,6 +4,7 @@ import { type Context, fauxAssistantMessage, fauxThinking, fauxToolCall } from "
 import type { SpanOptions, TelemetryContext, TelemetrySpan } from "@earendil-works/pi-telemetry";
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { PiAgentExecutor, type PiAgentExecutorOptions } from "../../../company-runtime/src/agent-runner.ts";
+import { createCapabilityBroker } from "../../../company-runtime/src/capability-broker.ts";
 import { parseRuntimeConfig } from "../../../company-runtime/src/config.ts";
 import type {
 	Handoff,
@@ -682,30 +683,45 @@ describe("Company Runtime S3 SDK adapter (faux only)", () => {
 		expect(store.snapshot.actions).toEqual([]);
 	});
 
-	it("uses only explicit resources despite project/global extensions, skills, prompts and SYSTEM files", async () => {
-		for (const dir of [join(workspace, ".pi"), options.agentDir]) {
-			mkdirSync(join(dir, "extensions"), { recursive: true });
-			mkdirSync(join(dir, "skills", "trap"), { recursive: true });
-			mkdirSync(join(dir, "prompts"), { recursive: true });
-			writeFileSync(join(dir, "extensions", "company.ts"), `throw new Error('COMPANY_RECURSION_TRAP');`);
-			writeFileSync(join(dir, "skills/trap/SKILL.md"), "---\nname: trap\ndescription: trap\n---\nRESOURCE_TRAP");
-			writeFileSync(join(dir, "prompts/trap.md"), "RESOURCE_TRAP");
-			writeFileSync(join(dir, "SYSTEM.md"), "RESOURCE_TRAP");
-			writeFileSync(join(dir, "APPEND_SYSTEM.md"), "RESOURCE_TRAP");
-			writeFileSync(join(dir, "AGENTS.md"), "RESOURCE_TRAP");
-		}
-		writeFileSync(join(workspace, "AGENTS.md"), "RESOURCE_TRAP");
-		harness.setResponses([submitHandoff()]);
-		await executor.execute(developer());
-		const loader = workers[0].resourceLoader;
-		expect(loader.getExtensions().extensions).toEqual([]);
-		expect(loader.getExtensions().errors).toEqual([]);
-		expect(loader.getSkills().skills).toEqual([]);
-		expect(loader.getPrompts().prompts).toEqual([]);
-		expect(loader.getAgentsFiles().agentsFiles).toEqual([]);
-		expect(workers[0].systemPrompt).toContain("Explicit reviewed project rules");
-		expect(workers[0].systemPrompt).not.toContain("RESOURCE_TRAP");
-	});
+	it.each(["CURRENT", "UNKNOWN"] as const)(
+		"uses only explicit resources with %s Broker despite project/global plugins and skills",
+		async (status) => {
+			const broker = createCapabilityBroker({ ownerId: "host", projectRevision: 0 });
+			broker.prepare(status === "CURRENT" ? options.config : null)({ projectRevision: 0 });
+			expect(broker.reader.list({ limit: 32 })).toMatchObject({ ok: true, inventory: { status } });
+			for (const dir of [join(workspace, ".pi"), options.agentDir]) {
+				mkdirSync(join(dir, "extensions"), { recursive: true });
+				mkdirSync(join(dir, "skills", "trap"), { recursive: true });
+				mkdirSync(join(dir, "prompts"), { recursive: true });
+				writeFileSync(join(dir, "extensions", "company.ts"), `throw new Error('COMPANY_RECURSION_TRAP');`);
+				writeFileSync(join(dir, "skills/trap/SKILL.md"), "---\nname: trap\ndescription: trap\n---\nRESOURCE_TRAP");
+				writeFileSync(join(dir, "prompts/trap.md"), "RESOURCE_TRAP");
+				writeFileSync(join(dir, "SYSTEM.md"), "RESOURCE_TRAP");
+				writeFileSync(join(dir, "APPEND_SYSTEM.md"), "RESOURCE_TRAP");
+				writeFileSync(join(dir, "AGENTS.md"), "RESOURCE_TRAP");
+			}
+			writeFileSync(join(workspace, "AGENTS.md"), "RESOURCE_TRAP");
+			harness.setResponses([submitHandoff()]);
+			await executor.execute(developer());
+			const loader = workers[0].resourceLoader;
+			expect(workers[0].getActiveToolNames().sort()).toEqual([
+				"runtime_edit",
+				"runtime_list_files",
+				"runtime_read",
+				"runtime_request_check",
+				"runtime_search",
+				"runtime_write",
+				"submit_handoff",
+			]);
+			expect(loader.getExtensions().extensions).toEqual([]);
+			expect(loader.getExtensions().errors).toEqual([]);
+			expect(loader.getSkills().skills).toEqual([]);
+			expect(loader.getPrompts().prompts).toEqual([]);
+			expect(loader.getAgentsFiles().agentsFiles).toEqual([]);
+			expect(workers[0].systemPrompt).toContain("Explicit reviewed project rules");
+			expect(workers[0].systemPrompt).not.toContain("RESOURCE_TRAP");
+		},
+	);
 
 	it.each(["profile", "provider", "model", "auth"])(
 		"fails %s preflight without creating/prompting a worker or fallback",
@@ -722,6 +738,12 @@ describe("Company Runtime S3 SDK adapter (faux only)", () => {
 	);
 	it("rechecks authentication immediately before execution", async () => {
 		vi.spyOn(options.modelRuntime, "checkAuth").mockResolvedValue(undefined);
+		const broker = createCapabilityBroker({ ownerId: "host", projectRevision: 0 });
+		broker.prepare(options.config)({ projectRevision: 0 });
+		expect(broker.reader.query({ id: "weavra.worker.runtime_write" })).toMatchObject({
+			ok: true,
+			inventory: { entries: [{ observation: { availability: "AVAILABLE" } }] },
+		});
 		await expect(executor.execute(developer())).rejects.toThrow();
 		expect(workers).toEqual([]);
 		expect(harness.faux.state.callCount).toBe(0);
