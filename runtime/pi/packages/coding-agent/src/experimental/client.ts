@@ -17,7 +17,7 @@ export type ClientResult =
 export interface RunClientOptions {
 	/** Directory defaults to WEAVRA_SERVER_DIR, explicit PI_SERVER_DIR compatibility, or <WEAVRA_HOME or ~/.weavra>/server. */
 	readonly directory?: string;
-	/** Receives snapshot-ordered main-lane events while a prompt is active. */
+	/** Receives snapshot-ordered main-lane events through the prompted operation's terminal event. */
 	readonly onEvent?: (event: LaneWatchEvent) => void | Promise<void>;
 }
 
@@ -81,6 +81,8 @@ export async function runClient(command: ClientCommand, options: RunClientOption
 
 		const agent = match.agent;
 		const completedText = new Map<string, string>();
+		const observedRunEnds = new Set<string>();
+		let pendingTerminal: { runId: string; resolve(): void; reject(error: unknown): void } | undefined;
 		let deliveryTail = Promise.resolve();
 		const unsubscribe = match.transcript.state.subscribe((value, _context, delivery) => {
 			if (delivery.kind !== "update" || value.event === null) return;
@@ -91,6 +93,12 @@ export async function runClient(command: ClientCommand, options: RunClientOption
 				}
 				await options.onEvent?.(event);
 			});
+			// Handle callback failures even while the command response is still in flight.
+			void deliveryTail.catch((error: unknown) => pendingTerminal?.reject(error));
+			if (event.type === "run_end") {
+				observedRunEnds.add(event.runId);
+				if (pendingTerminal?.runId === event.runId) pendingTerminal.resolve();
+			}
 		});
 		if (match.transcript.state.value?.snapshot === null || match.transcript.state.value?.snapshot === undefined) {
 			unsubscribe();
@@ -99,6 +107,26 @@ export async function runClient(command: ClientCommand, options: RunClientOption
 		let response: AgentOperationResponse;
 		try {
 			response = await agent.prompt({ message: command.prompt, images: null }, BACKGROUND_CONTEXT);
+			// The RPC response and transcript updates have independent delivery queues.
+			// Keep observing until this operation's terminal event has joined deliveryTail.
+			if (response.accepted && !observedRunEnds.has(response.operationId)) {
+				const runId = response.operationId;
+				const terminal = new Promise<void>((resolve, reject) => {
+					pendingTerminal = { runId, resolve, reject };
+				});
+				const stopAttachment = match.session.attachment.subscribe((attachment) => {
+					if (attachment.status !== "attached" || attachment.sessionId !== sessionId) {
+						pendingTerminal?.reject(new Error("Session attachment changed before terminal prompt delivery"));
+					}
+				});
+				try {
+					void deliveryTail.catch((error: unknown) => pendingTerminal?.reject(error));
+					await terminal;
+				} finally {
+					pendingTerminal = undefined;
+					stopAttachment();
+				}
+			}
 		} finally {
 			unsubscribe();
 			await deliveryTail;

@@ -19,6 +19,7 @@ import { browserDigest } from "../runtime/pi/packages/company-runtime/src/browse
 import { RegisteredVerifier } from "../runtime/pi/packages/company-runtime/src/verification.ts";
 import { GitWorkspace } from "../runtime/pi/packages/company-runtime/src/workspace.ts";
 import { buildTaskContract } from "../runtime/pi/packages/company-runtime/src/task-contract.ts";
+import { makeCapabilityInventoryTracker } from "../app/t3code/packages/client-runtime/src/state/capabilityInventory.ts";
 
 const exec = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -190,12 +191,31 @@ try {
   assert.equal(second.checks[0].status, "PASS", JSON.stringify(second));
   assert.notEqual(first.checks[0].browser.captureId, second.checks[0].browser.captureId);
   document = "Broken";
-  const broken = await verifier.verify({ ...request, step: { stepId: "test", attempt: 2 } });
+  const broken = await Effect.runPromise(Effect.gen(function* () {
+    const transport = yield* openControlTransport(executable, project, childEnv);
+    const hello = yield* transport.exchange({ protocolVersion: 1, id: randomUUID(), type: "control.hello" });
+    assert.equal(hello.success, true);
+    const tracker = makeCapabilityInventoryTracker();
+    const snapshot = () => transport.exchange({ protocolVersion: 1, id: randomUUID(), type: "control.snapshot" });
+    for (const expected of ["NEEDS_REFRESH", "CURRENT"]) {
+      const response = yield* snapshot();
+      assert.equal(response.success, true);
+      assert.equal(tracker.receive({
+        status: "CONNECTED", stale: false, state: response.data.state,
+        capabilities: hello.data.capabilities, observedAt: Date.now(), errorCode: null,
+      }, performance.now()).status, expected);
+      assert.equal(response.data.state.snapshot.status.run.status, "CANCELLED");
+    }
+    const result = yield* Effect.promise(() => verifier.verify({ ...request, step: { stepId: "test", attempt: 2 } }));
+    assert.equal(result.checks[0].status, "FAIL");
+    assert.equal((yield* snapshot()).data.state.snapshot.status.run.status, "CANCELLED");
+    return result;
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer), Effect.timeout("30 seconds")));
   assert.equal(broken.checks[0].status, "FAIL", JSON.stringify(broken));
   assert.notEqual(broken.checks[0].browser.captureId, observed.candidateId);
   assert.equal(verifier.safeToRelease, true);
   assert.ok([...intents.values()].every((status) => status !== "PREPARED"));
-  console.log("PASS RegisteredVerifier actual Chromium fresh self-check/test captures; retained Ready candidate + fresh Broken = FAIL");
+  console.log("PASS RegisteredVerifier actual Chromium fresh self-check/test captures; CURRENT Broker + retained Ready candidate + fresh Broken = FAIL, canonical run stays CANCELLED");
   console.log(`CROSS-BOUNDARY PASS; paid provider requests=0; owned pending loopback requests=${modelRequests}`);
 } finally {
   for (const response of pendingModelResponses) response.destroy();

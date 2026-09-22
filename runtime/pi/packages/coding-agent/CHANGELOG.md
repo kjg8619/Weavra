@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- Fixed the experimental non-interactive client's prompt response racing terminal event delivery: accepted operations now drain their matching `run_end` and asynchronous event callbacks before closing the transcript subscription.
 - Capped agent-level retry backoff at `retry.maxAgentDelayMs` (60s by default) so long retry runs stay responsive during prolonged transient outages ([#8826](https://github.com/earendil-works/pi/issues/8826)).
 - Fixed direct RPC `steer` and `follow_up` commands bypassing extension `input` handlers ([#8718](https://github.com/earendil-works/pi/issues/8718)).
 - Fixed premature missing-model errors after login by waiting for catalog discovery. Radius now defaults to `balanced`, falling back to the first available Radius model when needed.
