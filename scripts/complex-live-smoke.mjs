@@ -4,7 +4,11 @@
 // WEAVRA_HOME model configuration and credentials; nothing here copies or prints them.
 //
 //   node runtime/pi/node_modules/tsx/dist/cli.mjs scripts/complex-live-smoke.mjs \
-//     --provider <provider> --model <model> --confirm-paid
+//     --provider <provider> --model <model> --confirm-paid [--independent] [--max-parallel 2]
+//
+// --independent drops the formatter's dependency on the parser; with --max-parallel 2 both tasks then form one V0.8A
+// wave (implementation concurrent, verification joined and in plan order). Compare the printed durations of the same
+// independent plan with --max-parallel 1 and 2 for a real speedup measurement.
 //
 // At most 5 worker invocations under the COMPLEX 200,000 reported-token cap. The throwaway project is kept for
 // inspection and its path is printed. Not part of CI.
@@ -16,7 +20,17 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
 
-const { values } = parseArgs({ options: { provider: { type: "string" }, model: { type: "string" }, "confirm-paid": { type: "boolean" } } });
+const { values } = parseArgs({
+  options: {
+    provider: { type: "string" },
+    model: { type: "string" },
+    "confirm-paid": { type: "boolean" },
+    independent: { type: "boolean" },
+    "max-parallel": { type: "string" },
+  },
+});
+const maxParallel = Number(values["max-parallel"] ?? "1");
+if (!Number.isInteger(maxParallel) || maxParallel < 1 || maxParallel > 4) throw new Error("--max-parallel must be an integer from 1 to 4");
 if (!values.provider || !values.model) throw new Error("Usage: --provider <provider> --model <model> --confirm-paid");
 if (!values["confirm-paid"]) throw new Error(`Refusing a paid run for ${values.provider}/${values.model} without --confirm-paid`);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -49,6 +63,7 @@ await writeFile(
     schemaVersion: 1,
     models: { profiles: { coding: { provider: values.provider, model: values.model }, reasoning: { provider: values.provider, model: values.model } } },
     runtime: { workflow: "adaptive" },
+    ...(maxParallel > 1 ? { agents: { max_parallel: maxParallel } } : {}),
     files: { allowed_paths: ["src"] },
     verification: {
       checks: [
@@ -62,7 +77,7 @@ await writeFile(
 const draft = {
   tasks: [
     { title: "Add parser", goal: "Create src/parse.mjs exporting parse(text): split on commas, trim items, and return [] for empty text", dependsOnIndexes: [], criterionIndexes: [1], ownership: [{ path: "src/parse.mjs", operation: "create" }], checkIds: ["test-parse"] },
-    { title: "Add formatter", goal: "Create src/format.mjs exporting format(items) that joins items with a comma and a space", dependsOnIndexes: [1], criterionIndexes: [2], ownership: [{ path: "src/format.mjs", operation: "create" }], checkIds: ["test-format"] },
+    { title: "Add formatter", goal: "Create src/format.mjs exporting format(items) that joins items with a comma and a space", dependsOnIndexes: values.independent ? [] : [1], criterionIndexes: [2], ownership: [{ path: "src/format.mjs", operation: "create" }], checkIds: ["test-format"] },
   ],
 };
 const env = Object.fromEntries(["PATH", "HOME", "WEAVRA_HOME", "TMPDIR", "LANG", "LC_ALL"].map((key) => [key, process.env[key]]).filter(([, value]) => value !== undefined));
@@ -113,6 +128,8 @@ console.log(
   JSON.stringify(
     {
       target: `${values.provider}/${values.model}`,
+      maxParallel,
+      independent: values.independent === true,
       project,
       status: result.state.snapshot.status.run.status,
       durationSeconds: Math.round((Date.now() - started) / 1000),
