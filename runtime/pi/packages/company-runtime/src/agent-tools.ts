@@ -23,18 +23,24 @@ import {
 	readAnchoredSnapshot,
 	replaceAnchoredFile,
 } from "./anchored-files.ts";
+import { ComplexOwnershipDenied } from "./complex-ownership.ts";
 import { parseRuntimeConfig, type RuntimeConfig } from "./config.ts";
 import {
+	ComplexTaskReviewSchema,
+	ComplexTaskReviewSubmissionSchema,
 	ExecutorHandoffSchema,
 	HandoffSchema,
+	HandoffSubmissionSchema,
 	type Review,
 	ReviewSchema,
+	ReviewSubmissionSchema,
 	type VerificationResult,
 	validateContract,
 } from "./contracts.ts";
 import { assertExecutionContract, bindExecutionContract } from "./execution-contract.ts";
 import { createListFilesTool } from "./list-files-tool.ts";
 import { createLspTools } from "./lsp/tools.ts";
+import type { WorkerDenialCode } from "./measurement.ts";
 import {
 	type ActionAudit,
 	evaluatePolicy,
@@ -46,7 +52,13 @@ import {
 	type PolicyPathInspector,
 	PolicyRecheckError,
 } from "./policy.ts";
-import type { AdvisoryCheckResult, AgentExecutionRequest, AgentExecutionResult } from "./ports.ts";
+import type {
+	AdvisoryCheckResult,
+	AgentExecutionRequest,
+	AgentExecutionResult,
+	ComplexMutationOperation,
+	WorkspaceFileImage,
+} from "./ports.ts";
 
 const pathSchema = Type.String({ minLength: 1, maxLength: 4096 });
 const strict = { additionalProperties: false } as const;
@@ -169,6 +181,34 @@ function deletionFingerprint(path: string): { preconditionDigest: string; bytes:
 	}
 }
 
+/**
+ * Post-effect image in the GitWorkspace capture encoding (sha256 hex of the bytes, permission bits): null when the
+ * path is absent, undefined when it cannot be read as one regular file (the ledger then treats it as unknown).
+ */
+function fileImage(path: string): WorkspaceFileImage | null | undefined {
+	let fd: number;
+	try {
+		fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code === "ENOENT" ? null : undefined;
+	}
+	try {
+		const stat = fstatSync(fd);
+		if (!stat.isFile() || stat.nlink !== 1) return undefined;
+		return { hash: createHash("sha256").update(readFileSync(fd)).digest("hex"), mode: stat.mode & 0o777 };
+	} catch {
+		return undefined;
+	} finally {
+		closeSync(fd);
+	}
+}
+
+function sameFileImage(left: WorkspaceFileImage | null | undefined, right: WorkspaceFileImage | null | undefined) {
+	if (left === undefined || right === undefined) return false;
+	if (left === null || right === null) return left === right;
+	return left.hash === right.hash && left.mode === right.mode;
+}
+
 function writeText(path: string, content: string, signal: AbortSignal): void {
 	if (Buffer.byteLength(content) > MAX_BYTES) throw new Error("Worker write exceeds size limit");
 	signal.throwIfAborted();
@@ -206,6 +246,8 @@ export function createWorkerTools(options: {
 	policyDenial: () => string | undefined;
 	/** Sticky: a Policy denial, audit failure or post-intent target change. Other tool errors are correctable. */
 	fatalToolError: () => string | undefined;
+	/** Typed code of the first fatal Policy/ownership denial; COMPLEX maps it to BLOCKED. */
+	denialCode: () => WorkerDenialCode | undefined;
 	consumeSubmissionValidationError: (toolName: string, toolCallId: string) => boolean;
 	consumeStaleAnchorError: (toolName: string, toolCallId: string) => boolean;
 } {
@@ -235,6 +277,51 @@ export function createWorkerTools(options: {
 	let submitted: AgentExecutionResult | undefined;
 	let policyDenial: string | undefined;
 	let fatalFailure: string | undefined;
+	let denialCode: WorkerDenialCode | undefined;
+	// COMPLEX: Kernel-assigned identity and the per-invocation ownership capability (never model input).
+	const complexContext = request.complexContext ? structuredClone(request.complexContext) : undefined;
+	const ownership = request.role === "Developer" ? request.ownership : undefined;
+	/** Ownership denials are fatal and typed: no effect, no Approval request, no retry or reassignment. */
+	const noteOwnership = (error: unknown) => {
+		if (!(error instanceof ComplexOwnershipDenied)) return;
+		denialCode ??= error.code;
+		fatalFailure ??= error.message;
+	};
+	/**
+	 * COMPLEX mutation fence (§5.2): exact ownership before Policy, again after the Policy reinspection immediately
+	 * before the effect, then the observed post-image is recorded in the Kernel ledger.
+	 */
+	const firstImages = new Map<string, WorkspaceFileImage | null | undefined>();
+	const ownedEffect = async <T>(
+		mutation: { path: string; operation: ComplexMutationOperation } | undefined,
+		effect: () => T | Promise<T>,
+	): Promise<T> => {
+		if (!mutation || !ownership) return effect();
+		const target = join(options.cwd, mutation.path);
+		const before = fileImage(target);
+		// Late exact gate on the Policy-inspected path: a compatible write is a create only when the file is absent.
+		ownership.authorize(
+			mutation.path,
+			mutation.operation === "write" ? (before === null ? "create" : "replace") : mutation.operation,
+		);
+		if (!firstImages.has(mutation.path)) firstImages.set(mutation.path, before);
+		let value: T;
+		try {
+			value = await effect();
+		} catch (error) {
+			// Partial I/O is never described as zero mutation: an unexplained image stays unknown to the ledger.
+			if (!sameFileImage(before, fileImage(target))) ownership.recordEffect(mutation.path, undefined);
+			throw error;
+		}
+		ownership.recordEffect(mutation.path, fileImage(target));
+		return value;
+	};
+	/** Advisory submission feedback only: files this attempt's own effects left changed. The Kernel re-derives it. */
+	const attemptChangedFiles = () =>
+		[...firstImages]
+			.filter(([path, image]) => !sameFileImage(image, fileImage(join(options.cwd, path))))
+			.map(([path]) => path)
+			.sort();
 	// Audit/storage failures belong to the Runtime, never to the model's input.
 	const guardAudit = async (operation: () => Promise<void>) => {
 		try {
@@ -254,6 +341,7 @@ export function createWorkerTools(options: {
 		request.role === "Developer" &&
 		executionContract.mode === "EDIT" &&
 		!options.policy.r3Scope &&
+		!complexContext &&
 		options.config.verification.advisory?.mode === "developer"
 			? request.advisoryChecks
 			: undefined;
@@ -271,8 +359,21 @@ export function createWorkerTools(options: {
 		paths: string[],
 		input: unknown,
 		execute: () => string | Promise<string>,
+		mutation?: { path: string; operation: ComplexMutationOperation },
 	) => {
 		assertActive();
+		if (mutation && complexContext && !ownership) {
+			fatalFailure ??= WORKER_TOOL_FAILURE;
+			throw new Error("A COMPLEX mutation requires the Kernel-bound task ownership capability");
+		}
+		if (mutation && ownership)
+			try {
+				// Early exact ownership gate: before Policy, durable intent or any effect.
+				ownership.authorize(mutation.path, mutation.operation);
+			} catch (error) {
+				noteOwnership(error);
+				throw error;
+			}
 		const frozenPaths = [...paths];
 		const action = {
 			runId: request.runId,
@@ -294,6 +395,7 @@ export function createWorkerTools(options: {
 				input,
 				step: request.step,
 				revision: request.revision,
+				...(complexContext ? { complexContext } : {}),
 			}),
 		};
 		const result = await executePolicyAction(
@@ -304,12 +406,13 @@ export function createWorkerTools(options: {
 				audit,
 				execute: async () => {
 					assertActive();
-					return execute();
+					return ownedEffect(mutation, execute);
 				},
 			},
 			signal,
 		).catch((error: unknown) => {
 			if (error instanceof PolicyRecheckError) fatalFailure ??= WORKER_TOOL_FAILURE;
+			noteOwnership(error);
 			throw error;
 		});
 		if (result.decision.decision !== "ALLOW") {
@@ -329,6 +432,7 @@ export function createWorkerTools(options: {
 					`${denial}. Nothing was read; reads are limited to the allowed paths: ${options.policy.allowedPaths.join(", ")}.`,
 				);
 			policyDenial = denial;
+			denialCode ??= "POLICY_DENIED";
 			throw new Error(policyDenial);
 		}
 		return { content: [{ type: "text" as const, text: result.value ?? "" }], details: { actionId: action.actionId } };
@@ -398,51 +502,63 @@ export function createWorkerTools(options: {
 							parameters: ACTION_TOOL_SCHEMAS.runtime_write,
 							execute: async (id, input) => {
 								const params = structuredClone(input);
+								// COMPLEX ownership intent: the strict create/replace, or a compatible write resolved at the late gate.
+								const operation: ComplexMutationOperation = strictMutation
+									? params.operation === "create"
+										? "create"
+										: "replace"
+									: "write";
 								try {
-									return await fileAction("runtime_write", [params.path], params, () => {
-										if (!strictMutation) {
-											if (
-												params.operation !== undefined ||
-												params.mustNotExist !== undefined ||
-												params.readReceipt !== undefined ||
-												params.fileDigest !== undefined
-											)
-												throw new Error(
-													"operation, mustNotExist, readReceipt and fileDigest require mutation.mode: strict",
+									return await fileAction(
+										"runtime_write",
+										[params.path],
+										params,
+										() => {
+											if (!strictMutation) {
+												if (
+													params.operation !== undefined ||
+													params.mustNotExist !== undefined ||
+													params.readReceipt !== undefined ||
+													params.fileDigest !== undefined
+												)
+													throw new Error(
+														"operation, mustNotExist, readReceipt and fileDigest require mutation.mode: strict",
+													);
+												writeText(join(options.cwd, params.path), params.content, signal);
+												return "File written";
+											}
+											if (params.operation === "create") {
+												if (params.mustNotExist !== true)
+													throw new Error("strict create requires mustNotExist: true");
+												if (params.readReceipt !== undefined || params.fileDigest !== undefined)
+													throw new Error("strict create must not carry readReceipt or fileDigest");
+												createAnchoredFile(options.cwd, params.path, params.content, signal);
+												readReceipts.delete(params.path);
+												return "File created";
+											}
+											if (params.operation === "replace") {
+												if (params.mustNotExist !== undefined)
+													throw new Error("strict replace must not carry mustNotExist");
+												const expected = requireLatestReceipt(
+													params.path,
+													params.readReceipt,
+													params.fileDigest,
 												);
-											writeText(join(options.cwd, params.path), params.content, signal);
-											return "File written";
-										}
-										if (params.operation === "create") {
-											if (params.mustNotExist !== true)
-												throw new Error("strict create requires mustNotExist: true");
-											if (params.readReceipt !== undefined || params.fileDigest !== undefined)
-												throw new Error("strict create must not carry readReceipt or fileDigest");
-											createAnchoredFile(options.cwd, params.path, params.content, signal);
-											readReceipts.delete(params.path);
-											return "File created";
-										}
-										if (params.operation === "replace") {
-											if (params.mustNotExist !== undefined)
-												throw new Error("strict replace must not carry mustNotExist");
-											const expected = requireLatestReceipt(
-												params.path,
-												params.readReceipt,
-												params.fileDigest,
-											);
-											replaceAnchoredFile(
-												options.cwd,
-												params.path,
-												params.content,
-												params.fileDigest as string,
-												signal,
-												expected,
-											);
-											readReceipts.delete(params.path);
-											return "File replaced";
-										}
-										throw new Error("strict mutation requires operation create or replace");
-									});
+												replaceAnchoredFile(
+													options.cwd,
+													params.path,
+													params.content,
+													params.fileDigest as string,
+													signal,
+													expected,
+												);
+												readReceipts.delete(params.path);
+												return "File replaced";
+											}
+											throw new Error("strict mutation requires operation create or replace");
+										},
+										{ path: params.path, operation },
+									);
 								} catch (error) {
 									if (error instanceof StaleAnchorError) staleAnchorErrors.add(id);
 									throw error;
@@ -478,50 +594,56 @@ export function createWorkerTools(options: {
 								else if (params.readReceipt !== undefined)
 									throw new Error("readReceipt requires mutation.mode: strict");
 								try {
-									return await fileAction("runtime_edit", [params.path], params, () => {
-										if (strictMutation) {
-											const expected = requireLatestReceipt(
-												params.path,
-												params.readReceipt,
-												params.fileDigest,
-											);
-											editAnchoredFile(
-												options.cwd,
-												params.path,
-												{
-													...params,
-													anchor: params.anchor as string,
-													fileDigest: params.fileDigest as string,
-												},
+									return await fileAction(
+										"runtime_edit",
+										[params.path],
+										params,
+										() => {
+											if (strictMutation) {
+												const expected = requireLatestReceipt(
+													params.path,
+													params.readReceipt,
+													params.fileDigest,
+												);
+												editAnchoredFile(
+													options.cwd,
+													params.path,
+													{
+														...params,
+														anchor: params.anchor as string,
+														fileDigest: params.fileDigest as string,
+													},
+													signal,
+													expected,
+												);
+												readReceipts.delete(params.path);
+												return "File edited";
+											}
+											if (params.anchor !== undefined && params.fileDigest !== undefined) {
+												editAnchoredFile(
+													options.cwd,
+													params.path,
+													{ ...params, anchor: params.anchor, fileDigest: params.fileDigest },
+													signal,
+												);
+												return "File edited";
+											}
+											const path = join(options.cwd, params.path);
+											const content = readText(path);
+											const index = content.indexOf(params.oldText);
+											if (index < 0 || content.indexOf(params.oldText, index + 1) !== -1)
+												throw new Error("Edit requires a unique exact match");
+											writeText(
+												path,
+												content.slice(0, index) +
+													params.newText +
+													content.slice(index + params.oldText.length),
 												signal,
-												expected,
-											);
-											readReceipts.delete(params.path);
-											return "File edited";
-										}
-										if (params.anchor !== undefined && params.fileDigest !== undefined) {
-											editAnchoredFile(
-												options.cwd,
-												params.path,
-												{ ...params, anchor: params.anchor, fileDigest: params.fileDigest },
-												signal,
 											);
 											return "File edited";
-										}
-										const path = join(options.cwd, params.path);
-										const content = readText(path);
-										const index = content.indexOf(params.oldText);
-										if (index < 0 || content.indexOf(params.oldText, index + 1) !== -1)
-											throw new Error("Edit requires a unique exact match");
-										writeText(
-											path,
-											content.slice(0, index) +
-												params.newText +
-												content.slice(index + params.oldText.length),
-											signal,
-										);
-										return "File edited";
-									});
+										},
+										{ path: params.path, operation: "edit" },
+									);
 								} catch (error) {
 									if (error instanceof StaleAnchorError) staleAnchorErrors.add(id);
 									throw error;
@@ -588,13 +710,13 @@ export function createWorkerTools(options: {
 						? " unresolved must contain only remaining implementation/requirement problems, not Runtime-owned pending review, SELF_CHECK, TEST or Human Approval. Preserve real blockers; correct submission errors in this session."
 						: " criteria[] must report every frozen acceptance criterion exactly once by its exact Host-assigned ID and status; never restate, rename or invent criteria. unresolved must contain only unfinished criteria or concrete blockers, not general caveats, low confidence or Runtime-owned pending checks/review. Preserve real blockers; correct submission errors in this session."),
 				executionMode: "sequential",
-				parameters: request.role === "Executor" ? ExecutorHandoffSchema : HandoffSchema,
+				parameters: request.role === "Executor" ? ExecutorHandoffSchema : HandoffSubmissionSchema,
 				execute: async (id, params) => {
 					assertActive();
 					const handoff = structuredClone(
 						request.role === "Executor"
 							? validateContract(ExecutorHandoffSchema, params)
-							: validateContract(HandoffSchema, params),
+							: validateContract(HandoffSubmissionSchema, params),
 					);
 					const identityMismatch = [
 						handoff.runId === request.runId ? null : "runId",
@@ -635,8 +757,29 @@ export function createWorkerTools(options: {
 									"Nothing was accepted or filtered. Correct and resubmit submit_handoff alone in this same session.",
 							);
 						}
+						const expected = complexContext ? attemptChangedFiles() : undefined;
+						if (
+							expected &&
+							JSON.stringify([...new Set(handoff.changed_files)].sort()) !== JSON.stringify(expected)
+						) {
+							submissionValidationErrors.set(id, "submit_handoff");
+							throw new Error(
+								`Handoff changed_files validation failed: list exactly the claimed files your own tool effects changed in this attempt: ${JSON.stringify(expected)}. ` +
+									"Nothing was accepted. Correct changed_files and resubmit submit_handoff alone in this same session.",
+							);
+						}
 					}
-					submitted = handoff.role === "Executor" ? { role: "Executor", handoff } : { role: "Developer", handoff };
+					submitted =
+						handoff.role === "Executor"
+							? { role: "Executor", handoff }
+							: {
+									role: "Developer",
+									// Runtime-attached identity: the Kernel still validates it against its own context.
+									handoff: validateContract(HandoffSchema, {
+										...handoff,
+										...(complexContext ? { complexContext } : {}),
+									}),
+								};
 					return {
 						content: [
 							{ type: "text", text: "Handoff submitted for Kernel validation; not a completion approval." },
@@ -648,17 +791,30 @@ export function createWorkerTools(options: {
 			}),
 		);
 	} else {
+		// COMPLEX TASK scope judges a contribution to exactly the task's mapped criteria (§7.1); every other review,
+		// including the final INTEGRATION review, judges all frozen parent criteria MET/UNMET/UNVERIFIED.
+		const contribution = complexContext?.scope === "TASK";
+		const judged = contribution
+			? request.task.acceptanceCriteria.filter((criterion) =>
+					request.complexTask?.task.criterionIds.includes(criterion.id),
+				)
+			: request.task.acceptanceCriteria;
 		tools.push(
 			defineTool({
 				name: "submit_review",
 				label: "Submit review",
-				description:
-					"Submit an independent PASS/REVISE/BLOCK review. Judge every frozen acceptance criterion exactly once by its exact Host-assigned ID; criteria and statements cannot be added, removed or restated. Use only exact trustedEvidenceRefs strings in all evidenceRefs arrays; PASS also requires evidence for every criterion. Correct coverage or evidence errors and resubmit in this session. Call alone.",
+				description: contribution
+					? "Submit an independent PASS/REVISE/BLOCK contribution review of this COMPLEX task. Judge exactly the task's mapped acceptance criteria (complexTask.task.criterionIds) once each by exact ID as SUPPORTED, UNSUPPORTED or UNVERIFIED for this task's contribution; never judge or restate other criteria. Use only exact trustedEvidenceRefs strings in all evidenceRefs arrays; PASS requires every mapped criterion SUPPORTED with evidence. Correct coverage or evidence errors and resubmit in this session. Call alone."
+					: "Submit an independent PASS/REVISE/BLOCK review. Judge every frozen acceptance criterion exactly once by its exact Host-assigned ID; criteria and statements cannot be added, removed or restated. Use only exact trustedEvidenceRefs strings in all evidenceRefs arrays; PASS also requires evidence for every criterion. Correct coverage or evidence errors and resubmit in this session. Call alone.",
 				executionMode: "sequential",
-				parameters: ReviewSchema,
+				parameters: contribution ? ComplexTaskReviewSubmissionSchema : ReviewSubmissionSchema,
 				execute: async (id, params) => {
 					assertActive();
-					const review: Review = structuredClone(validateContract(ReviewSchema, params));
+					const review = structuredClone(
+						contribution
+							? validateContract(ComplexTaskReviewSubmissionSchema, params)
+							: validateContract(ReviewSubmissionSchema, params),
+					);
 					const identityMismatch = [
 						review.runId === request.runId ? null : "runId",
 						review.revision === request.revision ? null : "revision",
@@ -674,7 +830,7 @@ export function createWorkerTools(options: {
 								"Correct those fields and resubmit submit_review alone in this same session.",
 						);
 					}
-					const coverage = criterionCoverageError(review.criteria, request.task.acceptanceCriteria, "Review");
+					const coverage = criterionCoverageError(review.criteria, judged, "Review");
 					if (coverage) {
 						submissionValidationErrors.set(id, "submit_review");
 						throw new Error(coverage);
@@ -698,7 +854,19 @@ export function createWorkerTools(options: {
 								`Correct and resubmit submit_review alone in this session. trustedEvidenceRefs: ${JSON.stringify(evidenceRefs)}`,
 						);
 					}
-					submitted = { role: "Reviewer", review };
+					// Runtime-attached identity; the Kernel validates it again against its own context.
+					if (contribution && complexContext)
+						submitted = {
+							role: "Reviewer",
+							contribution: validateContract(ComplexTaskReviewSchema, { ...review, complexContext }),
+						};
+					else {
+						const parentReview: Review = validateContract(ReviewSchema, {
+							...review,
+							...(complexContext ? { complexContext } : {}),
+						});
+						submitted = { role: "Reviewer", review: parentReview };
+					}
 					return {
 						content: [{ type: "text", text: "Review submitted for Kernel validation." }],
 						details: {},
@@ -715,6 +883,7 @@ export function createWorkerTools(options: {
 				workerDigest(options.config)
 			) {
 				policyDenial = "Runtime configuration changed; approval is stale";
+				denialCode ??= "APPROVAL_INVALID";
 				throw new Error(policyDenial);
 			}
 		};
@@ -730,6 +899,17 @@ export function createWorkerTools(options: {
 				parameters: ACTION_TOOL_SCHEMAS.runtime_delete,
 				execute: async (_id, params) => {
 					assertActive();
+					if (complexContext && !ownership) {
+						fatalFailure ??= WORKER_TOOL_FAILURE;
+						throw new Error("A COMPLEX deletion requires the Kernel-bound task ownership capability");
+					}
+					try {
+						// Early exact ownership gate: before Policy, durable intent or any Approval request.
+						ownership?.authorize(params.path, "delete");
+					} catch (error) {
+						noteOwnership(error);
+						throw error;
+					}
 					const action = {
 						runId: request.runId,
 						actionId: randomUUID(),
@@ -742,12 +922,14 @@ export function createWorkerTools(options: {
 							projectInstructionDigest: options.policy.projectInstruction?.digest ?? null,
 							path: params.path,
 							step: request.step,
+							...(complexContext ? { complexContext } : {}),
 						}),
 					};
 					const initial = evaluatePolicy(action, options.policy, await options.paths.inspect(action.paths));
 					if (initial.decision !== "APPROVAL_REQUIRED") {
 						await options.audit.prepare(initial);
 						policyDenial = `Policy ${initial.risk}/${initial.decision}: ${initial.reason}`;
+						denialCode ??= "POLICY_DENIED";
 						throw new Error(policyDenial);
 					}
 					await options.audit.assertWritable();
@@ -762,6 +944,8 @@ export function createWorkerTools(options: {
 						...fingerprint,
 						step: request.step,
 						revision: request.revision,
+						// The COMPLEX task identity is part of the exact action the human approves (§7.2).
+						...(complexContext ? { complexContext } : {}),
 					});
 					if (!request.onApprovalRequested || !request.onApprovalConsumed)
 						throw new Error("Human approval callbacks unavailable");
@@ -777,6 +961,7 @@ export function createWorkerTools(options: {
 							...fingerprint,
 							step: request.step,
 							revision: request.revision,
+							...(complexContext ? { complexContext } : {}),
 							reason: "Delete one preselected Git-tracked workspace text file; no automatic rollback",
 						},
 						signal,
@@ -795,22 +980,34 @@ export function createWorkerTools(options: {
 							execute: async () => {
 								assertActive();
 								assertConfig();
+								const expired = Date.now() >= grant.expiresAt;
 								if (
 									deletionFingerprint(path).preconditionDigest !== fingerprint.preconditionDigest ||
-									Date.now() >= grant.expiresAt
+									expired
 								) {
 									policyDenial = "Deletion target changed or approval expired; action was not executed";
+									denialCode ??= expired ? "APPROVAL_EXPIRED" : "APPROVAL_INVALID";
 									throw new Error(policyDenial);
+								}
+								if (ownership) {
+									// Late exact ownership gate after the Policy reinspection, then the ledger records absence.
+									ownership.authorize(params.path, "delete");
+									if (!firstImages.has(params.path)) firstImages.set(params.path, fileImage(path));
 								}
 								// No JS yield between the final fingerprint/expiry check and unlink. External TOCTOU is not sandboxed.
 								unlinkSync(path);
+								ownership?.recordEffect(params.path, null);
 								return "Approved file deleted";
 							},
 						},
 						signal,
-					);
+					).catch((error: unknown) => {
+						noteOwnership(error);
+						throw error;
+					});
 					if (result.decision.decision !== "ALLOW") {
 						policyDenial = "Approval expired or mismatched before execution";
+						denialCode ??= "APPROVAL_INVALID";
 						throw new Error(policyDenial);
 					}
 					await request.onApprovalConsumed(action.actionId);
@@ -833,6 +1030,7 @@ export function createWorkerTools(options: {
 		advisoryRunLimit,
 		policyDenial: () => policyDenial,
 		fatalToolError: () => policyDenial ?? fatalFailure,
+		denialCode: () => denialCode,
 		consumeStaleAnchorError: (toolName, toolCallId) =>
 			(toolName === "runtime_edit" || toolName === "runtime_write") && staleAnchorErrors.delete(toolCallId),
 		consumeSubmissionValidationError: (toolName, toolCallId) =>

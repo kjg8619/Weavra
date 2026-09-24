@@ -472,7 +472,7 @@ describe("COMPLEX preparation over Host Control (#16 stage A)", () => {
 		expect(client.createModels).not.toHaveBeenCalled();
 	});
 
-	it("fails a confirmed COMPLEX preview closed at start: consumed, no model, writer or Run", async () => {
+	it("starts a confirmed COMPLEX preview once; a failing model runtime leaves no writer or Run (#16 stage B)", async () => {
 		const client = await complexClient();
 		const prepared = await client.mutation({ type: "workflow.prepare", goal, complexDraft });
 		if (!prepared.success || prepared.data.kind !== "prepared") throw new Error(JSON.stringify(prepared));
@@ -493,7 +493,8 @@ describe("COMPLEX preparation over Host Control (#16 stage A)", () => {
 			error: { code: "PLAN_CONSUMED" },
 		});
 		expect(await readdir(join(cwd, ".ai"))).toEqual(["config.yaml"]);
-		expect(client.createModels).not.toHaveBeenCalled();
+		// COMPLEX confirmation now starts execution: the model runtime is created (and fails in this fixture).
+		expect(client.createModels).toHaveBeenCalledOnce();
 	});
 
 	it("keeps STANDARD previews and snapshots free of COMPLEX fields", async () => {

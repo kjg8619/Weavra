@@ -1,10 +1,12 @@
 import { type Static, Type } from "typebox";
+import { ComplexEvidenceContextSchema } from "./complex-types.ts";
 
 const counter = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
 const text = Type.String({ minLength: 1, pattern: "\\S" });
 const strict = { additionalProperties: false } as const;
 
-// Leaf module on purpose: contracts.ts imports these schemas, so this file must not import contracts.ts.
+// Leaf module on purpose: contracts.ts imports these schemas, so this file must not import contracts.ts
+// (complex-types.ts is itself a leaf).
 // Role and step literals are owned by contracts.ts (RoleSchema, StepReferenceSchema) and kept in sync here.
 const role = Type.Enum(["Executor", "Developer", "Reviewer", "Lead"]);
 const step = Type.Object(
@@ -92,6 +94,8 @@ export const WorkerMeasurementSchema = Type.Object(
 		toolCallsByName: Type.Record(text, counter),
 		usage: WorkerUsageSchema,
 		outcome: Type.Enum(["SUCCEEDED", "FAILED", "CANCELLED"]),
+		/** Kernel-attached COMPLEX attribution of this invocation; adapters never supply it. */
+		complexContext: Type.Optional(ComplexEvidenceContextSchema),
 		reviewerContext: Type.Optional(ReviewerContextSummarySchema),
 		// Bounded advisory-context summary only; never snippet text, source text or path lists.
 		contextPack: Type.Optional(

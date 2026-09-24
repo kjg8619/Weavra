@@ -138,13 +138,24 @@ export class WorkerMeasurementAccumulator {
 	}
 }
 
+/** Known worker-side denial that COMPLEX maps to BLOCKED; QUICK/STANDARD keep their FAILED mapping. */
+export type WorkerDenialCode =
+	| "POLICY_DENIED"
+	| "OWNERSHIP_CONFLICT"
+	| "UNOWNED_PATH"
+	| "APPROVAL_EXPIRED"
+	| "APPROVAL_INVALID";
+
 /** Execution failure that still carries the settled measurement, so accounting never loses spent tokens. */
 export class WorkerExecutionError extends Error {
 	readonly measurement: WorkerMeasurement | undefined;
+	/** Present only for a typed Policy/ownership denial observed by the adapter, never inferred from text. */
+	readonly denial: WorkerDenialCode | undefined;
 
-	constructor(message: string, measurement?: WorkerMeasurement, options?: ErrorOptions) {
+	constructor(message: string, measurement?: WorkerMeasurement, options?: ErrorOptions, denial?: WorkerDenialCode) {
 		super(message, options);
 		this.name = "WorkerExecutionError";
 		this.measurement = measurement;
+		this.denial = denial;
 	}
 }

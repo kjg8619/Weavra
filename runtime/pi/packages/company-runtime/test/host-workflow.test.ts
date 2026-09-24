@@ -272,7 +272,7 @@ describe("Host workflow preparation for COMPLEX (#16 stage A)", () => {
 		expect(await failure(standard)).toBe("INVALID_REQUEST");
 	});
 
-	it("refuses to start a confirmed COMPLEX plan before any model, writer or Run exists", async () => {
+	it("hands only an exactly bound COMPLEX plan to execution (#16 stage B)", async () => {
 		const cwd = await project();
 		const plan = await finalizeComplexHostWorkflowPlan(
 			prepareHostWorkflowDraft({ goal, config: complexConfig(), complexDraft: draft() }),
@@ -282,16 +282,24 @@ describe("Host workflow preparation for COMPLEX (#16 stage A)", () => {
 		const createModels = vi.fn(async (): Promise<never> => {
 			throw new Error("Model initialization forbidden");
 		});
-		const failure = await createHostWorkflow({
-			cwd,
-			plan,
-			agentDir: join(cwd, "agent"),
-			signal: new AbortController().signal,
-			createModels,
-		}).catch((error: unknown) => error);
-		expect(failure).toBeInstanceOf(HostWorkflowError);
-		expect(failure).toMatchObject({ code: "UNSUPPORTED_WORKFLOW" });
+		const start = (value: typeof plan) =>
+			createHostWorkflow({
+				cwd,
+				plan: value,
+				agentDir: join(cwd, "agent"),
+				signal: new AbortController().signal,
+				createModels,
+			}).catch((error: unknown) => error);
+		// A COMPLEX workflow without its plan, or a plan on another workflow, is refused before any model.
+		const { complexPlan: _plan, ...unplanned } = plan;
+		expect(await start(unplanned)).toMatchObject({ code: "UNSUPPORTED_WORKFLOW" });
+		expect(await start({ ...plan, workflow: "STANDARD" })).toMatchObject({ code: "INVALID_REQUEST" });
 		expect(createModels).not.toHaveBeenCalled();
+		// The confirmed plan proceeds to Workflow construction; this fixture's model runtime refuses to start.
+		const failure = await start(plan);
+		expect(failure).not.toBeInstanceOf(HostWorkflowError);
+		expect(failure).toMatchObject({ message: "Model initialization forbidden" });
+		expect(createModels).toHaveBeenCalledOnce();
 		expect(await readdir(cwd)).toEqual(["src"]);
 	});
 

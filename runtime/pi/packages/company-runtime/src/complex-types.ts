@@ -1,9 +1,10 @@
 import { type Static, Type } from "typebox";
-import {
-	ACCEPTANCE_CRITERION_ID_PATTERN,
-	MAX_ACCEPTANCE_CRITERIA,
-	MAX_ACCEPTANCE_STATEMENT_LENGTH,
-} from "./contracts.ts";
+
+// Leaf module on purpose: contracts.ts imports these schemas, so this file must not import contracts.ts.
+// These three Task Contract bounds are owned by contracts.ts and kept in sync here (asserted by a test).
+const ACCEPTANCE_CRITERION_ID_PATTERN = "^AC-[0-9]{3}$";
+const MAX_ACCEPTANCE_CRITERIA = 16;
+const MAX_ACCEPTANCE_STATEMENT_LENGTH = 500;
 
 /**
  * V0.7B COMPLEX contract v1 (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md §4, §7.1, §9, §10.2).
@@ -94,6 +95,13 @@ export const COMPLEX_FAILURE_CODES = [
 	"CLEANUP_UNCONFIRMED",
 	"STORAGE_FAILED",
 ] as const;
+/** Local task-review verdict per mapped criterion (§7.1): a contribution, never parent MET. */
+export const CONTRIBUTION_STATUSES = ["SUPPORTED", "UNSUPPORTED", "UNVERIFIED"] as const;
+/** Started attempts in one Run: every task once plus the global revision allowance (§6). */
+export const COMPLEX_MAX_RUN_ATTEMPTS = COMPLEX_MAX_TASKS + COMPLEX_MAX_TOTAL_REVISION_CYCLES;
+/** One evidence record per started task attempt plus one integration record (§10.1). */
+export const COMPLEX_MAX_EVIDENCE_RECORDS = COMPLEX_MAX_RUN_ATTEMPTS + 1;
+export const COMPLEX_MAX_EVIDENCE_CHECK_REFS = 32;
 export const CHECK_GATES = ["NOT_RUN", "RUNNING", "PASS", "FAIL", "UNAVAILABLE", "STALE"] as const;
 export const REVIEW_GATES = ["NOT_RUN", "RUNNING", "PASS", "REVISE", "BLOCK", "UNAVAILABLE", "STALE"] as const;
 export const EVIDENCE_FRESHNESS = ["NONE", "CURRENT", "STALE", "UNKNOWN"] as const;
@@ -282,6 +290,40 @@ export const ComplexIntegrationSchema = Type.Object(
 );
 export type ComplexIntegration = Static<typeof ComplexIntegrationSchema>;
 
+export const ContributionStatusSchema = Type.Enum(CONTRIBUTION_STATUSES);
+export type ContributionStatus = Static<typeof ContributionStatusSchema>;
+
+/**
+ * Frozen-plan identity on Run lifecycle events of a COMPLEX Run (§10.1). It binds the plan without inventing a
+ * task attempt; task/step events carry a ComplexEvidenceContext instead.
+ */
+export const ComplexBindingSchema = Type.Object(
+	{ parentTaskContractDigest: digest, complexPlanDigest: digest },
+	strict,
+);
+export type ComplexBinding = Static<typeof ComplexBindingSchema>;
+
+/**
+ * Durable Kernel-owned COMPLEX execution state (`Run.complex`). The §10.2 projection is a pure function of this,
+ * the outer Run (parent, status, budget, revision cycle) and the transport envelope. Only the Kernel writes it.
+ */
+export const ComplexRunStateSchema = Type.Object(
+	{
+		plan: ComplexPlanSchema,
+		phase: ComplexPhaseSchema,
+		activeTaskId: Type.Union([taskId, Type.Null()]),
+		/** Exactly one row per plan task, in plan order. */
+		tasks: Type.Array(ComplexTaskStateSchema, { minItems: COMPLEX_MIN_TASKS, maxItems: COMPLEX_MAX_TASKS }),
+		integration: ComplexIntegrationSchema,
+		cleanup: CleanupStatusSchema,
+		partialChanges: Type.Boolean(),
+		changesUnknown: Type.Boolean(),
+		failureCode,
+	},
+	strict,
+);
+export type ComplexRunState = Static<typeof ComplexRunStateSchema>;
+
 /**
  * Wire duplicate of the frozen parent Task Contract with the §10.2 projection bounds. Parent scope paths keep
  * the existing Policy scope syntax; exact-file ownership syntax never rewrites them.
@@ -356,6 +398,19 @@ export const ComplexExecutionSchema = Type.Object(
 	strict,
 );
 export type ComplexExecution = Static<typeof ComplexExecutionSchema>;
+
+/**
+ * Evidence reference namespace of one verification stage. COMPLEX adds the task (or integration) identity so an
+ * identical check ID in another task, attempt or stage can never resolve to this evidence (§8.1, C24).
+ */
+export function evidenceNamespace(request: {
+	runId: string;
+	step: { stepId: string; attempt: number };
+	complexContext?: ComplexEvidenceContext;
+}): string {
+	const scope = request.complexContext ? `${request.complexContext.taskId ?? "integration"}:` : "";
+	return `${request.runId}:${scope}${request.step.stepId}:${request.step.attempt}`;
+}
 
 /** `CT-001`… in accepted plan order (1-based position). */
 export function complexTaskId(position: number): string {

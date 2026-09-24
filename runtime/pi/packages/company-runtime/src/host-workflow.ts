@@ -245,22 +245,25 @@ export interface CreateHostWorkflowOptions {
 	startGuard?: WorkflowOptions["startGuard"];
 }
 
-/** Call only after affirmative Host confirmation; execution still belongs to StandardWorkflow. */
+/**
+ * Call only after affirmative Host confirmation; execution still belongs to StandardWorkflow. A COMPLEX plan runs
+ * only with its frozen Host-compiled plan, which the Workflow revalidates before any writer or Run exists.
+ */
 export async function createHostWorkflow(options: CreateHostWorkflowOptions): Promise<StandardWorkflow> {
 	const { cwd, agentDir, signal } = options;
 	signal.throwIfAborted();
-	// Stage A boundary: a compiled COMPLEX plan can be previewed, but Workflow/Kernel do not execute it yet.
-	if (options.plan.workflow === "COMPLEX" || options.plan.complexPlan)
+	if ((options.plan.workflow === "COMPLEX") !== (options.plan.complexPlan !== undefined))
 		throw new HostWorkflowError(
-			"UNSUPPORTED_WORKFLOW",
-			`Unsupported classification/workflow: COMPLEX/${options.plan.risk}; COMPLEX execution is not enabled in this Runtime; no model, writer or Run was created`,
+			options.plan.workflow === "COMPLEX" ? "UNSUPPORTED_WORKFLOW" : "INVALID_REQUEST",
+			`Unsupported classification/workflow: ${options.plan.workflow}/${options.plan.risk}; a COMPLEX plan runs only as COMPLEX with its confirmed plan; no model, writer or Run was created`,
 		);
 	const { goal, executionMode } = options.plan;
-	const { config, taskContract, recipe, riskOverride } = structuredClone({
+	const { config, taskContract, recipe, riskOverride, complexPlan } = structuredClone({
 		config: options.plan.config,
 		taskContract: options.plan.taskContract,
 		recipe: options.plan.recipe,
 		riskOverride: options.plan.riskOverride,
+		complexPlan: options.plan.complexPlan,
 	});
 	const models = options.createModels
 		? await options.createModels(signal)
@@ -277,6 +280,7 @@ export async function createHostWorkflow(options: CreateHostWorkflowOptions): Pr
 		executionMode,
 		...(recipe ? { recipe } : {}),
 		...(riskOverride ? { riskOverride } : {}),
+		...(complexPlan ? { complexPlan } : {}),
 		config,
 		signal,
 		events: options.events,
