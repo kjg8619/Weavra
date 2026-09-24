@@ -1,12 +1,15 @@
 import {
   EnvironmentId,
   ProjectId,
+  WeavraComplexExecution,
   WeavraControlTransportError,
   WS_METHODS,
   type WeavraControlObservation,
+  type WeavraControlState,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import { Atom } from "effect/unstable/reactivity";
@@ -42,6 +45,24 @@ const initial: WeavraControlViewState = {
   observation: empty,
   capabilityInventory: { status: "NOT_EXPOSED", inventory: null },
 };
+const sameExecution = Schema.toEquivalence(WeavraComplexExecution);
+/** Same COMPLEX Run and state revision must carry the same canonical data; key order is irrelevant. */
+function complexChanged(previous: WeavraControlState, next: WeavraControlState) {
+  const before = previous.complexExecution;
+  const after = next.complexExecution;
+  return (
+    before !== undefined &&
+    after !== undefined &&
+    before.runId === after.runId &&
+    before.stateRevision === after.stateRevision &&
+    // Owner and project revision are observation-envelope values, not execution data.
+    !sameExecution(before, {
+      ...after,
+      ownerId: before.ownerId,
+      projectRevision: before.projectRevision,
+    })
+  );
+}
 
 /** Each session must receive canonical control state before cached data becomes current. */
 export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraControlState.make")(
@@ -56,6 +77,8 @@ export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraCon
       capabilityInventory: inventory.view(performance.now()),
     };
     let producer: RpcSession | undefined;
+    // The first emission of every subscription is the server's cached value: historical only.
+    let historicalFirst = false;
     const state = yield* SubscriptionRef.make(current);
     const update = (next: Omit<WeavraControlViewState, "capabilityInventory">) =>
       Effect.gen(function* () {
@@ -110,15 +133,19 @@ export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraCon
           });
           // No unknown feature RPC is ever sent to an older environment.
           if (!supported) return yield* Effect.never;
+          historicalFirst = true;
           return { projectId };
         }),
       { onExpectedFailure: unavailable, onDefect: unavailable },
     ).pipe(
-      Stream.runForEach(([session, observation]) =>
+      Stream.runForEach(([session, received]) =>
         Effect.gen(function* () {
           const active = yield* SubscriptionRef.get(supervisor.session);
           if (Option.isNone(active) || active.value !== session || cache.owner !== owner) return;
           producer = session;
+          // Only a later observation, checked by the server on its bound transport, is current.
+          const observation = historicalFirst ? { ...received, stale: true } : received;
+          historicalFirst = false;
           const previous = current.observation;
           const oldState = previous.state;
           const nextState = observation.state;
@@ -145,7 +172,8 @@ export const makeEnvironmentWeavraControlState = Effect.fn("EnvironmentWeavraCon
               (oldState.snapshot.status.run?.runId === nextState.snapshot.status.run?.runId &&
                 oldState.stateRevision !== null &&
                 (nextState.stateRevision === null ||
-                  nextState.stateRevision < oldState.stateRevision)))
+                  nextState.stateRevision < oldState.stateRevision)) ||
+              complexChanged(oldState, nextState))
           ) {
             inventory.stale(ownerChanged);
             yield* update({
