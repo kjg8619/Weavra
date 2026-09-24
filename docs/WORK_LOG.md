@@ -643,3 +643,25 @@
 - #22 경쟁 corpus 설계: P01–P17(동시 구현 관측, 인계 순서와 무관한 검증 순서, 의존성 웨이브, 소유권 충돌 중 형제 중단, 형제 실패, 동시 취소, REVISE, 예산 전원 예약 실패, 사용량 미상, 외부 변경, 통합 실패, 재연결, 소유자 강제 종료 복구, 이벤트 순서, V0.7B corpus 동등성, R3 고정). 실제 모델 병렬 smoke 또는 NOT VERIFIED 표기.
 - 현재 검증: `git diff --check`. 이 문서와 작업 기록만 바뀌었다. 구현·테스트·속도 향상 주장은 없다.
 - 커밋 상태: devlop 대상 설계 PR. 머지 후 #20(Runtime)·#21(App)을 각자 worktree에서 병렬로 개발한다.
+
+## 2026-09-25 KST — V0.8A #21 App 병렬 작업 투영 (계약 v2 소비자)
+
+- 목적: #19 계약의 App 소비자 쪽을 구현한다. 설계의 소비자 우선 규칙에 따라 #20 Runtime보다 먼저 머지한다. 현재 Runtime(계약 1)에서는 기존 동작을 그대로 유지한다.
+- 브랜치/worktree: `feat/v0.8a-parallel-app`, `Weavra-worktrees/v0.7b-complex-app`(재사용). #17을 만든 하위 에이전트가 이어서 구현했고, 메인 세션이 검토했다.
+- 변경(`app/t3code/`):
+  - contracts: v1 스키마는 그대로 두고 `*V1` 이름을 붙였다. v2 스키마를 추가했다: plan `schemaVersion 2`와 `maxParallel` 1..4, `HANDED_OFF`, `activeTaskIds`. capability는 1·2를 받는다.
+  - server `ComplexProjection`: v2 digest domain, 광고된 버전과 plan·preview·투영 버전의 일치, §8 규칙 1–6을 검사한다.
+  - client: 같은 revision에서의 변경 비교를 같은 계약 버전 안으로 한정했다. 재연결 뒤 버전이 바뀌면 교체한다.
+  - web: Runtime이 보고한 현재 웨이브(CURRENT WAVE), 검증 차례를 기다리는 HANDED_OFF, 행별 의존성, RUN_STOPPED 의미, 취소 상태, 읽기 전용 `maxParallel`을 보여 준다. 작업 제어 버튼은 없다.
+  - `docs/operations/development.md`: 계약 2 동작을 설명한다.
+- 계약 개정 A1(메인 세션, `PARALLEL_AGENTS.md` §8):
+  - v2 Runtime은 업그레이드 전 V0.7B의 종료된 COMPLEX Run을 v1 plan 그대로 담은 v2 실행 투영으로 보여 준다(`activeTaskIds: []`, v1 상태). 이 예외가 없으면 업그레이드 직후 그 프로젝트의 제어 화면을 쓸 수 없다.
+  - 소비자가 의존하는 원자적 저장 조건도 명문화했다. 웨이브 ELIGIBLE→IMPLEMENTING과 →STOPPING 전이는 한 번에 저장한다. 작업 중인 행 옆에 ELIGIBLE·STOPPING 행이 올 수 없다.
+- 현재 검증(하위 에이전트, Node 24.19.0, pnpm 11.10.0):
+  - `node scripts/validate.mjs t3` → `ALL GATES PASS`(개정 반영 후 재실행).
+  - 집중 테스트: contracts 89, server 97, client 40, web 39.
+  - 새 규칙을 제거하면 해당 테스트가 실패하는지 변이 확인을 했다.
+- 남은 한계:
+  - 실제 v2 Runtime과의 실행 검증은 #20 머지 뒤 #22에서 한다.
+  - 실제 클라이언트 화면 확인은 브라우저 사용 승인이 필요해 하지 않았다.
+- 커밋 상태: `744bc3ca`, `e61cc09c`, 개정 `21d6c4fa`, `6de4885b`, 이 기록. devlop 대상 PR.
