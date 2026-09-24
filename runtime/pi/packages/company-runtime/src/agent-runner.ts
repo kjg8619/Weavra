@@ -556,7 +556,7 @@ export class PiAgentExecutor implements AgentExecutor {
 					"No shell, extensions, skills or auto-discovered context is available.",
 					this.options.r3Scope || this.maxToolErrors === 0
 						? ""
-						: `Correctable tool errors (a missing or non-file path, a non-unique edit match, invalid arguments, an oversized file) are returned to you: fix the call and continue. More than ${this.maxToolErrors} such errors end this worker. Calling an unavailable tool or a Policy denial for a protected or out-of-scope path ends it immediately.`,
+						: `Correctable tool errors (a missing or non-file path, a read, search or listing outside the allowed paths, a non-unique edit match, invalid arguments, an oversized file) are returned to you: fix the call and continue. More than ${this.maxToolErrors} such errors end this worker. Calling an unavailable tool, a Policy denial for a protected path, or a change outside the allowed paths ends it immediately.`,
 					"You have no authority to approve actions, bypass approval, or control the workflow.",
 					r3Developer ? "" : "No approval-request or destructive tools are available to you.",
 					request.role !== "Reviewer"
