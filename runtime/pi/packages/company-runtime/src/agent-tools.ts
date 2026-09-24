@@ -40,6 +40,8 @@ import {
 	evaluatePolicy,
 	executePolicyAction,
 	NON_FILE_TARGET_REASON,
+	OUTSIDE_ALLOWED_PATHS_REASON,
+	OUTSIDE_LISTING_BOUNDARY_REASON,
 	type PolicyContext,
 	type PolicyPathInspector,
 	PolicyRecheckError,
@@ -311,10 +313,21 @@ export function createWorkerTools(options: {
 			throw error;
 		});
 		if (result.decision.decision !== "ALLOW") {
-			const denial = `Policy ${result.decision.risk}/${result.decision.decision}: ${result.decision.reason}`;
-			// A wrong path inside the allowed scope is correctable input; scope and protection denials stay fatal.
-			if (result.decision.decision === "DENY" && result.decision.reason === NON_FILE_TARGET_REASON)
+			const { decision, reason } = result.decision;
+			const denial = `Policy ${result.decision.risk}/${decision}: ${reason}`;
+			// Correctable input: a wrong path inside the scope, or a read-only look outside it (nothing was read).
+			// Mutations outside the scope, protected targets and other denials stay fatal.
+			if (decision === "DENY" && reason === NON_FILE_TARGET_REASON)
 				throw new Error(`${denial}. Use runtime_list_files to find existing allowed files.`);
+			const operation = options.policy.tools.find((item) => item.id === tool)?.operation;
+			if (
+				decision === "DENY" &&
+				(operation === "read" || operation === "search" || operation === "list") &&
+				(reason === OUTSIDE_ALLOWED_PATHS_REASON || reason === OUTSIDE_LISTING_BOUNDARY_REASON)
+			)
+				throw new Error(
+					`${denial}. Nothing was read; reads are limited to the allowed paths: ${options.policy.allowedPaths.join(", ")}.`,
+				);
 			policyDenial = denial;
 			throw new Error(policyDenial);
 		}

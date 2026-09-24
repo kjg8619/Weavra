@@ -448,3 +448,24 @@
   - 허용 범위 밖 읽기 거부를 "거부는 유지하되 치명적이지 않게" 바꿀지 판단한다.
   - 약한 기존 테스트, 누락되기 쉬운 요구사항, 다중 파일 변경처럼 변별력 있는 fixture를 추가한다.
 - **커밋 상태:** PR #32에 이 작업 기록을 추가한다. merge는 사용자 확인 후 한다.
+
+## 2026-09-24 KST — 허용 범위 밖 읽기 거부를 수정 가능한 오류로 전환
+
+- 목적: 벤치마크(`92d23ef0`) weavra B02가 2초 만에 `POLICY`로 FAILED된 원인을 확정하고 제거한다.
+- 원인 확정:
+  - B02의 `allowedPaths`는 `["test"]`이고, 과제는 `src/slug.mjs`를 바꾸지 말고 테스트만 추가하는 것이다.
+  - 기록은 모델 턴 2회, 도구 호출 2회, 복구 불가 도구 오류 1회였다. 첫 호출이 테스트 대상 `src/slug.mjs` 읽기였고, `Target outside allowed paths` 거부가 치명 오류로 처리됐다.
+  - 테스트 대상 모듈을 읽는 것은 정상적인 탐색이다. 읽기 거부 자체는 유지하되 run을 끝낼 이유는 없다.
+- 변경 파일:
+  - `runtime/pi/packages/company-runtime/src/policy.ts`: 거부 사유 문자열 두 개를 상수로 export(`OUTSIDE_ALLOWED_PATHS_REASON`, `OUTSIDE_LISTING_BOUNDARY_REASON`). 판정 로직은 그대로다.
+  - `runtime/pi/packages/company-runtime/src/agent-tools.ts`: Policy에 등록된 read/search/list 도구가 허용 범위 밖으로 거부되면 "아무것도 읽지 않았고, 읽기는 허용 경로로 제한된다"는 문구와 함께 모델에 돌려준다. 기존 수정 가능 오류 예산(기본 8회)을 그대로 쓴다.
+  - `runtime/pi/packages/company-runtime/src/agent-runner.ts`: Developer/Reviewer 프롬프트의 수정 가능 오류 설명을 새 규칙에 맞췄다.
+  - `runtime/pi/packages/coding-agent/test/suite/company-runtime-agent.test.ts`: 범위 밖 read/search가 같은 세션에서 복구되는 테스트 추가, 기존 "범위 밖 읽기 치명" 케이스를 "범위 밖 쓰기 치명"으로 교체.
+- 유지한 경계: 허용 범위 밖 쓰기·수정, 보호 경로(읽기 포함), 등록되지 않은 도구, 감사 기록 실패, R3 run의 모든 도구 오류는 계속 즉시 실패다. 거부된 읽기는 내용을 반환하지 않고 감사 기록에 `DENIED`로 남는다.
+- 현재 검증 (Node 24.19.0):
+  - `npm run check` 통과.
+  - coding-agent `company-runtime-agent` 99 PASS, `company-runtime-hardening`·`company-runtime-workflow` 99 PASS.
+  - company-runtime `policy`·`list-files`·`hardening` 122 PASS, `advisory-checks`·`anchored-tools`·`strict-mutation`·`context-leakage`·`quick` 157 PASS.
+  - 전체 `validate.mjs pi`는 원격 CI가 수행한다.
+- 남은 일: 거부 사유 범주를 벤치마크 기록에 남기는 계측, 변별력 있는 fixture 추가, 이 변경 후 B02 재측정.
+- 커밋 상태: `fix/recoverable-scope-reads` 브랜치, devlop 대상 PR.
