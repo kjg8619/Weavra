@@ -2,10 +2,10 @@
 
 ## 현재 진행 요약
 
-- 상태: 저장소 통합 baseline은 완료된 역사적 결과로 보존한다. 현재 Product Independence Phase 1은 별도 feature branch/worktree에서 진행 중이며, 전체 검증·PR CI 완료 전 PR-ready 또는 완료로 기록하지 않는다.
-- 날짜/시간대: 2026-09-21, Asia/Seoul (UTC+09:00).
-- 범위: 독립 공개 저장소 kjg8619/Weavra 통합. C09/V0.6D 기능 개발 없음.
-- 원본 Pi/T3Code 저장소는 수정하지 않는다. 아래 현재 실행 결과와 이전 저장소의 역사적 결과를 구분한다.
+- 갱신: 2026-09-24, Asia/Seoul (UTC+09:00). 저장소 통합 baseline과 Product Independence Phase 1은 완료된 역사적 결과로 보존한다.
+- 진행 단계: V0.7B COMPLEX 순차 워크플로. #15 설계 계약(`docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md`)은 머지됐다. 설계의 소비자 우선 규칙에 따라 #17 App 소비자를 먼저 올리고, #16 Runtime 생산자는 별도 worktree에서 단계별(A 기반 → B 엔진 → C 상태 출력)로 진행 중이다. #18 통합 검증은 둘 다 머지된 뒤 시작한다.
+- 그다음: #19 병렬 에이전트 설계 → #20 Runtime ∥ #21 App → #22 스트레스 검증(각각 선행 이슈 종료 후). #5 OmO 후보는 별도 백로그다.
+- 원본 Pi/T3Code 저장소는 수정하지 않는다. 아래 기록은 날짜별 append-only이며, 현재 실행 결과와 이전 저장소의 역사적 결과를 구분한다.
 
 ## 2026-09-21 KST — 독립 저장소 및 원본 스냅샷 import 완료
 
@@ -469,3 +469,30 @@
   - 전체 `validate.mjs pi`는 원격 CI가 수행한다.
 - 남은 일: 거부 사유 범주를 벤치마크 기록에 남기는 계측, 변별력 있는 fixture 추가, 이 변경 후 B02 재측정.
 - 커밋 상태: `fix/recoverable-scope-reads` 브랜치, devlop 대상 PR.
+
+## 2026-09-24 KST — V0.7B #17 App COMPLEX 소비자
+
+- 목적: #15 계약의 App 쪽을 구현한다. 설계의 소비자 우선 규칙에 따라 Runtime(#16)보다 먼저 머지한다. 새 필드를 보내지 않는 현재 Runtime에서는 기존 QUICK/STANDARD 화면이 그대로 동작해야 한다.
+- 브랜치/worktree: `feat/v0.7b-complex-app`, `Weavra-worktrees/v0.7b-complex-app`. 구현은 하위 에이전트가 했고, 병합 전 계약 일치 여부는 메인 세션이 검토했다.
+- 변경 파일(모두 `app/t3code/` 아래):
+  - `packages/contracts/src/weavraControl.ts`: §4/§7/§9/§10 DTO와 한도를 복제했다. capability `complexContractVersion`, prepare의 `complexDraft`, COMPLEX preview와 `complexPlan`, state의 `complexExecution`을 추가했다. recipe와 draft는 함께 보낼 수 없다.
+  - `apps/server/src/weavra/ComplexProjection.ts`(신규): parent/plan digest를 다시 계산하고, preview에서 parent를 재구성하며, snapshot 한 개 안의 규칙과 snapshot 사이의 규칙을 검사한다. `RuntimeController.ts`는 publish 전에 이 규칙을 적용한다. capability가 없는 Runtime에는 draft를 보내지 않는다.
+  - `packages/client-runtime/src/state/weavraControl.ts`: 구독의 첫 방출은 stale로 둔다. 같은 state revision에서 COMPLEX 데이터가 바뀌면 거부한다.
+  - `apps/web/src/components/settings/WeavraComplex.tsx`(신규)와 `WeavraControls.tsx`: capability가 있을 때만 확정 전 계획 편집기, 전체 preview, 읽기 전용 실행 상태를 보여 준다. 작업 완료·재시도·건너뛰기 버튼은 없다.
+  - `docs/operations/development.md`: COMPLEX 흐름 설명.
+  - `apps/server/src/weavra/testFixtures/complexContractV1.json`: 두 빌드 루트가 각자 복사해 쓰는 기준 fixture. parent `sha256:fd1d5105…`, plan `sha256:742e9871…`.
+- 계약 검토 결과(메인 세션):
+  - 소비자가 추가로 도출한 규칙이 모두 설계 문서와 맞음을 확인했다. 예: PENDING 행 token 0, attempt = revisionCycle + 1, 전역 호출 수 = 작업별 합 + 최종 Reviewer 최대 1회, revision 합계 일치, 종료 시 cleanup CONFIRMED.
+  - Runtime(#16)이 지켜야 할 목록으로 옮겨 적었다.
+- 기존 흐름에 미치는 변화:
+  - 새 구독의 첫 관측은 서버와 클라이언트 모두 stale이다. 기존 client 테스트 12개를 "캐시 값 → 확인된 값" 순서로 고쳤다.
+  - prepare 응답은 요청의 owner/project revision과 같아야 한다.
+  - 확인 모달이 닫힌 뒤 preview를 한 번 더 검사한다.
+- 현재 검증:
+  - 하위 에이전트가 worktree에서 `node scripts/validate.mjs t3`를 실행해 `ALL GATES PASS`를 받았다(Node 24.19.0, pnpm 11.10.0).
+  - 집중 테스트: contracts 31, server 70, client 39, web 32 PASS.
+  - devlop(PR #33) 병합 뒤 실제 Runtime과의 경계(cross-boundary)와 전체 게이트는 PR CI가 다시 확인한다.
+- 남은 한계:
+  - 실제 화면 확인과 실제 Runtime→App COMPLEX 수명 주기 검증은 #16 이후 #18에서 한다.
+  - 현재 Runtime은 capability를 광고하지 않으므로 이 PR만으로는 COMPLEX가 화면에 노출되지 않는다.
+- 커밋 상태: 기능 커밋 4개와 devlop 병합 커밋, 이 기록. devlop 대상 PR.
