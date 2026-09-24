@@ -398,3 +398,53 @@
   - 보관은 writer open 시점에만 일어나서, 한 세션 안에서 run이 20개를 넘게 쌓이면 다음 open까지 inline으로 남는다.
   - 호스트명을 공유하는 다른 PID namespace에서는 살아 있는 owner를 죽은 것으로 볼 수 있다. 이 경우 owner는 `lock lost`로 실패한다.
 - **커밋 상태:** 위 4개 커밋과 이 기록 커밋을 `devlop` 대상 PR로 올리고, 사용자 지시에 따라 원격 CI 3개가 모두 통과하면 merge commit으로 머지한다.
+
+## 2026-09-24 KST — 첫 실제 모델 벤치마크와 단계별 신호 기록
+
+- **배경:**
+  - 사용자 요청으로 PR #31의 Weavra-vs-Pi 하네스를 실제 모델로 처음 실행했다.
+  - 결과만으로는 어느 단계가 결과를 좌우했는지 알 수 없어서, 벤치마크에 단계별 신호를 추가했다(`ddd6b733`, PR #32).
+  - 모든 실행은 사용자가 명시적으로 허락한 `--confirm-paid`로 했다. 결과 JSON·Markdown은 gitignore된 `runtime/pi/packages/evals/.eval/benchmark/`에만 있고 커밋하지 않았다.
+- **1차: `codex-lb/gpt-6-astra`** (머지된 `1cff35db`, clean, harness weavra-benchmark-1)
+  - smoke(F02·B01 × 3 arm = 6회, `feb2a21a`): 6/6 PASS.
+  - 파일럿(15 fixture × 3 arm × 1회 = 45회, `4a058179`) 결과:
+
+    | arm | oracle PASS | 거짓 완료 | 평균 시간 | 평균 턴 | token 합 |
+    |---|---|---|---|---|---|
+    | pi | 14/15 | 0 | 14.8초 | 3.3 | 약 7.1만 |
+    | weavra | 15/15 | 0 | 47.4초 | 6.0 | 32.6만 |
+    | weavra-advisory | 15/15 | 0 | 42.3초 | 5.8 | 31.6만 |
+
+  - pi의 1건 실패(B01 `ERROR`, 12초, usage 미보고)는 같은 조건 단독 재실행(`3598e4fa`)에서 16초 PASS였다. 모델 실패가 아니라 일시적 provider 오류로 판단한다.
+- **2차: `commandcode/deepseek/deepseek-v4.1-flash`** (`ddd6b733`, clean, harness weavra-benchmark-2)
+  - **인증 수정:** 첫 smoke(`f6192fa5`)는 0.1초 만에 전부 끝났다. 원인은 `~/.weavra/agent/models.json`의 commandcode 키(14자)가 401로 거부된 것이다.
+    - CommandCode CLI 로그인 키(`~/.commandcode/auth.json`)는 최소 요청으로 200을 확인했다.
+    - 사용자 승인 후 원본을 권한을 유지한 채 `models.json.bak-2026-09-24`로 백업하고, commandcode `apiKey`만 `!jq -r .apiKey ~/.commandcode/auth.json`로 바꿨다. 키 값은 복사하거나 출력하지 않았다.
+  - smoke 재실행(`d0491de4`): weavra-advisory F02 1건만 `POLICY`로 FAILED였다. 작업 결과는 oracle PASS였으니, 올바른 작업을 Weavra가 거부한 경우다.
+  - 파일럿(45회, `92d23ef0`) 결과:
+
+    | arm | oracle PASS | 거짓 완료 | 중앙 시간 | token |
+    |---|---|---|---|---|
+    | pi | 15/15 | 0 | 7.8초 | 16.1만 |
+    | weavra | 14/15 | 0 | 21.7초 | 58.1만 이상 (1건 미보고) |
+    | weavra-advisory | 15/15 | 0 | 21.1초 | 60.6만 |
+
+  - **단계별 신호:**
+    - Reviewer REVISE 0회, verification repair 0회.
+    - weavra는 check 요청 11회(모두 request-only), weavra-advisory는 13회 요청 중 13회 advisory 실제 실행.
+    - 수정 가능한 도구 오류 복구가 3개 run(weavra F02·B06, weavra-advisory B02)을 완료로 이끌었다. PR #30 이전의 즉시 실패 규칙이었다면 이 3건은 실패였다.
+    - weavra B02는 첫 도구 호출이 복구 불가 Policy 오류여서 2초 만에 `POLICY`로 FAILED였다. 같은 과제를 pi와 advisory는 통과했다.
+- **해석:**
+  - 두 모델 모두 이 코퍼스를 대부분 혼자 풀어서 천장 효과가 난다.
+  - Weavra의 review·검증이 거짓 완료를 막은 사례가 한 건도 관측되지 않았다.
+  - Weavra 비용은 pi 대비 시간 약 2.7~3.2배, token 약 3.6~4.6배다.
+  - 관측된 Weavra 고유 효과는 두 가지다: 도구 오류 복구가 run 3건을 구했고(이득), 치명적 Policy 거부가 run 2건을 떨어뜨렸다(손실).
+  - 과제마다 1회 실행한 표본이라 편차와 통계적 유의성은 판단하지 않는다.
+- **현재 검증:**
+  - PR #32 로컬 검증: `npm run check` exit 0, evals 11 files / 110 PASS, coding-agent company-runtime fitness·agent·workflow 170 PASS, HEAD+staged tsgo·biome PASS.
+  - 전체 `validate.mjs pi`는 동시에 돌던 벤치마크 시간 측정을 왜곡하지 않도록 로컬에서 실행하지 않았고, 원격 CI가 수행한다.
+- **다음 단계:**
+  - `POLICY` 실패의 정확한 거부 사유를 기록에 남겨 원인을 확정한다. Runtime이 생성한 문구만 남기고 모델 텍스트는 남기지 않는다.
+  - 허용 범위 밖 읽기 거부를 "거부는 유지하되 치명적이지 않게" 바꿀지 판단한다.
+  - 약한 기존 테스트, 누락되기 쉬운 요구사항, 다중 파일 변경처럼 변별력 있는 fixture를 추가한다.
+- **커밋 상태:** PR #32에 이 작업 기록을 추가한다. merge는 사용자 확인 후 한다.

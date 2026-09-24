@@ -15,6 +15,7 @@ import { BENCHMARK_CORPUS, BENCHMARK_FIXTURE_IDS, benchmarkFixtureDigest } from 
 import {
 	type BenchmarkRecord,
 	type BenchmarkRun,
+	type BenchmarkStages,
 	formatBenchmarkMarkdown,
 	freezeBenchmarkRecord,
 	summarizeBenchmarkRuns,
@@ -211,6 +212,28 @@ describe("benchmark CLI arguments", () => {
 	});
 });
 
+const piStages: BenchmarkStages = {
+	toolErrors: 0,
+	recoverableToolErrors: null,
+	checkRequests: null,
+	advisoryCheckRuns: null,
+	reviewRevisions: null,
+	finalReview: null,
+	verificationRepairs: null,
+	failureCategory: null,
+};
+const weavraStages = (overrides: Partial<BenchmarkStages> = {}): BenchmarkStages => ({
+	toolErrors: 0,
+	recoverableToolErrors: 0,
+	checkRequests: 0,
+	advisoryCheckRuns: 0,
+	reviewRevisions: 0,
+	finalReview: "PASS",
+	verificationRepairs: 0,
+	failureCategory: null,
+	...overrides,
+});
+
 function run(overrides: Partial<BenchmarkRun>): BenchmarkRun {
 	const base: BenchmarkRun = {
 		sequence: 0,
@@ -230,6 +253,7 @@ function run(overrides: Partial<BenchmarkRun>): BenchmarkRun {
 		toolCalls: 1,
 		workerInvocations: 1,
 		tokens: { state: "KNOWN", input: 70, output: 30, total: 100 },
+		stages: piStages,
 	};
 	const merged = { ...base, ...overrides };
 	return {
@@ -241,7 +265,7 @@ function run(overrides: Partial<BenchmarkRun>): BenchmarkRun {
 
 const runs: BenchmarkRun[] = [
 	run({ sequence: 0, durationMs: 10 }),
-	run({ sequence: 1, oracle: "FAIL", durationMs: 20 }),
+	run({ sequence: 1, oracle: "FAIL", durationMs: 20, stages: { ...piStages, toolErrors: 2 } }),
 	run({ sequence: 2, claimedCompletion: false, terminalStatus: "ERROR", oracle: "FAIL", durationMs: 30 }),
 	run({
 		sequence: 3,
@@ -256,6 +280,7 @@ const runs: BenchmarkRun[] = [
 		durationMs: 50,
 		workerInvocations: 2,
 		tokens: { state: "KNOWN", input: 300, output: 100, total: 400 },
+		stages: weavraStages({ toolErrors: 1, recoverableToolErrors: 1, checkRequests: 1 }),
 	}),
 	run({
 		sequence: 5,
@@ -265,13 +290,14 @@ const runs: BenchmarkRun[] = [
 		oracle: "FAIL",
 		durationMs: 70,
 		tokens: { state: "KNOWN", input: 150, output: 50, total: 200 },
+		stages: weavraStages({ reviewRevisions: 1, finalReview: "BLOCK", failureCategory: "REVIEW" }),
 	}),
 ];
 
 function record(): BenchmarkRecord {
 	return freezeBenchmarkRecord({
-		schemaVersion: 1,
-		harnessVersion: "weavra-benchmark-1",
+		schemaVersion: 2,
+		harnessVersion: "weavra-benchmark-2",
 		harnessRevision: "UNKNOWN",
 		harnessDirty: null,
 		id: "00000000-0000-4000-8000-000000000000",
@@ -319,6 +345,15 @@ describe("benchmark summary and record schema", () => {
 			falseCompletionRate: 0.5,
 			medianDurationMs: 25,
 			tokens: { state: "UNKNOWN", total: null, knownRuns: 3 },
+			stages: {
+				toolErrors: 2,
+				recoverableToolErrors: null,
+				checkRequests: null,
+				advisoryCheckRuns: null,
+				reviewRevisions: null,
+				verificationRepairs: null,
+				failureCategories: [],
+			},
 		});
 		expect(weavra).toEqual({
 			arm: "weavra",
@@ -332,6 +367,15 @@ describe("benchmark summary and record schema", () => {
 			falseCompletionRate: 0,
 			medianDurationMs: 60,
 			tokens: { state: "KNOWN", total: 600, knownRuns: 2 },
+			stages: {
+				toolErrors: 1,
+				recoverableToolErrors: 1,
+				checkRequests: 1,
+				advisoryCheckRuns: 0,
+				reviewRevisions: 1,
+				verificationRepairs: 0,
+				failureCategories: [{ category: "REVIEW", runs: 1 }],
+			},
 		});
 		expect(summarizeBenchmarkRuns([], ["weavra-advisory"])[0]).toMatchObject({
 			runs: 0,
@@ -349,12 +393,15 @@ describe("benchmark summary and record schema", () => {
 			"| pi | 4 | 3 (75.0%) | 1 (33.3%), 1 invalid | 1 (50.0% of claims) | 0.0 s | UNKNOWN (3/4 runs reported) |",
 		);
 		expect(markdown).toContain("| weavra | 2 | 1 (50.0%) | 1 (50.0%) | 0 (0.0% of claims) | 0.1 s | 600 |");
+		// Stage signals: n/a where the pi arm has no such stage.
+		expect(markdown).toContain("| pi | 2 | n/a | n/a | n/a | none |");
+		expect(markdown).toContain("| weavra | 1 (1) | 1 (0) | 1 | 0 | REVIEW 1 |");
 	});
 
 	it("validates the versioned record, its digest and run consistency", () => {
 		const valid = record();
 		expect(validateBenchmarkRecord(JSON.parse(JSON.stringify(valid)))).toEqual(valid);
-		expect(() => validateBenchmarkRecord({ ...valid, schemaVersion: 2 })).toThrow("schema");
+		expect(() => validateBenchmarkRecord({ ...valid, schemaVersion: 1 })).toThrow("schema");
 		expect(() => validateBenchmarkRecord({ ...valid, extra: true })).toThrow("schema");
 		const tampered = structuredClone(valid);
 		tampered.runs[1].oracle = "PASS";

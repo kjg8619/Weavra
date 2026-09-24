@@ -212,4 +212,12 @@ npm run benchmark -- --provider <provider> --model <model> --repeat 3 --out /abs
 - Corpus: F01–F10 from C06 Fitness (without the cancellation fixture F08), plus benchmark-only B01–B06, which cover a multi-file bugfix, a test addition checked against a hidden mutant, a rename, an off-by-one, input validation and config parsing.
 - The hidden oracle is Host code only. It is never written into a workspace, HOME or prompt, and it judges the final files and final answer after the agent stops. For the `pi` arm, bash is not OS-sandboxed and can reach the harness source on the same machine.
 - Any provider other than `benchmark-faux` is refused without `--confirm-paid`. Without that flag the CLI prints the planned run count (arms × fixtures × repeat), for example 135 runs for all arms, all 15 fixtures and 3 repeats.
-- Results are a versioned, typebox-validated JSON record and a per-arm Markdown table. Tests use only the faux provider: `node ../../node_modules/vitest/dist/cli.js run --config vitest.test.config.ts`.
+- Results are a versioned, typebox-validated JSON record (schema 2) and per-arm Markdown tables. Tests use only the faux provider: `node ../../node_modules/vitest/dist/cli.js run --config vitest.test.config.ts`.
+- Stage signals show which stage shaped each outcome. They are payload-free counts from the Runtime's own observations:
+  - tool errors, and for Weavra how many were returned to the model within the correctable budget
+  - `runtime_request_check` calls and advisory checks that actually ran
+  - Reviewer REVISE verdicts and the final verdict
+  - verification repair attempts
+  - the Evidence Pack failure category when the Kernel did not complete
+
+  Stages the pi arm does not have are `null` (shown as `n/a`).

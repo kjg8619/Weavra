@@ -24,12 +24,24 @@ const tool = (name: string, args: Record<string, unknown>) =>
  * GOOD applies each fixture's reference change; FALSE_COMPLETER reports completion without doing the work.
  */
 export function benchmarkFauxResponse(behavior: BenchmarkFauxBehavior, context: Context): AssistantMessage {
-	if (context.tools?.some((item) => item.name === "submit_handoff" || item.name === "submit_review"))
-		return fitnessFauxResponse(
+	if (context.tools?.some((item) => item.name === "submit_handoff" || item.name === "submit_review")) {
+		const response = fitnessFauxResponse(
 			behavior === "GOOD" ? "GOOD" : "FALSE_COMPLETER",
 			context,
 			behavior === "GOOD" ? WEAVRA_FIXTURES : WEAVRA_FIXTURES_WITHOUT_CHANGES,
 		);
+		// A GOOD Developer with advisory checks runs the registered check once before handing off.
+		const advisory = context.tools
+			.find((item) => item.name === "runtime_request_check")
+			?.description.includes("ADVISORY");
+		const requested = context.messages.some(
+			(message) => message.role === "toolResult" && message.toolName === "runtime_request_check",
+		);
+		const handoff = response.content.some((part) => part.type === "toolCall" && part.name === "submit_handoff");
+		return behavior === "GOOD" && advisory && !requested && handoff
+			? tool("runtime_request_check", { id: "regression" })
+			: response;
+	}
 	const first = context.messages.find((message) => message.role === "user");
 	const prompt = first ? contentText(first.content) : "";
 	const entry = BENCHMARK_CORPUS.find((item) => prompt.includes(item.fixture.goal));

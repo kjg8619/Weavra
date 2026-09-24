@@ -13,6 +13,8 @@ import {
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { BudgetController } from "../../company-runtime/src/budget.ts";
+import type { Run } from "../../company-runtime/src/contracts.ts";
+import { projectEvidencePack } from "../../company-runtime/src/evidence.ts";
 import { fitnessDigest } from "../../company-runtime/src/fitness-records.ts";
 import { WorkerMeasurementAccumulator } from "../../company-runtime/src/measurement.ts";
 import type { AgentExecutionRequest } from "../../company-runtime/src/ports.ts";
@@ -33,6 +35,7 @@ import {
 	type BenchmarkArm,
 	type BenchmarkRecord,
 	type BenchmarkRun,
+	type BenchmarkStages,
 	type BenchmarkTerminalStatus,
 	freezeBenchmarkRecord,
 } from "./benchmark-record.ts";
@@ -193,6 +196,7 @@ async function runPiArm(entry: BenchmarkFixture, context: ArmContext): Promise<A
 	let session: AgentSession | undefined;
 	let terminalStatus: BenchmarkTerminalStatus = "HARNESS_ERROR";
 	let oracle: BenchmarkOracleVerdict = { verdict: "INVALID", failures: ["The pi arm did not reach the oracle"] };
+	let toolErrors = 0;
 	try {
 		mkdirSync(workspace, { mode: 0o700 });
 		mkdirSync(agentDir, { recursive: true, mode: 0o700 });
@@ -242,6 +246,7 @@ async function runPiArm(entry: BenchmarkFixture, context: ArmContext): Promise<A
 		let turns = 0;
 		let reported = 0;
 		const unsubscribe = active.subscribe((event) => {
+			if (event.type === "tool_execution_end" && event.isError) toolErrors++;
 			if (event.type === "turn_start" && ++turns > BENCHMARK_PI_MAX_TURNS) stop("TURN_LIMIT");
 			if (event.type === "message_end" && event.message.role === "assistant") {
 				measurement.observeAssistant(event.message);
@@ -307,12 +312,39 @@ async function runPiArm(entry: BenchmarkFixture, context: ArmContext): Promise<A
 			output: known ? settled.usage.output : null,
 			total: known ? settled.usage.totalTokens : null,
 		},
+		// A plain Pi session has no Kernel, review, advisory check or recovery budget.
+		stages: {
+			toolErrors,
+			recoverableToolErrors: null,
+			checkRequests: null,
+			advisoryCheckRuns: null,
+			reviewRevisions: null,
+			finalReview: null,
+			verificationRepairs: null,
+			failureCategory: null,
+		},
+	};
+}
+
+/** Kernel-side stage outcome of a settled Weavra run; the Evidence Pack category explains a non-COMPLETED end. */
+function runStages(
+	run: Run,
+): Pick<BenchmarkStages, "reviewRevisions" | "finalReview" | "verificationRepairs" | "failureCategory"> {
+	// The Kernel appends every review, including the current one, to reviewHistory.
+	const reviews = run.reviewHistory ?? [];
+	return {
+		reviewRevisions: reviews.filter((review) => review.result === "REVISE").length,
+		finalReview: reviews.at(-1)?.result ?? run.review?.result ?? null,
+		verificationRepairs: run.verificationRepair?.attempts.length ?? 0,
+		failureCategory:
+			run.status === "COMPLETED" ? null : (projectEvidencePack({ run }).failure?.category ?? "UNKNOWN"),
 	};
 }
 
 /** Existing Weavra STANDARD path through the Fitness executor (real Worker SDK, Policy, Kernel and verifier). */
 async function runWeavraArm(entry: BenchmarkFixture, advisory: boolean, context: ArmContext): Promise<ArmOutcome> {
-	const observed: { oracle?: BenchmarkOracleVerdict } = {};
+	const observed: { oracle?: BenchmarkOracleVerdict; run?: Run } = {};
+	const tools = { errors: 0, recoverable: 0, checkRequests: 0, advisoryRuns: 0 };
 	const result = await executeFitnessFixture(
 		entry.fixture,
 		{
@@ -324,7 +356,14 @@ async function runWeavraArm(entry: BenchmarkFixture, advisory: boolean, context:
 			onRequest: context.onRequest,
 			advisory,
 			maxRevisionCycles: BENCHMARK_WEAVRA_MAX_REVISION_CYCLES,
+			observeToolResult: (event) => {
+				if (event.isError) tools.errors++;
+				if (event.recoverable) tools.recoverable++;
+				if (event.name === "runtime_request_check") tools.checkRequests++;
+				if (event.advisoryCheck) tools.advisoryRuns++;
+			},
 			observeWorkspace: ({ workspace, run, baseline }) => {
+				observed.run = run;
 				observed.oracle = evaluateBenchmarkOracle(
 					entry,
 					workspace,
@@ -354,6 +393,15 @@ async function runWeavraArm(entry: BenchmarkFixture, advisory: boolean, context:
 		toolCalls: result.tools.calls,
 		workerInvocations: result.efficiency.workerInvocations,
 		tokens: { state: usage.state, input: usage.input, output: usage.output, total: usage.total },
+		stages: {
+			toolErrors: tools.errors,
+			recoverableToolErrors: tools.recoverable,
+			checkRequests: tools.checkRequests,
+			advisoryCheckRuns: tools.advisoryRuns,
+			...(observed.run
+				? runStages(observed.run)
+				: { reviewRevisions: null, finalReview: null, verificationRepairs: null, failureCategory: "UNOBSERVED" }),
+		},
 	};
 }
 
