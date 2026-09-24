@@ -328,6 +328,23 @@ describe("S4 extension and S0 loader/trust regression", () => {
 		expect(host.models).not.toHaveBeenCalled();
 		expect(await readdir(join(cwd, ".ai"))).toEqual(["config.yaml"]);
 	});
+	it("refuses a free-text COMPLEX goal and points to a structured plan through Host Control (#16)", async () => {
+		await mkdir(join(cwd, ".ai"));
+		await writeFile(join(cwd, ".ai/config.yaml"), config);
+		const host = commands();
+		await host.call("workflow", "run Refactor the parser across multiple modules");
+		await vi.waitFor(() =>
+			expect(notify).toHaveBeenCalledWith(expect.stringContaining("structured task plan"), "warning"),
+		);
+		const message = String(notify.mock.calls.find(([text]) => String(text).includes("structured task plan"))?.[0]);
+		expect(message).toContain("prepared and confirmed through Host Control");
+		expect(message).toContain("never downgrades COMPLEX to STANDARD");
+		expect(message).toContain("No run, worker, check or approval was created.");
+		expect(confirm).not.toHaveBeenCalled();
+		expect(editor).not.toHaveBeenCalled();
+		expect(host.models).not.toHaveBeenCalled();
+		expect(await readdir(join(cwd, ".ai"))).toEqual(["config.yaml"]);
+	});
 	it("rejects non-UI modes and a busy parent", async () => {
 		const host = commands();
 		await expect(host.call("state", "", { ...context(), hasUI: false })).rejects.toThrow("notification-capable UI");

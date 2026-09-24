@@ -13,8 +13,10 @@ import { GraphProjectionError, projectRunGraph, renderGraphText } from "./graph.
 import { GraphViewSession } from "./graph-view-component.ts";
 import {
 	applyHostWorkflowRecipe,
+	ComplexPlanRequiredError,
 	createHostWorkflow,
 	finalizeHostWorkflowPlan,
+	type HostWorkflowDraft,
 	HostWorkflowError,
 	type HostWorkflowPlan,
 	prepareHostWorkflowDraft,
@@ -190,6 +192,7 @@ export function registerCompanyRuntime(
 											"R2 file changes require STANDARD and independent Reviewer PASS; no install/shell tools.",
 											"Scoped R3: one tracked text-file deletion, separate one-time Human Approval (default Deny), then independent Reviewer and checks.",
 											"Both workflows require trusted config, clean Git, required checks and fresh evidence. Approval is not completion.",
+											"COMPLEX: 2-8 sequential tasks from a structured plan prepared and confirmed through Host Control (App); /workflow run refuses it. /workflow status shows its task rows.",
 											"No automatic commit/rollback or resume. Cancel with /workflow cancel, not parent Esc.",
 											usage.state,
 											usage.team,
@@ -299,11 +302,22 @@ export function registerCompanyRuntime(
 							// Keyword-only R3 is offered its rule-based risk only through an explicit UI answer.
 							// The draft is pure planning; it is used only after the user accepts.
 							const riskOverride = ctx.hasUI ? r3OverrideCandidate(goal) : undefined;
-							let draft = prepareHostWorkflowDraft({
-								goal,
-								config: loaded.config,
-								...(riskOverride ? { riskOverride } : {}),
-							});
+							let draft: HostWorkflowDraft;
+							try {
+								draft = prepareHostWorkflowDraft({
+									goal,
+									config: loaded.config,
+									...(riskOverride ? { riskOverride } : {}),
+								});
+							} catch (error) {
+								// A free-text goal never carries a COMPLEX plan, and COMPLEX is never downgraded.
+								if (!(error instanceof ComplexPlanRequiredError)) throw error;
+								ctx.ui.notify(
+									"Weavra: this goal selects COMPLEX, which runs only from a structured task plan (2-8 ordered tasks with exact file ownership and checks) prepared and confirmed through Host Control, such as the Weavra App. /workflow run takes a goal only and never downgrades COMPLEX to STANDARD. No run, worker, check or approval was created.",
+									"warning",
+								);
+								return;
+							}
 							if (riskOverride) {
 								const accepted = await ctx.ui.confirm(
 									`Weavra: continue as ${riskOverride.to}? (risk override; not an approval or permission token)`,

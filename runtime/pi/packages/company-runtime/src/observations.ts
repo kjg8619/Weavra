@@ -83,6 +83,60 @@ export function reviewRecords(run: Run): readonly ReviewRecord[] {
 	return run.reviewHistory ?? (run.review ? [run.review] : []);
 }
 
+const INTEGRATION_PHASES = new Set(["INTEGRATION_CHECK", "FINAL_REVIEW", "FINAL_TEST", "COMPLETING"]);
+
+/** Where the current COMPLEX step runs: the active task, the integration gate, or neither. */
+function complexScope(run: Run): string | undefined {
+	const state = run.complex;
+	if (!state) return undefined;
+	if (state.activeTaskId) return `task ${state.activeTaskId}`;
+	return INTEGRATION_PHASES.has(state.phase) ? "integration" : state.phase.toLowerCase().replace("_", " ");
+}
+
+/**
+ * COMPLEX parent, ordered task rows and integration gates from the durable Run (§10.2 data, display only). A task
+ * COMPLETED is a verified contribution; only the Run status is the outcome, so no row reads as Run completion.
+ */
+export function formatComplexRows(run: Run, detail: "status" | "history"): string[] {
+	const state = run.complex;
+	const parent = run.tasks[0];
+	if (!state || !parent) return [];
+	const plan = state.plan;
+	const failure = (code: string | null) => code ?? "none";
+	const lines = [
+		`COMPLEX parent ${displayText(parent.id)} [${parent.status}] | Run ${run.status} | phase ${state.phase} | active ${state.activeTaskId ?? "none"}`,
+	];
+	if (detail === "status")
+		lines.push(
+			`Plan ${displayText(plan.planId)} ${displayText(plan.complexPlanDigest)}; parent ${displayText(plan.parentTaskContractDigest)}`,
+			"Tasks in plan order (a COMPLETED task is a verified contribution, not Run completion):",
+		);
+	for (const [index, row] of state.tasks.entries()) {
+		const task = plan.tasks[index];
+		const title = displayText(task?.title ?? "untitled", 80);
+		lines.push(
+			detail === "history"
+				? `  ${row.id} ${row.status} | attempt ${row.attempt} | failure ${failure(row.failureCode)} | ${title}`
+				: `  ${row.id} ${row.status} | attempt ${row.attempt}, revisions ${row.revisionCycle}/${task?.maxRevisionCycles ?? "?"} | self-check ${row.selfCheck}, review ${row.review}, test ${row.test} | evidence ${row.evidenceFreshness} | changed ${row.changedFiles.length}${row.changesUnknown ? "+unknown" : ""}/${task?.ownership.length ?? 0} claimed | failure ${failure(row.failureCode)} | ${title}${task?.dependsOn.length ? ` | after ${task.dependsOn.join(", ")}` : ""}`,
+		);
+	}
+	const integration = state.integration;
+	lines.push(
+		`  Integration: first checks ${integration.check}, final review ${integration.review}, final checks ${integration.test}` +
+			(detail === "history"
+				? ""
+				: ` | workspace ${integration.workspaceDigest ?? "not captured"} | evidence ${integration.evidenceFreshness} | failure ${failure(integration.failureCode)}`),
+	);
+	if (detail === "status") {
+		const tokens = run.budget?.reportedTokens ?? null;
+		lines.push(
+			`Budget (one Run ledger): invocations ${run.budget?.workerInvocations ?? 0}/${plan.limits.maxWorkerInvocations}; reported tokens ${tokens ?? "UNKNOWN"}/${plan.limits.maxReportedTokens}${tokens === null ? " (usage unavailable)" : " (provider-reported)"}; work cycles ${run.revisionCycle}/${plan.limits.maxTotalRevisionCycles}`,
+			`Cleanup ${state.cleanup} | partial changes ${state.partialChanges ? "yes" : "no"}${state.changesUnknown ? " (unknown)" : ""} | Run failure ${failure(state.failureCode)}`,
+		);
+	}
+	return lines;
+}
+
 /** Live reviews report Host-assigned criterion IDs; legacy reviews stay statement-based and are labelled. */
 function reviewDetails(review: ReviewRecord): string[] {
 	if (isCriteriaReview(review))
@@ -162,17 +216,25 @@ function checkLine(check: CheckResult, index: number): string {
 }
 export function formatHistory(state: ObservationState, number = 1): string {
 	// Newest first: inline runs, then archived terminal runs (all older than every inline run).
-	const rows: Array<ArchivedRunSummary & { archived: boolean }> = [
-		...[...state.runs].reverse().map((run) => ({ ...run, archived: false })),
-		...[...(state.archivedRuns ?? [])].reverse().map((run) => ({ ...run, archived: true })),
+	const rows: Array<{ summary: ArchivedRunSummary; run?: Run }> = [
+		...[...state.runs].reverse().map((run) => ({ summary: run, run })),
+		...[...(state.archivedRuns ?? [])].reverse().map((summary) => ({ summary })),
 	];
 	const selected = page(rows, number);
 	return [
 		`Stored run history; project revision ${state.revision}. Not a live worker/diff check.`,
 		selected.label,
-		...selected.items.map(
-			(run) =>
-				`${displayText(run.runId)} | ${run.workflow}/${run.risk} | ${run.status}/${run.phase} | ${timestamp(run.updatedAt)}${run.archived ? " | archived" : ""}\n  ${displayText(run.goal, 300)}`,
+		...selected.items.map(({ summary, run }) =>
+			[
+				`${displayText(summary.runId)} | ${summary.workflow}/${summary.risk} | ${summary.status}/${summary.phase} | ${timestamp(summary.updatedAt)}${run ? "" : " | archived"}`,
+				`  ${displayText(summary.goal, 300)}`,
+				// COMPLEX: the parent plus ordered task rows and integration gates, never one task as the outcome.
+				...(run?.complex
+					? formatComplexRows(run, "history").map((line) => `  ${line}`)
+					: summary.workflow === "COMPLEX" && !run
+						? [`  COMPLEX task rows: /state ${displayText(summary.runId)}`]
+						: []),
+			].join("\n"),
 		),
 		"Use /state <full-run-id>; stored completion and PASS refer only to their recorded snapshot.",
 	].join("\n");
@@ -180,8 +242,8 @@ export function formatHistory(state: ObservationState, number = 1): string {
 export function formatConfiguration(config: RuntimeConfig): string {
 	const output = [
 		"Current config (not an active run's frozen configuration):",
-		`Workflow: ${config.runtime.workflow}; COMPLEX execution unsupported`,
-		`Reviewer revision limit: STANDARD ${config.agents.max_revision_cycles} (default 1, range 0..3); QUICK/R3 0`,
+		`Workflow: ${config.runtime.workflow}; COMPLEX runs only from a structured task plan prepared and confirmed through Host Control (App); /workflow run does not accept one`,
+		`Reviewer revision limit: STANDARD ${config.agents.max_revision_cycles} (default 1, range 0..3); QUICK/R3 0; COMPLEX min(3, limit) per Run, at most 2 per task`,
 		`Verification repair: ${config.verification.repair.mode}; maximum one separate STANDARD/EDIT/R1 SELF_CHECK repair; cumulative budget retained`,
 		`Worker timeout: ${config.agents.worker_timeout_ms}ms per role invocation (default 180000, range 10000..600000); cancel signals immediately, awaits cleanup`,
 		`Verifier sandbox: ${config.verification.sandbox.mode === "required" ? "required (network and $HOME/$TMPDIR reads denied)" : `disabled. ${SANDBOX_DISABLED_WARNING}`}`,
@@ -213,20 +275,29 @@ export function formatRunView(
 	const active = ["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(run.status);
 	const local = view.source.startsWith("live Kernel");
 	const actions = view.state?.actions.filter((action) => action.decision.runId === run.runId) ?? [];
+	// COMPLEX: `review` is only the final integration review; task contribution reviews are counted separately.
+	const complex = run.workflow === "COMPLEX" && run.complex !== undefined;
+	const finalReview = run.review?.result ?? "not performed";
 	const lines = [
 		`Source: ${displayText(view.source)}; no live filesystem/check refresh`,
 		`Run: ${displayText(run.runId)} | recorded ${timestamp(run.updatedAt)} | revision ${run.revision}`,
-		`Workflow: ${run.workflow} | Reviewer: ${run.workflow === "QUICK" ? "not required" : (run.review?.result ?? "not performed")}`,
+		complex
+			? `Workflow: COMPLEX | Final Reviewer: ${finalReview}`
+			: `Workflow: ${run.workflow} | Reviewer: ${run.workflow === "QUICK" ? "not required" : finalReview}`,
 		`Status: ${run.status} | Phase: ${run.phase} | Risk: ${run.risk}`,
 		`Execution contract: ${run.executionMode ?? "UNKNOWN (legacy; no permission inferred)"}`,
 		`Project instruction file: ${run.projectInstruction === undefined ? "UNKNOWN (legacy)" : run.projectInstruction === null ? "none" : `${displayText(run.projectInstruction.path, 4096)} | ${run.projectInstruction.digest} | ${run.projectInstruction.bytes} bytes (frozen context only)`}`,
 		`Agent: ${run.activeAgents.join(", ") || (run.workflow === "QUICK" ? "Executor (idle)" : "idle")}`,
-		`Review: ${run.workflow === "QUICK" ? "not required" : (run.review?.result ?? "not performed")}`,
-		...(run.risk === "R2" ? ["Review enforcement: REQUIRED (STANDARD/R2); no self-approval"] : []),
+		complex
+			? `Review: final ${finalReview}; task contribution reviews ${run.complexReviews?.length ?? 0}`
+			: `Review: ${run.workflow === "QUICK" ? "not required" : finalReview}`,
+		...(run.risk === "R2"
+			? [`Review enforcement: REQUIRED (${complex ? "COMPLEX" : "STANDARD"}/R2); no self-approval`]
+			: []),
 		...(run.risk === "R3"
 			? [
 					`Human approval: ${run.approvals?.at(-1)?.status ?? "not requested"} | Target: ${displayText(run.r3Scope?.targetPath ?? "unsupported")}`,
-					"Independent Reviewer: REQUIRED (STANDARD/R3)",
+					`Independent Reviewer: REQUIRED (${complex ? "COMPLEX" : "STANDARD"}/R3)`,
 				]
 			: []),
 		...(view.diagnostics ?? []).map((item) => `Warning: ${displayText(item)}`),
@@ -273,7 +344,11 @@ export function formatRunView(
 		);
 	} else if (detail === "review") {
 		const reviews = reviewRecords(run);
-		lines.push(`Review history: ${reviews.length} recorded result(s)`);
+		lines.push(
+			complex
+				? `Final integration review history: ${reviews.length} recorded result(s)`
+				: `Review history: ${reviews.length} recorded result(s)`,
+		);
 		for (const review of reviews)
 			lines.push(
 				`${review.result} | code revision ${review.revision} | diff ${displayText(review.diffDigest)}`,
@@ -304,11 +379,28 @@ export function formatRunView(
 							`  ${item.severity} ${displayText(item.file ?? "general")}: ${displayText(item.description)}; ${displayText(item.recommendation)}`,
 					),
 			);
+		if (complex) {
+			const contributions = run.complexReviews ?? [];
+			lines.push(
+				`Task contribution reviews: ${contributions.length} recorded (per task attempt; SUPPORTED/UNSUPPORTED/UNVERIFIED contributions, never parent MET)`,
+			);
+			for (const review of contributions)
+				lines.push(
+					`${review.complexContext.taskId ?? "integration"}@${review.complexContext.attempt} ${review.result} | code revision ${review.revision} | diff ${displayText(review.diffDigest)}`,
+					...review.criteria
+						.slice(0, 10)
+						.map(
+							(item) =>
+								`  ${item.status}: ${displayText(item.criterionId)}; evidence ${item.evidenceRefs.map((ref) => displayText(ref)).join(", ")}`,
+						),
+				);
+		}
 	} else if (command === "team") {
+		// COMPLEX runs one Developer and fresh Reviewers per task attempt plus one final Reviewer; no Lead exists.
 		const roles =
 			run.workflow === "QUICK"
 				? ["Executor"]
-				: run.workflow === "STANDARD"
+				: run.workflow === "STANDARD" || complex
 					? ["Developer", "Reviewer"]
 					: ["Lead", "Developer", "Reviewer"];
 		for (const role of roles) {
@@ -319,6 +411,10 @@ export function formatRunView(
 				...(last ? [`  ${displayText(last.sessionId)} → ${displayText(last.sessionFile)}`] : []),
 			);
 		}
+		if (complex)
+			lines.push(
+				"COMPLEX: one Developer and a fresh Reviewer per task attempt, plus one final Reviewer; no Lead/Planner.",
+			);
 		lines.push("Session references only; transcript/usage remain owned by Pi.");
 	} else if (command === "risk") {
 		lines.push(
@@ -340,11 +436,18 @@ export function formatRunView(
 			"Initial run risk and action risk are distinct. R2 binding, human consent and Reviewer PASS do not replace each other.",
 		);
 	} else {
+		const step = run.currentStep ? `${run.currentStep.stepId}@${run.currentStep.attempt}` : "not started";
 		lines.push(
 			`Goal: ${displayText(run.goal)}`,
-			`Step: ${run.currentStep ? `${run.currentStep.stepId}@${run.currentStep.attempt}` : "not started"}; code revision ${run.revisionCycle}; Reviewer revisions ${run.revisionCycle - (run.verificationRepair?.attempts.length ?? 0)}/${run.maxRevisionCycles ?? "limit not recorded"}`,
-			`Verification repair: ${run.verificationRepair?.mode ?? "UNKNOWN (legacy)"}; used ${run.verificationRepair?.attempts.length ?? 0}/1 (separate from Reviewer revisions)`,
+			// COMPLEX step attempts are task attempts; the work cycle counts accepted REVISE across all tasks.
+			complex
+				? `Step: ${step} (${complexScope(run)}); work cycles ${run.revisionCycle}/${run.maxRevisionCycles ?? "limit not recorded"} across tasks`
+				: `Step: ${step}; code revision ${run.revisionCycle}; Reviewer revisions ${run.revisionCycle - (run.verificationRepair?.attempts.length ?? 0)}/${run.maxRevisionCycles ?? "limit not recorded"}`,
+			complex
+				? "Verification repair: not used by COMPLEX (a failed task or integration check blocks the Run)"
+				: `Verification repair: ${run.verificationRepair?.mode ?? "UNKNOWN (legacy)"}; used ${run.verificationRepair?.attempts.length ?? 0}/1 (separate from Reviewer revisions)`,
 			`Next steps: ${run.next.join(", ") || "none"}`,
+			...(complex ? formatComplexRows(run, "status") : []),
 		);
 		if (command === "state") {
 			for (const task of run.tasks.slice(0, 10))
@@ -408,7 +511,7 @@ export function formatRunView(
 		);
 	}
 	lines.push(
-		`Partial changes exist: ${active ? "possible; active step is not a live diff snapshot" : view.report?.partialChanges || (run.status !== "COMPLETED" && !!run.workspace?.changedFiles.length) ? "yes" : "no"}${view.report?.changesUnknown ? " (collection incomplete)" : ""}`,
+		`Partial changes exist: ${active ? "possible; active step is not a live diff snapshot" : view.report?.partialChanges || (complex ? run.complex?.partialChanges === true : run.status !== "COMPLETED" && !!run.workspace?.changedFiles.length) ? "yes" : "no"}${view.report?.changesUnknown || (complex && run.complex?.changesUnknown) ? " (collection incomplete)" : ""}`,
 		`Error: ${displayText(view.report?.error ?? run.lastError ?? "none")}`,
 		`Next: ${displayText(active ? (local ? "Use /workflow status or /workflow cancel; parent Esc does not cancel workers" : "Inspect the owning Pi session to cancel; this stored snapshot has no local worker and is not automatically recovered") : (view.report?.recommendedAction ?? "Inspect stored evidence and current git diff; no automatic resume"))}`,
 	);

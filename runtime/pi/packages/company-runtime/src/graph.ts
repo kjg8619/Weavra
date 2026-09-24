@@ -1,4 +1,5 @@
 import { validBrowserCheckEvidence } from "./browser-evidence.ts";
+import { complexRunError } from "./complex-state.ts";
 import {
 	type CheckResult,
 	QUICK_STEP_IDS,
@@ -83,6 +84,44 @@ export function projectRunGraph(value: unknown): GraphProjection {
 		run.tasks.some((task) => task.id === run.currentTask) && run.classification.risk === run.risk,
 		"inconsistent run identity/risk",
 	);
+	const terminal = !["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(run.status);
+	const stopped: GraphNodeStatus =
+		run.status === "CANCELLED"
+			? "cancelled"
+			: run.status === "FAILED"
+				? "failed"
+				: run.status === "BLOCKED"
+					? "blocked"
+					: "unknown";
+	const graph: GraphProjection = {
+		runId: run.runId,
+		workflow: run.workflow,
+		risk: run.risk,
+		status: run.status,
+		stateRevision: run.revision,
+		recordedAt: run.updatedAt,
+		nodes: [],
+		edges: [],
+		diagnostics: [],
+	};
+	// COMPLEX (V0.7B) steps carry task attempts, not STANDARD revision attempts: never unroll them as one
+	// single-task chain. One run node keeps the stored outcome; task/integration detail is shown as unavailable.
+	if (run.workflow === "COMPLEX") {
+		requireGraph(complexRunError(run) === undefined, "inconsistent COMPLEX state");
+		graph.nodes.push({
+			id: "preflight",
+			kind: "preflight",
+			label: run.complex ? "COMPLEX sequential run (task graph unavailable)" : "Unsupported COMPLEX",
+			status: terminal ? stopped : "unknown",
+			...(terminal && run.lastError ? { detail: run.lastError } : {}),
+		});
+		graph.diagnostics.push(
+			run.complex
+				? "COMPLEX task and integration detail is not drawn as a graph; /workflow status and /state show the ordered task rows and integration gates. No transition is inferred, and a task COMPLETED is not Run completion."
+				: "COMPLEX has no supported execution graph; no Planner/Lead/scheduler is inferred.",
+		);
+		return graph;
+	}
 	const attempt = run.revisionCycle + 1;
 	const steps: readonly StepId[] = run.workflow === "QUICK" ? QUICK_STEP_IDS : STANDARD_STEP_IDS;
 	const current = run.currentStep;
@@ -109,36 +148,6 @@ export function projectRunGraph(value: unknown): GraphProjection {
 		"QUICK scope/workflow mismatch",
 	);
 	requireGraph(run.risk === "R3" || (!run.r3Scope && !run.approvals?.length), "approval metadata outside R3");
-	const terminal = !["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(run.status);
-	const stopped: GraphNodeStatus =
-		run.status === "CANCELLED"
-			? "cancelled"
-			: run.status === "FAILED"
-				? "failed"
-				: run.status === "BLOCKED"
-					? "blocked"
-					: "unknown";
-	const graph: GraphProjection = {
-		runId: run.runId,
-		workflow: run.workflow,
-		risk: run.risk,
-		status: run.status,
-		stateRevision: run.revision,
-		recordedAt: run.updatedAt,
-		nodes: [],
-		edges: [],
-		diagnostics: [],
-	};
-	if (run.workflow === "COMPLEX") {
-		graph.nodes.push({
-			id: "preflight",
-			kind: "preflight",
-			label: "Unsupported COMPLEX",
-			status: terminal ? stopped : "unknown",
-		});
-		graph.diagnostics.push("COMPLEX has no supported execution graph; no Planner/Lead/scheduler is inferred.");
-		return graph;
-	}
 	const reviews = new Map<number, ReviewRecord>();
 	for (const review of run.reviewHistory ?? []) {
 		requireGraph(!reviews.has(review.revision), "duplicate review attempt");

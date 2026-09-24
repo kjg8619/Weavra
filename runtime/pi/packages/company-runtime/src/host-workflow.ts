@@ -19,6 +19,19 @@ import { StandardWorkflow, type WorkflowOptions } from "./workflow.ts";
 
 export { HostWorkflowError } from "./host-workflow-error.ts";
 
+/**
+ * COMPLEX was selected but no structured decomposition plan came with the goal. Same existing Host Control code
+ * (UNSUPPORTED_WORKFLOW) and message; the type lets a free-text Host (the TUI) say where a plan is prepared.
+ */
+export class ComplexPlanRequiredError extends HostWorkflowError {
+	constructor(risk: Risk) {
+		super(
+			"UNSUPPORTED_WORKFLOW",
+			`Unsupported classification/workflow: COMPLEX/${risk}; COMPLEX requires a structured decomposition plan (complexDraft); no downgrade performed`,
+		);
+	}
+}
+
 export interface HostWorkflowDraft {
 	goal: string;
 	config: RuntimeConfig;
@@ -68,10 +81,7 @@ export function prepareHostWorkflowDraft(input: {
 			);
 		// COMPLEX runs only an explicit bounded decomposition; heuristic free-text decomposition is never invented.
 		if (selection.workflow === "COMPLEX" && complexDraft === undefined)
-			throw new HostWorkflowError(
-				"UNSUPPORTED_WORKFLOW",
-				`Unsupported classification/workflow: COMPLEX/${classification.risk}; COMPLEX requires a structured decomposition plan (complexDraft); no downgrade performed`,
-			);
+			throw new ComplexPlanRequiredError(classification.risk);
 		if (selection.workflow !== "COMPLEX" && complexDraft !== undefined)
 			throw new HostWorkflowError(
 				"INVALID_REQUEST",

@@ -4,7 +4,7 @@ Adaptive Agent Workflow Runtime — **Weavra v0.1 RC1 기반 development build**
 
 사용자 설치·Quick Start·기능 범위는 [Weavra README](../../README.md)를 참고한다. 이 문서는 S0~S6 및 RC 수정의 구현 참조다. 내부 `company-runtime`/`CompanyKernel` 명칭과 Pi workspace package 버전 `0.85.1`은 유지하며 Weavra 제품 버전과 구분한다.
 
-Host 독립 Kernel, StateStore·Policy, 독립 Pi SDK 역할에 실제 Git evidence·등록 check·명령/lifecycle을 연결했다. **STANDARD/R0~R2와 QUICK/R0~R1**을 지원한다. R2는 제한된 파일 변경과 독립 리뷰를 결합한 경로다. R3는 명시적 인간 승인을 받은 단일 tracked 텍스트 파일 삭제만 지원한다. COMPLEX/범용 R3 실행, 자동 resume/rollback/commit, 병렬 조직은 지원하지 않는다. [GPT RC-01~08 validation](../../docs/GPT_RC_VALIDATION_2026-09-16.md)의 한정된 실제 검증을 통과했으며 정식 V0.1 release 선언은 아니다. DeepSeek는 NOT VERIFIED다.
+Host 독립 Kernel, StateStore·Policy, 독립 Pi SDK 역할에 실제 Git evidence·등록 check·명령/lifecycle을 연결했다. **STANDARD/R0~R2와 QUICK/R0~R1**을 지원한다. R2는 제한된 파일 변경과 독립 리뷰를 결합한 경로다. R3는 명시적 인간 승인을 받은 단일 tracked 텍스트 파일 삭제만 지원한다. COMPLEX는 Host Control로 준비·확인한 구조화 계획의 2~8개 task를 한 Run에서 순차 실행하는 경로로만 지원한다([V0.7B](#v07b-complex-순차-workflow)). 범용 R3 실행, 자동 resume/rollback/commit, 병렬 조직, Planner는 지원하지 않는다. [GPT RC-01~08 validation](../../docs/GPT_RC_VALIDATION_2026-09-16.md)의 한정된 실제 검증을 통과했으며 정식 V0.1 release 선언은 아니다. DeepSeek는 NOT VERIFIED다.
 
 ## 로딩
 
@@ -613,7 +613,7 @@ readiness는 project config validation이나 Provider readiness가 아니라 **�
 - 브라우저 disconnect·Project panel 이탈은 **server-owned 실행을 종료하지 않는다.** reconnect는 fresh canonical state를 읽고 mutation을 자동 재전송하지 않는다. 이전 UI snapshot·receipt로 approval/실행을 복원하지 않는다. backend/Runtime 종료 뒤 resume/recovery를 제공한다는 뜻도 아니다.
 - cancel은 **기존 owned Run**이 있어야 한다. canonical Run 생성 전 model/Git/LSP preflight에는 wire cancellation ID가 없으므로 존재하지 않는 runId로 cancel을 보낼 수 없다. 취소 ACK 뒤 worker/check 정리·terminal state와 writer 해제를 확인한다. 비협조 I/O의 즉시 종료나 rollback을 보장하지 않으며 부분 변경은 보존한다.
 - R3는 기존 S5C의 **허용된 Git 추적 텍스트 파일 한 개 삭제**뿐이다. 일반 preview 확인은 삭제 승인이 아니며 현재 exact action·revision·digest·expiry에 대한 인간 응답만 전달한다. grant·검사·1회 소비·독립 review/checks·완료는 기존 Runtime 경로를 따른다. stale/다른 요청이나 재연결만으로 승인하지 않는다.
-- 임의 write/edit/tool/shell, 범용 R3, COMPLEX, resume/recovery/rollback/fallback, 새 network Host, 자동 setup·Policy 완화·UI의 완료 판정은 범위 밖이다. C07 closure 후 C06은 별도 [Fitness CLI](../../docs/WEAVRA_PROVIDER_FITNESS_PLAN_2026-09-20.md#9-c06-bounded-구현-계약)로 구현한다. `fitness list/show/compare`는 read-only이고 실제 평가는 paid opt-in·exact corpus·F01/F02 calibration·명시적 예산을 요구한다. C07 execution/control RPC에서 평가를 실행하지 않는다.
+- 임의 write/edit/tool/shell, 범용 R3, COMPLEX, resume/recovery/rollback/fallback, 새 network Host, 자동 setup·Policy 완화·UI의 완료 판정은 범위 밖이다. COMPLEX는 이후 V0.7B가 같은 command 집합에 선택적 필드만 더해 지원한다([V0.7B](#v07b-complex-순차-workflow)). C07 closure 후 C06은 별도 [Fitness CLI](../../docs/WEAVRA_PROVIDER_FITNESS_PLAN_2026-09-20.md#9-c06-bounded-구현-계약)로 구현한다. `fitness list/show/compare`는 read-only이고 실제 평가는 paid opt-in·exact corpus·F01/F02 calibration·명시적 예산을 요구한다. C07 execution/control RPC에서 평가를 실행하지 않는다.
 
 ### C07 actual proof와 closure 한계
 
@@ -690,6 +690,20 @@ weavra browser observe \
 - Private HOME/profile/CDP-pipe 격리는 **browser 전체 OS/network sandbox가 아니다**. 기존 command verifier의 required sandbox·deny-all network는 변경하지 않았다. Browser check는 별도 local-document 경계를 명시하며 sandbox ENFORCED 증거를 위조하지 않는다.
 - Click/type/submit/login/upload/download/drag-drop, multi-step browser agent, 임의 navigation/JS/eval/CDP, remote crawling/payment, 개인 인증/profile attach는 미지원이다. Linux/Windows browser actual과 paid Provider 품질을 macOS Chromium/faux SDK proof에서 추론하지 않는다.
 
+
+## V0.7B COMPLEX 순차 workflow
+
+설계 계약: [COMPLEX_SEQUENTIAL_WORKFLOW.md](../../../../docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md). 하나의 frozen parent Task Contract를 사람이 준 2~8개 task로 나눠 **한 Run·한 writer 안에서 순서대로** 실행하고, 필수 integration 검증과 새 독립 final review/checks를 통과한 뒤에만 Kernel이 `COMPLETED`를 기록한다. active task와 mutable worker는 항상 최대 하나다.
+
+- **준비는 Host Control만.** `workflow.prepare`의 선택적 `complexDraft`(task별 title·goal·앞선 task index·parent AC index·exact-file claim·로컬 registered check ID)를 결정적 compiler가 검증하고 `CT-001…` ID·digest·limits를 부여해 preview에 전체 plan을 싣는다. `workflow.confirm`이 그 preview를 한 번 실행하며, confirm 뒤 plan은 바꿀 수 없다. 구조화 계획 없는 COMPLEX 선택은 `UNSUPPORTED_WORKFLOW`, draft 모양·크기 오류는 `INVALID_REQUEST`, graph·coverage·ownership·check·limit 위반은 `INVALID_CRITERIA`다. TUI `/workflow run`은 goal만 받으므로 COMPLEX 목표를 안내와 함께 거부하고 STANDARD로 낮추지 않는다.
+- **순차 실행.** 다음 배열 항목만 `ELIGIBLE`이 되며 앞선 모든 task와 선언된 dependency가 `COMPLETED`여야 한다. 재정렬·병렬·건너뛰기는 없다.
+- **정확한 파일 소유.** claim은 exact file의 `modify`/`create`(R3만 `delete`)이고 권한이 아니다. 다른 task의 파일은 `OWNERSHIP_CONFLICT`, 미청구 파일은 `UNOWNED_PATH`로 effect 전에 막고 바이트를 바꾸지 않는다. Policy·보호 경로·R2/R3 규칙은 그대로이며 expected-image ledger가 설명되지 않는 변경을 `EXTERNAL_MUTATION`으로 막는다.
+- **검증.** task마다 선택한 registered check의 SELF_CHECK → 모든 Developer 세션과 다른 새 Reviewer의 기여 review(SUPPORTED/UNSUPPORTED/UNVERIFIED) → TEST를 거친다. 모든 task 뒤 전체 registered check, 이전 모든 세션과 다른 final Reviewer의 parent AC review(모든 AC MET + PASS), 전체 check 재실행을 거친다. task `COMPLETED`는 기여일 뿐 Run 완료가 아니다. `verification.repair`는 COMPLEX에 적용하지 않는다.
+- **완료와 중단.** 완료는 Kernel만 하며 모든 task의 검증 이력, fresh integration 증거, 알려진 budget, 확인된 자원 정리를 다시 확인한다. 실패·거부·취소는 정리 확인 후 `BLOCKED`/`FAILED`/`CANCELLED`, 정리를 확인하지 못하면 `INTERRUPTED`(writer 유지)다. 부분 변경은 보존하고 rollback·자동 resume·재시도는 없다. commit/merge/reset/stash/branch/worktree 같은 Git 자동화와 Planner/Lead 실행도 없다.
+- **한계.** task 2~8, claim은 task당 16·plan당 64, registered check 16, Developer/Reviewer 호출 전체 24회, provider-reported token 200,000(설정 budget이 더 작으면 그 값), revision은 Run 전체 `min(3, agents.max_revision_cycles)`·task당 `min(2, 전체)`이고 REVISE는 그 task의 새 attempt만 만든다. usage를 모르거나 cap에 닿으면 다음 worker와 완료 전에 `BLOCKED`다. R3는 CT-001의 Runtime 선택 tracked text file 삭제 하나와 read-only 후속 task만 허용하고 revision은 0이다. draft·plan은 각 12,288 bytes이며, 최대 실행 projection이 32,768 bytes를 넘을 plan은 prepare에서 거부한다.
+- **관측.** `control.hello`는 `complexContractVersion: 1`을 광고한다(권한이나 준비 완료 표시가 아님). `control.snapshot`은 최신 canonical Run이 COMPLEX일 때만(owned·historical·`INTERRUPTED` 포함) 그 Run에서 만든 `complexExecution`(parent·plan·task 행·integration gate·budget·cleanup·failure code)을 같은 ownerId/projectRevision/stateRevision으로 싣고, 이전 Run에서 가져오거나 잘라 보내지 않는다. 만들 수 없으면 `STATE_UNAVAILABLE`, projection 32 KiB나 응답 64 KiB를 넘으면 `RESPONSE_TOO_LARGE`다. read-only bridge summary에는 task 필드가 없다. TUI `/workflow status`·`/state`·`/workflow history`는 parent와 순서대로의 task 행·integration gate를, `/state evidence`는 prompt·transcript·diff·파일 내용·check 출력 없는 bounded `complex` 요약을 보여준다. `/graph`는 task graph를 그리지 않고 unavailable로 표시한다.
+- **미지원.** 병렬 task·다중 writer, Planner/Lead, confirm 뒤 plan 수정, 자동 resume/retry/rollback, TUI의 COMPLEX 계획 작성, directory/glob/공유 ownership, rename, 여러 파일 삭제 R3.
+- **검증 범위.** faux provider의 Kernel·StateStore·Host Control·SDK 테스트와 App consumer 규칙 재진술(`test/complex-conformance.ts`)만 근거다. 실제 Runtime→App 결합 lifecycle과 실모델 실행은 #18 전까지 NOT VERIFIED다.
 
 ## 설정 schema 1
 
@@ -797,7 +811,7 @@ FIX-01 설치 안내는 `devlop`을 명시하고 `main`/historical RC와 구분�
 - `classifyRequest(goal, hints?)`: 9개 intent, 3개 complexity, R0~R3의 최소 규칙 분류. 확률로 검증되지 않은 confidence는 `null`이며, 인식하지 못한 목표는 `requiresConfirmation: true`다. Host는 확인 전 실행하면 안 된다. 분류는 도구 실행 허가가 아니다.
 - `selectWorkflow(classification, requested?)`: 최소 역할 선택. R2/R3의 QUICK 요청은 Reviewer가 있는 STANDARD로 승격한다.
 - `CompanyKernel.create(request, ports, clock?)`: 새 run을 저장하고 RunCreated를 알린다. 저장소에 같은 ID가 있으면 거부한다. 복구·재실행은 하지 않는다.
-- `start()`: 선택한 순차 Workflow로 진입한다. QUICK은 고정 scope·필수 check·live inspection이 필요하다. COMPLEX와 미지원 R3는 BLOCKED다. R2 및 한정 R3도 필수 check/live inspection과 현재 회차의 독립 세션 증거를 요구한다.
+- `start()`: 선택한 순차 Workflow로 진입한다. QUICK은 고정 scope·필수 check·live inspection이 필요하다. Host가 확인한 plan이 없는 COMPLEX와 미지원 R3는 BLOCKED다(plan이 있는 COMPLEX는 [V0.7B](#v07b-complex-순차-workflow)의 task machine). R2 및 한정 R3도 필수 check/live inspection과 현재 회차의 독립 세션 증거를 요구한다.
 - `advance(expectedStep, signal?)`: 현재 단계 하나만 수행한다. 순서를 건너뛰거나 중복·동시 호출하면 거부한다. 실제 작업은 주입한 Port가 담당하며 S1 테스트에서는 fake뿐이다.
 - `snapshot`: 외부에서 수정해도 Kernel에 영향을 주지 않는 상태 사본이다.
 - `stop(CANCELLED | INTERRUPTED, reason)`: 단계 사이에서 중단한다. 진행 중 작업은 `advance`의 AbortSignal을 Port에 전달하고 반환 후 다시 검사한다. Port가 취소에 협조하지 않으면 반환까지 기다린다. 프로세스 강제 종료·자동 resume는 구현하지 않았다.
@@ -995,7 +1009,7 @@ S3의 단일 역할 검증에 이어 S4는 아래 전체 순차 흐름을 연결
 ```
 
 - `files.allowed_paths`에 명시된 파일만 기존 write/edit로 처리한다. manifest/lockfile을 다룰 때도 `.ai`/credential/.git/Runtime·등록 script 보호, symlink/hardlink·size 제한은 그대로다. 새로운 설치·삭제·이동·mkdir·배포·shell 도구는 없다.
-- 기존 classifier가 초기 R2로 판정하면 `adaptive`는 STANDARD를 고른다. Complexity QUICK/Risk R2도 Executor를 생성하지 않는다. 명시적 `runtime.workflow: QUICK`은 R2를 거부한다. COMPLEX/범용 R3는 미지원이며 한정 R3는 아래 S5C를 따른다. R1/QUICK 실행 중 dependency action이 나타나면 REVIEW_REQUIRED로 차단하고 사용자가 새 STANDARD/R2 run을 시작해야 한다.
+- 기존 classifier가 초기 R2로 판정하면 `adaptive`는 STANDARD를 고른다. Complexity QUICK/Risk R2도 Executor를 생성하지 않는다. 명시적 `runtime.workflow: QUICK`은 R2를 거부한다. 범용 R3는 미지원이고 한정 R3는 아래 S5C를, COMPLEX는 [V0.7B](#v07b-complex-순차-workflow)의 구조화 계획 경로를 따른다. R1/QUICK 실행 중 dependency action이 나타나면 REVIEW_REQUIRED로 차단하고 사용자가 새 STANDARD/R2 run을 시작해야 한다.
 - Host composition callback은 V0.3C부터 `createAgents(store, quickScope, r2RunId, r3Scope, executionContract)`를 받는다. PiAgentExecutor.create와 PolicyContext의 `r2RunId`는 Host가 preflight에서 고정하며 모델 도구 입력으로 받지 않는다. 다른 run/Executor/QUICK scope와 혼용할 수 없고 configDigest에도 포함된다.
 - Policy는 bound run의 Developer 파일 mutation을 R2 하한으로 평가한다. 그 결과의 ALLOW는 **독립 리뷰를 생략할 허가나 이미 받은 PASS가 아니다.** 해당 run은 이후 Reviewer PASS 없이는 완료하지 못한다.
 - R2 ALLOW intent를 저장할 때 StateStore는 실제 저장된 STANDARD/R2·RUNNING·IMPLEMENT·attempt·active Developer와 마지막 세션 참조를 검사한다. R2 risk/workflow obligation을 낮춰 저장할 수 없다. 순수 Policy에 binding을 꾸며 넣어도 durable R1 run에서 실행하지 못한다.
