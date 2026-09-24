@@ -1198,12 +1198,41 @@ describe("Company Runtime correctable worker tool errors (faux only)", () => {
 
 	it.each([
 		["protected path", "runtime_read", { path: ".ai/state.json" }, "Policy R0/DENY: Protected target"],
-		["path outside the allowlist", "runtime_read", { path: "README.md" }, "Target outside allowed paths"],
+		[
+			"write outside the allowlist",
+			"runtime_write",
+			{ path: "README.md", content: "x" },
+			"Target outside allowed paths",
+		],
 		["unavailable tool", "bash", { command: "ls" }, "Worker tool failed or was denied"],
 	])("keeps a %s fatal while the correctable budget remains", async (_name, tool, args, message) => {
 		harness.setResponses([call(tool, args), submitHandoff()]);
 		await expect(executor.execute(developer())).rejects.toThrow(message);
 		expect(harness.faux.state.callCount).toBe(1);
+	});
+
+	it("returns a read-only look outside the allowed paths as correctable input", async () => {
+		const errors: string[] = [];
+		harness.setResponses([
+			call("runtime_read", { path: "README.md" }),
+			(context) => {
+				errors.push(lastToolError(context));
+				return call("runtime_search", { query: "x", paths: ["README.md"] });
+			},
+			(context) => {
+				errors.push(lastToolError(context));
+				return call("runtime_write", { path: "src/app.ts", content: "fixed\n" });
+			},
+			submitHandoff(),
+		]);
+		await expect(executor.execute(developer())).resolves.toMatchObject({ role: "Developer" });
+		for (const error of errors) {
+			expect(error).toContain("Target outside allowed paths");
+			expect(error).toContain("Nothing was read; reads are limited to the allowed paths: src, ");
+		}
+		expect(errors).toHaveLength(2);
+		expect(readFileSync(join(workspace, "src/app.ts"), "utf8")).toBe("fixed\n");
+		expect(store.snapshot.actions.map((item) => item.status)).toEqual(["DENIED", "DENIED", "SUCCEEDED"]);
 	});
 
 	it("keeps an audit failure fatal after a correctable error", async () => {

@@ -155,6 +155,9 @@ export function isListablePath(path: string, context: Pick<PolicyContext, "allow
 
 /** Safe, in-scope literal path that is missing or not a regular file where one is required. */
 export const NON_FILE_TARGET_REASON = "Target is missing or not a regular file";
+/** Safe literal path outside the configured scope; nothing is read, written or listed. */
+export const OUTSIDE_ALLOWED_PATHS_REASON = "Target outside allowed paths";
+export const OUTSIDE_LISTING_BOUNDARY_REASON = "Target outside listing boundary";
 
 /** The target changed between the durable intent and execution; not a model-correctable input error. */
 export class PolicyRecheckError extends Error {
@@ -241,9 +244,9 @@ export function evaluatePolicy(
 	else if (action.paths.some((path) => isProtectedPath(path, context.protectedPaths ?? [])))
 		reason = "Protected target";
 	else if (listing && action.paths.some((path) => !isListablePath(path, context)))
-		reason = "Target outside listing boundary";
+		reason = OUTSIDE_LISTING_BOUNDARY_REASON;
 	else if (action.paths.some((path) => !context.allowedPaths.some((root) => within(path, root))))
-		reason = "Target outside allowed paths";
+		reason = OUTSIDE_ALLOWED_PATHS_REASON;
 	else if (
 		inspected.length !== action.paths.length ||
 		inspected.some((item, index) => item.path !== action.paths[index] || !item.safe)
