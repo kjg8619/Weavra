@@ -695,3 +695,31 @@
   - 실제 v2 Runtime과의 실행 검증은 #20 머지 뒤 #22에서 한다.
   - 실제 클라이언트 화면 확인은 브라우저 사용 승인이 필요해 하지 않았다.
 - 커밋 상태: `744bc3ca`, `e61cc09c`, 개정 `21d6c4fa`, `6de4885b`, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — V0.8A #20 Runtime 웨이브 스케줄러 (계약 v2 생산자)
+
+- 목적: #19 계약의 Runtime 쪽을 구현한다. 의존성이 끝난 작업을 최대 `max_parallel`(1–4)개까지 한 웨이브로 묶어 구현만 동시에 실행하고, join 뒤 계획 순서대로 한 작업씩 검증한다. 소비자 #21이 먼저 머지됐으므로 순서 규칙을 지킨다.
+- 브랜치/worktree: `feat/v0.8a-parallel-runtime`, `Weavra-worktrees/v0.7b-complex-runtime`(재사용). #16 B단계를 만든 하위 에이전트가 이어서 구현했고, 메인 세션이 검토했다.
+- 커밋:
+  - `5f0ecf69` 동시성 기본 요소: 작업별 lease, `reserveMany` 전원 예약, StateStore FIFO 쓰기 lane, 실행기 `maxConcurrentWorkers`, 작업 소유 파일 capture.
+  - `559ac4f7` 계약 v2와 웨이브 스케줄러.
+  - `b31f4d69` 수정: lane이 행동의 intent부터 outcome까지 잡으면 S6 hardening 테스트 3개가 멈췄다. 이제 lane은 짧은 쓰기 하나씩만 덮고 효과 구간은 잡지 않는다.
+  - `fb82e74b` 경쟁 corpus `test/complex-parallel.test.ts`(20).
+  - `b9d6be92` README와 corpus의 `activeTaskIds`·v2 반영.
+  - devlop 병합.
+- 규칙별 구현:
+  - config·plan: `min(max_parallel, 4)`로 동결하고, R3·삭제 claim은 1로 고정한다. v2 digest를 쓰고 v1 plan은 실행하지 않는다.
+  - 웨이브: 선언된 의존성과 계획 순서로 구성하고, 예약은 전부 하거나 하나도 하지 않는다. 쓰기는 한 큐로 직렬화해 revision을 +1씩 올리고 이벤트 번호는 엄격히 증가한다. handoff 시 해당 attempt 효과와 일치하는지 보고 소유 파일을 capture한다.
+  - join 뒤 전체 capture가 기대 상태와 맞지 않으면 EXTERNAL_MUTATION으로 막는다. 검증은 계획 순서로 한 작업씩 진행하고 소유 파일을 재확인한다. REVISE는 그 작업만 단독으로 다시 구현한다.
+  - 형제 실패·취소 시 abort → join → 모든 활성 행을 한 번에 STOPPING으로 저장 → 행별 코드. 형제 행은 RUN_STOPPED, 취소는 CANCELLED, 소유자 상실은 OWNER_LOST다.
+  - 투영: capability 2, `activeTaskIds`. 개정 A1대로 종료된 V0.7B Run은 v1 plan 그대로 보여 준다.
+- StateStore 변화: 동시에 PREPARED인 행동은 해당 Run의 구현 중인 웨이브 행 수까지만 허용한다. 그 밖에는 기존과 같이 "Concurrent actions"로 거부한다.
+- 현재 검증(하위 에이전트, Node 24.19.0, devlop 병합 후):
+  - `npm run check` exit 0.
+  - `./test.sh` exit 0: company-runtime 1,956 PASS, coding-agent 2,778 PASS(기존 skip 50).
+  - 경쟁 테스트: P01–P12, P15–P17. P01·P07은 실제 Host Control·실행기 경로를 faux 모델로 거쳤고, 두 Developer 동시 실행과 취소 후 writer 해제를 확인했다.
+  - #18 corpus: 실제 v2 App(devlop b2ddd090)과 함께 `COMPLEX INTEGRATION PASS: 14 scenarios; falseCompletion=0`.
+- 남은 일(#22):
+  - P13 App 재연결, P14 실제 소유 프로세스 강제 종료 복구.
+  - 실제 모델 병렬 smoke와 속도 향상 수치: 현재 NOT VERIFIED. faux 기준으로 웨이브가 순차 합보다 짧았다는 것만 확인했다.
+- 커밋 상태: devlop 대상 PR. #20 이슈는 #22 뒤에 닫는다.
