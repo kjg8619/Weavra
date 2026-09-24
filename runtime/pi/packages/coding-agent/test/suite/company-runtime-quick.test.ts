@@ -459,16 +459,18 @@ describe("S5A QUICK: same SDK/Policy/Git/Verifier with one Executor", () => {
 		});
 		expect(git("diff")).toBe("");
 	});
-	it.each(["Fix dependency typo in package.json", "Fix production typo in src/app.ts", "Delete typo in src/app.ts"])(
-		"rejects elevated explicitly QUICK goal %s before Provider use",
-		async (taskGoal) => {
-			config.runtime.workflow = "QUICK";
-			const report = await create(taskGoal).execute();
-			expect(report.run).toBeUndefined();
-			expect(report.error).toContain("Unsupported");
-			expect(harness.faux.state.callCount).toBe(0);
-		},
-	);
+	// "Delete typo" has no file/data target and is no longer R3; a path deletion target still is.
+	it.each([
+		"Fix dependency typo in package.json",
+		"Fix production typo in src/app.ts",
+		"Fix typo in src/app.ts and delete src/old.ts",
+	])("rejects elevated explicitly QUICK goal %s before Provider use", async (taskGoal) => {
+		config.runtime.workflow = "QUICK";
+		const report = await create(taskGoal).execute();
+		expect(report.run).toBeUndefined();
+		expect(report.error).toContain("Unsupported");
+		expect(harness.faux.state.callCount).toBe(0);
+	});
 	it.each(["tracked", "staged", "untracked"])("refuses %s dirty workspace without cleanup", async (kind) => {
 		const path = kind === "untracked" ? "src/user.ts" : "src/app.ts";
 		writeFileSync(join(cwd, path), "USER_CHANGE");

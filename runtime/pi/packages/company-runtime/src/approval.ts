@@ -9,9 +9,22 @@ import {
 import { isPolicyPath } from "./policy.ts";
 import type { ApprovalPort } from "./ports.ts";
 
+const R3_DELETION_GRAMMAR = /^(?:(?:delete|remove) file|파일 삭제) ([^\s]+)$/i;
+
+/** Exact deletion grammar shape, even when its path is not Policy-safe. Such a goal always keeps R3. */
+export function isR3DeletionGrammar(goal: string): boolean {
+	return R3_DELETION_GRAMMAR.test(goal.trim());
+}
+
+/** The only supported R3 action: the exact deletion grammar with one Policy-safe relative path. */
+export function isSupportedR3Goal(goal: string): boolean {
+	const match = R3_DELETION_GRAMMAR.exec(goal.trim());
+	return !!match && isPolicyPath(match[1]);
+}
+
 /** Exact initial S5C action grammar; no arbitrary destructive request becomes executable. */
 export function selectR3Scope(goal: string, runId: string): R3Scope | undefined {
-	const match = /^(?:(?:delete|remove) file|파일 삭제) ([^\s]+)$/i.exec(goal.trim());
+	const match = R3_DELETION_GRAMMAR.exec(goal.trim());
 	if (!match || !isPolicyPath(match[1])) return undefined;
 	return { runId, targetPath: match[1] };
 }

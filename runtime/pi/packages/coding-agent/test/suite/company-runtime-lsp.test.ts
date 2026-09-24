@@ -6,6 +6,7 @@ import { type Context, fauxAssistantMessage, fauxToolCall } from "@earendil-work
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PiAgentExecutor } from "../../../company-runtime/src/agent-runner.ts";
 import { trustedReviewEvidenceRefs } from "../../../company-runtime/src/agent-tools.ts";
+import type { RiskOverride } from "../../../company-runtime/src/classification.ts";
 import { parseRuntimeConfig, type RuntimeConfig } from "../../../company-runtime/src/config.ts";
 import type { VerificationResult } from "../../../company-runtime/src/contracts.ts";
 import type { ExecutionMode } from "../../../company-runtime/src/execution-contract.ts";
@@ -83,12 +84,14 @@ function git(...args: string[]) {
 function create(
 	goal = "Fix typo in src/app.ts",
 	executionMode: ExecutionMode = goal.startsWith("Explain") ? "READ_ONLY" : "EDIT",
+	riskOverride?: RiskOverride,
 ) {
 	return new StandardWorkflow({
 		executionMode,
 		cwd,
 		goal,
 		taskContract: workflowContract(goal, config),
+		...(riskOverride ? { riskOverride } : {}),
 		config,
 		approval: {
 			requestApproval: async (request) => ({
@@ -307,27 +310,57 @@ describe("V0.3B actual SDK/faux + real stdio server + unchanged process checks",
 		expect(report.partialChanges).toBe(true);
 		expect(readFileSync(join(cwd, "src/app.ts"), "utf8")).toBe("EXTERNAL");
 	});
-	it.each(["오류 원인을 설명해줘", "Analyze this bug without changing files", "Explain dependency handling"])(
-		"V0.3C READ_ONLY is independent of heuristic risk: %s",
-		async (goal) => {
-			config.runtime.workflow = "STANDARD";
-			harness.setResponses([submit, submit]);
-			const report = await create(goal, "READ_ONLY").execute();
-			expect(report.run?.status).toBe("COMPLETED");
-			expect(report.run?.executionMode).toBe("READ_ONLY");
-			expect(report.run?.roleSessionRefs.map((ref) => ref.role)).toEqual(["Developer", "Reviewer"]);
-			if (goal.includes("dependency")) expect(report.run?.risk).toBe("R2");
-		},
-	);
 	it.each([
-		"Explain src/app.ts and fix the bug",
+		"오류 원인을 설명해줘",
+		"Analyze this bug without changing files",
+		"Explain dependency handling",
+		// A deletion word without a file/data target is no longer R3.
 		"삭제하지 말고 삭제 로직을 설명해줘",
 		"Do not delete anything; explain the delete flow",
+	])("V0.3C READ_ONLY is independent of heuristic risk: %s", async (goal) => {
+		config.runtime.workflow = "STANDARD";
+		harness.setResponses([submit, submit]);
+		const report = await create(goal, "READ_ONLY").execute();
+		expect(report.run?.status).toBe("COMPLETED");
+		expect(report.run?.executionMode).toBe("READ_ONLY");
+		expect(report.run?.roleSessionRefs.map((ref) => ref.role)).toEqual(["Developer", "Reviewer"]);
+		if (goal.includes("dependency")) expect(report.run?.risk).toBe("R2");
+	});
+	it.each([
+		"Explain src/app.ts and fix the bug",
+		"파일을 삭제하지 말고 파일 삭제 로직을 설명해줘",
+		"Do not delete any files; explain the delete flow",
 	])("V0.3C ambiguity/elevated read-only routing remains fail-closed: %s", async (goal) => {
 		const report = await create(goal, "READ_ONLY").execute();
 		expect(report.run).toBeUndefined();
 		expect(harness.faux.state.callCount).toBe(0);
 		expect(report.changedFiles).toEqual([]);
+	});
+	it("user-confirmed keyword-only R3 override reaches the persisted run classification", async () => {
+		config.runtime.workflow = "STANDARD";
+		const goal = "Explain how the production deploy script works";
+		const refused = await create(goal, "READ_ONLY").execute();
+		expect(refused.run).toBeUndefined();
+		expect(refused.error).toContain("Unsupported classification/workflow: QUICK/R3");
+		const stale = await create(goal, "READ_ONLY", { from: "R3", to: "R1" }).execute();
+		expect(stale.run).toBeUndefined();
+		expect(stale.error).toContain("rejected");
+		expect(harness.faux.state.callCount).toBe(0);
+		harness.setResponses([submit, submit]);
+		const report = await create(goal, "READ_ONLY", { from: "R3", to: "R0" }).execute();
+		expect(report.error).toBeUndefined();
+		expect(report.run?.status).toBe("COMPLETED");
+		expect(report.run?.risk).toBe("R0");
+		expect(report.run).not.toHaveProperty("r3Scope");
+		const persisted = (
+			JSON.parse(readFileSync(join(cwd, ".ai/state.json"), "utf8")) as {
+				runs: Array<{ risk: string; classification: { risk: string; reason: string } }>;
+			}
+		).runs.at(-1);
+		expect(persisted?.risk).toBe("R0");
+		expect(persisted?.classification.risk).toBe("R0");
+		expect(persisted?.classification.reason).toContain("detected risk R3");
+		expect(persisted?.classification.reason).toContain("user-confirmed risk override R3→R0");
 	});
 	it("V0.3C refuses an EDIT grant for a clear READ_ONLY request", async () => {
 		const report = await create("Explain src/app.ts", "EDIT").execute();

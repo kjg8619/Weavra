@@ -1015,6 +1015,8 @@ S3의 단일 역할 검증에 이어 S4는 아래 전체 순차 흐름을 연결
 ### 지원 범위와 사용
 
 - 초기 grammar는 `Delete file <상대 경로>`, `Remove file <상대 경로>`, `파일 삭제 <상대 경로>`다. 공백 없는 literal 경로 한 개만 받는다. 대상은 clean baseline의 Git 추적 일반 UTF-8 파일이며 256 KiB 이하, `files.allowed_paths` 안이어야 한다.
+- 삭제 키워드는 파일, 디렉터리, 폴더, 브랜치, 데이터, 데이터베이스, 테이블, 레코드 또는 경로를 대상으로 할 때만 R3로 분류한다. "delete 버튼 버그 수정"이나 "delete 엔드포인트 설명" 같은 목표는 기존 규칙대로 R0/R1/R2다. deploy, production, credential, git reset/rebase, force push, 배포, 프로덕션, 자격증명, 히스토리 변경은 계속 R3다. 위 grammar가 아닌 R3 목표는 계획 편집 전 준비 단계에서 거부한다.
+- TUI에서는 키워드 때문에만 R3가 된 목표를 사용자가 명시적으로 확인하면 규칙 기반 위험도로 계속 실행할 수 있다. 이 선택은 Plan Preview와 Run 분류 사유에 기록되고, 오래되거나 위조된 override는 Runtime이 다시 판정해 거부한다. 이 확인은 승인이 아니며 삭제·셸·배포·자격증명 경로 도구를 추가하지 않는다. App Host 프로토콜에는 이 확인 필드가 없다.
 - `.git`, `.ai`/Runtime 설정·정책, 기존 규칙의 credential/secret, 알려진 npm/Cargo/Python/Go manifest/lockfile, node_modules와 symlink/hardlink/특수 파일은 승인으로 우회하지 못한다. 모든 의미적 파일 종류나 숨겨진 비밀을 판별하는 기능은 아니다. 디렉터리·대량 삭제·설치·배포·history·임의 shell은 지원하지 않는다.
 - R3 scope는 새 run에만 고정한다. R1/R2/QUICK에서 자동 승격하지 않으며 R2 binding을 인간 승인으로 취급하지 않는다. R3 Developer에는 delete 요청 외 mutation 도구가 없다. Reviewer는 계속 read-only다.
 - **`runtime_delete` 호출 자체가 승인 요청의 진입점**이다. Developer는 별도의 approval tool이나 승인 권한을 갖지 않으며, 이미 승인받았다고 가정하고 기다리는 구조가 아니다. preselected target으로 호출하면 Runtime이 `WAITING_APPROVAL`을 저장하고 사용자에게 Deny/Approve once를 묻는다. 유효한 1회 승인일 때만 그 tool 안에서 exact tracked text file을 삭제하고 결과를 반환한다. Deny·승인 timeout은 삭제 없이 종료한다. prompt/tool 설명은 승인 요청 능력과 승인 권한을 구분하며, Developer의 직접 승인·우회·tool 확인 전 승인 획득 주장을 금지한다. R3 Reviewer 및 R0/R1/R2에는 이 승인 요청/삭제 도구가 제공되지 않는다.

@@ -83,7 +83,8 @@ describe("V0.3C proposal is not a permission grant", () => {
 		expect(proposal.mode).toBeUndefined();
 	});
 	it("does not turn quoted/negated risk words into a destructive grant or downgrade risk", () => {
-		const goal = "삭제하지 말고 삭제 로직을 설명해줘";
+		// A deletion target keeps R3; a bare deletion word ("삭제 로직") alone no longer does.
+		const goal = "파일을 삭제하지 말고 파일 삭제 로직을 설명해줘";
 		expect(proposeExecutionMode(goal).mode).toBe("READ_ONLY");
 		expect(classifyRequest(goal).classification.risk).toBe("R3");
 		const contract = bindExecutionContract("run", "READ_ONLY");

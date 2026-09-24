@@ -267,6 +267,67 @@ describe("S4 extension and S0 loader/trust regression", () => {
 		expect(host.models).not.toHaveBeenCalled();
 		expect(await readdir(join(cwd, ".ai"))).toEqual(["config.yaml"]);
 	});
+	it.each([
+		["Fix production build warning in src/a.ts", "R1", "EDIT", 1],
+		["Explain how production deploy works", "R0", "READ_ONLY", 0],
+	] as const)(
+		"offers keyword-only R3 %s its rule-based risk only through explicit confirmation",
+		async (goal, risk, mode, editorCalls) => {
+			await mkdir(join(cwd, ".ai"));
+			await writeFile(join(cwd, ".ai/config.yaml"), config);
+			const host = commands();
+			const ctx = context();
+			const prompts: Array<{ title: string; body: string }> = [];
+			ctx.ui.confirm = async (title, body) => {
+				prompts.push({ title, body });
+				// Accept the risk override, then decline the Plan Preview so no run starts.
+				return prompts.length === 1;
+			};
+			await host.call("workflow", `run ${goal}`, ctx);
+			await vi.waitFor(() => expect(notify).toHaveBeenCalledWith(expect.stringContaining("plan declined"), "info"));
+			expect(prompts).toHaveLength(2);
+			expect(prompts[0].title).toContain(`continue as ${risk}?`);
+			expect(prompts[0].title).toContain("not an approval");
+			expect(prompts[0].body).toContain("classified this goal as R3");
+			expect(prompts[0].body).toContain('"delete file <path>"');
+			expect(prompts[0].body).toContain("no delete, shell, deploy or credential-path tools");
+			expect(prompts[1].body).toContain(`Risk: ${risk}\n  User-confirmed override from R3`);
+			expect(prompts[1].body).toContain(`Execution contract: ${mode}`);
+			expect(editor).toHaveBeenCalledTimes(editorCalls);
+			expect(host.models).not.toHaveBeenCalled();
+			expect(await readdir(join(cwd, ".ai"))).toEqual(["config.yaml"]);
+		},
+	);
+	it("declining the risk override creates no plan, run, worker, check or approval", async () => {
+		await mkdir(join(cwd, ".ai"));
+		await writeFile(join(cwd, ".ai/config.yaml"), config);
+		const host = commands();
+		await host.call("workflow", "run Fix production build warning in src/a.ts");
+		await vi.waitFor(() =>
+			expect(notify).toHaveBeenCalledWith(
+				"Weavra: risk override declined; no run, worker, check or approval was created.",
+				"info",
+			),
+		);
+		expect(confirm).toHaveBeenCalledTimes(1);
+		expect(editor).not.toHaveBeenCalled();
+		expect(host.models).not.toHaveBeenCalled();
+		expect(await readdir(join(cwd, ".ai"))).toEqual(["config.yaml"]);
+	});
+	it("refuses unsupported R3 without an override offer before plan editing", async () => {
+		await mkdir(join(cwd, ".ai"));
+		await writeFile(join(cwd, ".ai/config.yaml"), config);
+		const host = commands();
+		await host.call("workflow", "run Delete file ../outside.ts");
+		await vi.waitFor(() =>
+			expect(notify).toHaveBeenCalledWith(expect.stringContaining('"delete file <path>"'), "error"),
+		);
+		expect(notify).toHaveBeenCalledWith(expect.stringContaining("Unsupported classification/workflow"), "error");
+		expect(confirm).not.toHaveBeenCalled();
+		expect(editor).not.toHaveBeenCalled();
+		expect(host.models).not.toHaveBeenCalled();
+		expect(await readdir(join(cwd, ".ai"))).toEqual(["config.yaml"]);
+	});
 	it("rejects non-UI modes and a busy parent", async () => {
 		const host = commands();
 		await expect(host.call("state", "", { ...context(), hasUI: false })).rejects.toThrow("notification-capable UI");

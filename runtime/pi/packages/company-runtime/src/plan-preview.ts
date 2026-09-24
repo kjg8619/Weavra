@@ -1,3 +1,4 @@
+import type { RiskOverride } from "./classification.ts";
 import type { RuntimeConfig } from "./config.ts";
 import type { AcceptanceCriterion, Risk, Workflow } from "./contracts.ts";
 import type { ExecutionMode } from "./execution-contract.ts";
@@ -7,6 +8,8 @@ export interface PlanPreview {
 	workflow: Workflow;
 	executionMode: ExecutionMode;
 	risk: Risk;
+	/** User-confirmed keyword-only R3 override; display only, never an approval or a tool grant. */
+	riskOverride?: RiskOverride;
 	acceptanceCriteria: readonly AcceptanceCriterion[];
 	allowedPaths: readonly string[];
 	checks: RuntimeConfig["verification"]["checks"];
@@ -30,6 +33,11 @@ export function formatPlanPreview(plan: PlanPreview): string {
 		`Workflow: ${plan.workflow}`,
 		`Execution contract: ${plan.executionMode}`,
 		`Risk: ${plan.risk}`,
+		...(plan.riskOverride
+			? [
+					`  User-confirmed override from ${plan.riskOverride.from} (risk keywords only); not an approval and no delete/shell/deploy tools are added`,
+				]
+			: []),
 		"Acceptance criteria (Host-assigned IDs; workers judge and report by ID, never by prose):",
 		...plan.acceptanceCriteria.map(
 			(criterion) =>
