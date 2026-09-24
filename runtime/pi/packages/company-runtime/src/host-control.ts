@@ -14,6 +14,9 @@ import {
 import { browserDigest, browserProjectId } from "./browser-types.ts";
 import { boundCapabilityInventory, createCapabilityBroker, type RuntimeCapabilityBroker } from "./capability-broker.ts";
 import { capabilityJson } from "./capability-catalog.ts";
+import { complexDraftBytes } from "./complex-plan.ts";
+import { ComplexProjectionError, projectComplexExecution } from "./complex-state.ts";
+import { COMPLEX_CONTRACT_VERSION, COMPLEX_DRAFT_MAX_BYTES, type ComplexExecution } from "./complex-types.ts";
 import { loadRuntimeConfig } from "./config.ts";
 import type { ApprovalDecision, ApprovalRequest, Run } from "./contracts.ts";
 import { taskContractDigest } from "./criterion-evidence.ts";
@@ -48,6 +51,7 @@ import {
 import {
 	applyHostWorkflowRecipe,
 	createHostWorkflow,
+	finalizeComplexHostWorkflowPlan,
 	finalizeHostWorkflowPlan,
 	HostWorkflowError,
 	prepareHostWorkflowDraft,
@@ -383,6 +387,18 @@ export class HostControlBridge {
 			if (attempt >= 2) throw new ControlError("STATE_UNAVAILABLE");
 			return this.snapshot(request, attempt + 1, true);
 		}
+		// §10.3: present iff this coherent snapshot's latest canonical Run is COMPLEX (owned or historical), built from
+		// that exact Run and envelope; never null, never from an older Run and never a partial DTO.
+		let complexExecution: ComplexExecution | undefined;
+		if (run?.workflow === "COMPLEX") {
+			const stateRevision = observation.identity.stateRevision;
+			if (stateRevision === null) throw new ControlError("STATE_UNAVAILABLE");
+			try {
+				complexExecution = projectComplexExecution(run, { ownerId: this.ownerId, projectRevision, stateRevision });
+			} catch (error) {
+				throw new ControlError(error instanceof ComplexProjectionError ? error.code : "STATE_UNAVAILABLE");
+			}
+		}
 		publishInventory({ projectRevision, sourceChanged });
 		const inventory = this.capabilities.reader.list({ limit: 32 });
 		const capabilityInventory = inventory.ok
@@ -407,6 +423,7 @@ export class HostControlBridge {
 					projectFacts,
 					pendingApproval,
 					capabilityInventory,
+					...(complexExecution ? { complexExecution } : {}),
 					snapshot: {
 						status: observation.status,
 						graph,
@@ -563,13 +580,30 @@ export class HostControlBridge {
 			);
 		}
 		if (request.type === "workflow.prepare") {
+			const { complexDraft } = request;
+			// Recipes stay STANDARD-only; the structured draft is byte-bounded before any compilation.
+			if (
+				complexDraft !== undefined &&
+				(request.recipeId !== undefined ||
+					request.recipeInputs !== undefined ||
+					complexDraftBytes(complexDraft) > COMPLEX_DRAFT_MAX_BYTES)
+			)
+				throw new ControlError("INVALID_REQUEST");
 			await this.idleRevision(request.expectedProjectRevision);
 			const config = await this.configuration();
-			let draft = prepareHostWorkflowDraft({ goal: request.goal, config });
+			let draft = prepareHostWorkflowDraft({
+				goal: request.goal,
+				config,
+				...(complexDraft !== undefined ? { complexDraft } : {}),
+			});
 			if (request.recipeInputs && !request.recipeId) throw new ControlError("INVALID_RECIPE");
 			if (request.recipeId)
 				draft = applyHostWorkflowRecipe(draft, { recipeId: request.recipeId, inputs: request.recipeInputs ?? {} });
-			const plan = finalizeHostWorkflowPlan(draft, request.acceptanceStatements ?? draft.statements);
+			const statements = request.acceptanceStatements ?? draft.statements;
+			const plan =
+				draft.workflow === "COMPLEX"
+					? await finalizeComplexHostWorkflowPlan(draft, statements, { cwd: this.root.path })
+					: finalizeHostWorkflowPlan(draft, statements);
 			const fields = {
 				previewId: randomUUID(),
 				ownerId: this.ownerId,
@@ -597,6 +631,8 @@ export class HostControlBridge {
 					verificationRepairMode: config.verification.repair.mode,
 					lspEnabled: config.code_intelligence?.lsp.enabled === true,
 				},
+				// Absent (not null) for QUICK/STANDARD; the preview digest below covers the complete plan.
+				...(plan.complexPlan ? { complexPlan: plan.complexPlan } : {}),
 			};
 			const preview: HostControlPreview = {
 				...fields,
@@ -717,6 +753,9 @@ export class HostControlBridge {
 					previewTtlMs: HOST_CONTROL_PREVIEW_TTL_MS,
 					runtimeVersion: runtimePackage.version,
 					readiness: this.options.readiness ?? "READY",
+					// §10.3: this Runtime implements COMPLEX contract v1 and always says so. Advertisement is not
+					// readiness, authority or permission to execute.
+					complexContractVersion: COMPLEX_CONTRACT_VERSION,
 					recipes: listTaskRecipes().map(({ id, version, title }) => ({
 						id,
 						version,

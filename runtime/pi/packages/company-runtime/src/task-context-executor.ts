@@ -22,8 +22,10 @@ export function taskContextSeeds(request: AgentExecutionRequest): string[] {
 	const scope = request.task.acceptanceCriteria.flatMap((criterion) => criterion.scope.paths);
 	const seeds = new Set<string>(scope.map((path) => path.trim()).filter((path) => path.length > 0));
 	if (request.role === "Developer") {
-		for (const issue of request.previousReview?.issues ?? [])
+		for (const issue of request.previousReview?.issues ?? request.complexTask?.previousReview?.issues ?? [])
 			if (typeof issue.file === "string" && issue.file.trim().length > 0) seeds.add(issue.file.trim());
+		// COMPLEX: the task's exact claimed files are the natural starting context (still advisory, never permission).
+		for (const claim of request.complexTask?.task.ownership ?? []) seeds.add(claim.path);
 	} else if (request.role === "Reviewer") {
 		for (const path of request.handoff.changed_files) if (path.trim()) seeds.add(path.trim());
 		for (const path of request.verification.changedFiles ?? []) if (path.trim()) seeds.add(path.trim());

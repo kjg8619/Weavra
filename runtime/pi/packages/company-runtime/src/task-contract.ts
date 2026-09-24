@@ -53,6 +53,7 @@ export function buildTaskContract(input: TaskContractInput): TaskContract {
 	const checkIds = input.config.verification.checks.filter((check) => check.required).map((check) => check.id);
 	// Criteria may map to zero checks (no required checks configured); the Workflow still requires
 	// at least one required check for every live run, and STANDARD criteria are covered by review evidence.
+	// COMPLEX parents also require review: every task contribution and the final integration are reviewed.
 	const contract = validateContract(TaskContractSchema, {
 		id: input.taskId ?? randomUUID(),
 		goal: input.goal,
@@ -60,7 +61,7 @@ export function buildTaskContract(input: TaskContractInput): TaskContract {
 			id: `AC-${String(index + 1).padStart(3, "0")}`,
 			statement,
 			scope: { paths: [...input.config.files.allowed_paths] },
-			verification: { checkIds, reviewRequired: input.workflow === "STANDARD" },
+			verification: { checkIds, reviewRequired: input.workflow === "STANDARD" || input.workflow === "COMPLEX" },
 		})),
 		status: "pending",
 	});
@@ -83,6 +84,8 @@ export function assertTaskContractBinding(
 			throw new Error("QUICK cannot satisfy review-required acceptance criteria; select STANDARD");
 		if (options.workflow === "STANDARD" && !criterion.verification.reviewRequired)
 			throw new Error("STANDARD acceptance criteria must require independent review");
+		if (options.workflow === "COMPLEX" && !criterion.verification.reviewRequired)
+			throw new Error("COMPLEX acceptance criteria must require independent review");
 	}
 }
 

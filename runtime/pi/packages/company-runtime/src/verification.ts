@@ -13,13 +13,20 @@ import {
 	type RegisteredBrowserCheck,
 	validateRegisteredBrowserCheck,
 } from "./browser-types.ts";
+import { type ComplexEvidenceContext, type ComplexPlan, evidenceNamespace } from "./complex-types.ts";
 import type { RuntimeConfig } from "./config.ts";
 import type { CheckRequirement, CheckResult, VerificationResult } from "./contracts.ts";
 import { collectLspEvidence, markStaleLspEvidence } from "./lsp/evidence.ts";
 import type { LspEvidence, LspPort } from "./lsp/types.ts";
 import { type ActionAudit, evaluateRegisteredCheck, type PolicyContext, type RegisteredCheck } from "./policy.ts";
 import { FilePolicyPathInspector } from "./policy-paths.ts";
-import type { AdvisoryCheckPort, AdvisoryCheckResult, VerificationRequest, Verifier } from "./ports.ts";
+import type {
+	AdvisoryCheckPort,
+	AdvisoryCheckResult,
+	ComplexWorkspaceImages,
+	VerificationRequest,
+	Verifier,
+} from "./ports.ts";
 import { ProcessCleanupError, resolveExecutable, runProcess, verificationEnvironment } from "./process-runner.ts";
 import {
 	buildSandboxPolicy,
@@ -60,6 +67,8 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 	private readonly trustSnapshots: Array<VerifierTrustSnapshot | undefined>;
 	private readonly sandbox?: SandboxPolicySnapshot;
 	private readonly lsp?: LspPort;
+	/** Host-confirmed frozen COMPLEX plan: the only source of a task's check subset. */
+	private readonly complexPlan?: ComplexPlan;
 	private constructor(
 		config: RuntimeConfig,
 		policy: PolicyContext,
@@ -70,7 +79,9 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 		trustSnapshots: Array<VerifierTrustSnapshot | undefined>,
 		sandbox: SandboxPolicySnapshot | undefined,
 		lsp?: LspPort,
+		complexPlan?: ComplexPlan,
 	) {
+		this.complexPlan = complexPlan ? structuredClone(complexPlan) : undefined;
 		this.trustSnapshots = trustSnapshots;
 		this.sandbox = sandbox;
 		this.lsp = lsp;
@@ -87,8 +98,15 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 		audit: ActionAudit,
 		workspace: GitWorkspace,
 		lsp?: LspPort,
+		complexPlan?: ComplexPlan,
 	): Promise<RegisteredVerifier> {
 		config = structuredClone(config);
+		if (
+			complexPlan &&
+			JSON.stringify(complexPlan.integration.checkIds) !==
+				JSON.stringify(config.verification.checks.map((check) => check.id).sort())
+		)
+			throw new Error("COMPLEX plan integration checks differ from the frozen registrations");
 		const env = verificationEnvironment();
 		const registrations = await Promise.all(
 			config.verification.checks.map(async (check) => {
@@ -195,6 +213,7 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 			trustSnapshots,
 			sandbox,
 			lsp,
+			complexPlan,
 		);
 	}
 	/**
@@ -239,6 +258,30 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 		const { diff: _diff, ...snapshot } = await this.workspace.inspect(signal);
 		return snapshot;
 	}
+	/** COMPLEX ledger capture through the same GitWorkspace evaluation as `inspect`. */
+	async images(paths: readonly string[], signal?: AbortSignal): Promise<ComplexWorkspaceImages> {
+		return this.workspace.complexImages(paths, signal);
+	}
+	/**
+	 * Frozen registration indexes a verification context runs: the task's frozen `checkIds` in TASK scope, every
+	 * registration in INTEGRATION scope, and every registration for QUICK/STANDARD. Arbitrary subsets never apply.
+	 */
+	private selection(context: ComplexEvidenceContext | undefined): number[] {
+		const all = this.config.verification.checks.map((_check, index) => index);
+		if (!context && !this.complexPlan) return all;
+		const plan = this.complexPlan;
+		if (
+			!context ||
+			!plan ||
+			context.parentTaskContractDigest !== plan.parentTaskContractDigest ||
+			context.complexPlanDigest !== plan.complexPlanDigest
+		)
+			throw new Error("COMPLEX verification context differs from the frozen plan");
+		if (context.scope === "INTEGRATION") return all;
+		const task = plan.tasks.find((item) => item.id === context.taskId);
+		if (!task) throw new Error("COMPLEX verification names an unknown task");
+		return all.filter((index) => task.checkIds.includes(this.config.verification.checks[index].id));
+	}
 
 	/**
 	 * One Developer-requested run of a registered process check while implementing, with the same frozen
@@ -247,7 +290,13 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 	 */
 	async advise(input: Parameters<AdvisoryCheckPort["advise"]>[0]): Promise<AdvisoryCheckResult> {
 		if (!this.safeToRelease) throw new ProcessCleanupError();
-		if (input.runId !== this.policy.executionRunId || this.policy.r3Scope || input.step.stepId !== "implement")
+		// COMPLEX has no advisory runs: an unaccounted check side effect would break the expected-image ledger.
+		if (
+			input.runId !== this.policy.executionRunId ||
+			this.policy.r3Scope ||
+			this.complexPlan ||
+			input.step.stepId !== "implement"
+		)
 			throw new Error("Advisory check binding mismatch");
 		const index = this.config.verification.checks.findIndex((check) => check.id === input.checkId);
 		const check = this.config.verification.checks[index];
@@ -467,7 +516,8 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 			...(check.repairableExitCodes?.length ? { repairableExitCodes: check.repairableExitCodes } : {}),
 			...(check.browser ? { browser: browserDigest(check.browser) } : {}),
 		});
-		const frozenRequirements = this.trustRequirements;
+		const selected = this.selection(request.complexContext);
+		const frozenRequirements = this.trustRequirements.filter((_check, index) => selected.includes(index));
 		if (
 			JSON.stringify(request.checks.map(requirementOf)) !==
 			JSON.stringify(
@@ -480,10 +530,13 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 			)
 		)
 			throw new Error("Verification request changed registered checks");
+		const context = request.complexContext ? structuredClone(request.complexContext) : undefined;
+		const namespace = evidenceNamespace(request);
 		const before = await this.workspace.inspect(request.signal);
 		if (!before.safe) throw new Error("Unsupported workspace mutation; review required");
 		const checks: CheckResult[] = [];
 		for (const [index, check] of configured.entries()) {
+			if (!selected.includes(index)) continue;
 			const now = Date.now();
 			const base: CheckResult = {
 				id: check.id,
@@ -497,10 +550,11 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 				reason: "Cancelled before check",
 				startedAt: now,
 				finishedAt: now,
-				evidenceRefs: [`check:${request.runId}:${request.step.stepId}:${request.step.attempt}:${check.id}`],
+				evidenceRefs: [`check:${namespace}:${check.id}`],
 				diffDigest: before.diffDigest,
 				stdout: "",
 				stderr: "",
+				...(context ? { complexContext: structuredClone(context) } : {}),
 			};
 			if (request.signal?.aborted) {
 				checks.push(base);
@@ -525,6 +579,7 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 						step: request.step,
 						revision: request.revision,
 						...(check.kind === "browser" ? { browser: check.browser } : {}),
+						...(context ? { complexContext: context } : {}),
 					}),
 				},
 				action,
@@ -732,7 +787,7 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 						diagnostics: [],
 						reason: "LSP diagnostics cancelled",
 						diffDigest: final.diffDigest,
-						evidenceRef: `lsp:${request.runId}:${request.step.stepId}:${request.step.attempt}:cancelled`,
+						evidenceRef: `lsp:${namespace}:cancelled`,
 						startedAt: now,
 						finishedAt: now,
 						withheld: 0,
@@ -766,8 +821,10 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 			if (checks.some((check) => check.kind !== "browser" && check.sandbox?.status !== "ENFORCED"))
 				integrity = false;
 		}
-		for (const [index, check] of checks.entries()) {
-			const snapshot = this.trustSnapshots[index];
+		// Results follow registration order but may be a frozen COMPLEX task subset: resolve each by its ID.
+		const registrationIndex = (check: CheckResult) => configured.findIndex((item) => item.id === check.id);
+		for (const check of checks) {
+			const snapshot = this.trustSnapshots[registrationIndex(check)];
 			if (repairEnabled || (check.status === "PASS" && snapshot?.mode === "strict")) {
 				const settled = snapshot ? validateVerifierTrust(this.workspace.cwd, snapshot) : undefined;
 				if (!settled?.ok) {
@@ -779,6 +836,15 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 				}
 			}
 		}
+		// COMPLEX strengthening (§5.3): a check may not mutate accounted files, even when the change is otherwise safe.
+		if (context && final.diffDigest !== before.diffDigest) {
+			integrity = false;
+			for (const check of checks)
+				if (check.status === "PASS") {
+					check.status = "FAIL";
+					check.reason = "The workspace changed during COMPLEX verification; checks cannot mutate accounted files";
+				}
+		}
 		for (const check of checks)
 			if (request.signal?.aborted || !final.safe || check.diffDigest !== final.diffDigest) {
 				integrity = false;
@@ -789,9 +855,9 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 					? "Verification cancelled before result settlement"
 					: "Workspace changed or evidence unavailable; check evidence is stale";
 			}
-		for (const [index, check] of checks.entries()) {
+		for (const check of checks) {
 			if (check.kind !== "browser") continue;
-			const definition = configured[index];
+			const definition = configured[registrationIndex(check)];
 			if (
 				check.status === "PASS" &&
 				(definition.kind !== "browser" || !validBrowserCheckEvidence(check, definition.browser, Date.now()))
@@ -806,6 +872,7 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 			runId: request.runId,
 			revision: request.revision,
 			step: request.step,
+			...(context ? { complexContext: context } : {}),
 			diffDigest: final.diffDigest,
 			evidenceRefs: [...final.evidenceRefs, ...(lspEvidence?.map((item) => item.evidenceRef) ?? [])],
 			...(lspEvidence ? { lspEvidence } : {}),

@@ -6,6 +6,7 @@ import type { Run } from "./contracts.ts";
 import { OBSERVATION_FILES, ownedObservationPaths } from "./observation-files.ts";
 import { evaluatePolicy, isPolicyPath, type PolicyContext } from "./policy.ts";
 import { FilePolicyPathInspector } from "./policy-paths.ts";
+import type { ComplexWorkspaceImages } from "./ports.ts";
 import { ProcessCleanupError, resolveExecutable, runProcess, verificationEnvironment } from "./process-runner.ts";
 import { changedLineCount } from "./quick.ts";
 
@@ -176,11 +177,39 @@ export class GitWorkspace {
 		}
 		return images;
 	}
-	async inspect(signal?: AbortSignal): Promise<DiffEvidence> {
+	private async capture(
+		signal?: AbortSignal,
+	): Promise<{ images: Map<string, FileImage>; head: string; index: string; gitConfig: string }> {
 		const images = await this.images(signal);
 		const head = (await this.command(["rev-parse", "HEAD"], signal)).trim();
 		const index = await this.command(["ls-files", "--stage", "-z"], signal);
 		const gitConfig = await this.controlHash();
+		return { images, head, index, gitConfig };
+	}
+	async inspect(signal?: AbortSignal): Promise<DiffEvidence> {
+		return this.evidence(await this.capture(signal));
+	}
+	/**
+	 * COMPLEX expected-image ledger input: one capture, evaluated exactly like `inspect`, plus the byte hash and
+	 * permission bits of every requested file and every changed file (null when absent). No checks, no Git write.
+	 */
+	async complexImages(paths: readonly string[], signal?: AbortSignal): Promise<ComplexWorkspaceImages> {
+		const capture = await this.capture(signal);
+		const { diffDigest, safe, changedFiles } = await this.evidence(capture);
+		const images: ComplexWorkspaceImages["images"] = {};
+		for (const path of new Set([...paths, ...changedFiles])) {
+			const image = capture.images.get(path);
+			images[path] = image ? { hash: image.hash, mode: image.mode } : null;
+		}
+		return { diffDigest, safe, changedFiles, images };
+	}
+	private async evidence(capture: {
+		images: Map<string, FileImage>;
+		head: string;
+		index: string;
+		gitConfig: string;
+	}): Promise<DiffEvidence> {
+		const { images, head, index, gitConfig } = capture;
 		const changedFiles = [...new Set([...this.baseline.keys(), ...images.keys()])]
 			.filter(
 				(path) =>

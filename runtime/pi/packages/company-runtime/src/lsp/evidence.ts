@@ -1,3 +1,4 @@
+import { evidenceNamespace } from "../complex-types.ts";
 import type { VerificationRequest } from "../ports.ts";
 import { ProcessCleanupError } from "../process-runner.ts";
 import type { LspConfig, LspEvidence, LspPort } from "./types.ts";
@@ -48,7 +49,7 @@ export async function collectLspEvidence(
 		evidence.push({
 			...item,
 			diffDigest,
-			evidenceRef: `lsp:${request.runId}:${request.step.stepId}:${request.step.attempt}:${evidence.length}`,
+			evidenceRef: `lsp:${evidenceNamespace(request)}:${evidence.length}`,
 		});
 	}
 	if (!routed.length || routed.length > 8) {
@@ -58,7 +59,7 @@ export async function collectLspEvidence(
 			status: routed.length ? "PARTIAL" : "UNAVAILABLE",
 			diagnostics: [],
 			diffDigest,
-			evidenceRef: `lsp:${request.runId}:${request.step.stepId}:${request.step.attempt}:${evidence.length}`,
+			evidenceRef: `lsp:${evidenceNamespace(request)}:${evidence.length}`,
 			startedAt: now,
 			finishedAt: now,
 			withheld: 0,

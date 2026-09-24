@@ -1,4 +1,5 @@
 import type { RiskOverride } from "./classification.ts";
+import type { ComplexPlan } from "./complex-types.ts";
 import type { RuntimeConfig } from "./config.ts";
 import type { AcceptanceCriterion, Risk, Workflow } from "./contracts.ts";
 import type { ExecutionMode } from "./execution-contract.ts";
@@ -24,10 +25,51 @@ export interface PlanPreview {
 	verificationRepairMode: "disabled" | "self-check-once";
 	/** Bounded reviewed-recipe metadata; never the raw recipe inputs and never an authority. */
 	recipe?: { id: string; version: number; digest: string };
+	/** Present iff workflow is COMPLEX: the complete immutable plan bound to this parent. Not an approval. */
+	complexPlan?: ComplexPlan;
+}
+
+/** Render untrusted plan text without letting control, bidi or invisible characters restyle the preview. */
+function displayText(text: string): string {
+	let display = "";
+	for (let index = 0; index < text.length; index++) {
+		const code = text.charCodeAt(index);
+		// C0/C1 controls plus zero-width, line/paragraph separator, bidi, word-joiner and BOM code points.
+		const invisible =
+			code <= 0x1f ||
+			(code >= 0x7f && code <= 0x9f) ||
+			(code >= 0x200b && code <= 0x200f) ||
+			(code >= 0x2028 && code <= 0x202e) ||
+			(code >= 0x2060 && code <= 0x206f) ||
+			code === 0xfeff;
+		display += invisible ? `U+${code.toString(16).toUpperCase().padStart(4, "0")}` : text[index];
+	}
+	return display;
+}
+
+function formatComplexPlan(plan: ComplexPlan): string[] {
+	const { limits, integration } = plan;
+	return [
+		`COMPLEX plan ${plan.planId} ${plan.complexPlanDigest} (parent ${plan.parentTaskId} ${plan.parentTaskContractDigest}):`,
+		"  Tasks run one at a time in this exact order, each only after every earlier task COMPLETED; no Planner/Lead, parallel work, reordering, retry or reassignment.",
+		...plan.tasks.flatMap((task) => [
+			`  ${task.id} ${displayText(task.title)}`,
+			`    Goal: ${displayText(task.goal)}`,
+			`    Depends on: ${task.dependsOn.join(", ") || "none"}`,
+			`    Criteria: ${task.criterionIds.join(", ")}`,
+			`    Owned files: ${task.ownership.length ? task.ownership.map((claim) => `${claim.operation} ${claim.path}`).join("; ") : "none (read-only contribution)"}`,
+			`    Local checks (mandatory, run fresh before and after an independent task review): ${task.checkIds.join(", ")}`,
+			`    Local revision cycles: at most ${task.maxRevisionCycles}`,
+		]),
+		`  Integration after every task COMPLETED: fresh checks ${integration.checkIds.join(", ")}, a new independent final review of ${integration.criterionIds.join(", ")}, then fresh final checks`,
+		`  Limits: ${limits.maxTasks} tasks; ${limits.maxWorkerInvocations} worker invocations; ${limits.maxReportedTokens} provider-reported tokens (not a billing cap); ${limits.maxTotalRevisionCycles} total revision cycles`,
+		"  Owned files are exclusive responsibility, not permission: Policy, R2 review and R3 approval still apply, and unclaimed files are denied. The plan cannot change after confirmation.",
+	];
 }
 
 /** Host-side display only. Confirming this plan is neither an approval nor a permission token. */
 export function formatPlanPreview(plan: PlanPreview): string {
+	const complex = plan.complexPlan;
 	return [
 		`Goal: ${plan.goal}`,
 		...(plan.recipe ? [`Recipe: ${plan.recipe.id}@${plan.recipe.version} ${plan.recipe.digest}`] : []),
@@ -51,7 +93,8 @@ export function formatPlanPreview(plan: PlanPreview): string {
 				? `  ${check.id} (browser)${check.required ? " required" : " optional"}: ${check.browser.documentIdentity} ${check.browser.target.selector} ${JSON.stringify(check.browser.assertion)}; fresh isolated capture, strict verifier trust, no automatic repair`
 				: `  ${check.id} (${check.kind})${check.required ? " required" : " optional"}: ${check.executable} ${check.args.join(" ")}`,
 		),
-		`Roles: ${plan.workflow === "QUICK" ? "Executor" : "Developer -> independent Reviewer"}`,
+		...(complex ? formatComplexPlan(complex) : []),
+		`Roles: ${plan.workflow === "QUICK" ? "Executor" : complex ? "Developer -> independent Reviewer for each task, then a new independent final Reviewer (no Planner/Lead)" : "Developer -> independent Reviewer"}`,
 		`Project instruction: ${plan.projectInstructionPath ? `${plan.projectInstructionPath} (configured; frozen prompt context, not readable by workers)` : "none"}`,
 		`LSP: ${plan.lspEnabled ? "enabled (trusted local program, not sandboxed)" : "disabled"}`,
 		`Mutation mode: ${plan.mutationMode}${plan.mutationMode === "strict" ? " (strict freshness/precondition enforcement for existing files; not a permission and not approval)" : ""}`,
@@ -63,8 +106,10 @@ export function formatPlanPreview(plan: PlanPreview): string {
 				]
 			: []),
 		`Task context pack: ${plan.contextPackMode === "bounded" ? "bounded (Host-selected advisory context; policy-filtered; not permission, approval, evidence or mutation freshness)" : "disabled"}`,
-		`Verification repair: ${plan.verificationRepairMode} (maximum one fresh attempt; STANDARD/EDIT/R1 SELF_CHECK only; original policy and cumulative budget retained)`,
-		...(plan.verificationRepairMode === "self-check-once"
+		complex
+			? "Verification repair: not used by COMPLEX (a failed task SELF_CHECK or TEST blocks the Run; no repair cycle)"
+			: `Verification repair: ${plan.verificationRepairMode} (maximum one fresh attempt; STANDARD/EDIT/R1 SELF_CHECK only; original policy and cumulative budget retained)`,
+		...(!complex && plan.verificationRepairMode === "self-check-once"
 			? plan.checks
 					.filter((check) => check.repairable_exit_codes?.length)
 					.map(

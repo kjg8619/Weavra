@@ -165,6 +165,45 @@ describe("V0.3E acceptance criteria", () => {
 		expect(() => assertCriterionIdentity(tampered)).toThrow("sequential Host-assigned IDs");
 	});
 
+	it("builds COMPLEX parents with every criterion review-required and binds only such parents (#16)", () => {
+		const config = testConfig({ checkIds: ["regression"] });
+		const build = (workflow: "QUICK" | "STANDARD" | "COMPLEX") =>
+			buildTaskContract({
+				goal: "Refactor the parser across multiple modules",
+				statements,
+				workflow,
+				config,
+				taskId: "task-1",
+			});
+		const complex = build("COMPLEX");
+		expect(complex.acceptanceCriteria.map((criterion) => criterion.verification)).toEqual([
+			{ checkIds: ["regression"], reviewRequired: true },
+			{ checkIds: ["regression"], reviewRequired: true },
+		]);
+		expect(() => assertTaskContractBinding(complex, { workflow: "COMPLEX", config })).not.toThrow();
+		// Same Host-assigned identity and digest material as STANDARD; only the workflow binding rule is new.
+		expect(taskContractDigest(complex)).toBe(taskContractDigest(build("STANDARD")));
+		expect(() => assertTaskContractBinding(build("QUICK"), { workflow: "COMPLEX", config })).toThrow(
+			"COMPLEX acceptance criteria must require independent review",
+		);
+		const oneUnreviewed: TaskContract = {
+			...complex,
+			acceptanceCriteria: [
+				complex.acceptanceCriteria[0],
+				{
+					...complex.acceptanceCriteria[1],
+					verification: { ...complex.acceptanceCriteria[1].verification, reviewRequired: false },
+				},
+			],
+		};
+		expect(() => assertTaskContractBinding(oneUnreviewed, { workflow: "COMPLEX", config })).toThrow(
+			"COMPLEX acceptance criteria must require independent review",
+		);
+		expect(() =>
+			assertTaskContractBinding(complex, { workflow: "COMPLEX", config: testConfig({ checkIds: ["other"] }) }),
+		).toThrow("unregistered check");
+	});
+
 	it("digest covers the frozen contract identity but not lifecycle status", () => {
 		const built = contract();
 		expect(taskContractDigest(built)).toMatch(/^sha256:[0-9a-f]{64}$/);

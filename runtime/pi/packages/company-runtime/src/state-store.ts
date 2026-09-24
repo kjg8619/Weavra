@@ -5,6 +5,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { type Static, Type } from "typebox";
 import { readAnchoredSource } from "./anchored-files.ts";
+import { ACTIVE_TASK_STATUSES, complexRunError, settleComplexState } from "./complex-state.ts";
 import { type PolicyDecision, PolicyDecisionSchema, type Run, RunSchema, validateContract } from "./contracts.ts";
 import { createRuntimeEvent, type EventDeliveryFailure, type RuntimeEvent, type RuntimeEventSink } from "./events.ts";
 import { isExecutionMode } from "./execution-contract.ts";
@@ -160,6 +161,9 @@ function assertState(value: unknown): FileRuntimeState {
 		const taskIds = new Set(run.tasks.map((task) => task.id));
 		if (taskIds.size !== run.tasks.length || !taskIds.has(run.currentTask) || run.revision < 1)
 			throw new Error("Invalid run identity");
+		// COMPLEX identity/state invariants hold for every stored snapshot, not only for fresh saves.
+		const complex = complexRunError(run);
+		if (complex) throw new Error(`Invalid COMPLEX run state: ${complex}`);
 	}
 	const actionIds = new Set<string>();
 	for (const action of state.actions) {
@@ -577,6 +581,18 @@ export class FileStateStore implements StateStore, ActionAudit {
 		const events: RuntimeEvent[] = [];
 		for (const run of next.runs)
 			if (active(run)) {
+				// COMPLEX: completed contribution rows stay historical; every unfinished row and running gate is
+				// interrupted by owner loss with unknown changes and unconfirmed cleanup. Never replayed.
+				if (run.complex)
+					run.complex = settleComplexState(run.complex, {
+						taskStatus: "INTERRUPTED",
+						failureCode: "OWNER_LOST",
+						cancelled: false,
+						ownerLost: true,
+						cleanup: "UNCONFIRMED",
+						partialChanges: true,
+						changesUnknown: true,
+					});
 				run.status = "INTERRUPTED";
 				run.revision++;
 				run.eventSequence++;
@@ -800,7 +816,9 @@ export class FileStateStore implements StateStore, ActionAudit {
 				previous?.risk === "R3" &&
 				previous.r3Scope &&
 				(run.risk !== "R3" ||
-					run.workflow !== "STANDARD" ||
+					// Explicit COMPLEX branch: the same single deletion obligation, never a relabelled STANDARD run.
+					run.workflow !== previous.workflow ||
+					(run.workflow !== "STANDARD" && run.workflow !== "COMPLEX") ||
 					JSON.stringify(run.r3Scope) !== JSON.stringify(previous.r3Scope))
 			)
 				throw new Error("R3 scope/approval obligation cannot change");
@@ -849,10 +867,12 @@ export class FileStateStore implements StateStore, ActionAudit {
 				throw new Error("Approval history cannot be removed");
 			if (
 				previous?.risk === "R2" &&
-				previous.workflow === "STANDARD" &&
-				(run.risk !== "R2" || run.workflow !== "STANDARD" || run.quickScope !== undefined)
+				(previous.workflow === "STANDARD" || previous.workflow === "COMPLEX") &&
+				(run.risk !== "R2" || run.workflow !== previous.workflow || run.quickScope !== undefined)
 			)
 				throw new Error("A persisted R2 review obligation cannot be downgraded");
+			const complex = complexRunError(run, previous);
+			if (complex) throw new Error(`Invalid COMPLEX run state: ${complex}`);
 			if (run.revision !== (previous?.revision ?? 0) + 1 || (previous && !active(previous)))
 				throw new Error("Stale revision or terminal run; resume is unsupported");
 			if (!previous && (run.status !== "CREATED" || next.runs.some(active)))
@@ -891,19 +911,40 @@ export class FileStateStore implements StateStore, ActionAudit {
 				throw new Error("Action requires a running owner, a fresh ID and the same frozen configuration");
 			if (decision.decision === "ALLOW" && (decision.risk === "R2" || decision.risk === "R3")) {
 				const run = next.runs.find((run) => run.runId === decision.runId);
+				// COMPLEX: the attempt is the active task attempt (§10.1), not revisionCycle + 1.
+				const implementing = run?.complex?.tasks.find((row) => ACTIVE_TASK_STATUSES.has(row.status));
 				if (
 					!run ||
 					run.risk !== decision.risk ||
-					run.workflow !== "STANDARD" ||
+					!(run.workflow === "STANDARD" || (run.workflow === "COMPLEX" && run.complex)) ||
 					run.quickScope ||
 					run.phase !== "IMPLEMENT" ||
 					run.currentStep?.stepId !== "implement" ||
-					run.currentStep.attempt !== run.revisionCycle + 1 ||
+					(run.workflow === "COMPLEX"
+						? implementing?.status !== "IMPLEMENTING" || run.currentStep.attempt !== implementing.attempt
+						: run.currentStep.attempt !== run.revisionCycle + 1) ||
 					decision.role !== "Developer" ||
 					!run.activeAgents.includes("Developer") ||
 					run.roleSessionRefs.at(-1)?.role !== "Developer"
 				)
 					throw new Error("R2 intent requires a persisted STANDARD/R2 Developer session and review obligation");
+			}
+			if (decision.decision === "ALLOW" && decision.role === "Developer" && decision.risk !== "R0") {
+				// COMPLEX mutation intent exists only inside the one IMPLEMENTING task attempt with its Developer session.
+				const run = next.runs.find((run) => run.runId === decision.runId);
+				const implementing = run?.complex?.tasks.find((row) => ACTIVE_TASK_STATUSES.has(row.status));
+				if (
+					run?.workflow === "COMPLEX" &&
+					(!run.complex ||
+						implementing?.status !== "IMPLEMENTING" ||
+						run.currentStep?.stepId !== "implement" ||
+						run.currentStep.attempt !== implementing.attempt ||
+						!run.activeAgents.includes("Developer") ||
+						run.roleSessionRefs.at(-1)?.role !== "Developer")
+				)
+					throw new Error(
+						"COMPLEX mutation intent requires the active IMPLEMENTING task attempt and its Developer",
+					);
 			}
 			if (decision.decision === "ALLOW" && decision.risk === "R3") {
 				const run = next.runs.find((run) => run.runId === decision.runId)!;

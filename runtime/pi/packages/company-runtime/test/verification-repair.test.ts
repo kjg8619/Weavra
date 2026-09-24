@@ -382,7 +382,7 @@ describe("V0.5C fresh attempt isolation", () => {
 				const execute = f.ports.agents.execute;
 				f.ports.agents.execute = async (input) => {
 					const result = await execute(input);
-					if (result.role === "Reviewer") result.review.revision = 0;
+					if (result.role === "Reviewer" && result.review) result.review.revision = 0;
 					return result;
 				};
 			}

@@ -1,6 +1,16 @@
 import { type Static, type TSchema, Type } from "typebox";
 import { Check } from "typebox/value";
 import { BrowserVerificationEvidenceSchema, RegisteredBrowserCheckSchema } from "./browser-types.ts";
+import {
+	COMPLEX_MAX_EVIDENCE_CHECK_REFS,
+	COMPLEX_MAX_EVIDENCE_RECORDS,
+	COMPLEX_MAX_PLAN_CLAIMS,
+	COMPLEX_MAX_RUN_ATTEMPTS,
+	ComplexEvidenceContextSchema,
+	ComplexFailureCodeSchema,
+	ComplexRunStateSchema,
+	ContributionStatusSchema,
+} from "./complex-types.ts";
 import { ExecutionModeSchema } from "./execution-contract.ts";
 import { LspEvidenceSchema } from "./lsp/types.ts";
 import { WorkerMeasurementSchema } from "./measurement-types.ts";
@@ -178,6 +188,8 @@ export const CheckResultSchema = Type.Object(
 		browser: Type.Optional(BrowserVerificationEvidenceSchema),
 		/** Positive attribution only; absence is never repair authority. */
 		failureKind: Type.Optional(Type.Literal("COMMAND_NONZERO")),
+		/** Kernel-assigned COMPLEX identity (§10.1): mandatory on live COMPLEX records, absent on QUICK/STANDARD. */
+		complexContext: Type.Optional(ComplexEvidenceContextSchema),
 	},
 	strict,
 );
@@ -221,25 +233,34 @@ export const VerificationResultSchema = Type.Object(
 				strict,
 			),
 		),
+		/** Kernel-assigned COMPLEX identity (§10.1): mandatory on live COMPLEX records, absent on QUICK/STANDARD. */
+		complexContext: Type.Optional(ComplexEvidenceContextSchema),
 	},
 	strict,
 );
 export type CheckRequirement = Static<typeof CheckRequirementSchema>;
 export type VerificationResult = Static<typeof VerificationResultSchema>;
 
+const handoffFields = {
+	runId: text,
+	revision: counter,
+	role: Type.Literal("Developer"),
+	task: text,
+	changed_files: texts,
+	summary: text,
+	assumptions: texts,
+	// References to verifier evidence, not agent-supplied check results.
+	tests_run: texts,
+	known_risks: texts,
+	unresolved: texts,
+};
+/** Model-facing Developer submission. Identity context is Runtime-attached, never supplied by the model. */
+export const HandoffSubmissionSchema = Type.Object(handoffFields, strict);
 export const HandoffSchema = Type.Object(
 	{
-		runId: text,
-		revision: counter,
-		role: Type.Literal("Developer"),
-		task: text,
-		changed_files: texts,
-		summary: text,
-		assumptions: texts,
-		// References to verifier evidence, not agent-supplied check results.
-		tests_run: texts,
-		known_risks: texts,
-		unresolved: texts,
+		...handoffFields,
+		/** Kernel-assigned COMPLEX identity (§10.1): mandatory on live COMPLEX records, absent on QUICK/STANDARD. */
+		complexContext: Type.Optional(ComplexEvidenceContextSchema),
 	},
 	strict,
 );
@@ -247,7 +268,7 @@ export const HandoffSchema = Type.Object(
 /** Historical Executor handoff with string requirements; read-only compatibility for stored state. */
 export const LegacyExecutorHandoffSchema = Type.Object(
 	{
-		...HandoffSchema.properties,
+		...handoffFields,
 		role: Type.Literal("Executor"),
 		requirements: Type.Array(
 			Type.Object({ requirement: text, status: CriterionStatusSchema, explanation: text }, strict),
@@ -260,7 +281,7 @@ export const LegacyExecutorHandoffSchema = Type.Object(
 // Executor supplies a criterion-by-criterion result, not a self-approval or invented check evidence.
 export const ExecutorHandoffSchema = Type.Object(
 	{
-		...HandoffSchema.properties,
+		...handoffFields,
 		role: Type.Literal("Executor"),
 		criteria: Type.Array(
 			Type.Object({ criterionId: acceptanceId, status: CriterionStatusSchema, explanation: text }, strict),
@@ -309,24 +330,52 @@ export const LegacyReviewSchema = Type.Object(
 	strict,
 );
 
+const reviewFields = {
+	runId: text,
+	revision: counter,
+	role: Type.Literal("Reviewer"),
+	task: text,
+	result: Type.Enum(["PASS", "REVISE", "BLOCK"]),
+	issues: reviewIssues,
+	// Reviewer judges the frozen AC IDs; it cannot add, remove, replace or restate criteria.
+	criteria: Type.Array(
+		Type.Object({ criterionId: acceptanceId, status: CriterionStatusSchema, evidenceRefs: texts }, strict),
+		{ minItems: 1, maxItems: MAX_ACCEPTANCE_CRITERIA },
+	),
+	evidenceRefs: texts,
+	diffDigest: text,
+};
+/** Model-facing parent review submission. Identity context is Runtime-attached, never supplied by the model. */
+export const ReviewSubmissionSchema = Type.Object(reviewFields, strict);
 export const ReviewSchema = Type.Object(
 	{
-		runId: text,
-		revision: counter,
-		role: Type.Literal("Reviewer"),
-		task: text,
-		result: Type.Enum(["PASS", "REVISE", "BLOCK"]),
-		issues: reviewIssues,
-		// Reviewer judges the frozen AC IDs; it cannot add, remove, replace or restate criteria.
-		criteria: Type.Array(
-			Type.Object({ criterionId: acceptanceId, status: CriterionStatusSchema, evidenceRefs: texts }, strict),
-			{ minItems: 1, maxItems: MAX_ACCEPTANCE_CRITERIA },
-		),
-		evidenceRefs: texts,
-		diffDigest: text,
+		...reviewFields,
+		/** Kernel-assigned COMPLEX identity (§10.1): a final INTEGRATION review carries it; QUICK/STANDARD never. */
+		complexContext: Type.Optional(ComplexEvidenceContextSchema),
 	},
 	strict,
 );
+
+const contributionReviewFields = {
+	...reviewFields,
+	// A task review judges the declared contribution to exactly its mapped parent criteria, never parent MET.
+	criteria: Type.Array(
+		Type.Object({ criterionId: acceptanceId, status: ContributionStatusSchema, evidenceRefs: texts }, strict),
+		{ minItems: 1, maxItems: MAX_ACCEPTANCE_CRITERIA },
+	),
+};
+/** Model-facing COMPLEX task contribution review submission (§7.1); identity context is Runtime-attached. */
+export const ComplexTaskReviewSubmissionSchema = Type.Object(contributionReviewFields, strict);
+/**
+ * Runtime-local COMPLEX task review (§10.1): existing review identity/verdict/issues/diff/evidence fields with the
+ * SUPPORTED/UNSUPPORTED/UNVERIFIED contribution enum and a mandatory TASK context. Stored in `Run.complexReviews`,
+ * never in the parent `review`/`reviewHistory` (whose MET/UNMET/UNVERIFIED semantics differ).
+ */
+export const ComplexTaskReviewSchema = Type.Object(
+	{ ...contributionReviewFields, complexContext: ComplexEvidenceContextSchema },
+	strict,
+);
+export type ComplexTaskReview = Static<typeof ComplexTaskReviewSchema>;
 
 export type LegacyReview = Static<typeof LegacyReviewSchema>;
 export const ReviewRecordSchema = Type.Union([ReviewSchema, LegacyReviewSchema]);
@@ -356,8 +405,45 @@ export const PolicyDecisionSchema = Type.Object(
 	strict,
 );
 
-export const RoleSessionReferenceSchema = Type.Object({ role: RoleSchema, sessionId: text, sessionFile: text }, strict);
+export const RoleSessionReferenceSchema = Type.Object(
+	{
+		role: RoleSchema,
+		sessionId: text,
+		sessionFile: text,
+		/** Kernel-attached COMPLEX attribution; adapters never supply it. Absent on QUICK/STANDARD. */
+		complexContext: Type.Optional(ComplexEvidenceContextSchema),
+	},
+	strict,
+);
 export type RoleSessionReference = Static<typeof RoleSessionReferenceSchema>;
+
+/**
+ * One bounded COMPLEX evidence record per started task attempt plus one integration record (§10.1). References
+ * resolve to this Run's typed records (checks, handoff, reviews, sessions, measurements), never worker strings.
+ */
+export const ComplexEvidenceRecordSchema = Type.Object(
+	{
+		complexContext: ComplexEvidenceContextSchema,
+		/** Global work cycle (`Run.revisionCycle`) captured when the attempt or integration started. */
+		revision: counter,
+		entryWorkspaceDigest: Type.Union([Type.String({ pattern: "^[0-9a-f]{64}$" }), Type.Null()]),
+		/** null when the attempt ended without an accepted exit capture. */
+		exitWorkspaceDigest: Type.Union([Type.String({ pattern: "^[0-9a-f]{64}$" }), Type.Null()]),
+		/** Task attempt: its own exact claimed files (at most 16); integration: the cumulative Run delta. */
+		changedFiles: Type.Array(text, { maxItems: COMPLEX_MAX_PLAN_CLAIMS, uniqueItems: true }),
+		/** Expected-ledger change digest of this record's delta; null when the change set is unknown. */
+		changeDigest: Type.Union([Type.String({ pattern: "^sha256:[0-9a-f]{64}$" }), Type.Null()]),
+		checkRefs: Type.Array(text, { maxItems: COMPLEX_MAX_EVIDENCE_CHECK_REFS, uniqueItems: true }),
+		handoff: Type.Boolean(),
+		review: Type.Boolean(),
+		sessionRefs: Type.Array(RoleSessionReferenceSchema, { maxItems: 2 }),
+		/** Indexes into `Run.workerMeasurements`. */
+		measurementIndexes: Type.Array(counter, { maxItems: 2, uniqueItems: true }),
+		failureCode: Type.Union([ComplexFailureCodeSchema, Type.Null()]),
+	},
+	strict,
+);
+export type ComplexEvidenceRecord = Static<typeof ComplexEvidenceRecordSchema>;
 
 export const R3ScopeSchema = Type.Object({ runId: text, targetPath: text }, strict);
 export type R3Scope = Static<typeof R3ScopeSchema>;
@@ -376,6 +462,8 @@ export const ApprovalRequestSchema = Type.Object(
 		step: StepReferenceSchema,
 		revision: counter,
 		expiresAt: counter,
+		/** Runtime-bound COMPLEX task identity, included in the action digest; never from the model or App. */
+		complexContext: Type.Optional(ComplexEvidenceContextSchema),
 	},
 	strict,
 );
@@ -488,6 +576,13 @@ export const RunSchema = Type.Object(
 		workerMeasurements: Type.Optional(Type.Array(WorkerMeasurementSchema)),
 		provenance: Type.Optional(ProvenanceSchema),
 		budget: Type.Optional(BudgetStatusSchema),
+		// COMPLEX only (§10.1): Kernel-owned sequential task state, bounded evidence records and task-local
+		// contribution reviews. Absent on QUICK/STANDARD runs; `tasks` stays the single parent Task Contract.
+		complex: Type.Optional(ComplexRunStateSchema),
+		complexEvidence: Type.Optional(
+			Type.Array(ComplexEvidenceRecordSchema, { maxItems: COMPLEX_MAX_EVIDENCE_RECORDS }),
+		),
+		complexReviews: Type.Optional(Type.Array(ComplexTaskReviewSchema, { maxItems: COMPLEX_MAX_RUN_ATTEMPTS })),
 		verification: Type.Array(CheckResultSchema),
 		lastError: Type.Union([text, Type.Null()]),
 		createdAt: counter,

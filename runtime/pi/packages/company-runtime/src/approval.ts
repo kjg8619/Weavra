@@ -16,17 +16,21 @@ export function isR3DeletionGrammar(goal: string): boolean {
 	return R3_DELETION_GRAMMAR.test(goal.trim());
 }
 
+/** Grammar-derived single deletion target: the exact deletion grammar with one Policy-safe relative path. */
+export function r3DeletionTarget(goal: string): string | undefined {
+	const match = R3_DELETION_GRAMMAR.exec(goal.trim());
+	return match && isPolicyPath(match[1]) ? match[1] : undefined;
+}
+
 /** The only supported R3 action: the exact deletion grammar with one Policy-safe relative path. */
 export function isSupportedR3Goal(goal: string): boolean {
-	const match = R3_DELETION_GRAMMAR.exec(goal.trim());
-	return !!match && isPolicyPath(match[1]);
+	return r3DeletionTarget(goal) !== undefined;
 }
 
 /** Exact initial S5C action grammar; no arbitrary destructive request becomes executable. */
 export function selectR3Scope(goal: string, runId: string): R3Scope | undefined {
-	const match = R3_DELETION_GRAMMAR.exec(goal.trim());
-	if (!match || !isPolicyPath(match[1])) return undefined;
-	return { runId, targetPath: match[1] };
+	const targetPath = r3DeletionTarget(goal);
+	return targetPath === undefined ? undefined : { runId, targetPath };
 }
 
 /** A timeout/cancelled/late/foreign answer is not consent. Non-cooperative UI cannot keep a grant alive. */

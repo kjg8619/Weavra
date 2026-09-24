@@ -504,3 +504,41 @@
 - 수정: 치환 문자열을 "edited"(6자)로 바꿔 크기가 달라지게 했다. 모든 줄이 여전히 바뀌므로 기대값 4000/4000은 그대로다. 제품 코드는 바꾸지 않았다.
 - 현재 검증: 해당 파일 97 tests PASS, `vp fmt --check` 통과. 같은 파일의 lint 경고 1건(1529행 inline schema compile)은 이번 변경 전부터 있던 것이다.
 - 커밋 상태: `fix/racy-git-diff-stats-test` 브랜치, devlop 대상 PR.
+
+## 2026-09-25 KST — V0.7B #16 Runtime COMPLEX 순차 실행 (A 기반 · B 엔진 · C 상태 출력)
+
+- 목적: #15 계약의 Runtime 생산자 쪽을 구현한다. 한 개의 동결된 부모 Task Contract를 2–8개 작업으로 나눈 계획을 한 Run 안에서 순서대로 실행한다. 그 뒤 통합 검사, 독립 최종 리뷰, 최종 검사를 거쳐 Kernel만 완료를 판정한다. 소비자(#17)는 이미 devlop에 머지돼 있어 설계의 소비자 우선 순서를 지킨다.
+- 브랜치/worktree: `feat/v0.7b-complex-runtime`, `Weavra-worktrees/v0.7b-complex-runtime`. 단계별 하위 에이전트가 구현했고, 메인 세션이 단계 사이의 결정 사항(`RUNTIME_PLAN`)을 고정했다. 단계마다 결과를 검토했고, 병합 전 실제 경계 검증을 직접 실행했다.
+- 커밋:
+  - A: `f5750043` 계획 컴파일러·preview.
+  - B: `469cbcff` 엔진, `a3ae15b6` 소유권·상태 저장·복구, `b07e64a3` SDK 종단 간 테스트.
+  - C: `6792bdc2` Host Control 투영·capability, `9c946ec3` TUI·graph·Evidence Pack, `afaeded0` 실제 snapshot 소비자 규칙 검사.
+  - devlop 병합 커밋 3개(PR #33·#34·#35 포함).
+- 주요 변경(`runtime/pi/packages/company-runtime/src`):
+  - 계획: `complex-types.ts`(닫힌 스키마·한도), `complex-plan.ts`(결정적 컴파일러; 모델·Planner 없음), `complex-binding.ts`(digest·경로 규칙·결합 가드). prepare는 draft가 있을 때만 COMPLEX를 받고, 부모의 모든 AC를 reviewRequired로 동결한다.
+  - 엔진: `kernel.ts`의 COMPLEX 상태 기계(다음 배열 항목만 스케줄링, 작업별 self-check→review→test, 통합 check→최종 review→최종 test→완료)와 독립 완료 가드 `assertCanCompleteComplex`. 실패·취소 시에는 STOPPING을 먼저 쓰고 자원 정리를 확인한 뒤에만 종료 상태를 쓰며, 확인하지 못하면 INTERRUPTED로 끝나고 writer를 유지한다.
+  - 소유권: `complex-ownership.ts` ledger. 정확한 파일 claim, 한 번에 하나의 lease, 기대 이미지, 외부 변경 감지를 맡는다. `agent-tools.ts`는 Policy 전(early)과 효과 직전(late)에 소유권을 검사하고, 효과 뒤 이미지를 기록한다. 부분 I/O는 unknown으로 남긴다.
+  - 검증기: 작업 문맥에서는 동결된 작업 검사만, 통합 문맥에서는 전체 등록 검사를 실행한다. evidence ref는 문맥별 namespace로 구분돼 같은 check id가 다른 작업의 증거로 재사용되지 않는다.
+  - 상태: `Run.complex`, `Run.complexEvidence`, `Run.complexReviews`. StateStore는 계획·부모 불변, 카운터 비감소, 종료 행 불변을 검사한다. 복구 시에는 완료된 작업 행을 보존하고 나머지를 INTERRUPTED(OWNER_LOST)로 둔다.
+  - 출력: `complexExecution`을 control snapshot에 투영하고 capability `complexContractVersion: 1`을 광고한다. Evidence Pack에는 제한된 `complex` 요약을 넣는다. TUI `/workflow status`·기록에는 작업 행과 통합 단계를 보여 준다. 일반 관찰 스트림에는 새 이벤트 타입이나 작업 필드를 추가하지 않는다.
+  - README에 COMPLEX 절을 추가하고, "COMPLEX 미지원" 문장 네 곳을 고쳤다.
+- 메인 세션 검토:
+  - 완료 가드는 설계 §8.2 조건을 모두 검사한다. 모든 작업 행의 PASS×3과 exit digest 결합, 작업별 증거 기록과 독립 세션, 통합 검사·최종 리뷰·최종 검사·live capture·ledger digest의 일치, 모든 AC MET, 승인 해소, 알려진 예산과 호출 수(Σ작업+최종 Reviewer 1), 자원 정리 확인이다.
+  - 소유권 게이트의 호출 순서가 §5.2와 같음을 확인했다.
+- 현재 검증:
+  - 하위 에이전트가 커밋 상태에서 실행한 결과: `npm run check` exit 0. `./test.sh` exit 0으로 company-runtime 68 files / 1,917 PASS, coding-agent 280 files / 2,774 PASS(기존 skip 50). COMPLEX 전용은 kernel 57 시나리오, ownership 15, state-store 19, projection·surfaces·conformance, SDK 5다. 모든 테스트 snapshot이 App 소비자 규칙 재진술(`complex-conformance.ts`)을 통과해야 하며, 규칙마다 음성 사례가 있다.
+  - 메인 세션 실행: 이 브랜치의 실제 Runtime 실행 파일(stdio Host Control)과 devlop의 #17 App `ControlTransport`·`complexStateConsistent`를 대본 루프백 모델(유료 호출 0)로 연결했다. 6개 시나리오가 모든 snapshot에서 App 엄격 디코더와 소비자 검사를 통과했다.
+    - 정상 2작업: COMPLETED, 통합 PASS×3, 호출 5회.
+    - C03 소유권 충돌: 효과 전 BLOCKED, 바이트 불변.
+    - C01/C21 작업 검사 실패: 다음 작업 미실행, 부분 변경 보존.
+    - C08 통합 검사 실패.
+    - C14/C32 다음 작업 중 취소: CANCELLED, 앞 작업 이력 보존, writer 해제.
+    - C12 예산 소진.
+  - 이 하네스는 #18에서 저장소 스크립트와 CI로 옮긴다. 실행 중 발견한 fixture 오류 두 가지(Node 24 `--test`에 디렉터리 인자, 등록 검사의 `node -e` 차단)는 Runtime 결함이 아니었다.
+- 남은 한계:
+  - 실제 모델 COMPLEX smoke는 아직 NOT VERIFIED다.
+  - 실제 브라우저 capture 재사용 거부(C37)는 가드 수준 테스트만 있다.
+  - 결정적 컴파일러라 사람이 구조화된 계획을 직접 써야 한다.
+  - 목표 문장의 첫 동사가 EDIT 동사 목록(fix/implement/add…)에 없으면 기존 규칙대로 INVALID_GOAL이다.
+  - 기준 fixture의 `src/config.ts`는 기본 Policy 보호 이름이라 digest 증명용으로만 쓴다.
+- 커밋 상태: devlop 대상 PR. #16 이슈는 #18 통합 검증 후 닫는다.

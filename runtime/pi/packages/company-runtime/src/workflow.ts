@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
 import { selectR3Scope } from "./approval.ts";
 import { budgetLimitsFromConfig } from "./budget.ts";
+import { capabilityJson } from "./capability-catalog.ts";
 import { classifyRequest, type RiskOverride, selectWorkflow } from "./classification.ts";
+import { assertComplexPlanBinding, complexClaimsDenial, complexPlanLimits } from "./complex-plan.ts";
+import type { ComplexPlan } from "./complex-types.ts";
 import type { RuntimeConfig } from "./config.ts";
 import type { QuickScope, R3Scope, Run, TaskContract } from "./contracts.ts";
 import { taskContractDigest } from "./criterion-evidence.ts";
@@ -59,6 +62,11 @@ export interface WorkflowOptions {
 	approvalTimeoutMs?: number;
 	/** Trusted Host freshness fence; guarded starts never recover an interrupted Run. */
 	startGuard?: (store: FileStateStore) => Promise<void>;
+	/**
+	 * Host-confirmed frozen COMPLEX plan (V0.7B), required iff the selected workflow is COMPLEX. It is revalidated
+	 * against the live checkout, Policy and registrations before any Run exists; it never grants permission.
+	 */
+	complexPlan?: ComplexPlan;
 }
 export interface WorkflowReport {
 	run?: Run;
@@ -94,6 +102,7 @@ export class StandardWorkflow {
 			taskContract: structuredClone(options.taskContract),
 			...(options.recipe ? { recipe: structuredClone(options.recipe) } : {}),
 			...(options.riskOverride ? { riskOverride: structuredClone(options.riskOverride) } : {}),
+			...(options.complexPlan ? { complexPlan: structuredClone(options.complexPlan) } : {}),
 		};
 	}
 	get snapshot(): Run | undefined {
@@ -150,12 +159,14 @@ export class StandardWorkflow {
 				classification.risk === "R3" && contract.mode === "EDIT"
 					? selectR3Scope(this.options.goal, runId)
 					: undefined;
+			const complexPlan = this.options.complexPlan;
+			const configuredWorkflow = this.options.config.runtime.workflow;
 			if (
 				requiresConfirmation ||
-				classification.complexity === "COMPLEX" ||
+				(classification.complexity === "COMPLEX" && !complexPlan) ||
 				(classification.risk === "R3" && (!r3Scope || !this.options.approval)) ||
-				(["R2", "R3"].includes(classification.risk) && this.options.config.runtime.workflow === "QUICK") ||
-				!["adaptive", "STANDARD", "QUICK"].includes(this.options.config.runtime.workflow)
+				(["R2", "R3"].includes(classification.risk) && configuredWorkflow === "QUICK") ||
+				!["adaptive", "STANDARD", "QUICK", ...(complexPlan ? ["COMPLEX"] : [])].includes(configuredWorkflow)
 			)
 				throw new Error(
 					`Unsupported classification/workflow: ${classification.complexity}/${classification.risk}; no downgrade performed`,
@@ -164,7 +175,12 @@ export class StandardWorkflow {
 				throw new Error(
 					"Execution request needs clarification or conflicts with the READ_ONLY contract; start a new explicit run",
 				);
-			const selection = selectWorkflow(classification, this.options.config.runtime.workflow);
+			const selection = selectWorkflow(classification, configuredWorkflow);
+			// COMPLEX runs only a Host-confirmed plan and a plan never runs another workflow: no silent downgrade.
+			if ((selection.workflow === "COMPLEX") !== (complexPlan !== undefined))
+				throw new Error(
+					`Unsupported classification/workflow: ${selection.workflow}/${classification.risk}; COMPLEX requires exactly its Host-confirmed plan; no downgrade performed`,
+				);
 			// Fail closed when the Host-confirmed contract does not match this run's workflow/goal/config.
 			assertTaskContractBinding(this.options.taskContract, {
 				workflow: selection.workflow,
@@ -182,6 +198,17 @@ export class StandardWorkflow {
 				throw new Error("STANDARD revision limit must be from 0 to 3");
 			if (!this.options.config.verification.checks.some((check) => check.required))
 				throw new Error("Configure at least one trusted required verification check");
+			if (complexPlan) {
+				// Admission recheck before any writer: digest, parent binding, registrations and frozen limits (§4.2).
+				assertComplexPlanBinding(complexPlan, this.options.taskContract, {
+					registeredCheckIds: this.options.config.verification.checks.map((check) => check.id),
+				});
+				if (
+					capabilityJson(complexPlan.limits) !==
+					capabilityJson(complexPlanLimits(this.options.config, classification.risk))
+				)
+					throw new Error("COMPLEX plan limits differ from the current configuration; prepare a new plan");
+			}
 			const r2RunId = classification.risk === "R2" ? runId : undefined;
 			store = await FileStateStore.open(this.options.cwd, {
 				events: this.options.events,
@@ -199,6 +226,25 @@ export class StandardWorkflow {
 			if (JSON.stringify(agents.policy.r3Scope) !== JSON.stringify(r3Scope))
 				throw new Error("R3 execution binding differs from selected scope");
 			if (agents.policy.r2RunId !== r2RunId) throw new Error("R2 execution binding differs from the selected run");
+			if (complexPlan) {
+				// Fresh claims against the live checkout and the Run's own Policy protections: never a grant.
+				const pathInspector = await FilePolicyPathInspector.open(this.options.cwd);
+				const protectedPaths = agents.policy.protectedPaths ?? [];
+				const denial = await complexClaimsDenial({
+					plan: complexPlan,
+					config: this.options.config,
+					executionMode: contract.mode,
+					risk: classification.risk,
+					goal: this.options.goal,
+					claims: {
+						inspect: async (paths) => ({
+							facts: await pathInspector.inspectOwnership(paths),
+							protectedPaths,
+						}),
+					},
+				});
+				if (denial) throw new Error(`COMPLEX claims are no longer admissible: ${denial}`);
+			}
 			signal.throwIfAborted();
 			// Host-owned snapshot at run start; never refreshed mid-run and UNKNOWN stays UNKNOWN.
 			const provenance = captureProvenance({
@@ -257,9 +303,20 @@ export class StandardWorkflow {
 					}),
 				};
 			}
-			verifier = await RegisteredVerifier.create(this.options.config, agents.policy, store, workspace, lsp);
+			verifier = await RegisteredVerifier.create(
+				this.options.config,
+				agents.policy,
+				store,
+				workspace,
+				lsp,
+				complexPlan,
+			);
 			// Opt-in Developer feedback through the same frozen verifier; results never reach the Kernel.
-			const advisoryChecks = this.options.config.verification.advisory?.mode === "developer" ? verifier : undefined;
+			// COMPLEX has none: an unaccounted advisory side effect would break the expected-image ledger.
+			const advisoryChecks =
+				this.options.config.verification.advisory?.mode === "developer" && !complexPlan ? verifier : undefined;
+			const settledVerifier = verifier;
+			const settledWorkspace = workspace;
 			signal.throwIfAborted();
 			await this.options.startGuard?.(store);
 			this.kernel = await CompanyKernel.create(
@@ -268,15 +325,21 @@ export class StandardWorkflow {
 					executionMode: contract.mode,
 					projectInstruction: agents.policy.projectInstruction ?? null,
 					task: this.options.taskContract,
+					// COMPLEX budget and revision limits are the frozen plan limits, derived by the Kernel.
 					...(() => {
-						const budget = budgetLimitsFromConfig(this.options.config.budget);
+						const budget = complexPlan ? undefined : budgetLimitsFromConfig(this.options.config.budget);
 						return budget ? { budget } : {};
 					})(),
 					provenance,
 					classification,
 					workflow: selection.workflow,
-					maxRevisionCycles: classification.risk === "R3" ? 0 : this.options.config.agents.max_revision_cycles,
-					verificationRepairMode: this.options.config.verification.repair.mode,
+					maxRevisionCycles: complexPlan
+						? complexPlan.limits.maxTotalRevisionCycles
+						: classification.risk === "R3"
+							? 0
+							: this.options.config.agents.max_revision_cycles,
+					verificationRepairMode: complexPlan ? "disabled" : this.options.config.verification.repair.mode,
+					...(complexPlan ? { complexPlan } : {}),
 					approvalTimeoutMs: this.options.approvalTimeoutMs,
 					// Host-frozen guard input from the verifier's Run-start snapshot, never from a result.
 					checks: verifier.trustRequirements.map((requirement) => ({
@@ -324,6 +387,29 @@ export class StandardWorkflow {
 					store,
 					events: this.options.events,
 					approval: this.options.approval,
+					...(complexPlan
+						? {
+								// Stop/join before any COMPLEX terminal write: close code intelligence, then report each
+								// resource as confirmed stopped. A missing flag is unknown, never confirmed.
+								resources: {
+									settle: async () => {
+										let lspClosed = true;
+										try {
+											await this.lsp?.close();
+										} catch {
+											lspClosed = false;
+										}
+										return {
+											agents: agents.executor.safeToRelease,
+											verifier: settledVerifier.safeToRelease,
+											workspace: settledWorkspace.safeToRelease,
+											lsp:
+												lspClosed && (this.lsp ? this.lsp.safeToRelease && !this.lsp.cleanupFailed : true),
+										};
+									},
+								},
+							}
+						: {}),
 				},
 			);
 			const kernelStartedAt = Date.now();
@@ -368,6 +454,8 @@ export class StandardWorkflow {
 				cleanupUncertain = true;
 			}
 			cleanupUncertain ||= this.lsp?.safeToRelease === false;
+			// A COMPLEX Run that recorded unconfirmed cleanup keeps the writer for manual inspection (§9).
+			cleanupUncertain ||= this.snapshot?.complex?.cleanup === "UNCONFIRMED";
 			cleanupUncertain ||=
 				executor?.safeToRelease === false ||
 				verifier?.safeToRelease === false ||

@@ -1,24 +1,34 @@
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { PiAgentExecutor } from "./agent-runner.ts";
 import { isSupportedR3Goal } from "./approval.ts";
 import { classifyRequest, type RiskOverride, selectWorkflow } from "./classification.ts";
+import { type ComplexClaimInspector, compileComplexPlan, parseComplexDraft } from "./complex-plan.ts";
+import type { ComplexDraft, ComplexPlan } from "./complex-types.ts";
 import type { RuntimeConfig } from "./config.ts";
-import type { Risk, TaskContract } from "./contracts.ts";
+import type { Risk, TaskContract, Workflow } from "./contracts.ts";
 import { type ExecutionMode, proposeExecutionMode } from "./execution-contract.ts";
-import type { HostControlErrorCode } from "./host-control-protocol.ts";
+import { HostWorkflowError } from "./host-workflow-error.ts";
 import type { PlanPreview } from "./plan-preview.ts";
+import { FilePolicyPathInspector } from "./policy-paths.ts";
+import { resolveProjectProtectedPaths } from "./project-protection.ts";
 import { acceptanceStatementsError, buildTaskContract } from "./task-contract.ts";
 import { compileTaskRecipe, TaskRecipeError } from "./task-recipe-compiler.ts";
 import { StandardWorkflow, type WorkflowOptions } from "./workflow.ts";
 
-export class HostWorkflowError extends Error {
-	readonly code: HostControlErrorCode;
+export { HostWorkflowError } from "./host-workflow-error.ts";
 
-	constructor(code: HostControlErrorCode, message: string) {
-		super(message);
-		this.name = "HostWorkflowError";
-		this.code = code;
+/**
+ * COMPLEX was selected but no structured decomposition plan came with the goal. Same existing Host Control code
+ * (UNSUPPORTED_WORKFLOW) and message; the type lets a free-text Host (the TUI) say where a plan is prepared.
+ */
+export class ComplexPlanRequiredError extends HostWorkflowError {
+	constructor(risk: Risk) {
+		super(
+			"UNSUPPORTED_WORKFLOW",
+			`Unsupported classification/workflow: COMPLEX/${risk}; COMPLEX requires a structured decomposition plan (complexDraft); no downgrade performed`,
+		);
 	}
 }
 
@@ -26,16 +36,20 @@ export interface HostWorkflowDraft {
 	goal: string;
 	config: RuntimeConfig;
 	executionMode: ExecutionMode;
-	workflow: "QUICK" | "STANDARD";
+	workflow: Workflow;
 	risk: Risk;
 	/** User-confirmed keyword-only R3 override (TUI only); not an approval and adds no tools. */
 	riskOverride?: RiskOverride;
 	statements: string[];
 	recipe?: { id: string; version: number; digest: string };
+	/** Shape-checked structured COMPLEX proposal; present iff workflow is COMPLEX. Draft data, never authority. */
+	complexDraft?: ComplexDraft;
 }
 
 export interface HostWorkflowPlan extends HostWorkflowDraft {
 	taskContract: TaskContract;
+	/** Present iff workflow is COMPLEX: the immutable Host-compiled plan bound to `taskContract`. */
+	complexPlan?: ComplexPlan;
 	preview: PlanPreview;
 }
 
@@ -44,13 +58,17 @@ export function prepareHostWorkflowDraft(input: {
 	goal: string;
 	config: RuntimeConfig;
 	riskOverride?: RiskOverride;
+	/** Untrusted `workflow.prepare.complexDraft`; required for COMPLEX and rejected for QUICK/STANDARD. */
+	complexDraft?: unknown;
 }): HostWorkflowDraft {
-	const { goal, config, riskOverride } = input;
+	const { goal, config, riskOverride, complexDraft } = input;
 	const proposal = proposeExecutionMode(goal);
 	if (proposal.requiresConfirmation || !proposal.mode) throw new HostWorkflowError("INVALID_GOAL", proposal.reason);
 	try {
 		const { classification, requiresConfirmation } = classifyRequest(goal, {}, riskOverride);
-		if (requiresConfirmation || classification.complexity === "COMPLEX")
+		const selection = selectWorkflow(classification, config.runtime.workflow);
+		// A COMPLEX classification is never silently run by a configured QUICK/STANDARD organization.
+		if (requiresConfirmation || (classification.complexity === "COMPLEX" && selection.workflow !== "COMPLEX"))
 			throw new HostWorkflowError(
 				"UNSUPPORTED_WORKFLOW",
 				`Unsupported classification/workflow: ${classification.complexity}/${classification.risk}; no downgrade performed`,
@@ -61,11 +79,13 @@ export function prepareHostWorkflowDraft(input: {
 				"UNSUPPORTED_WORKFLOW",
 				`Unsupported classification/workflow: ${classification.complexity}/R3; the only supported R3 action is "delete file <path>" (one safe relative path); no downgrade performed`,
 			);
-		const selection = selectWorkflow(classification, config.runtime.workflow);
-		if (selection.workflow === "COMPLEX")
+		// COMPLEX runs only an explicit bounded decomposition; heuristic free-text decomposition is never invented.
+		if (selection.workflow === "COMPLEX" && complexDraft === undefined)
+			throw new ComplexPlanRequiredError(classification.risk);
+		if (selection.workflow !== "COMPLEX" && complexDraft !== undefined)
 			throw new HostWorkflowError(
-				"UNSUPPORTED_WORKFLOW",
-				`Unsupported classification/workflow: ${selection.workflow}/${classification.risk}; no downgrade performed`,
+				"INVALID_REQUEST",
+				`complexDraft is accepted only when COMPLEX is selected; this goal selects ${selection.workflow}`,
 			);
 		if (selection.workflow === "QUICK" && ["R2", "R3"].includes(classification.risk))
 			throw new HostWorkflowError("UNSUPPORTED_WORKFLOW", "R2/R3 cannot run as QUICK; STANDARD is required");
@@ -78,6 +98,7 @@ export function prepareHostWorkflowDraft(input: {
 			// Copy only the validated fields; classifyRequest already bound `to` to the rule-based risk.
 			...(riskOverride ? { riskOverride: { from: riskOverride.from, to: riskOverride.to } } : {}),
 			statements: [goal],
+			...(selection.workflow === "COMPLEX" ? { complexDraft: parseComplexDraft(complexDraft) } : {}),
 		};
 	} catch (error) {
 		if (error instanceof HostWorkflowError) throw error;
@@ -120,47 +141,106 @@ export function applyHostWorkflowRecipe(
 	}
 }
 
-/** Snapshot the user-reviewed data before the Host asks for explicit plan confirmation. */
-export function finalizeHostWorkflowPlan(
+/** Freeze the user-reviewed statements into the pending parent Task Contract, once. */
+function freezeHostParent(
 	draft: HostWorkflowDraft,
-	statements: readonly string[] = draft.statements,
-): HostWorkflowPlan {
+	statements: readonly string[],
+): { snapshot: HostWorkflowDraft; taskContract: TaskContract } {
 	const statementsError = acceptanceStatementsError(statements);
 	if (statementsError) throw new HostWorkflowError("INVALID_CRITERIA", statementsError);
 	const snapshot = structuredClone({ ...draft, statements: [...statements] });
-	const { goal, config, workflow, executionMode, risk, riskOverride, recipe } = snapshot;
-	let taskContract: TaskContract;
+	const { goal, config, workflow } = snapshot;
 	try {
-		taskContract = buildTaskContract({ goal, statements: snapshot.statements, workflow, config });
+		return { snapshot, taskContract: buildTaskContract({ goal, statements: snapshot.statements, workflow, config }) };
 	} catch (error) {
 		throw new HostWorkflowError(
 			"INVALID_CRITERIA",
 			error instanceof Error ? error.message : "Invalid acceptance criteria",
 		);
 	}
+}
+
+function hostPlanPreview(
+	snapshot: HostWorkflowDraft,
+	taskContract: TaskContract,
+	complexPlan?: ComplexPlan,
+): PlanPreview {
+	const { goal, config, workflow, executionMode, risk, riskOverride, recipe } = snapshot;
 	return {
-		...snapshot,
-		taskContract,
-		preview: {
-			goal,
-			workflow,
-			executionMode,
-			risk,
-			...(riskOverride ? { riskOverride } : {}),
-			acceptanceCriteria: taskContract.acceptanceCriteria,
-			allowedPaths: config.files.allowed_paths,
-			checks: config.verification.checks,
-			projectInstructionPath: config.project?.instructions.path ?? null,
-			lspEnabled: config.code_intelligence?.lsp.enabled === true,
-			mutationMode: config.mutation.mode,
-			verifierTrustMode: config.verification.trust.mode,
-			verifierSandboxMode: config.verification.sandbox.mode,
-			contextPackMode: config.agents.context_pack.mode,
-			verificationRepairMode: config.verification.repair.mode,
-			...(recipe ? { recipe } : {}),
-			verifierTrustSources: [...new Set(config.verification.checks.flatMap((check) => check.trust.files))].sort(),
+		goal,
+		workflow,
+		executionMode,
+		risk,
+		...(riskOverride ? { riskOverride } : {}),
+		acceptanceCriteria: taskContract.acceptanceCriteria,
+		allowedPaths: config.files.allowed_paths,
+		checks: config.verification.checks,
+		projectInstructionPath: config.project?.instructions.path ?? null,
+		lspEnabled: config.code_intelligence?.lsp.enabled === true,
+		mutationMode: config.mutation.mode,
+		verifierTrustMode: config.verification.trust.mode,
+		verifierSandboxMode: config.verification.sandbox.mode,
+		contextPackMode: config.agents.context_pack.mode,
+		verificationRepairMode: config.verification.repair.mode,
+		...(recipe ? { recipe } : {}),
+		verifierTrustSources: [...new Set(config.verification.checks.flatMap((check) => check.trust.files))].sort(),
+		...(complexPlan ? { complexPlan } : {}),
+	};
+}
+
+/** Snapshot the user-reviewed data before the Host asks for explicit plan confirmation. */
+export function finalizeHostWorkflowPlan(
+	draft: HostWorkflowDraft,
+	statements: readonly string[] = draft.statements,
+): HostWorkflowPlan {
+	if (draft.workflow === "COMPLEX")
+		throw new HostWorkflowError(
+			"UNSUPPORTED_WORKFLOW",
+			"Unsupported classification/workflow: COMPLEX plans are compiled with Host path inspection (finalizeComplexHostWorkflowPlan); no downgrade performed",
+		);
+	const { snapshot, taskContract } = freezeHostParent(draft, statements);
+	return { ...snapshot, taskContract, preview: hostPlanPreview(snapshot, taskContract) };
+}
+
+/**
+ * Real Host adapters for the pure COMPLEX compiler: exact-spelling facts from `FilePolicyPathInspector` and the
+ * protected paths the Run's Policy receives (verifier/LSP sources, Runtime source, project instruction).
+ * Read-only and bounded; opened only when the compiler asks for claim facts.
+ */
+export function hostComplexClaimInspector(cwd: string, config: RuntimeConfig): ComplexClaimInspector {
+	return {
+		inspect: async (paths) => {
+			const inspector = await FilePolicyPathInspector.open(cwd);
+			const protectedPaths = await resolveProjectProtectedPaths(inspector.projectPath, config);
+			if (config.project) protectedPaths.push(config.project.instructions.path);
+			return { facts: await inspector.inspectOwnership(paths), protectedPaths };
 		},
 	};
+}
+
+/**
+ * COMPLEX preparation: freeze the parent once (every AC review-required), then compile and bind the immutable
+ * plan (INVALID_REQUEST for shape/bytes, INVALID_CRITERIA for graph/coverage/ownership/check/limit). Side-effect
+ * free: bounded read-only path inspection only, no model, check, writer, Approval or durable Run.
+ */
+export async function finalizeComplexHostWorkflowPlan(
+	draft: HostWorkflowDraft,
+	statements: readonly string[],
+	options: { cwd: string },
+): Promise<HostWorkflowPlan> {
+	if (draft.workflow !== "COMPLEX" || draft.complexDraft === undefined)
+		throw new HostWorkflowError("INVALID_REQUEST", "A COMPLEX plan needs the COMPLEX workflow and a complexDraft");
+	const { snapshot, taskContract } = freezeHostParent(draft, statements);
+	const complexPlan = await compileComplexPlan({
+		planId: randomUUID(),
+		parent: taskContract,
+		draft: snapshot.complexDraft,
+		config: snapshot.config,
+		executionMode: snapshot.executionMode,
+		risk: snapshot.risk,
+		claims: hostComplexClaimInspector(options.cwd, snapshot.config),
+	});
+	return { ...snapshot, taskContract, complexPlan, preview: hostPlanPreview(snapshot, taskContract, complexPlan) };
 }
 
 export interface CreateHostWorkflowOptions {
@@ -175,16 +255,25 @@ export interface CreateHostWorkflowOptions {
 	startGuard?: WorkflowOptions["startGuard"];
 }
 
-/** Call only after affirmative Host confirmation; execution still belongs to StandardWorkflow. */
+/**
+ * Call only after affirmative Host confirmation; execution still belongs to StandardWorkflow. A COMPLEX plan runs
+ * only with its frozen Host-compiled plan, which the Workflow revalidates before any writer or Run exists.
+ */
 export async function createHostWorkflow(options: CreateHostWorkflowOptions): Promise<StandardWorkflow> {
 	const { cwd, agentDir, signal } = options;
 	signal.throwIfAborted();
+	if ((options.plan.workflow === "COMPLEX") !== (options.plan.complexPlan !== undefined))
+		throw new HostWorkflowError(
+			options.plan.workflow === "COMPLEX" ? "UNSUPPORTED_WORKFLOW" : "INVALID_REQUEST",
+			`Unsupported classification/workflow: ${options.plan.workflow}/${options.plan.risk}; a COMPLEX plan runs only as COMPLEX with its confirmed plan; no model, writer or Run was created`,
+		);
 	const { goal, executionMode } = options.plan;
-	const { config, taskContract, recipe, riskOverride } = structuredClone({
+	const { config, taskContract, recipe, riskOverride, complexPlan } = structuredClone({
 		config: options.plan.config,
 		taskContract: options.plan.taskContract,
 		recipe: options.plan.recipe,
 		riskOverride: options.plan.riskOverride,
+		complexPlan: options.plan.complexPlan,
 	});
 	const models = options.createModels
 		? await options.createModels(signal)
@@ -201,6 +290,7 @@ export async function createHostWorkflow(options: CreateHostWorkflowOptions): Pr
 		executionMode,
 		...(recipe ? { recipe } : {}),
 		...(riskOverride ? { riskOverride } : {}),
+		...(complexPlan ? { complexPlan } : {}),
 		config,
 		signal,
 		events: options.events,
