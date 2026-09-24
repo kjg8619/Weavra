@@ -1,5 +1,6 @@
 # Weavra development rules
 
+- Read `docs/architecture/OVERVIEW.md` first for the code map, the run flow and who decides what.
 - This is an independent product repository, not an upstream-synchronized fork.
 - `runtime/pi`: use npm; preserve Pi/Weavra runtime build, check, test, shrinkwrap, and install-lock gates.
 - `app/t3code`: use pnpm 11 / Vite+; preserve T3 workspace tests, typecheck, lint, format, knip, and build gates.

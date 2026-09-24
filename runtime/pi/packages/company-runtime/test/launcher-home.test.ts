@@ -494,6 +494,10 @@ describe("read-only doctor", () => {
 		])
 			expect(result.stdout).toContain(`PASS  ${item}`);
 		expect(result.stdout).toContain("WARN  auth.json");
+		// Project sandbox guidance only; it never parses project config or changes readiness.
+		expect(result.stdout).toContain(
+			"INFO  Verifier sandbox: per project, default disabled; check with /workflow config",
+		);
 		expect(result.stdout).toContain("Result: READY (local checks only");
 		expect(await snapshot(home)).toEqual(before);
 	});

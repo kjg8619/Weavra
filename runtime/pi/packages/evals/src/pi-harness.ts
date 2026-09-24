@@ -24,6 +24,7 @@ import {
 	type TranscriptEvent,
 	toJsonValue,
 } from "vitest-evals/harness";
+import { isolatedShellCommandPrefix } from "./pi-isolation.ts";
 import { PI_SESSION_SNAPSHOT_ARTIFACT } from "./vitest-evals/artifacts.ts";
 
 export type PiCodingAgentInput = string | Array<{ type: "prompt"; content: string } | { type: "reload" }>;
@@ -166,9 +167,7 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 			cwd,
 			agentDir,
 			modelRuntime,
-			settingsManager: SettingsManager.inMemory({
-				shellCommandPrefix: `export HOME=${JSON.stringify(isolatedHome)}; unset PI_CODING_AGENT_DIR PI_EVAL_ARTIFACT_DIR PI_MODEL PI_PROVIDER PI_REASONING_LEVEL PI_SESSION_FILE PI_SESSION_ID;`,
-			}),
+			settingsManager: SettingsManager.inMemory({ shellCommandPrefix: isolatedShellCommandPrefix(isolatedHome) }),
 			...(extensionFactories.length > 0 ? { resourceLoaderOptions: { extensionFactories } } : {}),
 		});
 		signal?.throwIfAborted();

@@ -104,12 +104,20 @@ export class StandardWorkflow {
 	}
 	get report(): WorkflowReport {
 		const failures = this.kernel?.deliveryFailures ?? [];
+		const recovered = this.store?.recoveredStaleLock;
 		return structuredClone({
 			...this.reportValue,
 			run: this.snapshot,
-			diagnostics: failures.length
-				? [`Observer delivery failures: ${failures.length}; execution result was not changed`]
-				: [],
+			diagnostics: [
+				...(failures.length
+					? [`Observer delivery failures: ${failures.length}; execution result was not changed`]
+					: []),
+				...(recovered
+					? [
+							`Recovered a writer lock left by dead process ${recovered.pid} on this host; any run it left active is INTERRUPTED and was not resumed`,
+						]
+					: []),
+			],
 		});
 	}
 	cancel(): void {

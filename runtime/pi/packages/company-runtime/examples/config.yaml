@@ -12,6 +12,11 @@ models:
 files:
   allowed_paths: [src, test]
 verification:
+  # Runs registered checks in the OS sandbox: no network, no $HOME/$TMPDIR reads (macOS verified; Linux NOT
+  # VERIFIED). Checks that need toolchain caches (~/.m2, ~/.gradle, ~/.cargo, ~/.npm) or downloads need
+  # `mode: disabled`, which runs them with this user's filesystem and network access.
+  sandbox:
+    mode: required
   checks:
     - id: regression
       kind: test

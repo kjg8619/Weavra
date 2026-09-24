@@ -72,4 +72,14 @@ describe("Host workflow preparation for R3 goals", () => {
 		expect(draft.riskOverride).toBeUndefined();
 		expect(formatPlanPreview(finalizeHostWorkflowPlan(draft).preview)).not.toContain("User-confirmed override");
 	});
+
+	it("warns in every Plan Preview while the verifier sandbox is disabled", () => {
+		const preview = finalizeHostWorkflowPlan(
+			prepareHostWorkflowDraft({ goal: "Fix bug in src/a.ts", config }),
+		).preview;
+		expect(formatPlanPreview(preview)).toContain(
+			"Command verifier sandbox: disabled. WARNING: registered checks run unsandboxed",
+		);
+		expect(formatPlanPreview({ ...preview, verifierSandboxMode: "required" })).not.toContain("WARNING");
+	});
 });

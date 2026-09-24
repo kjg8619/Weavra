@@ -2,6 +2,7 @@ import type { RiskOverride } from "./classification.ts";
 import type { RuntimeConfig } from "./config.ts";
 import type { AcceptanceCriterion, Risk, Workflow } from "./contracts.ts";
 import type { ExecutionMode } from "./execution-contract.ts";
+import { SANDBOX_DISABLED_WARNING } from "./sandbox-advice.ts";
 
 export interface PlanPreview {
 	goal: string;
@@ -55,7 +56,7 @@ export function formatPlanPreview(plan: PlanPreview): string {
 		`LSP: ${plan.lspEnabled ? "enabled (trusted local program, not sandboxed)" : "disabled"}`,
 		`Mutation mode: ${plan.mutationMode}${plan.mutationMode === "strict" ? " (strict freshness/precondition enforcement for existing files; not a permission and not approval)" : ""}`,
 		`Command verifier trust: ${plan.verifierTrustMode}${plan.verifierTrustMode === "strict" ? " (frozen registration + trusted source integrity pinning; sources are protected from workers; not a sandbox)" : " (not strictly pinned)"}`,
-		`Command verifier sandbox: ${plan.verifierSandboxMode === "required" ? "required (network denied; Host-owned fixed policy; not a sandbox for workers and not approval)" : "disabled"}`,
+		`Command verifier sandbox: ${plan.verifierSandboxMode === "required" ? "required (network denied; Host-owned fixed policy; not a sandbox for workers and not approval)" : `disabled. ${SANDBOX_DISABLED_WARNING}`}`,
 		...(plan.checks.some((check) => check.kind === "browser")
 			? [
 					"Browser checks: private HOME/profile/CDP pipe and guarded local-static GET; not an OS sandbox. Historical observations are not verification.",

@@ -1,11 +1,21 @@
-import { fork } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { fork, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { PolicyDecision, Run } from "../src/contracts.ts";
+import { readHostObservation } from "../src/host-bridge-projections.ts";
 import { CompanyKernel } from "../src/kernel.ts";
-import { FileStateStore, type FileStateStoreOptions, StateStoreError, withFileStateStore } from "../src/state-store.ts";
+import { formatHistory } from "../src/observations.ts";
+import {
+	FileStateStore,
+	type FileStateStoreOptions,
+	INLINE_TERMINAL_RUNS,
+	StateStoreError,
+	withFileStateStore,
+} from "../src/state-store.ts";
+import { isRuntimeOwnedPath } from "../src/workspace.ts";
 import { testContract } from "./fixture-contract.ts";
 
 let root: string;
@@ -359,5 +369,156 @@ describe("file StateStore", () => {
 		await symlink(root, join(root, ".ai"));
 		await expect(openStore()).rejects.toThrow();
 		expect(await readdir(root)).toEqual([".ai"]);
+	});
+});
+
+/** A PID that belonged to a process which has already exited on this host. */
+function deadPid(): number {
+	const child = spawnSync(process.execPath, ["-e", ""]);
+	if (!child.pid) throw new Error("No child PID");
+	return child.pid;
+}
+async function writeLock(owner: Record<string, unknown>) {
+	await mkdir(join(root, ".ai"), { recursive: true });
+	await writeFile(join(root, ".ai/writer.lock"), JSON.stringify(owner));
+}
+
+describe("stale writer lock recovery", () => {
+	it("recovers a same-host lock whose owner process no longer exists", async () => {
+		const pid = deadPid();
+		await writeLock({
+			schemaVersion: 1,
+			projectPath: await realpath(root),
+			token: "dead",
+			pid,
+			hostname: hostname(),
+		});
+		const store = await openStore();
+		expect(store.recoveredStaleLock).toEqual({ pid });
+		const lock = await json("writer.lock");
+		expect(lock).toMatchObject({ pid: process.pid, hostname: hostname() });
+		expect(lock.token).not.toBe("dead");
+		expect(await readdir(join(root, ".ai"))).not.toContain("writer.lock.recovery");
+	});
+
+	it.each([
+		["a live owner", async () => ({ pid: process.pid, hostname: hostname(), projectPath: await realpath(root) })],
+		[
+			"another host",
+			async () => ({ pid: deadPid(), hostname: `${hostname()}-other`, projectPath: await realpath(root) }),
+		],
+		["the older format without a hostname", async () => ({ pid: deadPid(), projectPath: await realpath(root) })],
+		["another project", async () => ({ pid: deadPid(), hostname: hostname(), projectPath: "/elsewhere" })],
+		["an invalid PID", async () => ({ pid: -1, hostname: hostname(), projectPath: await realpath(root) })],
+	])("keeps a lock held by %s untouched", async (_name, owner) => {
+		await writeLock({ schemaVersion: 1, token: "kept", ...(await owner()) });
+		const before = await readFile(join(root, ".ai/writer.lock"), "utf8");
+		await expect(openStore()).rejects.toMatchObject({ stage: "open/lock" });
+		expect(await readFile(join(root, ".ai/writer.lock"), "utf8")).toBe(before);
+		expect(await readdir(join(root, ".ai"))).toEqual(["writer.lock"]);
+	});
+
+	it("does not recover while another recovery guard exists", async () => {
+		await writeLock({
+			schemaVersion: 1,
+			projectPath: await realpath(root),
+			token: "dead",
+			pid: deadPid(),
+			hostname: hostname(),
+		});
+		await writeFile(join(root, ".ai/writer.lock.recovery"), "other recoverer");
+		await expect(openStore()).rejects.toMatchObject({ stage: "open/lock" });
+		expect(await readFile(join(root, ".ai/writer.lock.recovery"), "utf8")).toBe("other recoverer");
+		expect(await json("writer.lock")).toMatchObject({ token: "dead" });
+	});
+});
+
+describe("terminal-run archive", () => {
+	async function terminalRuns(store: FileStateStore, count: number) {
+		for (let index = 0; index < count; index++) {
+			const run = await kernel(store, `run-${index}`);
+			await run.start();
+			await store.prepare({ ...decision, runId: `run-${index}`, actionId: `action-${index}` });
+			await store.finish(`run-${index}`, `action-${index}`, "SUCCEEDED");
+			await run.stop("CANCELLED", "Fixture");
+		}
+	}
+	const archiveText = (runId: string) => readFile(join(root, ".ai/runs", `${runId}.json`), "utf8");
+	const digest = (text: string) => `sha256:${createHash("sha256").update(text).digest("hex")}`;
+
+	it("moves terminal runs beyond the inline limit, with their actions, behind a digest index", async () => {
+		const first = await openStore();
+		await terminalRuns(first, INLINE_TERMINAL_RUNS + 2);
+		await first.close();
+		const store = await openStore();
+		const state = store.snapshot;
+		expect(state.runs.map((run) => run.runId)).toEqual(
+			Array.from({ length: INLINE_TERMINAL_RUNS }, (_, index) => `run-${index + 2}`),
+		);
+		expect(state.actions.some((action) => ["run-0", "run-1"].includes(action.decision.runId))).toBe(false);
+		expect(state.archivedRuns?.map((entry) => entry.runId)).toEqual(["run-0", "run-1"]);
+		const text = await archiveText("run-0");
+		expect(state.archivedRuns?.[0]).toMatchObject({ status: "CANCELLED", actions: 1, digest: digest(text) });
+		const archived = await FileStateStore.readArchivedRun(root, "run-0");
+		expect(archived?.run.runId).toBe("run-0");
+		expect(archived?.actions).toEqual([
+			{ decision: { ...decision, runId: "run-0", actionId: "action-0" }, status: "SUCCEEDED" },
+		]);
+		expect(JSON.stringify(await json("tasks.json"))).not.toContain('"run-0"');
+		expect(await FileStateStore.readArchivedRun(root, "run-5")).toBeUndefined();
+		// Host bridge lookups and history see archived runs; the newest run is still inline.
+		expect((await readHostObservation(root, "run-0")).run?.runId).toBe("run-0");
+		expect((await readHostObservation(root)).run?.runId).toBe(`run-${INLINE_TERMINAL_RUNS + 1}`);
+		const history = formatHistory(state, 3);
+		expect(history).toContain(`Page 3/3 (${INLINE_TERMINAL_RUNS + 2} records)`);
+		expect(history).toMatch(/run-0 \| STANDARD\/R1 \| CANCELLED\/IMPLEMENT \| \S+ \| archived\n {2}Fix bug/);
+		// Exports still cover the whole history.
+		await store.exportViews();
+		const decisions = await readFile(join(root, ".ai/decisions.md"), "utf8");
+		expect(decisions).toContain("## Run run-0\n");
+		expect(decisions).toContain(`## Run run-${INLINE_TERMINAL_RUNS + 1}\n`);
+	});
+
+	it("reuses a byte-identical archive after a crash between the archive and the state commit", async () => {
+		const first = await openStore();
+		await terminalRuns(first, INLINE_TERMINAL_RUNS + 1);
+		await first.close();
+		await expect(
+			openStore({
+				beforeAtomicStep: (file, step) => {
+					if (file === "state.json" && step === "rename") throw new Error("crash");
+				},
+			}),
+		).rejects.toThrow();
+		const written = await archiveText("run-0");
+		expect((await json("state.json")).runs[0].runId).toBe("run-0");
+		const store = await openStore();
+		expect(store.snapshot.archivedRuns).toMatchObject([{ runId: "run-0", digest: digest(written) }]);
+		expect(await archiveText("run-0")).toBe(written);
+	});
+
+	it("refuses a changed archive on read and a conflicting archive on write", async () => {
+		const first = await openStore();
+		await terminalRuns(first, INLINE_TERMINAL_RUNS + 1);
+		await first.close();
+		await mkdir(join(root, ".ai/runs"), { recursive: true });
+		await writeFile(join(root, ".ai/runs/run-0.json"), "{}");
+		await expect(openStore()).rejects.toMatchObject({ stage: "archive conflict" });
+		await rm(join(root, ".ai/runs/run-0.json"));
+		await (await openStore()).close();
+		await writeFile(
+			join(root, ".ai/runs/run-0.json"),
+			(await archiveText("run-0")).replace("CANCELLED", "COMPLETED"),
+		);
+		await expect(FileStateStore.readArchivedRun(root, "run-0")).rejects.toMatchObject({
+			stage: "archived run integrity",
+		});
+	});
+
+	it("treats archives and the recovery guard as Runtime-owned workspace files only", () => {
+		expect(isRuntimeOwnedPath(".ai/runs/0b5c7f4e-1d2a-4c8e-9f00-123456789abc.json")).toBe(true);
+		expect(isRuntimeOwnedPath(".ai/writer.lock.recovery")).toBe(true);
+		for (const path of [".ai/runs/../state.json", ".ai/runs/nested/x.json", ".ai/runs/.x.tmp", ".ai/other.json"])
+			expect(isRuntimeOwnedPath(path)).toBe(false);
 	});
 });

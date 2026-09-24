@@ -358,3 +358,43 @@
   - evals 패키지를 한 번 기본 vitest 설정으로 잘못 실행해 `src/*.eval.ts`가 수집됐다. CLI가 빌드되기 전이라 harness-error 39건에서 멈췄다. provider 호출 흔적은 보지 못했지만 없었다고 보장하지는 않는다. 이후 `vitest.test.config.ts`로 다시 실행해 9 files / 54 PASS를 확인했다.
   - 이전 평가 단계에서 company-runtime 패키지 vitest를 직접 실행한 적이 있다. 이 패키지에는 env로 켜지는 실제 provider e2e가 없음을 확인했다.
 - **커밋 상태:** 위 4개 커밋과 이 작업 기록 커밋을 `devlop` 대상 PR로 올린다. 자동 merge는 하지 않는다.
+
+## 2026-09-24 KST — 리뷰 후속 2차: 벤치마크·샌드박스 경고·상태 저장소·아키텍처 입구 문서
+
+- **배경:**
+  - PR #30은 원격 CI 3개 job(runtime/pi 8분 33초, app/t3code 20분 10초, cross-boundary 4분 9초)이 HEAD `4220bfd1`에서 모두 성공한 뒤 사용자 지시로 `dd828dd2`에 merge commit으로 머지했다.
+  - 이어서 사용자가 남은 항목 네 가지를 골랐다. 기준은 `dd828dd2`이며, 전용 worktree `Weavra-worktrees/runtime-review-followups-2`의 `feat/runtime-review-followups-2` 브랜치에서 작업했다.
+  - 벤치마크 하네스는 별도 worktree의 하위 에이전트가 구현했고, 검토·수정한 뒤 적용했다.
+- **샌드박스 결정 변경:** 사용자는 처음에 "macOS 기본 required"를 골랐다. 구현 전 조사에서 다음을 확인했다.
+  - sandbox 정책이 `$HOME`·`$TMPDIR` 읽기와 네트워크를 전부 막는다(`sandbox.ts` 정책).
+  - 이 때문에 Maven·Gradle·Cargo·bun·npm 캐시나 다운로드가 필요한 check가 FAIL이 된다.
+  - 이를 알리자 사용자가 "기본값 유지 + 경고·진단"으로 바꿨다.
+- **항목 1 `d9ee3187` — Weavra vs Pi 벤치마크 하네스:**
+  - `npm run benchmark`가 plain Pi, Weavra STANDARD, Weavra+advisory를 같은 fixture·모델·wall-clock 한도로 비교한다.
+  - 기록 항목은 완료 주장, hidden oracle, 거짓 완료, 시간·턴·도구, provider가 보고한 token이다.
+  - corpus는 F01–F10(F08 제외)과 B01–B06 새 fixture다. oracle은 Host 코드에만 있다.
+  - 하위 에이전트가 Weavra arm에 C06 Fitness 설정의 `max_revision_cycles: 0`을 그대로 썼다. 이 값이면 REVISE 한 번에 바로 BLOCKED가 되어 비교가 불공정하다. 벤치마크에서만 제품 기본값 1을 쓰도록 고치고 record에 `weavraMaxRevisionCycles`를 남겼다. Fitness 기본값과 digest는 회귀 테스트로 고정했다.
+  - `benchmark-faux`가 아닌 provider는 `--confirm-paid` 없이 거부한다. **유료 실행은 하지 않았다.**
+- **항목 2 `f8b1e94c` — 샌드박스 비활성 경고:**
+  - 비활성일 때 Plan Preview와 `/workflow config`가 위험과 켜는 방법을 표시한다.
+  - `weavra doctor`는 안내 줄만 추가했다. `launcher-home.ts`가 import하면 worktree launcher 테스트의 standalone 복사본이 깨졌기 때문이다. 처음에 69건이 실패해서 import를 제거했다.
+  - 예제 config와 README 예제는 `required`로 바꿨다.
+- **항목 3 `42ba2b20` — 상태 저장소** (설계 `docs/architecture/STATE_STORE.md`):
+  - **죽은 writer lock 복구:** lock에 hostname을 기록한다. 같은 호스트·같은 프로젝트이고 PID가 ESRCH일 때만 복구한다. O_EXCL recovery guard와 inode 재확인을 거친다.
+  - **terminal run 보관:** 최근 20개만 inline으로 남기고, 나머지는 `.ai/runs/<id>.json`과 sha256 색인으로 옮긴다. 조회와 export는 digest를 검증하고, workspace 검사는 보관 파일을 Runtime 소유로 취급한다.
+  - README S2의 "PID로 자동 탈취하지 않는다"는 의도적 설계였다. 사용자 선택에 따라 좁은 조건으로 바꿨고, hardening 테스트 기대 1건도 이에 맞게 바꿨다. 이제 죽은 fixture owner의 lease를 복구하되 성공은 추정하지 않는다.
+- **항목 4 `2fc963e9` — 입구 문서:** `docs/architecture/OVERVIEW.md`를 추가하고 루트 README와 `AGENTS.md`에서 연결했다. 기존 문서는 삭제하지 않았다.
+- **현재 검증** (이번 작업에서 실제 실행, 최종 tree = 위 4개 커밋):
+  - `npm run check` exit 0 (1,489 files).
+  - `npm run build` PASS.
+  - `node scripts/validate.mjs pi`: **ALL GATES PASS / 296초.** company-runtime 62 files / 1,613 PASS, coding-agent 279 files / 2,768 PASS / 50 skipped, evals 11 files / 110 PASS, 그 밖의 패키지 PASS.
+  - `run-cross-boundary.mjs`(Chrome for Testing fresh profile) PASS / 9초, paid provider requests=0.
+  - `run-capability-boundary.mjs` PASS / 21초.
+  - 커밋마다 단독 상태를 임시 detached worktree에서 `tsgo --noEmit`와 `biome check`로 확인했다. 4개 모두 PASS.
+- **절차상 수정:** 검증 스크립트에 첫 worktree 경로가 하드코딩되어 있어서, 첫 staging 검증이 다른 worktree를 확인했다. 스크립트가 경로를 인자로 받도록 고친 뒤 올바른 worktree로 다시 확인했다. PR #30의 검증은 해당 worktree에서 실행한 것이라 영향이 없다.
+- **미실행 / 한계:**
+  - `validate.mjs t3`는 실행하지 않았다. 이번 App 쪽 변경은 없다.
+  - 유료 벤치마크는 실행하지 않았다.
+  - 보관은 writer open 시점에만 일어나서, 한 세션 안에서 run이 20개를 넘게 쌓이면 다음 open까지 inline으로 남는다.
+  - 호스트명을 공유하는 다른 PID namespace에서는 살아 있는 owner를 죽은 것으로 볼 수 있다. 이 경우 owner는 `lock lost`로 실패한다.
+- **커밋 상태:** 위 4개 커밋과 이 기록 커밋을 `devlop` 대상 PR로 올리고, 사용자 지시에 따라 원격 CI 3개가 모두 통과하면 merge commit으로 머지한다.

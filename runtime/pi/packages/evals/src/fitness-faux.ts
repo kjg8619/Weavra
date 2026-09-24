@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import {
+	type AssistantMessage,
 	type Context,
 	fauxAssistantMessage,
 	fauxProvider,
@@ -9,7 +10,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import type { AgentExecutionRequest } from "../../company-runtime/src/ports.ts";
-import { FITNESS_CORPUS } from "./fitness-corpus.ts";
+import { FITNESS_CORPUS, type FitnessFixture } from "./fitness-corpus.ts";
 
 export type FitnessFauxBehavior = "GOOD" | "CONTRACT_VIOLATOR" | "UNRELIABLE" | "FALSE_COMPLETER";
 function text(message: Message | undefined): string {
@@ -23,12 +24,19 @@ function text(message: Message | undefined): string {
 const tool = (name: string, args: Record<string, unknown>) =>
 	fauxAssistantMessage(fauxToolCall(name, args), { stopReason: "toolUse" });
 
-/** Scripted model choices still pass through the real SDK, Worker tools, Policy, receipts and Kernel. */
-export function fitnessFauxResponse(behavior: FitnessFauxBehavior, context: Context) {
+/**
+ * Scripted model choices still pass through the real SDK, Worker tools, Policy, receipts and Kernel.
+ * `fixtures` lets the benchmark script its own Fitness-shaped fixtures; the Fitness corpus is the default.
+ */
+export function fitnessFauxResponse(
+	behavior: FitnessFauxBehavior,
+	context: Context,
+	fixtures: readonly FitnessFixture[] = FITNESS_CORPUS,
+) {
 	const request = JSON.parse(
 		text(context.messages.find((message) => message.role === "user")),
 	) as AgentExecutionRequest;
-	const fixture = FITNESS_CORPUS.find((item) => request.task.id.endsWith(`-${item.id}`));
+	const fixture = fixtures.find((item) => request.task.id.endsWith(`-${item.id}`));
 	if (!fixture) throw new Error("Unknown faux Fitness fixture");
 	if (behavior === "UNRELIABLE") throw new Error("FAUX_PRIVATE_CREDENTIAL_MARKER");
 	if (behavior === "CONTRACT_VIOLATOR")
@@ -125,13 +133,17 @@ export function fitnessFauxResponse(behavior: FitnessFauxBehavior, context: Cont
 	});
 }
 
-export async function createFitnessFauxModels(agentDir: string, behavior: FitnessFauxBehavior): Promise<ModelRuntime> {
+/** Local scripted provider in an isolated model runtime: no user credentials, models file or network. */
+export async function createFauxModelRuntime(
+	agentDir: string,
+	options: { provider: string; modelId: string; respond: (context: Context) => AssistantMessage; responses?: number },
+): Promise<ModelRuntime> {
 	const faux = fauxProvider({
-		provider: "fitness-faux",
-		models: [{ id: behavior, contextWindow: 128000, maxTokens: 8192 }],
+		provider: options.provider,
+		models: [{ id: options.modelId, contextWindow: 128000, maxTokens: 8192 }],
 	});
 	// Finite scripted stream inventory, independent of paid providers and user credentials.
-	faux.setResponses(Array.from({ length: 256 }, () => (context: Context) => fitnessFauxResponse(behavior, context)));
+	faux.setResponses(Array.from({ length: options.responses ?? 256 }, () => options.respond));
 	const models = await ModelRuntime.create({
 		authPath: join(agentDir, "auth.json"),
 		modelsPath: null,
@@ -140,6 +152,14 @@ export async function createFitnessFauxModels(agentDir: string, behavior: Fitnes
 		refreshOnCreate: false,
 	});
 	models.registerNativeProvider(faux.provider);
-	await models.refresh({ providers: ["fitness-faux"], allowNetwork: false });
+	await models.refresh({ providers: [options.provider], allowNetwork: false });
 	return models;
+}
+
+export async function createFitnessFauxModels(agentDir: string, behavior: FitnessFauxBehavior): Promise<ModelRuntime> {
+	return createFauxModelRuntime(agentDir, {
+		provider: "fitness-faux",
+		modelId: behavior,
+		respond: (context) => fitnessFauxResponse(behavior, context),
+	});
 }

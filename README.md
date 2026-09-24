@@ -2,6 +2,8 @@
 
 Weavra is an independent product combining an agent runtime with a desktop, web, and host application. It is not operated as a Pi or T3Code fork.
 
+New to the code? Start with the [architecture overview](docs/architecture/OVERVIEW.md): repository map, one run end to end, authority, on-disk state and the labels used throughout the docs.
+
 ```text
 Weavra
 ├─ Runtime / Agent Engine

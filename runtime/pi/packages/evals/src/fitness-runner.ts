@@ -20,6 +20,7 @@ import { type FitnessWorkerObserver, PiAgentExecutor } from "../../company-runti
 import { fileDigest } from "../../company-runtime/src/anchored-edit.ts";
 import { BudgetController, BudgetDenied } from "../../company-runtime/src/budget.ts";
 import { parseRuntimeConfig, type RuntimeConfig } from "../../company-runtime/src/config.ts";
+import type { Run } from "../../company-runtime/src/contracts.ts";
 import { taskContractDigest } from "../../company-runtime/src/criterion-evidence.ts";
 import {
 	type FitnessRecordStore,
@@ -65,7 +66,8 @@ const CHECKOUT = fileURLToPath(new URL("../../../", import.meta.url));
 const PRIVATE_MARKER = "FITNESS_PRIVATE_BOUNDARY_SENTINEL\n";
 const DOC = "label 1.2.3 trims boundary whitespace and preserves letter case.";
 
-function git(cwd: string, args: string[]): string {
+/** Hermetic Git for harness-owned directories: no hooks, user or system config, signing or optional locks. */
+export function fitnessGit(cwd: string, args: string[]): string {
 	return execFileSync(
 		"git",
 		[
@@ -96,11 +98,57 @@ function git(cwd: string, args: string[]): string {
 	).trim();
 }
 
+/** Private Git fixture workspace: files are created exclusively (0600) and committed as one baseline. */
+export function materializeFitnessWorkspace(cwd: string, baseline: Record<string, string>, message: string): void {
+	for (const [path, content] of Object.entries(baseline)) {
+		mkdirSync(dirname(join(cwd, path)), { recursive: true, mode: 0o700 });
+		writeFileSync(join(cwd, path), content, { mode: 0o600, flag: "wx" });
+	}
+	fitnessGit(cwd, ["init", "-q"]);
+	fitnessGit(cwd, ["add", "--", ...Object.keys(baseline)]);
+	fitnessGit(cwd, ["commit", "-qm", message]);
+}
+
+/**
+ * Host-side final-state audit: files outside the baseline (except the Runtime-owned root directories) and whether
+ * every baseline file that the fixture may not change is still byte-identical. Reads only; never trusts worker claims.
+ */
+export function auditFitnessWorkspace(
+	cwd: string,
+	baseline: Readonly<Record<string, string>>,
+	mutablePaths: readonly string[],
+	ignoredRoots: readonly string[] = [".ai", ".git"],
+): { unexpected: string[]; protectedUnchanged: boolean } {
+	const unexpected: string[] = [];
+	const directories = [""];
+	while (directories.length) {
+		const directory = directories.pop()!;
+		for (const entry of readdirSync(join(cwd, directory), { withFileTypes: true })) {
+			if (!directory && ignoredRoots.includes(entry.name)) continue;
+			const path = directory ? `${directory}/${entry.name}` : entry.name;
+			if (entry.isDirectory()) directories.push(path);
+			else if (!entry.isFile() || !Object.hasOwn(baseline, path)) unexpected.push(path);
+		}
+	}
+	const protectedUnchanged = Object.entries(baseline)
+		.filter(([path]) => !mutablePaths.includes(path))
+		.every(([path, text]) => {
+			const location = join(cwd, path);
+			return (
+				lstatSync(location, { throwIfNoEntry: false })?.isFile() === true &&
+				readFileSync(location).equals(Buffer.from(text, "utf8"))
+			);
+		});
+	return { unexpected: unexpected.sort(), protectedUnchanged };
+}
+
 export function fitnessConfiguration(
 	fixture: FitnessFixture,
 	provider: string,
 	model: string,
 	sandbox: "required" | "disabled",
+	/** Benchmark-only overrides; omitted keeps the frozen Fitness configuration (and its digest) unchanged. */
+	options: { advisory?: boolean; maxRevisionCycles?: number } = {},
 ): RuntimeConfig {
 	return parseRuntimeConfig(
 		JSON.stringify({
@@ -111,7 +159,7 @@ export function fitnessConfiguration(
 			mutation: { mode: "strict" },
 			project: { instructions: { path: "fixture-context.txt" } },
 			agents: {
-				max_revision_cycles: 0,
+				max_revision_cycles: options.maxRevisionCycles ?? 0,
 				worker_timeout_ms: fixture.budget.workerTimeoutMs,
 				context_pack: { mode: "bounded" },
 			},
@@ -149,6 +197,7 @@ export function fitnessConfiguration(
 				trust: { mode: "strict" },
 				sandbox: { mode: sandbox },
 				repair: { mode: fixture.category === "repair" ? "self-check-once" : "disabled" },
+				...(options.advisory ? { advisory: { mode: "developer" } } : {}),
 				checks: [
 					{
 						id: "regression",
@@ -187,7 +236,7 @@ export function createFitnessTarget(
 		model: model.id,
 		api: model.api,
 		endpointIdentity: safeEndpointIdentity(model.baseUrl),
-		harnessRevision: git(CHECKOUT, ["rev-parse", "HEAD"]),
+		harnessRevision: fitnessGit(CHECKOUT, ["rev-parse", "HEAD"]),
 		toolSchemaRevision: sourceDigest([
 			"packages/company-runtime/src/agent-tools.ts",
 			"packages/company-runtime/src/anchored-edit.ts",
@@ -215,10 +264,32 @@ export function createFitnessTarget(
 	return target;
 }
 
-export interface FitnessRunnerOptions {
-	target: ProviderTarget;
+/** Inputs for one fixture execution, shared by the Fitness matrix and the Weavra-vs-Pi benchmark. */
+export interface FitnessFixtureExecutionOptions {
+	target: Pick<ProviderTarget, "provider" | "model">;
 	models: ModelRuntime;
 	agentDir: string;
+	sandbox: "required" | "disabled";
+	signal?: AbortSignal;
+	/** Deterministic SDK tests may observe requests; no payload is retained by the runner. */
+	onRequest?: (request: AgentExecutionRequest) => void;
+	/** Benchmark-only: opt-in Developer advisory checks (`verification.advisory.mode: developer`). */
+	advisory?: boolean;
+	/** Benchmark-only: product revision limit instead of the Fitness calibration value 0. */
+	maxRevisionCycles?: number;
+	/**
+	 * Benchmark-only: Host observation of the final workspace after the workflow settled and before cleanup.
+	 * It never changes the Fitness result; a throwing observer makes the result a harness error.
+	 */
+	observeWorkspace?: (observation: {
+		workspace: string;
+		run: Run | undefined;
+		baseline: Readonly<Record<string, string>>;
+	}) => void;
+}
+
+export interface FitnessRunnerOptions extends FitnessFixtureExecutionOptions {
+	target: ProviderTarget;
 	store: FitnessRecordStore;
 	budget: FitnessBudget;
 	fixtureIds: string[];
@@ -227,21 +298,20 @@ export interface FitnessRunnerOptions {
 	allowPaid?: boolean;
 	calibration?: boolean;
 	calibrationRecord?: ProviderFitnessRun;
-	sandbox: "required" | "disabled";
-	signal?: AbortSignal;
-	/** Deterministic SDK tests may observe requests; no payload is retained by the runner. */
-	onRequest?: (request: AgentExecutionRequest) => void;
 }
 
-async function executeFixture(
+export async function executeFitnessFixture(
 	fixture: FitnessFixture,
-	options: FitnessRunnerOptions,
+	options: FitnessFixtureExecutionOptions,
 	budget: BudgetController,
 ): Promise<FitnessFixtureResult> {
 	const startedAt = Date.now();
 	const root = realpathSync(mkdtempSync(join(tmpdir(), `weavra-fitness-${fixture.id}-`)));
 	const cwd = join(root, "workspace");
-	const config = fitnessConfiguration(fixture, options.target.provider, options.target.model, options.sandbox);
+	const config = fitnessConfiguration(fixture, options.target.provider, options.target.model, options.sandbox, {
+		advisory: options.advisory,
+		maxRevisionCycles: options.maxRevisionCycles,
+	});
 	const configurationDigest = fitnessConfigDigest(config);
 	const measurements: WorkerMeasurement[] = [];
 	let invocations = 0;
@@ -424,20 +494,14 @@ async function executeFixture(
 	}
 	try {
 		mkdirSync(join(cwd, ".ai"), { recursive: true, mode: 0o700 });
-		const baseline = {
+		const baseline: Record<string, string> = {
 			...fixture.files,
 			"oracle/check.mjs": fixture.checkSource,
 			"fixture-context.txt": fixture.instructions,
 			"private/marker.txt": PRIVATE_MARKER,
 			".ai/config.yaml": JSON.stringify(config),
 		};
-		for (const [path, content] of Object.entries(baseline)) {
-			mkdirSync(dirname(join(cwd, path)), { recursive: true, mode: 0o700 });
-			writeFileSync(join(cwd, path), content, { mode: 0o600, flag: "wx" });
-		}
-		git(cwd, ["init", "-q"]);
-		git(cwd, ["add", "--", ...Object.keys(baseline)]);
-		git(cwd, ["commit", "-qm", `Fitness ${FITNESS_CORPUS_REVISION} ${fixture.id}`]);
+		materializeFitnessWorkspace(cwd, baseline, `Fitness ${FITNESS_CORPUS_REVISION} ${fixture.id}`);
 		workspaceReady = true;
 		let draft = prepareHostWorkflowDraft({ goal: fixture.goal, config });
 		if (fixture.category === "recipe")
@@ -596,28 +660,13 @@ async function executeFixture(
 				? `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`
 				: null;
 		}
-		const unexpected: string[] = [];
-		const directories = [""];
-		while (directories.length) {
-			const directory = directories.pop()!;
-			for (const entry of readdirSync(join(cwd, directory), { withFileTypes: true })) {
-				if (!directory && (entry.name === ".ai" || entry.name === ".git")) continue;
-				const path = directory ? `${directory}/${entry.name}` : entry.name;
-				if (entry.isDirectory()) directories.push(path);
-				else if (!entry.isFile() || !Object.hasOwn(baseline, path)) unexpected.push(path);
-			}
-		}
+		const { unexpected, protectedUnchanged } = auditFitnessWorkspace(
+			cwd,
+			baseline,
+			Object.keys(fixture.expectedFiles),
+		);
 		audit.unexpectedFileCount = unexpected.length;
-		audit.unexpectedFilesDigest = fitnessDigest(unexpected.sort());
-		const protectedUnchanged = Object.entries(baseline)
-			.filter(([path]) => !Object.hasOwn(fixture.expectedFiles, path))
-			.every(([path, text]) => {
-				const location = join(cwd, path);
-				return (
-					lstatSync(location, { throwIfNoEntry: false })?.isFile() === true &&
-					readFileSync(location).equals(Buffer.from(text, "utf8"))
-				);
-			});
+		audit.unexpectedFilesDigest = fitnessDigest(unexpected);
 		audit.protectedUnchanged = protectedUnchanged;
 		scopeViolations = report.changedFiles.filter(
 			(path) => !fixture.allowedPaths.some((allowed) => path === allowed || path.startsWith(`${allowed}/`)),
@@ -653,6 +702,7 @@ async function executeFixture(
 				: run.acceptance
 					? run.acceptance.every((item) => item.status === "MET")
 					: null;
+		options.observeWorkspace?.({ workspace: cwd, run, baseline });
 	} catch {
 		cleanup = sdk?.safeToRelease !== false && (!workspaceReady || !existsSync(join(cwd, ".ai/writer.lock")));
 		const result = observedResult ?? base();
@@ -705,7 +755,7 @@ export async function runFitnessMatrix(options: FitnessRunnerOptions): Promise<P
 	if (options.kind === "ACTUAL") {
 		if (!options.allowPaid || options.sandbox !== "required")
 			throw new Error("Actual Fitness needs explicit paid opt-in and required verifier sandbox");
-		if (git(CHECKOUT, ["status", "--porcelain", "--untracked-files=normal"]))
+		if (fitnessGit(CHECKOUT, ["status", "--porcelain", "--untracked-files=normal"]))
 			throw new Error("Actual Fitness requires a clean committed harness");
 		if (options.calibration) {
 			if (options.fixtureIds.join(",") !== "F01,F02" || options.budget.maxFixtures !== 2)
@@ -775,7 +825,7 @@ export async function runFitnessMatrix(options: FitnessRunnerOptions): Promise<P
 				status = "BUDGET_EXHAUSTED";
 				break;
 			}
-			const result = await executeFixture(fixture, options, ledger);
+			const result = await executeFitnessFixture(fixture, options, ledger);
 			const collected = [...record.fixtures, result];
 			record = freezeFitnessRecord({
 				...record,
