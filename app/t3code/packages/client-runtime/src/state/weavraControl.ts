@@ -46,7 +46,11 @@ const initial: WeavraControlViewState = {
   capabilityInventory: { status: "NOT_EXPOSED", inventory: null },
 };
 const sameExecution = Schema.toEquivalence(WeavraComplexExecution);
-/** Same COMPLEX Run and state revision must carry the same canonical data; key order is irrelevant. */
+/**
+ * Same COMPLEX Run, state revision and contract version must carry the same canonical data; key
+ * order is irrelevant. Another contract version comes only from a reconnected Runtime, whose
+ * checked observation replaces the old one as on the server.
+ */
 function complexChanged(previous: WeavraControlState, next: WeavraControlState) {
   const before = previous.complexExecution;
   const after = next.complexExecution;
@@ -55,6 +59,7 @@ function complexChanged(previous: WeavraControlState, next: WeavraControlState) 
     after !== undefined &&
     before.runId === after.runId &&
     before.stateRevision === after.stateRevision &&
+    before.schemaVersion === after.schemaVersion &&
     // Owner and project revision are observation-envelope values, not execution data.
     !sameExecution(before, {
       ...after,

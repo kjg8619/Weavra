@@ -168,6 +168,20 @@ Presence and compatibility:
 - An old App with a new Runtime is incompatible by design: its strict decoder rejects version 2, and the App shows the control as stale or unavailable.
 - Landing is consumer first: #21 lands before #20, as in V0.7B.
 
+**Amendment A1 — historical v1 Runs (added during #21 review).**
+
+After an upgrade, a project's latest Run may be a V0.7B COMPLEX Run with a v1 plan. Every such Run is terminal, because Host open recovers active Runs as INTERRUPTED. A v2 Runtime projects it as a `schemaVersion: 2` execution that:
+- carries the frozen v1 plan unchanged, with its own `schemaVersion: 1` and its `weavra-complex-plan-v1` digest;
+- has `activeTaskIds: []`;
+- has v1 row statuses (no `HANDED_OFF`).
+
+The App accepts a v1 plan inside a v2 execution only when the snapshot Run is terminal, and recomputes that plan's digest in its own domain. Previews and non-terminal executions from a v2 Runtime always carry v2 plans. The Runtime never rewrites, upgrades or re-digests a frozen plan. Without this amendment, a v2 Runtime could not show such a Run, and the project's control surface would stay unavailable until another Run was started.
+
+**Atomic saves the consumer relies on.** Rules 3 and 4 constrain which states may coexist; they do not list every allowed state. The App also accepts snapshots in which all active rows are ELIGIBLE, all are HANDED_OFF, or all are STOPPING. Consequences for the Runtime:
+- It moves every wave row ELIGIBLE → IMPLEMENTING in one save, with the shared wave entry capture.
+- It moves every working row (IMPLEMENTING or WAITING_APPROVAL, or a verification-stage row) → STOPPING in one save. HANDED_OFF rows may stay HANDED_OFF beside STOPPING rows until the terminal save.
+- A working row never appears beside an ELIGIBLE or STOPPING row.
+
 ## 9. App (#21)
 
 - Decode v1 and v2 strictly by capability. Recompute the v2 plan digest and the parent digest. Apply the v2 consumer rules in `ComplexProjection`.

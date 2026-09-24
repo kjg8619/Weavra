@@ -10,10 +10,12 @@ import type {
   WeavraTaskContract,
 } from "@t3tools/contracts";
 
-// Consumer checks for the COMPLEX contract v1 (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md
-// §4.2, §10, §11.1). Runtime stays the authority: these predicates only reject inconsistent
-// observations before publication and never repair, merge or advance anything.
+// Consumer checks for the COMPLEX contract: v1 (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md
+// §4.2, §10, §11.1) and v2, whose §8 consumer rules in docs/architecture/PARALLEL_AGENTS.md
+// replace the single-active-task rules. Runtime stays the authority: these predicates only reject
+// inconsistent observations before publication and never repair, merge or advance anything.
 
+type ContractVersion = NonNullable<WeavraControlCapabilities["complexContractVersion"]>;
 type Criterion = {
   readonly id: string;
   readonly checkIds: ReadonlyArray<string>;
@@ -97,10 +99,25 @@ export function previewTaskContractDigest(preview: WeavraControlPreview, parentT
   );
 }
 
+/**
+ * Each plan version hashes under its own domain, so a plan never verifies as another version. A
+ * historical v1 plan inside a v2 projection (Amendment A1) is recomputed in the v1 domain.
+ */
+const PLAN_DIGEST_DOMAIN: Record<WeavraComplexPlan["schemaVersion"], string> = {
+  1: "weavra-complex-plan-v1",
+  2: "weavra-complex-plan-v2",
+};
 export function complexPlanDigest(plan: WeavraComplexPlan) {
   const { complexPlanDigest: _excluded, ...material } = plan;
-  return sha256(canonicalJson(["weavra-complex-plan-v1", material]));
+  return sha256(canonicalJson([PLAN_DIGEST_DOMAIN[plan.schemaVersion], material]));
 }
+/** v1 plans run one task at a time. */
+const maxParallelOf = (plan: WeavraComplexPlan) =>
+  plan.schemaVersion === 2 ? plan.limits.maxParallel : 1;
+/** v1 plans, and v2 plans frozen to one worker, schedule only the next row after every earlier one. */
+const sequential = (plan: WeavraComplexPlan) => maxParallelOf(plan) === 1;
+/** R3 keeps the narrow one-deletion flow: its plans freeze maxParallel = 1 (v2 §8 rule 5). */
+const riskFits = (risk: Run["risk"], plan: WeavraComplexPlan) => risk !== "R3" || sequential(plan);
 
 /** Plan rules that need the parent: bound identity, complete coverage and mapped check selection. */
 function planFitsParent(
@@ -143,15 +160,23 @@ function total(check: () => boolean) {
   }
 }
 
-/** §10.3 preview checks; the opaque previewDigest is only echoed on confirmation, never rebuilt. */
-export function complexPreviewConsistent(preview: WeavraControlPreview): boolean {
+/**
+ * §10.3 preview checks; the opaque previewDigest is only echoed on confirmation, never rebuilt.
+ * The plan must have exactly the contract version this connection advertised.
+ */
+export function complexPreviewConsistent(
+  preview: WeavraControlPreview,
+  version: ContractVersion | undefined,
+): boolean {
   const plan = preview.complexPlan;
   if (!plan) return preview.workflow !== "COMPLEX";
   return total(() => {
     const parentDigest = previewTaskContractDigest(preview, plan.parentTaskId);
     return (
+      plan.schemaVersion === version &&
       preview.workflow === "COMPLEX" &&
       preview.recipe === null &&
+      riskFits(preview.risk, plan) &&
       preview.taskContractDigest === parentDigest &&
       sameList(plan.integration.checkIds, preview.checks.map((check) => check.id).sort()) &&
       (preview.executionMode === "EDIT" ||
@@ -165,11 +190,13 @@ const ACTIVE = new Set<WeavraComplexTaskState["status"]>([
   "ELIGIBLE",
   "IMPLEMENTING",
   "WAITING_APPROVAL",
+  "HANDED_OFF",
   "SELF_CHECK",
   "REVIEW",
   "TEST",
   "STOPPING",
 ]);
+const VERIFYING = new Set<WeavraComplexTaskState["status"]>(["SELF_CHECK", "REVIEW", "TEST"]);
 const FINISHED = new Set<WeavraComplexTaskState["status"]>([
   "COMPLETED",
   "BLOCKED",
@@ -207,7 +234,9 @@ const sum = (values: ReadonlyArray<number>) => values.reduce((total, value) => t
 function rowConsistent(
   row: WeavraComplexTaskState,
   task: WeavraComplexTask | undefined,
-  earlier: ReadonlyArray<WeavraComplexTaskState>,
+  rows: ReadonlyArray<WeavraComplexTaskState>,
+  index: number,
+  inOrder: boolean,
 ) {
   if (!task || row.id !== task.id) return false;
   if (row.status === "PENDING")
@@ -227,6 +256,13 @@ function rowConsistent(
       row.failureCode === null
     );
   const claims = new Set(task.ownership.map((claim) => claim.path));
+  const completed = (id: string) =>
+    rows.some((item) => item.id === id && item.status === "COMPLETED");
+  // v2 rule 2: an active or COMPLETED row needs its declared dependencies COMPLETED; sequential
+  // plans (v1, or maxParallel = 1) need every earlier row COMPLETED, the V0.7B rule.
+  const ready = inOrder
+    ? rows.slice(0, index).every((before) => before.status === "COMPLETED")
+    : task.dependsOn.every(completed);
   return (
     (row.attempt === 0 ? row.revisionCycle === 0 : row.attempt === row.revisionCycle + 1) &&
     row.revisionCycle <= task.maxRevisionCycles &&
@@ -240,9 +276,14 @@ function rowConsistent(
       row.changesUnknown) &&
     row.changedFiles.every((path) => claims.has(path)) &&
     ordered(row.selfCheck, row.review, row.test) &&
-    // Only the next array entry is scheduled, and only after every earlier task completed.
-    ((!ACTIVE.has(row.status) && row.status !== "COMPLETED") ||
-      earlier.every((before) => before.status === "COMPLETED")) &&
+    ((!ACTIVE.has(row.status) && row.status !== "COMPLETED") || ready) &&
+    // v2 rule 5: implemented and entry-captured, every gate still waiting for its verification turn.
+    (row.status !== "HANDED_OFF" ||
+      (row.attempt >= 1 &&
+        row.entryWorkspaceDigest !== null &&
+        row.selfCheck === "NOT_RUN" &&
+        row.review === "NOT_RUN" &&
+        row.test === "NOT_RUN")) &&
     (row.status !== "COMPLETED" ||
       (row.attempt >= 1 &&
         row.selfCheck === "PASS" &&
@@ -254,10 +295,52 @@ function rowConsistent(
   );
 }
 
+/**
+ * Which rows are active, and which may be active together. v1 has at most one active row. v2 lists
+ * every active row (rule 1) and constrains the rows doing work (rules 3 and 4). Without a working
+ * row the active rows are all ELIGIBLE (one wave-formation save) or HANDED_OFF and STOPPING (join
+ * and settlement), per the §8 atomic-save amendment.
+ */
+function activeRowsConsistent(
+  execution: WeavraComplexExecution,
+  active: ReadonlyArray<WeavraComplexTaskState>,
+) {
+  if (execution.schemaVersion === 1)
+    return active.length <= 1 && execution.activeTaskId === (active[0]?.id ?? null);
+  const eligible = active.filter((row) => row.status === "ELIGIBLE");
+  // A revising row (attempt ≥ 2) re-implements alone during its verification turn.
+  const verifying = active.filter(
+    (row) => VERIFYING.has(row.status) || (row.status === "IMPLEMENTING" && row.attempt >= 2),
+  );
+  const implementing = active.filter(
+    (row) =>
+      row.status === "WAITING_APPROVAL" || (row.status === "IMPLEMENTING" && row.attempt < 2),
+  );
+  const othersHandedOff = (working: ReadonlyArray<WeavraComplexTaskState>) =>
+    active.every((row) => working.includes(row) || row.status === "HANDED_OFF");
+  return (
+    // Rule 1: exactly the active rows, in plan order, never more than maxParallel. Integration and
+    // TERMINAL need every row COMPLETED or finished, so the list is empty there.
+    sameList(
+      execution.activeTaskIds,
+      active.map((row) => row.id),
+    ) &&
+    active.length <= maxParallelOf(execution.plan) &&
+    // A wave is formed in one save: ELIGIBLE rows are the whole active set.
+    (eligible.length === 0 || eligible.length === active.length) &&
+    // Rule 3: first attempts implement together; the other active rows wait HANDED_OFF.
+    (implementing.length === 0 || (verifying.length === 0 && othersHandedOff(implementing))) &&
+    // Rule 4: one row verifies at a time on a quiescent workspace, never beside a first attempt.
+    (verifying.length === 0 ||
+      (verifying.length === 1 && implementing.length === 0 && othersHandedOff(verifying)))
+  );
+}
+
 function executionConsistent(execution: WeavraComplexExecution, run: Run) {
   const { plan, parent, tasks, integration, budget } = execution;
   const parentDigest = taskContractDigest(parent);
   const active = tasks.filter((row) => ACTIVE.has(row.status));
+  const inOrder = sequential(plan);
   const integrationGates = [integration.check, integration.review, integration.test];
   const gates = [
     ...tasks.flatMap((row) => [row.selfCheck, row.review, row.test]),
@@ -278,10 +361,10 @@ function executionConsistent(execution: WeavraComplexExecution, run: Run) {
     ) &&
     // Task success never marks the parent; only final Run completion does.
     (parent.status !== "completed" || run.status === "COMPLETED") &&
+    riskFits(run.risk, plan) &&
     tasks.length === plan.tasks.length &&
-    tasks.every((row, index) => rowConsistent(row, plan.tasks[index], tasks.slice(0, index))) &&
-    active.length <= 1 &&
-    execution.activeTaskId === (active[0]?.id ?? null) &&
+    tasks.every((row, index) => rowConsistent(row, plan.tasks[index], tasks, index, inOrder)) &&
+    activeRowsConsistent(execution, active) &&
     (!tasks.some((row) => row.status === "WAITING_APPROVAL") ||
       run.status === "WAITING_APPROVAL") &&
     (execution.phase === "TERMINAL") === TERMINAL_RUN.has(run.status) &&
@@ -364,26 +447,31 @@ function transitionConsistent(before: WeavraComplexExecution, after: WeavraCompl
 /**
  * §10.3 presence and §11.1 consistency for one checked snapshot. An advertised Runtime whose
  * latest Run is COMPLEX must include the projection; an unadvertised one must never send it.
+ * Every COMPLEX shape has exactly the advertised contract version, so versions never mix on one
+ * connection.
  */
 export function complexStateConsistent(
   state: WeavraControlState,
   capabilities: WeavraControlCapabilities,
   previous: WeavraControlState | null,
 ): boolean {
+  const version = capabilities.complexContractVersion;
   const execution = state.complexExecution;
   const run = state.snapshot.status.run;
-  if (state.preview && !complexPreviewConsistent(state.preview)) return false;
-  if (capabilities.complexContractVersion !== 1)
-    return execution === undefined && state.preview?.workflow !== "COMPLEX";
-  if (!execution) return run?.workflow !== "COMPLEX";
+  if (state.preview && !complexPreviewConsistent(state.preview, version)) return false;
+  if (!execution) return version === undefined || run?.workflow !== "COMPLEX";
+  if (execution.schemaVersion !== version) return false;
   const before = previous?.complexExecution;
   return total(
     () =>
       run !== null &&
       executionConsistent(execution, run) &&
-      // A new Run replaces the projection; nothing is merged from an older one.
+      // A new Run replaces the projection; nothing is merged from an older one. So does the
+      // first snapshot of a reconnected Runtime with another contract version: the old
+      // observation came from a different connection and its shape is not comparable.
       (before === undefined ||
         before.runId !== execution.runId ||
+        before.schemaVersion !== execution.schemaVersion ||
         (transitionConsistent(before, execution) &&
           (before.phase !== "TERMINAL" || previous?.snapshot.status.run?.status === run.status))),
   );

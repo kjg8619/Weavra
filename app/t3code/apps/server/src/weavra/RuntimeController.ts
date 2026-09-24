@@ -415,12 +415,13 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
       if (entry.pending >= 8)
         return yield* new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" });
       const capabilities = entry.latest.capabilities;
-      // A structured COMPLEX draft is never sent to a Runtime that does not advertise contract v1.
+      // A structured COMPLEX draft is never sent to a Runtime that advertises no COMPLEX contract.
+      // The draft shape is the same in contract v1 and v2.
       if (
         !capabilities ||
         (input.request.type === "workflow.prepare" &&
           input.request.complexDraft !== undefined &&
-          capabilities.complexContractVersion !== 1)
+          capabilities.complexContractVersion === undefined)
       )
         return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
       const bridge = entry.bridge;
@@ -442,7 +443,7 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
                 data.preview.projectRevision === request.expectedProjectRevision &&
                 // COMPLEX requires the draft, and a draft is never silently downgraded.
                 (data.preview.workflow === "COMPLEX") === (request.complexDraft !== undefined) &&
-                complexPreviewConsistent(data.preview)
+                complexPreviewConsistent(data.preview, capabilities.complexContractVersion)
               : request.type === "browser.inspect"
                 ? data.kind === "browser-state"
                 : request.type === "browser.prepare"

@@ -6,7 +6,21 @@ import type {
 import { Badge } from "../ui/badge";
 
 type Run = NonNullable<WeavraControlState["snapshot"]["status"]["run"]>;
+type Row = WeavraComplexExecution["tasks"][number];
 const known = (value: number | null) => (value === null ? "unknown" : String(value));
+/** Contract v1 plans have no parallel limit: they run one task at a time. */
+const maxParallelOf = (plan: WeavraComplexPlan) =>
+  plan.schemaVersion === 2 ? plan.limits.maxParallel : 1;
+/** What a Runtime-reported status or failure means; never a transition the App makes. */
+const statusNote: Partial<Record<Row["status"], string>> = {
+  HANDED_OFF: "Implemented; waiting for its verification turn (one task at a time, in plan order).",
+  STOPPING: "Stopping with the Run; waiting for every live task to settle.",
+};
+const failureNote: Partial<Record<NonNullable<Row["failureCode"]>, string>> = {
+  RUN_STOPPED: "stopped because a sibling task failed or the Run stopped",
+  CANCELLED: "cancelled with the Run",
+  OWNER_LOST: "the Runtime owner was lost; nothing resumes automatically",
+};
 
 /** Read-only frozen COMPLEX plan. Display only: nothing here schedules, edits or verifies work. */
 export function ComplexPlanView({
@@ -17,6 +31,7 @@ export function ComplexPlanView({
   criteria: ReadonlyArray<{ id: string; statement: string }>;
 }) {
   const statements = new Map(criteria.map((criterion) => [criterion.id, criterion.statement]));
+  const maxParallel = maxParallelOf(plan);
   return (
     <div className="space-y-3 text-xs">
       <dl className="grid gap-2 sm:grid-cols-2">
@@ -68,11 +83,18 @@ export function ComplexPlanView({
       <p>
         Limits: {plan.limits.maxTasks} tasks · {plan.limits.maxWorkerInvocations} worker invocations
         · {plan.limits.maxReportedTokens} provider-reported tokens ·{" "}
-        {plan.limits.maxTotalRevisionCycles} total revision cycles.
+        {plan.limits.maxTotalRevisionCycles} total revision cycles
+        {plan.schemaVersion === 2
+          ? ` · at most ${maxParallel} ${maxParallel === 1 ? "task" : "tasks"} implemented at once (Runtime configuration, read-only)`
+          : ""}
+        .
       </p>
       <p className="text-muted-foreground">
-        Tasks run one at a time in this order under one Runtime-owned Run. File claims narrow
-        responsibility; they are not filesystem permission, Policy ALLOW or approval.
+        {maxParallel > 1
+          ? `Tasks whose dependencies are COMPLETED are implemented together, up to ${maxParallel} at once; checks and reviews then run one task at a time in this order, all under one Runtime-owned Run.`
+          : "Tasks run one at a time in this order under one Runtime-owned Run."}{" "}
+        File claims narrow responsibility; they are not filesystem permission, Policy ALLOW or
+        approval.
       </p>
     </div>
   );
@@ -86,6 +108,7 @@ export function ComplexExecutionView({
   owned,
   observedAt,
   writerPresent,
+  cancelling,
 }: {
   execution: WeavraComplexExecution;
   run: Run;
@@ -93,11 +116,15 @@ export function ComplexExecutionView({
   owned: boolean;
   observedAt: number | null;
   writerPresent: boolean | null;
+  cancelling: boolean;
 }) {
-  const titles = new Map(execution.plan.tasks.map((task) => [task.id, task.title]));
+  const tasks = new Map(execution.plan.tasks.map((task) => [task.id, task]));
   const completed = execution.tasks.filter((task) => task.status === "COMPLETED").length;
   const allTasksCompleted = completed === execution.tasks.length;
   const { integration, budget, plan } = execution;
+  // Wave membership is only what the Runtime reports; nothing is inferred from dependencies.
+  const wave = execution.schemaVersion === 2 ? execution.activeTaskIds : null;
+  const label = (id: string) => `${id} · ${tasks.get(id)?.title ?? "unknown task"}`;
   return (
     <section
       aria-label="COMPLEX execution"
@@ -120,9 +147,21 @@ export function ComplexExecutionView({
         </p>
       )}
       <p>
-        Canonical Run outcome: <strong>{run.status}</strong> · phase {execution.phase} · active task{" "}
-        {execution.activeTaskId ?? "none"}
+        Canonical Run outcome: <strong>{run.status}</strong> · phase {execution.phase}
+        {execution.schemaVersion === 1 ? ` · active task ${execution.activeTaskId ?? "none"}` : ""}
       </p>
+      {wave !== null && (
+        <p>
+          Current wave, as reported by Runtime:{" "}
+          {wave.length === 0 ? "none" : wave.map(label).join(", ")} · at most {maxParallelOf(plan)}{" "}
+          implemented at once; checks and reviews run one task at a time.
+        </p>
+      )}
+      {(cancelling || execution.phase === "STOPPING") && (
+        <p>
+          {`${cancelling ? "Cancel requested" : "Stopping"}: Runtime stops every live task and waits for all of them to settle before it records the outcome. Cleanup: ${execution.cleanup}.`}
+        </p>
+      )}
       <p>
         Task contributions completed: {completed} / {execution.tasks.length}.{" "}
         {allTasksCompleted && run.status !== "COMPLETED"
@@ -133,11 +172,14 @@ export function ComplexExecutionView({
         {execution.tasks.map((task) => (
           <li key={task.id} className="space-y-1 rounded-md border border-border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-medium">
-                {task.id} · {titles.get(task.id)}
-              </span>
-              <Badge variant="outline">{task.status}</Badge>
+              <span className="font-medium">{label(task.id)}</span>
+              <div className="flex flex-wrap gap-2">
+                {wave?.includes(task.id) && <Badge variant="outline">CURRENT WAVE</Badge>}
+                <Badge variant="outline">{task.status}</Badge>
+              </div>
             </div>
+            {statusNote[task.status] && <p>{statusNote[task.status]}</p>}
+            <p>Depends on: {tasks.get(task.id)?.dependsOn.join(", ") || "none"}</p>
             <p>
               Attempt {task.attempt} · local revision cycle {task.revisionCycle} · worker
               invocations {task.workerInvocations} · reported tokens {known(task.reportedTokens)}
@@ -153,7 +195,12 @@ export function ComplexExecutionView({
               Changed files: {task.changedFiles.join(", ") || "none recorded"}
               {task.changesUnknown ? " · additional changes UNKNOWN" : ""}
             </p>
-            {task.failureCode && <p>Failure: {task.failureCode}</p>}
+            {task.failureCode && (
+              <p>
+                Failure: {task.failureCode}
+                {failureNote[task.failureCode] ? ` — ${failureNote[task.failureCode]}` : ""}
+              </p>
+            )}
           </li>
         ))}
       </ol>
