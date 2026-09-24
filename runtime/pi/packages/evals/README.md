@@ -197,3 +197,19 @@ necessary, use Vitest's built-in sequence shuffling.
 
 See the [`skill-eval-harness`](https://github.com/adewale/skill-eval-harness/) guidance for comparative-eval methodology,
 repetition strategy, trustworthy judges, and telemetry interpretation.
+
+## Weavra vs Pi benchmark
+
+`npm run benchmark` asks whether Weavra STANDARD beats plain Pi on the same tasks, with the same model and the same wall-clock limit per run. Each run records whether the agent claimed completion, whether a hidden oracle passed, and whether it was a false completion (claimed, but the oracle failed). It also records duration, model turns, tool calls and provider-reported tokens. Tokens are `UNKNOWN` when a provider does not report them; they are never estimated.
+
+```bash
+cd runtime/pi && npm run build
+npm run benchmark -- --provider <provider> --model <model> --repeat 3 --out /abs/results --confirm-paid
+```
+
+- Arms: `pi` is a plain Pi SDK session with default tools, a fresh isolated HOME and agent directory, and no extensions, skills or context files. `weavra` is STANDARD through the real Worker SDK, Policy, verifier and Kernel. `weavra-advisory` is the same plus `verification.advisory: {mode: developer}`.
+- Weavra arms use the C06 Fitness measurement profile (strict mutation and trust, bounded context pack, budget of 4 worker invocations and 100k reported tokens), but with the product revision limit of 1 instead of the Fitness calibration value of 0. A Reviewer REVISE therefore gets one fix attempt, as in a real run.
+- Corpus: F01–F10 from C06 Fitness (without the cancellation fixture F08), plus benchmark-only B01–B06, which cover a multi-file bugfix, a test addition checked against a hidden mutant, a rename, an off-by-one, input validation and config parsing.
+- The hidden oracle is Host code only. It is never written into a workspace, HOME or prompt, and it judges the final files and final answer after the agent stops. For the `pi` arm, bash is not OS-sandboxed and can reach the harness source on the same machine.
+- Any provider other than `benchmark-faux` is refused without `--confirm-paid`. Without that flag the CLI prints the planned run count (arms × fixtures × repeat), for example 135 runs for all arms, all 15 fixtures and 3 repeats.
+- Results are a versioned, typebox-validated JSON record and a per-arm Markdown table. Tests use only the faux provider: `node ../../node_modules/vitest/dist/cli.js run --config vitest.test.config.ts`.

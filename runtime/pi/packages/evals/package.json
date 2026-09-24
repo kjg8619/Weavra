@@ -7,6 +7,7 @@
 		"prepublishOnly": "node ../../scripts/publish.mjs",
 		"clean": "shx rm -rf .eval",
 		"eval": "node scripts/run-evals.mjs",
+		"benchmark": "node scripts/run-benchmark.mjs",
 		"test": "vitest run --config vitest.test.config.ts"
 	},
 	"devDependencies": {
