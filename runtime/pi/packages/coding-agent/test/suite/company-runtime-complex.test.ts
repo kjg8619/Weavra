@@ -3,22 +3,27 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Context, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { projectComplexExecution } from "../../../company-runtime/src/complex-state.ts";
 import { parseRuntimeConfig, type RuntimeConfig } from "../../../company-runtime/src/config.ts";
 import type { Run } from "../../../company-runtime/src/contracts.ts";
 import type { RuntimeEvent } from "../../../company-runtime/src/events.ts";
 import { HostControlBridge } from "../../../company-runtime/src/host-control.ts";
 import type {
+	HostControlCapabilities,
 	HostControlPreview,
 	HostControlResponse,
 	HostControlState,
 } from "../../../company-runtime/src/host-control-protocol.ts";
 import type { AgentExecutionRequest } from "../../../company-runtime/src/ports.ts";
 import { FileStateStore } from "../../../company-runtime/src/state-store.ts";
+import { type ComplexObservation, complexConsumerIssues } from "../../../company-runtime/test/complex-conformance.ts";
 import { createHarness, getMessageText, type Harness } from "./harness.ts";
 
 // #16 stage B: COMPLEX sequential execution through the real Host Control confirm path, StandardWorkflow,
 // PiAgentExecutor worker tools with Kernel-bound ownership, RegisteredVerifier over real Git and processes, and
 // the validating FileStateStore. Faux provider only; no real provider, key or paid token.
+// #16 stage C: every control snapshot observed during these real Runs is checked against every #17 App consumer
+// rule (company-runtime/test/complex-conformance.ts), alone and against the previous snapshot of the connection.
 
 let harness: Harness;
 let cwd: string;
@@ -27,6 +32,8 @@ let config: RuntimeConfig;
 let clock: number;
 let events: RuntimeEvent[];
 let client: ReturnType<typeof connect>;
+let capabilities: HostControlCapabilities;
+let observed: ComplexObservation[];
 const owners: HostControlBridge[] = [];
 const GOAL = "Refactor the app across multiple modules";
 const DRAFT = {
@@ -92,7 +99,9 @@ function connect(owner: HostControlBridge) {
 			return responses[offset];
 		},
 		async hello() {
-			return this.request({ protocolVersion: 1, id: `hello-${++sequence}`, type: "control.hello" });
+			const result = await this.request({ protocolVersion: 1, id: `hello-${++sequence}`, type: "control.hello" });
+			if (result.success && result.data.kind === "capabilities") capabilities = result.data.capabilities;
+			return result;
 		},
 		async state(): Promise<HostControlState> {
 			const result = await this.request({
@@ -102,6 +111,16 @@ function connect(owner: HostControlBridge) {
 			});
 			if (!result.success || result.data.kind !== "snapshot")
 				throw new Error(`Snapshot unavailable: ${JSON.stringify(result)}`);
+			observed.push({
+				capabilities,
+				state: result.data.state,
+				response: {
+					ownerId: result.ownerId,
+					runId: result.runId,
+					stateRevision: result.stateRevision,
+					projectRevision: result.projectRevision,
+				},
+			});
 			return result.data.state;
 		},
 	};
@@ -140,6 +159,14 @@ async function idleState() {
 		{ timeout: 60000, interval: 20 },
 	);
 	return state;
+}
+/** Every observed snapshot, checked as the #17 App consumer would before publishing it (alone and in sequence). */
+function consumerIssues(): string[] {
+	return observed.flatMap((observation, index) =>
+		complexConsumerIssues(observation, index ? observed[index - 1] : null).map(
+			(issue) => `snapshot ${index}: ${issue}`,
+		),
+	);
 }
 async function storedRun(): Promise<Run> {
 	const run = (await FileStateStore.readSnapshot(cwd)).state?.runs.at(-1);
@@ -283,6 +310,7 @@ beforeEach(async () => {
 	git("init", "-q");
 	clock = Date.now();
 	events = [];
+	observed = [];
 });
 afterEach(async () => {
 	client?.close();
@@ -310,9 +338,30 @@ describe("COMPLEX sequential Run through Host Control and real adapters (#16)", 
 			writerPresent: false,
 			run: { status: "COMPLETED", workflow: "COMPLEX" },
 		});
-		// Stage C owns the control projection; Stage B never emits it.
-		expect("complexExecution" in state).toBe(false);
 		const run = await storedRun();
+		// #16 stage C: contract v1 is advertised and the latest COMPLEX Run is projected, from exactly that durable
+		// Run, at the snapshot's own owner/project/state revisions.
+		expect(capabilities.complexContractVersion).toBe(1);
+		expect(state.complexExecution).toEqual(
+			projectComplexExecution(run, {
+				ownerId: state.ownerId,
+				projectRevision: state.projectRevision,
+				stateRevision: run.revision,
+			}),
+		);
+		expect(state.complexExecution).toMatchObject({
+			runId: state.snapshot.status.run?.runId,
+			stateRevision: state.stateRevision,
+			phase: "TERMINAL",
+			activeTaskId: null,
+			cleanup: "CONFIRMED",
+			integration: { check: "PASS", review: "PASS", test: "PASS", evidenceFreshness: "CURRENT" },
+			budget: { workerInvocations: 5, totalRevisionCycles: 0, status: "WITHIN_LIMITS" },
+		});
+		expect(state.complexExecution?.tasks.map((row) => row.status)).toEqual(["COMPLETED", "COMPLETED"]);
+		// Snapshots observed while the real Run advanced all passed every App consumer rule, alone and in sequence.
+		expect(observed.filter((item) => item.state.complexExecution).length).toBeGreaterThan(1);
+		expect(consumerIssues()).toEqual([]);
 		expect(run.lastError).toBeNull();
 		expect(run.complex).toMatchObject({
 			phase: "TERMINAL",
@@ -385,6 +434,13 @@ describe("COMPLEX sequential Run through Host Control and real adapters (#16)", 
 			stored.actions.filter((action) => action.decision.role === "Developer" && action.decision.risk === "R1"),
 		).toHaveLength(1);
 		expect(harness.faux.state.callCount).toBe(4);
+		expect(state.complexExecution).toMatchObject({
+			phase: "TERMINAL",
+			failureCode: "OWNERSHIP_CONFLICT",
+			cleanup: "CONFIRMED",
+			stateRevision: state.stateRevision,
+		});
+		expect(consumerIssues()).toEqual([]);
 	});
 
 	it("C14: cancel during a later task keeps earlier history, cancels the rest and releases the writer", async () => {
@@ -409,6 +465,7 @@ describe("COMPLEX sequential Run through Host Control and real adapters (#16)", 
 		await start();
 		await ready;
 		const live = await client.state();
+		expect(live.complexExecution).toMatchObject({ phase: "TASK_SEQUENCE", activeTaskId: "CT-002" });
 		const cancelled = await mutation({
 			type: "workflow.cancel",
 			runId: live.ownedRunId,
@@ -422,6 +479,13 @@ describe("COMPLEX sequential Run through Host Control and real adapters (#16)", 
 		expect(run.complex?.tasks.map((row) => row.status)).toEqual(["COMPLETED", "CANCELLED"]);
 		expect(readFileSync(join(cwd, "src/app.js"), "utf8")).toBe("fixed\n");
 		expect(events.some((event) => event.type === "RunCompleted")).toBe(false);
+		expect(state.complexExecution).toMatchObject({
+			phase: "TERMINAL",
+			failureCode: "CANCELLED",
+			cleanup: "CONFIRMED",
+		});
+		expect(state.complexExecution?.tasks.map((row) => row.status)).toEqual(["COMPLETED", "CANCELLED"]);
+		expect(consumerIssues()).toEqual([]);
 	});
 });
 
@@ -441,6 +505,9 @@ describe("COMPLEX confirmation rechecks the live checkout (#16)", () => {
 		expect(state).toMatchObject({ startFailure: "START_FAILED", preview: null });
 		expect(state.snapshot.status).toMatchObject({ writerPresent: false, run: null });
 		expect(harness.faux.state.callCount).toBe(0);
+		// No Run, no projection; the preview was consumed.
+		expect("complexExecution" in state).toBe(false);
+		expect(consumerIssues()).toEqual([]);
 	});
 });
 
@@ -491,6 +558,14 @@ describe("COMPLEX R3 single deletion through Host Control (#16)", () => {
 			{ timeout: 30000, interval: 20 },
 		);
 		expect(existsSync(join(cwd, "src/obsolete.js"))).toBe(true);
+		// The waiting snapshot projects CT-001 waiting for the exact Approval while the Run waits.
+		const waiting = observed.find((item) => item.state.pendingApproval)?.state;
+		expect(waiting?.snapshot.status.run?.status).toBe("WAITING_APPROVAL");
+		expect(waiting?.complexExecution).toMatchObject({
+			activeTaskId: "CT-001",
+			stateRevision: waiting?.stateRevision,
+		});
+		expect(waiting?.complexExecution?.tasks[0].status).toBe("WAITING_APPROVAL");
 		const resolved = await mutation({
 			type: "approval.resolve",
 			runId: approval!.runId,
@@ -520,5 +595,12 @@ describe("COMPLEX R3 single deletion through Host Control (#16)", () => {
 		expect(
 			stored.actions.filter((action) => action.decision.risk === "R3" && action.status === "SUCCEEDED"),
 		).toHaveLength(1);
+		expect(state.complexExecution).toMatchObject({ phase: "TERMINAL", cleanup: "CONFIRMED", failureCode: null });
+		// The waiting and the final revisions were both observed: the cross-snapshot rules ran on real transitions.
+		const revisions = new Set(
+			observed.filter((item) => item.state.complexExecution).map((item) => item.state.stateRevision),
+		);
+		expect(revisions.size).toBeGreaterThanOrEqual(2);
+		expect(consumerIssues()).toEqual([]);
 	});
 });
