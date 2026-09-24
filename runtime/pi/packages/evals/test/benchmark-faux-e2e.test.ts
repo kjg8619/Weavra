@@ -156,6 +156,7 @@ describe("Weavra-vs-Pi benchmark through real SDK and Runtime boundaries (faux p
 		expect(b04.fixture.checkSource).toContain(checkMarker);
 		const shellResults: string[] = [];
 		const weavraListings: string[] = [];
+		const weavraDenials: string[] = [];
 		const sessions: PiSessionObservation[] = [];
 		const leaks: string[] = [];
 		const tool = (name: string, args: Record<string, unknown>) =>
@@ -177,9 +178,14 @@ describe("Weavra-vs-Pi benchmark through real SDK and Runtime boundaries (faux p
 					if (name.startsWith("weavra-fitness-B04-"))
 						leaks.push(...filesContaining(join(realpathSync(tmpdir()), name), oracleMarker));
 				if (!results.length) return tool("runtime_list_files", {});
-				weavraListings.push(text(results[0]));
-				// Policy denies the protected verifier input and ends the worker; its bytes never reach the model.
-				return tool("runtime_read", { path: "oracle/check.mjs" });
+				if (results.length === 1) {
+					weavraListings.push(text(results[0]));
+					// Policy denies the protected verifier input; the correctable denial carries none of its bytes.
+					return tool("runtime_read", { path: "oracle/check.mjs" });
+				}
+				weavraDenials.push(text(results[1]));
+				// Ending without a structured submission leaves the Weavra worker FAILED.
+				return fauxAssistantMessage("Done.");
 			}
 			if (!results.length)
 				return tool("bash", {
@@ -220,6 +226,10 @@ describe("Weavra-vs-Pi benchmark through real SDK and Runtime boundaries (faux p
 		expect(weavraListings).toHaveLength(1);
 		expect(weavraListings[0]).toContain("src/paginate.mjs");
 		expect(weavraListings[0]).not.toContain("oracle");
+		expect(weavraDenials).toHaveLength(1);
+		expect(weavraDenials[0]).toContain("Protected target");
+		expect(weavraDenials[0]).toContain("Nothing was read");
+		expect(weavraDenials[0]).not.toContain(checkMarker);
 		expect(leaks).toEqual([]);
 		const pi = record.runs.find((run) => run.arm === "pi")!;
 		expect(pi).toMatchObject({ claimedCompletion: true, oracle: "FAIL", falseCompletion: true });

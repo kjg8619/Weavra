@@ -158,6 +158,8 @@ export const NON_FILE_TARGET_REASON = "Target is missing or not a regular file";
 /** Safe literal path outside the configured scope; nothing is read, written or listed. */
 export const OUTSIDE_ALLOWED_PATHS_REASON = "Target outside allowed paths";
 export const OUTSIDE_LISTING_BOUNDARY_REASON = "Target outside listing boundary";
+/** Runtime state, credentials, project instructions or trusted verifier sources: never read or changed by workers. */
+export const PROTECTED_TARGET_REASON = "Protected target";
 
 /** The target changed between the durable intent and execution; not a model-correctable input error. */
 export class PolicyRecheckError extends Error {
@@ -242,7 +244,7 @@ export function evaluatePolicy(
 	)
 		reason = "Invalid or missing literal target paths";
 	else if (action.paths.some((path) => isProtectedPath(path, context.protectedPaths ?? [])))
-		reason = "Protected target";
+		reason = PROTECTED_TARGET_REASON;
 	else if (listing && action.paths.some((path) => !isListablePath(path, context)))
 		reason = OUTSIDE_LISTING_BOUNDARY_REASON;
 	else if (action.paths.some((path) => !context.allowedPaths.some((root) => within(path, root))))
