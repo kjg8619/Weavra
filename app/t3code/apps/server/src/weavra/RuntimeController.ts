@@ -1,5 +1,6 @@
 import {
   type ProjectId,
+  type WeavraControlCapabilities,
   type WeavraControlInput,
   type WeavraControlObservation,
   type WeavraControlResponse,
@@ -28,6 +29,7 @@ import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import { ProjectionSnapshotQuery } from "../orchestration/Services/ProjectionSnapshotQuery.ts";
 import { subscribeBeforeSnapshotWithoutMutex } from "../utils/subscribeBeforeSnapshot.ts";
+import { complexPreviewConsistent, complexStateConsistent } from "./ComplexProjection.ts";
 import { type ControlTransport, openControlTransport } from "./ControlTransport.ts";
 
 const sameInventory = Schema.toEquivalence(WeavraCapabilityInventory);
@@ -62,7 +64,11 @@ interface Entry {
   inventory?: NonNullable<WeavraControlState["capabilityInventory"]>;
   retiredInventoryEpochs: Set<string>;
 }
-function consistent(response: WeavraControlResponse, previous: WeavraControlState | null): boolean {
+function consistent(
+  response: WeavraControlResponse,
+  previous: WeavraControlState | null,
+  capabilities: WeavraControlCapabilities,
+): boolean {
   if (!response.success || response.data.kind !== "snapshot") return false;
   const state = response.data.state;
   const snapshot = state.snapshot;
@@ -104,6 +110,7 @@ function consistent(response: WeavraControlResponse, previous: WeavraControlStat
         state.busy &&
         approval.stateRevision === state.stateRevision &&
         approval.projectRevision === state.projectRevision)) &&
+    complexStateConsistent(state, capabilities, previous) &&
     (!previous ||
       (state.projectRevision >= previous.projectRevision &&
         (previous.snapshot.status.run?.runId !== run?.runId ||
@@ -240,7 +247,7 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
         return yield* new WeavraControlTransportError({ code: "TRANSPORT_CLOSED" });
       if (
         response.ownerId !== capabilities.ownerId ||
-        !consistent(response, entry.latest.state) ||
+        !consistent(response, entry.latest.state, capabilities) ||
         !response.success ||
         response.data.kind !== "snapshot" ||
         !acceptsInventory(response.data.state)
@@ -379,7 +386,17 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
             entry.changes,
             Effect.sync(() => entry.latest),
           );
-          return Stream.concat(Stream.make(subscription.latest), subscription.changes);
+          // The cached value is historical for this subscriber. Only a snapshot checked on the
+          // currently bound transport, published after this point, is current.
+          if (entry.refresh)
+            yield* entry.refresh.pipe(
+              Effect.catch((error) => unavailable(entry, error)),
+              Effect.forkIn(entry.scope),
+            );
+          return Stream.concat(
+            Stream.make({ ...subscription.latest, stale: true }),
+            subscription.changes,
+          );
         }),
       ),
     command: Effect.fn("weavra.controlCommand")(function* (input: WeavraControlInput) {
@@ -397,6 +414,15 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
         return yield* new WeavraControlTransportError({ code: "TRANSPORT_CLOSED" });
       if (entry.pending >= 8)
         return yield* new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" });
+      const capabilities = entry.latest.capabilities;
+      // A structured COMPLEX draft is never sent to a Runtime that does not advertise contract v1.
+      if (
+        !capabilities ||
+        (input.request.type === "workflow.prepare" &&
+          input.request.complexDraft !== undefined &&
+          capabilities.complexContractVersion !== 1)
+      )
+        return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
       const bridge = entry.bridge;
       const refresh = entry.refresh;
       entry.pending++;
@@ -411,7 +437,12 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
           const data = response.data;
           const valid =
             request.type === "workflow.prepare"
-              ? data.kind === "prepared"
+              ? data.kind === "prepared" &&
+                data.preview.ownerId === request.ownerId &&
+                data.preview.projectRevision === request.expectedProjectRevision &&
+                // COMPLEX requires the draft, and a draft is never silently downgraded.
+                (data.preview.workflow === "COMPLEX") === (request.complexDraft !== undefined) &&
+                complexPreviewConsistent(data.preview)
               : request.type === "browser.inspect"
                 ? data.kind === "browser-state"
                 : request.type === "browser.prepare"

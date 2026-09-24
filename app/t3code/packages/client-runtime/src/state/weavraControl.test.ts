@@ -7,6 +7,7 @@ import {
   WS_METHODS,
   type WeavraControlInput,
   type WeavraControlObservation,
+  type WeavraComplexExecution,
   type WeavraControlObserveInput,
   type WeavraControlResponse,
   type WeavraControlState,
@@ -219,6 +220,11 @@ type ObservationSubscription = {
   input: WeavraControlObserveInput;
   events: Queue.Queue<ObservationEvent>;
 };
+/** A new subscription first receives the server's cached value, then its checked refresh. */
+const cachedThenChecked = (
+  events: Queue.Queue<ObservationEvent>,
+  observation: WeavraControlObservation,
+) => Queue.offerAll(events, [Effect.succeed(observation), Effect.succeed(observation)]);
 const makeSession = Effect.fnUntraced(function* (
   capabilities: { weavraControl?: boolean } = { weavraControl: true },
 ) {
@@ -364,7 +370,7 @@ for (const capabilities of [{}, { weavraControl: false }]) {
 }
 
 it.effect(
-  "opens controlObserve with only the project and becomes fresh only on canonical CONNECTED state",
+  "opens controlObserve with only the project and promotes only the checked observation after the historical first emission",
   () =>
     Effect.gen(function* () {
       const remote = yield* makeSession();
@@ -376,6 +382,10 @@ it.effect(
       expect(subscription.input).toEqual({ projectId });
       expect((yield* SubscriptionRef.get(state)).observation.stale).toBe(true);
       const canonical = observed(10);
+      // Even a CONNECTED, fresh-looking first emission is the server's cached history.
+      yield* Queue.offer(subscription.events, Effect.succeed(canonical));
+      const historical = yield* waitFor(state, (view) => view.observation.state !== null);
+      expect(historical.observation).toEqual({ ...canonical, stale: true });
       yield* Queue.offer(subscription.events, Effect.succeed(canonical));
       expect((yield* waitFor(state, (view) => !view.observation.stale)).observation).toEqual(
         canonical,
@@ -392,7 +402,7 @@ it.effect("retains canonical display as stale on stream failure", () =>
     );
     const subscription = yield* Queue.take(remote.subscriptions);
     const canonical = observed(10);
-    yield* Queue.offer(subscription.events, Effect.succeed(canonical));
+    yield* cachedThenChecked(subscription.events, canonical);
     yield* waitFor(state, (view) => !view.observation.stale);
     yield* Queue.offer(
       subscription.events,
@@ -419,7 +429,7 @@ it.effect(
       );
       const oldSubscription = yield* Queue.take(old.subscriptions);
       const canonical = observed(10);
-      yield* Queue.offer(oldSubscription.events, Effect.succeed(canonical));
+      yield* cachedThenChecked(oldSubscription.events, canonical);
       yield* waitFor(state, (view) => !view.observation.stale);
       yield* SubscriptionRef.set(supervisor.session, Option.none());
       const disconnected = yield* waitFor(
@@ -568,7 +578,7 @@ for (const [nextProject, nextRoot] of [
         const oldAtom = h.atoms.stateAtom(target.environmentId, projectId, "/root");
         const stopOld = h.registry.mount(oldAtom);
         const oldSubscription = yield* Queue.take(remote.subscriptions);
-        yield* Queue.offer(oldSubscription.events, Effect.succeed(observed(10)));
+        yield* cachedThenChecked(oldSubscription.events, observed(10));
         yield* waitForAtom(h.registry, oldAtom, (view) => !view.observation.stale);
         const nextAtom = h.atoms.stateAtom(target.environmentId, nextProject, nextRoot);
         h.registry.mount(nextAtom);
@@ -620,7 +630,7 @@ it.effect("old scope finalization cannot mark the replacement stream or its cach
     );
     const subscription = yield* Queue.take(fresh.subscriptions);
     const next = observed(20);
-    yield* Queue.offer(subscription.events, Effect.succeed(next));
+    yield* cachedThenChecked(subscription.events, next);
     yield* waitFor(state, (view) => !view.observation.stale);
     yield* Scope.close(oldScope, Exit.void);
     expect(cache.observation).toEqual(next);
@@ -702,7 +712,7 @@ it.effect(
       h.registry.mount(atom);
       const subscription = yield* Queue.take(old.subscriptions);
       const canonical = observed(10);
-      yield* Queue.offer(subscription.events, Effect.succeed(canonical));
+      yield* cachedThenChecked(subscription.events, canonical);
       yield* waitForAtom(h.registry, atom, (view) => !view.observation.stale);
       const result = h.command.run(h.registry, {
         environmentId: target.environmentId,
@@ -723,7 +733,7 @@ it.effect(
       const fresh = yield* makeSession();
       yield* SubscriptionRef.set(supervisor.session, Option.some(fresh.session));
       const replacement = yield* Queue.take(fresh.subscriptions);
-      yield* Queue.offer(replacement.events, Effect.succeed(observed(11)));
+      yield* cachedThenChecked(replacement.events, observed(11));
       yield* waitForAtom(h.registry, atom, (view) => !view.observation.stale);
       expect(old.sent).toEqual([cancelInput]);
       expect(fresh.sent).toEqual([]);
@@ -764,7 +774,7 @@ for (const request of [
         h.registry.mount(atom);
         const subscription = yield* Queue.take(remote.subscriptions);
         const canonical = observed(10);
-        yield* Queue.offer(subscription.events, Effect.succeed(canonical));
+        yield* cachedThenChecked(subscription.events, canonical);
         yield* waitForAtom(h.registry, atom, (view) => !view.observation.stale);
         const input: WeavraControlInput = { projectId, request };
         const result = h.command.run(h.registry, { environmentId: target.environmentId, input });
@@ -812,7 +822,7 @@ it.effect(
           pendingApproval: null,
         },
       };
-      yield* Queue.offer(subscription.events, Effect.succeed(replacement));
+      yield* cachedThenChecked(subscription.events, replacement);
       expect((yield* waitFor(state, (view) => !view.observation.stale)).observation).toEqual(
         replacement,
       );
@@ -987,7 +997,7 @@ it.effect(
         Effect.provideService(EnvironmentSupervisor, supervisor),
       );
       const subscription = yield* Queue.take(remote.subscriptions);
-      yield* Queue.offer(subscription.events, Effect.succeed(brokerObservation(10)));
+      yield* cachedThenChecked(subscription.events, brokerObservation(10));
       const baseline = yield* waitFor(state, (view) => !view.observation.stale);
       expect(baseline.capabilityInventory.status).toBe("NEEDS_REFRESH");
       yield* Queue.offer(subscription.events, Effect.succeed(brokerObservation(11)));
@@ -1010,7 +1020,7 @@ it.effect(
       yield* SubscriptionRef.set(supervisor.session, Option.some(replacement.session));
       const newSubscription = yield* Queue.take(replacement.subscriptions);
       yield* Queue.offer(subscription.events, Effect.succeed(brokerObservation(999)));
-      yield* Queue.offer(newSubscription.events, Effect.succeed(brokerObservation(12)));
+      yield* cachedThenChecked(newSubscription.events, brokerObservation(12));
       const reconnected = yield* waitFor(
         state,
         (view) =>
@@ -1071,3 +1081,209 @@ it("does not interpret JSON key order as a generation change or renew freshness"
   expect(tracker.receive(reordered, 5_099).status).toBe("CURRENT");
   expect(tracker.view(5_100).status).toBe("NEEDS_REFRESH");
 });
+
+const complexRow = (id: string): WeavraComplexExecution["tasks"][number] => ({
+  id,
+  status: "PENDING",
+  attempt: 0,
+  revisionCycle: 0,
+  workerInvocations: 0,
+  reportedTokens: 0,
+  entryWorkspaceDigest: null,
+  exitWorkspaceDigest: null,
+  changedFiles: [],
+  changesUnknown: false,
+  selfCheck: "NOT_RUN",
+  review: "NOT_RUN",
+  test: "NOT_RUN",
+  evidenceFreshness: "NONE",
+  failureCode: null,
+});
+function complexObserved(stateRevision: number, reportedTokens: number | null = 0) {
+  const base = observed(10, stateRevision, "complex-run");
+  const state = base.state!;
+  const complexExecution: WeavraComplexExecution = {
+    schemaVersion: 1,
+    ownerId: "owner",
+    projectRevision: 10,
+    runId: "complex-run",
+    stateRevision,
+    parent: {
+      id: "parent",
+      goal: "Split the parser",
+      acceptanceCriteria: [
+        {
+          id: "AC-001",
+          statement: "Parsing still works",
+          scope: { paths: ["src"] },
+          verification: { checkIds: ["test"], reviewRequired: true },
+        },
+      ],
+      status: "inProgress",
+    },
+    plan: {
+      schemaVersion: 1,
+      planId: "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a",
+      complexPlanDigest: digest,
+      parentTaskId: "parent",
+      parentTaskContractDigest: digest,
+      tasks: ["CT-001", "CT-002"].map((id, index) => ({
+        id,
+        title: `Task ${index + 1}`,
+        goal: "Contribute to the parent",
+        dependsOn: index === 0 ? [] : ["CT-001"],
+        criterionIds: ["AC-001"],
+        ownership: [{ path: `src/${index}.ts`, operation: "modify" as const }],
+        checkIds: ["test"],
+        maxRevisionCycles: 2,
+      })),
+      integration: {
+        criterionIds: ["AC-001"],
+        checkIds: ["test"],
+        reviewRequired: true,
+        finalChecksRequired: true,
+      },
+      limits: {
+        maxTasks: 8,
+        maxWorkerInvocations: 24,
+        maxReportedTokens: 200000,
+        maxTotalRevisionCycles: 3,
+      },
+    },
+    phase: "TASK_SEQUENCE",
+    activeTaskId: null,
+    tasks: [complexRow("CT-001"), complexRow("CT-002")],
+    integration: {
+      check: "NOT_RUN",
+      review: "NOT_RUN",
+      test: "NOT_RUN",
+      workspaceDigest: null,
+      evidenceFreshness: "NONE",
+      failureCode: null,
+    },
+    budget: {
+      workerInvocations: 0,
+      reportedTokens,
+      totalRevisionCycles: 0,
+      status: reportedTokens === null ? "UNKNOWN" : "WITHIN_LIMITS",
+    },
+    cleanup: "NOT_REQUESTED",
+    partialChanges: false,
+    changesUnknown: false,
+    failureCode: null,
+  };
+  return {
+    ...base,
+    state: {
+      ...state,
+      preview: null,
+      pendingApproval: null,
+      complexExecution,
+      snapshot: {
+        ...state.snapshot,
+        graph: null,
+        graphAvailable: false,
+        status: {
+          ...state.snapshot.status,
+          run: { ...state.snapshot.status.run!, status: "RUNNING", workflow: "COMPLEX" },
+        },
+      },
+    },
+  } satisfies WeavraControlObservation;
+}
+
+it.effect("an absent field on a later checked snapshot clears the COMPLEX projection", () =>
+  Effect.gen(function* () {
+    const remote = yield* makeSession();
+    const supervisor = yield* setup(remote.session);
+    const state = yield* makeEnvironmentWeavraControlState(projectId).pipe(
+      Effect.provideService(EnvironmentSupervisor, supervisor),
+    );
+    const subscription = yield* Queue.take(remote.subscriptions);
+    yield* cachedThenChecked(subscription.events, complexObserved(10));
+    const projected = yield* waitFor(state, (view) => !view.observation.stale);
+    expect(projected.observation.state?.complexExecution?.runId).toBe("complex-run");
+    const replaced = observed(11, 1, "standard-run");
+    yield* Queue.offer(subscription.events, Effect.succeed(replaced));
+    const cleared = yield* waitFor(
+      state,
+      (view) => !view.observation.stale && view.observation.state?.projectRevision === 11,
+    );
+    expect(cleared.observation.state).not.toHaveProperty("complexExecution");
+    expect(cleared.observation).toEqual(replaced);
+  }).pipe(Effect.scoped),
+);
+
+it.effect(
+  "keeps the last checked COMPLEX projection stale when the same revision changes, ignoring key order",
+  () =>
+    Effect.gen(function* () {
+      const remote = yield* makeSession();
+      const supervisor = yield* setup(remote.session);
+      const state = yield* makeEnvironmentWeavraControlState(projectId).pipe(
+        Effect.provideService(EnvironmentSupervisor, supervisor),
+      );
+      const subscription = yield* Queue.take(remote.subscriptions);
+      const checked = complexObserved(10);
+      yield* cachedThenChecked(subscription.events, checked);
+      yield* waitFor(state, (view) => !view.observation.stale);
+      const reordered = {
+        ...checked,
+        observedAt: 20,
+        state: {
+          ...checked.state,
+          complexExecution: Object.fromEntries(
+            Object.entries(checked.state.complexExecution).toReversed(),
+          ) as WeavraComplexExecution,
+        },
+      };
+      yield* Queue.offer(subscription.events, Effect.succeed(reordered));
+      yield* waitFor(state, (view) => view.observation.observedAt === 20);
+      expect((yield* SubscriptionRef.get(state)).observation.stale).toBe(false);
+      yield* Queue.offer(subscription.events, Effect.succeed(complexObserved(10, 999)));
+      const rejected = yield* waitFor(
+        state,
+        (view) => view.observation.errorCode === "REVISION_REGRESSION",
+      );
+      expect(rejected.observation).toMatchObject({ status: "ERROR", stale: true });
+      expect(rejected.observation.state?.complexExecution?.budget.reportedTokens).toBe(0);
+      expect(remote.sent).toEqual([]);
+    }).pipe(Effect.scoped),
+);
+
+it.effect(
+  "keeps a COMPLEX projection historical across disconnect until the new session's checked observation",
+  () =>
+    Effect.gen(function* () {
+      const old = yield* makeSession();
+      const supervisor = yield* setup(old.session);
+      const state = yield* makeEnvironmentWeavraControlState(projectId).pipe(
+        Effect.provideService(EnvironmentSupervisor, supervisor),
+      );
+      const oldSubscription = yield* Queue.take(old.subscriptions);
+      yield* cachedThenChecked(oldSubscription.events, complexObserved(10));
+      yield* waitFor(state, (view) => !view.observation.stale);
+      yield* SubscriptionRef.set(supervisor.session, Option.none());
+      const disconnected = yield* waitFor(
+        state,
+        (view) => view.observation.status === "DISCONNECTED",
+      );
+      expect(disconnected.observation).toMatchObject({ stale: true, observedAt: 10 });
+      expect(disconnected.observation.state?.complexExecution?.stateRevision).toBe(10);
+      const fresh = yield* makeSession();
+      yield* SubscriptionRef.set(supervisor.session, Option.some(fresh.session));
+      const freshSubscription = yield* Queue.take(fresh.subscriptions);
+      // A late callback from the retired session cannot publish a newer projection.
+      yield* Queue.offer(oldSubscription.events, Effect.succeed(complexObserved(12)));
+      yield* Queue.offer(freshSubscription.events, Effect.succeed(complexObserved(11)));
+      const historical = yield* waitFor(
+        state,
+        (view) => view.observation.state?.complexExecution?.stateRevision === 11,
+      );
+      expect(historical.observation.stale).toBe(true);
+      yield* Queue.offer(freshSubscription.events, Effect.succeed(complexObserved(11)));
+      const current = yield* waitFor(state, (view) => !view.observation.stale);
+      expect(current.observation.state?.complexExecution?.stateRevision).toBe(11);
+      expect([...old.sent, ...fresh.sent]).toEqual([]);
+    }).pipe(Effect.scoped),
+);
