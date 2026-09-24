@@ -496,3 +496,11 @@
   - 실제 화면 확인과 실제 Runtime→App COMPLEX 수명 주기 검증은 #16 이후 #18에서 한다.
   - 현재 Runtime은 capability를 광고하지 않으므로 이 PR만으로는 COMPLEX가 화면에 노출되지 않는다.
 - 커밋 상태: 기능 커밋 4개와 devlop 병합 커밋, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — App git diff 통계 테스트의 racy-git flaky 수정
+
+- 증상: PR #34 CI의 app/t3code job이 `apps/server/src/vcs/GitVcsDriverCore.test.ts` "keeps complete stats for files beyond the combined patch limit" 한 건으로 실패했고, 같은 job 재실행은 통과했다. 직전 PR #33 CI에서도 통과한 테스트다.
+- 원인: 테스트가 `a-large.txt`를 커밋한 직후 같은 크기로 다시 쓴다("changed"→"updated", 7자→7자). 파일 시각이 index 기록과 같은 해상도 구간에 들어가면 git이 크기·시각이 같은 파일을 변경 없음으로 보고 working-tree 목록에서 뺀다(racy-git).
+- 수정: 치환 문자열을 "edited"(6자)로 바꿔 크기가 달라지게 했다. 모든 줄이 여전히 바뀌므로 기대값 4000/4000은 그대로다. 제품 코드는 바꾸지 않았다.
+- 현재 검증: 해당 파일 97 tests PASS, `vp fmt --check` 통과. 같은 파일의 lint 경고 1건(1529행 inline schema compile)은 이번 변경 전부터 있던 것이다.
+- 커밋 상태: `fix/racy-git-diff-stats-test` 브랜치, devlop 대상 PR.
