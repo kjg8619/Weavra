@@ -1,0 +1,121 @@
+{
+  "description": "Weavra COMPLEX contract v1 reference fixture (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md §4.2/§10.3). Runtime and App each keep their own copy; never import across build roots.",
+  "parent": {
+    "id": "3f2a8c1e-6b4d-4e7a-9c0f-1a2b3c4d5e6f",
+    "goal": "Split the config parser into parse and validate modules",
+    "acceptanceCriteria": [
+      {
+        "id": "AC-001",
+        "statement": "parseConfig returns key/value pairs for valid input",
+        "scope": {
+          "paths": ["src", "test"]
+        },
+        "verification": {
+          "checkIds": ["test"],
+          "reviewRequired": true
+        }
+      },
+      {
+        "id": "AC-002",
+        "statement": "validateConfig rejects duplicate keys with a clear error",
+        "scope": {
+          "paths": ["src", "test"]
+        },
+        "verification": {
+          "checkIds": ["test"],
+          "reviewRequired": true
+        }
+      }
+    ],
+    "status": "pending"
+  },
+  "parentTaskContractDigest": "sha256:fd1d5105a288951d82a4c971cac3c7681d2d80614b1710e11af2682161501184",
+  "plan": {
+    "schemaVersion": 1,
+    "planId": "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a",
+    "parentTaskId": "3f2a8c1e-6b4d-4e7a-9c0f-1a2b3c4d5e6f",
+    "parentTaskContractDigest": "sha256:fd1d5105a288951d82a4c971cac3c7681d2d80614b1710e11af2682161501184",
+    "tasks": [
+      {
+        "id": "CT-001",
+        "title": "Extract parser",
+        "goal": "Move parsing into src/parse.ts and keep parseConfig behavior",
+        "dependsOn": [],
+        "criterionIds": ["AC-001"],
+        "ownership": [
+          {
+            "path": "src/config.ts",
+            "operation": "modify"
+          },
+          {
+            "path": "src/parse.ts",
+            "operation": "create"
+          }
+        ],
+        "checkIds": ["test"],
+        "maxRevisionCycles": 2
+      },
+      {
+        "id": "CT-002",
+        "title": "Add validation",
+        "goal": "Add validateConfig in src/validate.ts rejecting duplicate keys",
+        "dependsOn": ["CT-001"],
+        "criterionIds": ["AC-002"],
+        "ownership": [
+          {
+            "path": "src/validate.ts",
+            "operation": "create"
+          }
+        ],
+        "checkIds": ["test"],
+        "maxRevisionCycles": 2
+      }
+    ],
+    "integration": {
+      "criterionIds": ["AC-001", "AC-002"],
+      "checkIds": ["lint", "test"],
+      "reviewRequired": true,
+      "finalChecksRequired": true
+    },
+    "limits": {
+      "maxTasks": 8,
+      "maxWorkerInvocations": 24,
+      "maxReportedTokens": 200000,
+      "maxTotalRevisionCycles": 3
+    },
+    "complexPlanDigest": "sha256:742e987165d287618138870c54f5d2c02ac656f2e5469d968d592de026e46190"
+  },
+  "complexPlanDigest": "sha256:742e987165d287618138870c54f5d2c02ac656f2e5469d968d592de026e46190",
+  "complexPlanDigestInput": "[\"weavra-complex-plan-v1\",{\"integration\":{\"checkIds\":[\"lint\",\"test\"],\"criterionIds\":[\"AC-001\",\"AC-002\"],\"finalChecksRequired\":true,\"reviewRequired\":true},\"limits\":{\"maxReportedTokens\":200000,\"maxTasks\":8,\"maxTotalRevisionCycles\":3,\"maxWorkerInvocations\":24},\"parentTaskContractDigest\":\"sha256:fd1d5105a288951d82a4c971cac3c7681d2d80614b1710e11af2682161501184\",\"parentTaskId\":\"3f2a8c1e-6b4d-4e7a-9c0f-1a2b3c4d5e6f\",\"planId\":\"9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a\",\"schemaVersion\":1,\"tasks\":[{\"checkIds\":[\"test\"],\"criterionIds\":[\"AC-001\"],\"dependsOn\":[],\"goal\":\"Move parsing into src/parse.ts and keep parseConfig behavior\",\"id\":\"CT-001\",\"maxRevisionCycles\":2,\"ownership\":[{\"operation\":\"modify\",\"path\":\"src/config.ts\"},{\"operation\":\"create\",\"path\":\"src/parse.ts\"}],\"title\":\"Extract parser\"},{\"checkIds\":[\"test\"],\"criterionIds\":[\"AC-002\"],\"dependsOn\":[\"CT-001\"],\"goal\":\"Add validateConfig in src/validate.ts rejecting duplicate keys\",\"id\":\"CT-002\",\"maxRevisionCycles\":2,\"ownership\":[{\"operation\":\"create\",\"path\":\"src/validate.ts\"}],\"title\":\"Add validation\"}]}]",
+  "preview": {
+    "goal": "Split the config parser into parse and validate modules",
+    "allowedPaths": ["src", "test"],
+    "acceptanceCriteria": [
+      {
+        "id": "AC-001",
+        "statement": "parseConfig returns key/value pairs for valid input",
+        "checkIds": ["test"],
+        "reviewRequired": true
+      },
+      {
+        "id": "AC-002",
+        "statement": "validateConfig rejects duplicate keys with a clear error",
+        "checkIds": ["test"],
+        "reviewRequired": true
+      }
+    ],
+    "checks": [
+      {
+        "id": "lint",
+        "kind": "command",
+        "required": false
+      },
+      {
+        "id": "test",
+        "kind": "command",
+        "required": true
+      }
+    ],
+    "taskContractDigest": "sha256:fd1d5105a288951d82a4c971cac3c7681d2d80614b1710e11af2682161501184"
+  }
+}

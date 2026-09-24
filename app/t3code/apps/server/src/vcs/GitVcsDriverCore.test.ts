@@ -1459,7 +1459,8 @@ it.layer(TestLayer)("GitVcsDriver core integration", (it) => {
         yield* writeTextFile(cwd, "z-last.txt", "last file\n");
         yield* git(cwd, ["add", "."]);
         yield* git(cwd, ["commit", "-m", "large change"]);
-        yield* writeTextFile(cwd, "a-large.txt", largeContents.replaceAll("changed", "updated"));
+        // A different length keeps the rewrite visible to git even within the index timestamp granularity.
+        yield* writeTextFile(cwd, "a-large.txt", largeContents.replaceAll("changed", "edited"));
         yield* writeTextFile(cwd, "z-last.txt", "last file updated\n");
         yield* writeTextFile(cwd, "untracked.txt", largeContents);
 

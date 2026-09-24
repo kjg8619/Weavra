@@ -232,6 +232,334 @@ const projectFact = Schema.Union([
   Schema.Struct({ ...factIdentity, status: Schema.Literal("STALE"), statement: Schema.Null }),
 ]);
 
+// COMPLEX sequential workflow, contract v1 (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md
+// §4, §10). Duplicated from the Runtime wire shapes; never imported across build roots.
+// Structural rules that need no parent or hashing live here; digests and cross-object
+// consistency are checked by the server consumer before publication.
+export const WEAVRA_COMPLEX_MAX_DRAFT_BYTES = 12_288;
+export const WEAVRA_COMPLEX_MAX_PLAN_BYTES = 12_288;
+export const WEAVRA_COMPLEX_MAX_EXECUTION_BYTES = 32_768;
+const utf8 = new TextEncoder();
+const jsonBytes = (value: unknown) => utf8.encode(JSON.stringify(value)).byteLength;
+/** Unique and ascending in JavaScript code-unit order, which is ASCII order for ASCII values. */
+const ascending = (values: ReadonlyArray<string>) =>
+  values.every((value, index) => index === 0 || values[index - 1]! < value);
+const strictlyAscending = Schema.makeFilter<ReadonlyArray<string>>(ascending, {
+  expected: "unique values in ascending order",
+});
+const complexTaskId = Schema.String.check(Schema.isPattern(/^CT-00[1-8]$/));
+const criterionId = Schema.String.check(Schema.isPattern(/^AC-[0-9]{3}$/));
+const workspaceDigest = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/));
+const canonicalUuid = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
+);
+const complexTitle = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(80),
+  Schema.isPattern(/\S/),
+);
+const complexGoal = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(300),
+  Schema.isPattern(/\S/),
+);
+const oneBasedIndex = counter.check(Schema.isGreaterThanOrEqualTo(1));
+const forbiddenPathCharacters = new Set(["\\", "*", "?", "[", "]", "{", "}"]);
+/** Lexical wire rule only; Runtime additionally inspects the filesystem before and at effect time. */
+function isExactFilePath(path: string) {
+  if (utf8.encode(path).byteLength > 256 || /^[A-Za-z]:/.test(path)) return false;
+  for (const character of path) {
+    const code = character.codePointAt(0)!;
+    if (
+      code <= 0x1f ||
+      code === 0x7f ||
+      code === 0x200e ||
+      code === 0x200f ||
+      (code >= 0x202a && code <= 0x202e) ||
+      (code >= 0x2066 && code <= 0x2069) ||
+      forbiddenPathCharacters.has(character)
+    )
+      return false;
+  }
+  return path.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+}
+const exactFilePath = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(256),
+  Schema.makeFilter(isExactFilePath, { expected: "an exact canonical project-relative file" }),
+);
+
+export const WeavraComplexOwnershipClaim = Schema.Struct({
+  path: exactFilePath,
+  operation: Schema.Literals(["modify", "create", "delete"]),
+});
+export type WeavraComplexOwnershipClaim = typeof WeavraComplexOwnershipClaim.Type;
+
+/** Human planning proposal sent with `workflow.prepare`; Runtime compiles and assigns every ID. */
+export const WeavraComplexDraft = Schema.Struct({
+  tasks: Schema.Array(
+    Schema.Struct({
+      title: complexTitle,
+      goal: complexGoal,
+      dependsOnIndexes: Schema.Array(oneBasedIndex).check(Schema.isMaxLength(7), Schema.isUnique()),
+      criterionIndexes: Schema.Array(oneBasedIndex).check(
+        Schema.isMinLength(1),
+        Schema.isMaxLength(16),
+        Schema.isUnique(),
+      ),
+      ownership: Schema.Array(WeavraComplexOwnershipClaim).check(Schema.isMaxLength(16)),
+      checkIds: Schema.Array(identifier).check(
+        Schema.isMinLength(1),
+        Schema.isMaxLength(16),
+        Schema.isUnique(),
+      ),
+    }),
+  ).check(
+    Schema.isMinLength(2),
+    Schema.isMaxLength(8),
+    // A 1-based dependency index must name an earlier row.
+    Schema.makeFilter((tasks) =>
+      tasks.every((task, index) =>
+        task.dependsOnIndexes.every((dependency) => dependency <= index),
+      ),
+    ),
+  ),
+}).check(Schema.makeFilter((draft) => jsonBytes(draft) <= WEAVRA_COMPLEX_MAX_DRAFT_BYTES));
+export type WeavraComplexDraft = typeof WeavraComplexDraft.Type;
+
+export const WeavraComplexTask = Schema.Struct({
+  id: complexTaskId,
+  title: complexTitle,
+  goal: complexGoal,
+  dependsOn: Schema.Array(complexTaskId).check(Schema.isMaxLength(7), Schema.isUnique()),
+  criterionIds: Schema.Array(criterionId).check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(16),
+    strictlyAscending,
+  ),
+  ownership: Schema.Array(WeavraComplexOwnershipClaim).check(
+    Schema.isMaxLength(16),
+    Schema.makeFilter((claims) => ascending(claims.map((claim) => claim.path))),
+  ),
+  checkIds: Schema.Array(identifier).check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(16),
+    strictlyAscending,
+  ),
+  maxRevisionCycles: counter.check(Schema.isLessThanOrEqualTo(2)),
+});
+export type WeavraComplexTask = typeof WeavraComplexTask.Type;
+
+export const WeavraComplexPlan = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  planId: canonicalUuid,
+  complexPlanDigest: digest,
+  parentTaskId: identifier,
+  parentTaskContractDigest: digest,
+  tasks: Schema.Array(WeavraComplexTask).check(Schema.isMinLength(2), Schema.isMaxLength(8)),
+  integration: Schema.Struct({
+    criterionIds: Schema.Array(criterionId).check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(16),
+      strictlyAscending,
+    ),
+    checkIds: Schema.Array(identifier).check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(16),
+      strictlyAscending,
+    ),
+    reviewRequired: Schema.Literal(true),
+    finalChecksRequired: Schema.Literal(true),
+  }),
+  limits: Schema.Struct({
+    maxTasks: Schema.Literal(8),
+    maxWorkerInvocations: counter.check(Schema.isBetween({ minimum: 1, maximum: 24 })),
+    maxReportedTokens: counter.check(Schema.isBetween({ minimum: 1, maximum: 200_000 })),
+    maxTotalRevisionCycles: counter.check(Schema.isLessThanOrEqualTo(3)),
+  }),
+}).check(
+  Schema.makeFilter((plan) => {
+    const paths = plan.tasks.flatMap((task) => task.ownership.map((claim) => claim.path));
+    return (
+      jsonBytes(plan) <= WEAVRA_COMPLEX_MAX_PLAN_BYTES &&
+      paths.length <= 64 &&
+      new Set(paths).size === paths.length &&
+      plan.tasks.every(
+        (task, index) =>
+          task.id === `CT-00${index + 1}` &&
+          task.maxRevisionCycles <= plan.limits.maxTotalRevisionCycles &&
+          // Fixed-width IDs order like their indexes: every edge points to an earlier task.
+          task.dependsOn.every((dependency) => dependency < task.id),
+      )
+    );
+  }),
+);
+export type WeavraComplexPlan = typeof WeavraComplexPlan.Type;
+
+const scopePath = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(256),
+  Schema.isPattern(/\S/),
+  Schema.makeFilter((path: string) => utf8.encode(path).byteLength <= 256),
+);
+/** Exact frozen parent Task Contract plus its lifecycle status; never a replacement contract. */
+export const WeavraTaskContract = Schema.Struct({
+  id: identifier,
+  goal,
+  acceptanceCriteria: Schema.Array(
+    Schema.Struct({
+      id: criterionId,
+      statement: Schema.String.check(
+        Schema.isMinLength(1),
+        Schema.isMaxLength(500),
+        Schema.isPattern(/\S/),
+      ),
+      scope: Schema.Struct({
+        paths: Schema.Array(scopePath).check(Schema.isMaxLength(32), Schema.isUnique()),
+      }),
+      verification: Schema.Struct({
+        checkIds: Schema.Array(identifier).check(Schema.isMaxLength(16), Schema.isUnique()),
+        reviewRequired: Schema.Boolean,
+      }),
+    }),
+  ).check(Schema.isMinLength(1), Schema.isMaxLength(16)),
+  status: Schema.Literals(["pending", "inProgress", "completed", "blocked"]),
+});
+export type WeavraTaskContract = typeof WeavraTaskContract.Type;
+
+export const WeavraComplexTaskStatus = Schema.Literals([
+  "PENDING",
+  "ELIGIBLE",
+  "IMPLEMENTING",
+  "WAITING_APPROVAL",
+  "SELF_CHECK",
+  "REVIEW",
+  "TEST",
+  "STOPPING",
+  "COMPLETED",
+  "BLOCKED",
+  "FAILED",
+  "CANCELLED",
+  "INTERRUPTED",
+]);
+export type WeavraComplexTaskStatus = typeof WeavraComplexTaskStatus.Type;
+export const WeavraComplexPhase = Schema.Literals([
+  "TASK_SEQUENCE",
+  "INTEGRATION_CHECK",
+  "FINAL_REVIEW",
+  "FINAL_TEST",
+  "COMPLETING",
+  "STOPPING",
+  "TERMINAL",
+]);
+export type WeavraComplexPhase = typeof WeavraComplexPhase.Type;
+export const WeavraComplexCleanupStatus = Schema.Literals([
+  "NOT_REQUESTED",
+  "PENDING",
+  "CONFIRMED",
+  "UNCONFIRMED",
+]);
+export const WeavraComplexFailureCode = Schema.Literals([
+  "OWNERSHIP_CONFLICT",
+  "UNOWNED_PATH",
+  "DEPENDENCY_NOT_COMPLETED",
+  "RUN_STOPPED",
+  "WORKER_FAILED",
+  "INVALID_RESULT",
+  "POLICY_DENIED",
+  "CHECK_FAILED",
+  "CHECK_UNAVAILABLE",
+  "REVIEW_BLOCKED",
+  "REVIEW_MISSING",
+  "STALE_EVIDENCE",
+  "PARENT_MISMATCH",
+  "PLAN_MISMATCH",
+  "BUDGET_EXHAUSTED",
+  "BUDGET_UNKNOWN",
+  "REVISION_LIMIT",
+  "APPROVAL_DENIED",
+  "APPROVAL_EXPIRED",
+  "APPROVAL_INVALID",
+  "EXTERNAL_MUTATION",
+  "CANCELLED",
+  "OWNER_LOST",
+  "CLEANUP_UNCONFIRMED",
+  "STORAGE_FAILED",
+]);
+export const WeavraComplexCheckGate = Schema.Literals([
+  "NOT_RUN",
+  "RUNNING",
+  "PASS",
+  "FAIL",
+  "UNAVAILABLE",
+  "STALE",
+]);
+export const WeavraComplexReviewGate = Schema.Literals([
+  "NOT_RUN",
+  "RUNNING",
+  "PASS",
+  "REVISE",
+  "BLOCK",
+  "UNAVAILABLE",
+  "STALE",
+]);
+const evidenceFreshness = Schema.Literals(["NONE", "CURRENT", "STALE", "UNKNOWN"]);
+
+export const WeavraComplexTaskState = Schema.Struct({
+  id: complexTaskId,
+  status: WeavraComplexTaskStatus,
+  attempt: counter.check(Schema.isLessThanOrEqualTo(3)),
+  revisionCycle: counter.check(Schema.isLessThanOrEqualTo(2)),
+  workerInvocations: counter.check(Schema.isLessThanOrEqualTo(6)),
+  reportedTokens: Schema.NullOr(counter),
+  entryWorkspaceDigest: Schema.NullOr(workspaceDigest),
+  exitWorkspaceDigest: Schema.NullOr(workspaceDigest),
+  changedFiles: Schema.Array(exactFilePath).check(Schema.isMaxLength(16), strictlyAscending),
+  changesUnknown: Schema.Boolean,
+  selfCheck: WeavraComplexCheckGate,
+  review: WeavraComplexReviewGate,
+  test: WeavraComplexCheckGate,
+  evidenceFreshness,
+  failureCode: Schema.NullOr(WeavraComplexFailureCode),
+});
+export type WeavraComplexTaskState = typeof WeavraComplexTaskState.Type;
+export const WeavraComplexIntegration = Schema.Struct({
+  check: WeavraComplexCheckGate,
+  review: WeavraComplexReviewGate,
+  test: WeavraComplexCheckGate,
+  workspaceDigest: Schema.NullOr(workspaceDigest),
+  evidenceFreshness,
+  failureCode: Schema.NullOr(WeavraComplexFailureCode),
+});
+
+/** Read-only Runtime projection of the latest COMPLEX Run; the snapshot status stays the outcome. */
+export const WeavraComplexExecution = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  ownerId: identifier,
+  projectRevision: counter,
+  runId: identifier,
+  stateRevision: counter,
+  parent: WeavraTaskContract,
+  plan: WeavraComplexPlan,
+  phase: WeavraComplexPhase,
+  activeTaskId: Schema.NullOr(complexTaskId),
+  tasks: Schema.Array(WeavraComplexTaskState).check(Schema.isMinLength(2), Schema.isMaxLength(8)),
+  integration: WeavraComplexIntegration,
+  budget: Schema.Struct({
+    workerInvocations: counter.check(Schema.isLessThanOrEqualTo(24)),
+    reportedTokens: Schema.NullOr(counter),
+    totalRevisionCycles: counter.check(Schema.isLessThanOrEqualTo(3)),
+    status: Schema.Literals(["WITHIN_LIMITS", "EXHAUSTED", "UNKNOWN"]),
+  }),
+  cleanup: WeavraComplexCleanupStatus,
+  partialChanges: Schema.Boolean,
+  changesUnknown: Schema.Boolean,
+  failureCode: Schema.NullOr(WeavraComplexFailureCode),
+}).check(
+  Schema.makeFilter((execution) => jsonBytes(execution) <= WEAVRA_COMPLEX_MAX_EXECUTION_BYTES),
+);
+export type WeavraComplexExecution = typeof WeavraComplexExecution.Type;
+
 export const WeavraControlMutation = Schema.Union([
   Schema.Struct({
     ...mutation,
@@ -273,7 +601,15 @@ export const WeavraControlMutation = Schema.Union([
         Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500), Schema.isPattern(/\S/)),
       ).check(Schema.isMinLength(1), Schema.isMaxLength(16)),
     ),
-  }),
+    complexDraft: Schema.optionalKey(WeavraComplexDraft),
+  }).check(
+    // Reviewed recipes remain STANDARD-only; a recipe never travels with a COMPLEX draft.
+    Schema.makeFilter(
+      (request) =>
+        request.complexDraft === undefined ||
+        (request.recipeId === undefined && request.recipeInputs === undefined),
+    ),
+  ),
   Schema.Struct({
     ...mutation,
     type: Schema.Literal("workflow.confirm"),
@@ -357,7 +693,7 @@ export const WeavraControlPreview = Schema.Struct({
   projectRevision: counter,
   expiresAt: counter,
   goal,
-  workflow: Schema.Literals(["QUICK", "STANDARD"]),
+  workflow: Schema.Literals(["QUICK", "STANDARD", "COMPLEX"]),
   executionMode: Schema.Literals(["EDIT", "READ_ONLY"]),
   risk: WeavraRunSummary.fields.risk,
   allowedPaths: Schema.Array(boundedText).check(
@@ -386,7 +722,13 @@ export const WeavraControlPreview = Schema.Struct({
     verificationRepairMode: Schema.Literals(["disabled", "self-check-once"]),
     lspEnabled: Schema.Boolean,
   }),
-});
+  complexPlan: Schema.optionalKey(WeavraComplexPlan),
+}).check(
+  // Required iff COMPLEX, forbidden otherwise.
+  Schema.makeFilter(
+    (preview) => (preview.workflow === "COMPLEX") === (preview.complexPlan !== undefined),
+  ),
+);
 export type WeavraControlPreview = typeof WeavraControlPreview.Type;
 
 export const WeavraControlApproval = Schema.Struct({
@@ -548,13 +890,21 @@ export const WeavraControlState = Schema.Struct({
   }),
   pendingApproval: Schema.NullOr(WeavraControlApproval),
   capabilityInventory: Schema.optional(WeavraCapabilityInventory),
+  complexExecution: Schema.optionalKey(WeavraComplexExecution),
   snapshot: WeavraSnapshotSummary,
 }).check(
   Schema.makeFilter(
     (state) =>
-      state.capabilityInventory === undefined ||
-      (state.capabilityInventory.ownerId === state.ownerId &&
-        state.capabilityInventory.projectRevision === state.projectRevision),
+      (state.capabilityInventory === undefined ||
+        (state.capabilityInventory.ownerId === state.ownerId &&
+          state.capabilityInventory.projectRevision === state.projectRevision)) &&
+      // The projection belongs to exactly the enclosing latest COMPLEX Run and observation.
+      (state.complexExecution === undefined ||
+        (state.complexExecution.ownerId === state.ownerId &&
+          state.complexExecution.projectRevision === state.projectRevision &&
+          state.complexExecution.stateRevision === state.stateRevision &&
+          state.complexExecution.runId === state.snapshot.status.run?.runId &&
+          state.snapshot.status.run.workflow === "COMPLEX")),
   ),
 );
 export type WeavraControlState = typeof WeavraControlState.Type;
@@ -582,6 +932,8 @@ export const WeavraControlCapabilities = Schema.Struct({
   previewTtlMs: counter,
   runtimeVersion: boundedText,
   readiness: Schema.Literals(["READY", "NOT_SETUP", "CONFIG_INVALID"]),
+  // Absent means COMPLEX is NOT_EXPOSED; never inferred from readiness or version text.
+  complexContractVersion: Schema.optionalKey(Schema.Literal(1)),
   recipes: Schema.Array(
     Schema.Struct({
       id: identifier,

@@ -6,6 +6,8 @@ import {
   type WeavraBrowserCandidateSummary,
   type WeavraBrowserPreview,
   type WeavraBrowserState,
+  type WeavraComplexExecution,
+  type WeavraComplexPlan,
   type WeavraControlObservation,
   type WeavraControlPreview,
   type WeavraControlResponse,
@@ -58,6 +60,7 @@ vi.mock("../ui/textarea", () => ({ Textarea: "textarea" }));
 vi.mock("./SettingsGroup", () => ({ SettingsGroup: "div" }));
 vi.mock("./settingsLayout", () => ({ SettingsSection: "section" }));
 import { WeavraControls } from "./WeavraControls";
+import { ComplexExecutionView, ComplexPlanView } from "./WeavraComplex";
 
 const environmentId = EnvironmentId.make("local-control");
 const projectId = ProjectId.make("control-project");
@@ -808,5 +811,406 @@ describe("Weavra browser registration authority", () => {
       visitElements(tree, (node) => node.type === "strong" && text(node) === "PASS"),
     ).toBeNull();
     expect(data.invoke).toHaveBeenCalledOnce();
+  });
+});
+
+const complexPlan: WeavraComplexPlan = {
+  schemaVersion: 1,
+  planId: "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a",
+  complexPlanDigest: `sha256:${"7".repeat(64)}`,
+  parentTaskId: "parent-1",
+  parentTaskContractDigest: digest,
+  tasks: [
+    {
+      id: "CT-001",
+      title: "Extract parser",
+      goal: "Move parsing into src/parse.ts",
+      dependsOn: [],
+      criterionIds: ["AC-001"],
+      ownership: [
+        { path: "src/config.ts", operation: "modify" },
+        { path: "src/parse.ts", operation: "create" },
+      ],
+      checkIds: ["test"],
+      maxRevisionCycles: 2,
+    },
+    {
+      id: "CT-002",
+      title: "Add validation",
+      goal: "Reject duplicate keys",
+      dependsOn: ["CT-001"],
+      criterionIds: ["AC-002"],
+      ownership: [],
+      checkIds: ["test"],
+      maxRevisionCycles: 2,
+    },
+  ],
+  integration: {
+    criterionIds: ["AC-001", "AC-002"],
+    checkIds: ["lint", "test"],
+    reviewRequired: true,
+    finalChecksRequired: true,
+  },
+  limits: {
+    maxTasks: 8,
+    maxWorkerInvocations: 24,
+    maxReportedTokens: 200000,
+    maxTotalRevisionCycles: 3,
+  },
+};
+const complexPreview: WeavraControlPreview = {
+  ...preview,
+  previewId: "complex-preview",
+  workflow: "COMPLEX",
+  checks: [
+    { id: "lint", kind: "command", required: false },
+    { id: "test", kind: "command", required: true },
+  ],
+  acceptanceCriteria: [
+    { id: "AC-001", statement: "Parse input", checkIds: ["test"], reviewRequired: true },
+    { id: "AC-002", statement: "Validate input", checkIds: ["test"], reviewRequired: true },
+  ],
+  complexPlan,
+};
+type ComplexRow = WeavraComplexExecution["tasks"][number];
+const idleRow = (id: string): ComplexRow => ({
+  id,
+  status: "PENDING",
+  attempt: 0,
+  revisionCycle: 0,
+  workerInvocations: 0,
+  reportedTokens: 0,
+  entryWorkspaceDigest: null,
+  exitWorkspaceDigest: null,
+  changedFiles: [],
+  changesUnknown: false,
+  selfCheck: "NOT_RUN",
+  review: "NOT_RUN",
+  test: "NOT_RUN",
+  evidenceFreshness: "NONE",
+  failureCode: null,
+});
+const completedTask = (id: string, freshness: ComplexRow["evidenceFreshness"]): ComplexRow => ({
+  ...idleRow(id),
+  status: "COMPLETED",
+  attempt: 1,
+  workerInvocations: 2,
+  reportedTokens: null,
+  entryWorkspaceDigest: "1".repeat(64),
+  exitWorkspaceDigest: "2".repeat(64),
+  changedFiles: id === "CT-001" ? ["src/config.ts"] : [],
+  selfCheck: "PASS",
+  review: "PASS",
+  test: "PASS",
+  evidenceFreshness: freshness,
+});
+function complexExecution(patch: Partial<WeavraComplexExecution> = {}): WeavraComplexExecution {
+  return {
+    schemaVersion: 1,
+    ownerId: "owner",
+    projectRevision: 9,
+    runId: "run-1",
+    stateRevision: 7,
+    parent: {
+      id: "parent-1",
+      goal: preview.goal,
+      acceptanceCriteria: complexPreview.acceptanceCriteria.map((criterion) => ({
+        id: criterion.id,
+        statement: criterion.statement,
+        scope: { paths: ["src"] },
+        verification: { checkIds: criterion.checkIds, reviewRequired: true },
+      })),
+      status: "inProgress",
+    },
+    plan: complexPlan,
+    phase: "FINAL_REVIEW",
+    activeTaskId: null,
+    tasks: [completedTask("CT-001", "STALE"), completedTask("CT-002", "CURRENT")],
+    integration: {
+      check: "PASS",
+      review: "RUNNING",
+      test: "NOT_RUN",
+      workspaceDigest: "3".repeat(64),
+      evidenceFreshness: "CURRENT",
+      failureCode: null,
+    },
+    budget: {
+      workerInvocations: 5,
+      reportedTokens: null,
+      totalRevisionCycles: 0,
+      status: "UNKNOWN",
+    },
+    cleanup: "NOT_REQUESTED",
+    partialChanges: true,
+    changesUnknown: false,
+    failureCode: null,
+    ...patch,
+  };
+}
+function advertiseComplex() {
+  data.observation = {
+    ...data.observation!,
+    capabilities: { ...data.observation!.capabilities!, complexContractVersion: 1 },
+  };
+}
+function complexRunning() {
+  running();
+  const current = data.observation!.state!;
+  update({
+    complexExecution: complexExecution(),
+    snapshot: {
+      ...current.snapshot,
+      status: {
+        ...current.snapshot.status,
+        run: { ...current.snapshot.status.run!, workflow: "COMPLEX", phase: "REVIEW" },
+      },
+    },
+  });
+}
+/** Rendered text with the harness's child-joining whitespace collapsed. */
+const words = (node: unknown) => text(node).replace(/\s+/g, " ");
+function toggle(label: string) {
+  (control(render(), label).props.onChange as () => void)();
+}
+function submitPrepare() {
+  const form = visitElements(render(), (node) => node.type === "form")!;
+  (form.props.onSubmit as (event: { preventDefault: () => void }) => void)({ preventDefault() {} });
+  return flush();
+}
+/** Renders a presentational child the harness left unexpanded; those views have no hooks. */
+function child<P extends object>(
+  tree: ReactElement<Record<string, unknown>>,
+  component: (props: P) => React.ReactNode,
+) {
+  const element = visitElements(tree, (node) => node.type === component);
+  if (!element) throw new Error(`Missing ${component.name}`);
+  return component(element.props as P) as ReactElement<Record<string, unknown>>;
+}
+function elements(tree: unknown, type: string) {
+  const found: Array<ReactElement<Record<string, unknown>>> = [];
+  visitElements(tree, (node) => {
+    if (node.type === type) found.push(node);
+    return false;
+  });
+  return found;
+}
+async function draftTwoTasks() {
+  advertiseComplex();
+  change("Workflow goal", preview.goal);
+  await click("Add task");
+  await click("Add task");
+  change("COMPLEX acceptance criteria", "Parse input\nValidate input");
+  change("Task 1 title", "Extract parser");
+  change("Task 1 goal", "Move parsing into src/parse.ts");
+  toggle("Task 1 maps criterion 1");
+  await click("Add task 1 file claim");
+  change("Task 1 claim 1 path", "src/config.ts");
+  change("Task 1 check IDs", "test");
+  change("Task 2 title", "Add validation");
+  change("Task 2 goal", "Reject duplicate keys");
+  toggle("Task 2 depends on task 1");
+  change("Task 2 check IDs", "test");
+}
+
+describe("COMPLEX task plan and execution projection", () => {
+  it("shows no COMPLEX surface and never sends a draft without the Runtime capability", async () => {
+    expect(
+      visitElements(render(), (node) => node.props["aria-label"] === "COMPLEX task plan"),
+    ).toBeNull();
+    expect(visitElements(render(), (node) => text(node) === "Add task")).toBeNull();
+    await prepare();
+    const request = data.invoke.mock.calls[0]?.[0].input.request;
+    expect(request).toMatchObject({ type: "workflow.prepare", goal: preview.goal });
+    expect(request).not.toHaveProperty("complexDraft");
+  });
+  it("sends the exact bounded draft on workflow.prepare only after local reference checks", async () => {
+    await draftTwoTasks();
+    await submitPrepare();
+    expect(words(render())).toContain("Task 2 does not map any acceptance criterion.");
+    toggle("Task 2 maps criterion 1");
+    await submitPrepare();
+    expect(words(render())).toContain("Acceptance criterion 2 is not mapped to any task.");
+    toggle("Task 2 maps criterion 1");
+    toggle("Task 2 maps criterion 2");
+    change("Reviewed recipe", "bug-fix");
+    await submitPrepare();
+    expect(words(render())).toContain("STANDARD-only");
+    expect(data.invoke).not.toHaveBeenCalled();
+    change("Reviewed recipe", "");
+    data.invoke.mockResolvedValue(
+      AsyncResult.success(response({ kind: "prepared", preview: complexPreview })),
+    );
+    await submitPrepare();
+    expect(data.invoke).toHaveBeenCalledOnce();
+    expect(data.invoke.mock.calls[0]?.[0].input.request).toEqual({
+      protocolVersion: 1,
+      id: "owner:1",
+      ownerId: "owner",
+      expectedProjectRevision: 0,
+      type: "workflow.prepare",
+      goal: preview.goal,
+      acceptanceStatements: ["Parse input", "Validate input"],
+      complexDraft: {
+        tasks: [
+          {
+            title: "Extract parser",
+            goal: "Move parsing into src/parse.ts",
+            dependsOnIndexes: [],
+            criterionIndexes: [1],
+            ownership: [{ path: "src/config.ts", operation: "modify" }],
+            checkIds: ["test"],
+          },
+          {
+            title: "Add validation",
+            goal: "Reject duplicate keys",
+            dependsOnIndexes: [1],
+            criterionIndexes: [2],
+            ownership: [],
+            checkIds: ["test"],
+          },
+        ],
+      },
+    });
+  });
+  it("rejects noncanonical claims locally instead of rewriting them", async () => {
+    await draftTwoTasks();
+    toggle("Task 2 maps criterion 2");
+    change("Task 1 claim 1 path", "src/config.ts/");
+    await submitPrepare();
+    expect(data.invoke).not.toHaveBeenCalled();
+    expect(words(render())).toContain("Invalid task plan");
+    expect(control(render(), "Task 1 claim 1 path").props.value).toBe("src/config.ts/");
+  });
+  it("shows the complete Runtime plan, confirms that exact preview once and drops it on draft edits", async () => {
+    await draftTwoTasks();
+    toggle("Task 2 maps criterion 2");
+    data.invoke.mockResolvedValue(
+      AsyncResult.success(response({ kind: "prepared", preview: complexPreview })),
+    );
+    await submitPrepare();
+    update({ preview: complexPreview, nextRequestId: "owner:2" });
+    const section = control(render(), "Runtime Plan Preview");
+    expect(words(section)).toContain("COMPLEX");
+    expect(words(section)).toContain("AC-002 · Validate input");
+    expect(
+      visitElements(section, (node) => node.props["aria-label"] === "Acceptance criteria"),
+    ).toBeNull();
+    const plan = words(child(section, ComplexPlanView));
+    for (const expected of [
+      "CT-001 · Extract parser",
+      "CT-002 · Add validation",
+      "Depends on: CT-001",
+      "AC-002 · Validate input",
+      "modify src/config.ts, create src/parse.ts",
+      "none (read-only contribution)",
+      "all registered checks lint, test",
+      "24 worker invocations",
+      complexPlan.complexPlanDigest,
+    ]) {
+      expect(plan).toContain(expected);
+    }
+    accepted("workflow.confirm");
+    await click("Confirm and start");
+    expect(data.confirm.mock.calls[0]?.[0]).toContain(
+      "CT-001 Extract parser; CT-002 Add validation",
+    );
+    expect(data.confirm.mock.calls[0]?.[0]).toContain(
+      "Completing every task does not complete the Run",
+    );
+    expect(data.invoke.mock.calls[1]?.[0].input.request).toMatchObject({
+      type: "workflow.confirm",
+      previewId: complexPreview.previewId,
+      previewDigest: complexPreview.previewDigest,
+    });
+    change("Task 1 title", "Edited after preparing");
+    expect(
+      visitElements(render(), (node) => node.props["aria-label"] === "Runtime Plan Preview"),
+    ).toBeNull();
+  });
+  it("keeps the confirmed plan read-only and offers no task controls", async () => {
+    await draftTwoTasks();
+    complexRunning();
+    const tree = render();
+    for (const label of [
+      "Add task",
+      "Task 1 title",
+      "Task 1 check IDs",
+      "Task 2 depends on task 1",
+    ]) {
+      expect(control(tree, label).props.disabled).toBe(true);
+    }
+    const buttons = elements(tree, "button").map((button) => text(button).trim());
+    expect(buttons).toContain("Cancel workflow");
+    for (const label of buttons) {
+      expect(label).not.toMatch(/complete|retry|skip|next|reorder|resume|pass|approve plan/i);
+    }
+    const projection = child(tree, ComplexExecutionView);
+    for (const type of ["button", "input", "select", "textarea", "form"]) {
+      expect(elements(projection, type)).toEqual([]);
+    }
+  });
+  it("labels historical and unowned projections and never presents completed tasks as the Run outcome", () => {
+    complexRunning();
+    let projection = words(child(render(), ComplexExecutionView));
+    expect(projection).toContain("CURRENT OBSERVATION");
+    expect(projection).toContain("Canonical Run outcome: RUNNING");
+    expect(projection).toContain("Task contributions completed: 2 / 2");
+    expect(projection).toContain("Completed tasks do not complete the Run");
+    expect(projection).toContain("historical contribution, not current completion evidence");
+    expect(projection).toContain("reported tokens unknown");
+    expect(projection).toContain("unknown / 200000");
+    expect(projection).not.toContain("reported tokens 0");
+    data.observation = { ...data.observation!, stale: true, observedAt: 1 };
+    projection = words(child(render(), ComplexExecutionView));
+    expect(projection).toContain("HISTORICAL · NOT CURRENT");
+    expect(projection).toContain("Last checked observation");
+    expect(visitElements(render(), (node) => text(node) === "Cancel workflow")).toBeNull();
+    data.observation = { ...data.observation!, stale: false };
+    update({ ownedRunId: "another-run" });
+    expect(words(child(render(), ComplexExecutionView))).toContain("DISPLAY ONLY · NOT OWNED");
+    expect(visitElements(render(), (node) => text(node) === "Cancel workflow")).toBeNull();
+  });
+  it("shows terminal cleanup uncertainty and partial changes from the canonical snapshot", () => {
+    complexRunning();
+    const current = data.observation!.state!;
+    update({
+      busy: false,
+      complexExecution: complexExecution({
+        phase: "TERMINAL",
+        tasks: [
+          completedTask("CT-001", "STALE"),
+          { ...idleRow("CT-002"), status: "INTERRUPTED", failureCode: "OWNER_LOST" },
+        ],
+        integration: {
+          ...complexExecution().integration,
+          check: "NOT_RUN",
+          review: "NOT_RUN",
+          workspaceDigest: null,
+          evidenceFreshness: "NONE",
+        },
+        cleanup: "UNCONFIRMED",
+        changesUnknown: true,
+        failureCode: "CLEANUP_UNCONFIRMED",
+      }),
+      snapshot: {
+        ...current.snapshot,
+        status: {
+          ...current.snapshot.status,
+          writerPresent: true,
+          run: { ...current.snapshot.status.run!, status: "INTERRUPTED" },
+        },
+      },
+    });
+    const projection = words(child(render(), ComplexExecutionView));
+    for (const expected of [
+      "Canonical Run outcome: INTERRUPTED",
+      "UNCONFIRMED / true",
+      "Cleanup is unconfirmed",
+      "partial changes retained · change set UNKNOWN",
+      "Failure: OWNER_LOST",
+      "CLEANUP_UNCONFIRMED",
+    ]) {
+      expect(projection).toContain(expected);
+    }
   });
 });

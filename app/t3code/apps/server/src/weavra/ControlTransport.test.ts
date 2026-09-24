@@ -183,6 +183,7 @@ for await (const line of createInterface({input:process.stdin})) {
  const response = structuredClone(responses[request.type]);
  if (!response) process.exit(42);
  if(mode==='broker' && process.env.BROKER)response.data.state.capabilityInventory=JSON.parse(process.env.BROKER);
+ if(mode==='patch'){const patch=JSON.parse(process.env.PATCH);Object.assign(request.type==='control.hello'?response.data.capabilities:response.data.state,patch);}
  if (mode==='version') response.protocolVersion=2;
  if (mode==='wrong-id') response.id='owner-2:1';
  if (mode==='wrong-command') response.command='workflow.cancel';
@@ -467,3 +468,248 @@ it.effect("retains a timed-out mutation and resumes its receipt without replayin
     expect(yield* fs.readFileString(`${cwd}/control-closed`)).toBe("closed");
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
+
+const exchangePatched = (request: WeavraControlRequest, patch: unknown) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "weavra-complex-transport-" });
+    const executable = writeFakeCli({
+      directory: cwd,
+      name: "controller",
+      source,
+      env: { MODE: "patch", PATCH: encodeJson(patch) },
+    });
+    const result = yield* Effect.gen(function* () {
+      const bridge = yield* openControlTransport(executable, cwd, env);
+      return yield* bridge.exchange(request);
+    }).pipe(Effect.scoped, Effect.result);
+    expect(yield* fs.readFileString(`${cwd}/request-lines`)).toBe(requestLines(request));
+    return result;
+  });
+const digest = `sha256:${"a".repeat(64)}`;
+const pendingRow = (id: string) => ({
+  id,
+  status: "PENDING",
+  attempt: 0,
+  revisionCycle: 0,
+  workerInvocations: 0,
+  reportedTokens: 0,
+  entryWorkspaceDigest: null,
+  exitWorkspaceDigest: null,
+  changedFiles: [],
+  changesUnknown: false,
+  selfCheck: "NOT_RUN",
+  review: "NOT_RUN",
+  test: "NOT_RUN",
+  evidenceFreshness: "NONE",
+  failureCode: null,
+});
+const planTask = (id: string, dependsOn: ReadonlyArray<string>, path: string) => ({
+  id,
+  title: `Task ${id}`,
+  goal: "Contribute to the parent",
+  dependsOn,
+  criterionIds: ["AC-001"],
+  ownership: [{ path, operation: "modify" }],
+  checkIds: ["test"],
+  maxRevisionCycles: 2,
+});
+// Schema-valid shapes only: this boundary proves strict decoding, not digest consistency.
+const transportExecution = {
+  schemaVersion: 1,
+  ownerId: "owner-1",
+  projectRevision: 8,
+  runId: "run-1",
+  stateRevision: 1,
+  parent: {
+    id: "parent-1",
+    goal: "Split the parser",
+    acceptanceCriteria: [
+      {
+        id: "AC-001",
+        statement: "Parsing still works",
+        scope: { paths: ["src"] },
+        verification: { checkIds: ["test"], reviewRequired: true },
+      },
+    ],
+    status: "inProgress",
+  },
+  plan: {
+    schemaVersion: 1,
+    planId: "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a",
+    complexPlanDigest: digest,
+    parentTaskId: "parent-1",
+    parentTaskContractDigest: digest,
+    tasks: [planTask("CT-001", [], "src/a.ts"), planTask("CT-002", ["CT-001"], "src/b.ts")],
+    integration: {
+      criterionIds: ["AC-001"],
+      checkIds: ["test"],
+      reviewRequired: true,
+      finalChecksRequired: true,
+    },
+    limits: {
+      maxTasks: 8,
+      maxWorkerInvocations: 24,
+      maxReportedTokens: 200000,
+      maxTotalRevisionCycles: 3,
+    },
+  },
+  phase: "TASK_SEQUENCE",
+  activeTaskId: null,
+  tasks: [pendingRow("CT-001"), pendingRow("CT-002")],
+  integration: {
+    check: "NOT_RUN",
+    review: "NOT_RUN",
+    test: "NOT_RUN",
+    workspaceDigest: null,
+    evidenceFreshness: "NONE",
+    failureCode: null,
+  },
+  budget: {
+    workerInvocations: 0,
+    reportedTokens: 0,
+    totalRevisionCycles: 0,
+    status: "WITHIN_LIMITS",
+  },
+  cleanup: "NOT_REQUESTED",
+  partialChanges: false,
+  changesUnknown: false,
+  failureCode: null,
+};
+const complexSnapshot = {
+  ...snapshotResponse.data.state.snapshot,
+  status: {
+    ...snapshotResponse.data.state.snapshot.status,
+    run: { ...snapshotResponse.data.state.snapshot.status.run, workflow: "COMPLEX" },
+  },
+};
+const statementBytes = "한".repeat(500);
+const overBound = {
+  ...transportExecution,
+  parent: {
+    ...transportExecution.parent,
+    goal: "한".repeat(2048),
+    acceptanceCriteria: Array.from({ length: 16 }, (_, index) => ({
+      ...transportExecution.parent.acceptanceCriteria[0],
+      id: `AC-${String(index + 1).padStart(3, "0")}`,
+      statement: statementBytes,
+    })),
+  },
+};
+const standardPreview = {
+  previewId: "preview-1",
+  previewDigest: digest,
+  ownerId: "owner-1",
+  projectRevision: 8,
+  expiresAt: 9999999999999,
+  goal: "Split the parser",
+  workflow: "STANDARD",
+  executionMode: "EDIT",
+  risk: "R1",
+  allowedPaths: ["src"],
+  checks: [{ id: "test", kind: "command", required: true }],
+  acceptanceCriteria: [
+    { id: "AC-001", statement: "Parsing still works", checkIds: ["test"], reviewRequired: true },
+  ],
+  taskContractDigest: digest,
+  recipe: null,
+  configuration: {
+    mutationMode: "strict",
+    verifierTrustMode: "strict",
+    verifierSandboxMode: "disabled",
+    contextPackMode: "bounded",
+    verificationRepairMode: "disabled",
+    lspEnabled: false,
+  },
+};
+
+for (const [label, patch, code] of [
+  ["current projection", { snapshot: complexSnapshot, complexExecution: transportExecution }, null],
+  [
+    "unknown projection field",
+    { snapshot: complexSnapshot, complexExecution: { ...transportExecution, taskComplete: true } },
+    "INVALID_PAYLOAD",
+  ],
+  [
+    "unknown projection version",
+    { snapshot: complexSnapshot, complexExecution: { ...transportExecution, schemaVersion: 2 } },
+    "INVALID_PAYLOAD",
+  ],
+  [
+    "unknown task status enum",
+    {
+      snapshot: complexSnapshot,
+      complexExecution: {
+        ...transportExecution,
+        tasks: [{ ...pendingRow("CT-001"), status: "SKIPPED" }, pendingRow("CT-002")],
+      },
+    },
+    "INVALID_PAYLOAD",
+  ],
+  [
+    "null in place of the optional projection",
+    { snapshot: complexSnapshot, complexExecution: null },
+    "INVALID_PAYLOAD",
+  ],
+  [
+    "projection above its own byte bound",
+    { snapshot: complexSnapshot, complexExecution: overBound },
+    "INVALID_PAYLOAD",
+  ],
+  [
+    "oversized response",
+    {
+      snapshot: complexSnapshot,
+      complexExecution: { ...transportExecution, rawTranscript: "PRIVATE_SECRET".repeat(6000) },
+    },
+    "OVERSIZED_PAYLOAD",
+  ],
+  [
+    "unknown preview workflow",
+    { preview: { ...standardPreview, workflow: "PARALLEL" } },
+    "INVALID_PAYLOAD",
+  ],
+  [
+    "COMPLEX preview without its plan",
+    { preview: { ...standardPreview, workflow: "COMPLEX" } },
+    "INVALID_PAYLOAD",
+  ],
+  [
+    "plan on a STANDARD preview",
+    { preview: { ...standardPreview, complexPlan: transportExecution.plan } },
+    "INVALID_PAYLOAD",
+  ],
+] as const) {
+  it.effect(`decodes COMPLEX ${label} strictly before publication (C38)`, () =>
+    Effect.gen(function* () {
+      const result = yield* exchangePatched(snapshotRequest, patch);
+      if (code === null) {
+        expect(result).toMatchObject({
+          _tag: "Success",
+          success: { data: { state: { complexExecution: transportExecution } } },
+        });
+      } else {
+        expect(result).toMatchObject({ _tag: "Failure", failure: { code } });
+        expect(encodeJson(result)).not.toContain("PRIVATE_SECRET");
+      }
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+for (const [label, version, accepted] of [
+  ["contract v1", 1, true],
+  ["a future contract version", 2, false],
+  ["null", null, false],
+  ["a guessed string version", "1", false],
+] as const) {
+  it.effect(`capability advertisement with ${label} is exact, never inferred`, () =>
+    Effect.gen(function* () {
+      const result = yield* exchangePatched(helloRequest, { complexContractVersion: version });
+      expect(result).toMatchObject(
+        accepted
+          ? { _tag: "Success", success: { data: { capabilities: { complexContractVersion: 1 } } } }
+          : { _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } },
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
