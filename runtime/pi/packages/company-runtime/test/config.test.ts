@@ -30,6 +30,9 @@ describe("runtime config", () => {
 		expect(example.models.profiles.coding.provider).toBe("your-provider");
 		expect(example.verification.checks[0].required).toBe(true);
 		expect(example.agents.worker_timeout_ms).toBe(180_000);
+		// The shipped example opts into the OS sandbox; an omitted setting keeps the disabled default.
+		expect(example.verification.sandbox.mode).toBe("required");
+		expect(parseRuntimeConfig(JSON.stringify(minimal)).verification.sandbox.mode).toBe("disabled");
 	});
 	it("uses conservative defaults without hardcoded provider models", () => {
 		const config = parseRuntimeConfig(JSON.stringify(minimal));

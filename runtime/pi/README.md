@@ -219,12 +219,16 @@ models:
 files:
   allowed_paths: [src, test]
 verification:
+  sandbox:
+    mode: required
   checks:
     - id: regression
       kind: test
       executable: node
       args: [scripts/check.mjs]
 ```
+
+예제는 registered check를 OS sandbox에서 실행한다(network와 `$HOME`/`$TMPDIR` 읽기 차단, macOS 검증, Linux NOT VERIFIED). `verification.sandbox`를 생략하면 기본값은 계속 `disabled`이며, 이때 Plan Preview와 `/workflow config`는 check가 사용자 권한·네트워크로 실행된다는 경고를 표시한다. `~/.m2`·`~/.gradle`·`~/.cargo`·`~/.npm` 캐시나 다운로드가 필요한 check는 `disabled`로 둬야 한다.
 
 실제 [schema/parser](packages/company-runtime/src/config.ts)는 알 수 없는 필드와 정책 완화를 거부한다. 위 예제의 기본값은 `runtime.workflow: adaptive`, `agents.max_parallel: 1`, `agents.max_revision_cycles: 1`, `agents.worker_timeout_ms: 180000`, review/state 활성, `.ai` 저장, R3 승인 필수다. check 기본값은 `cwd: .`, `timeout_ms: 60000`, `required: true`다.
 

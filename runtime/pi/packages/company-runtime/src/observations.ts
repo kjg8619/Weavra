@@ -8,6 +8,7 @@ import {
 	type ReviewRecord,
 	type Run,
 } from "./contracts.ts";
+import { SANDBOX_DISABLED_WARNING } from "./sandbox-advice.ts";
 
 export interface ObservationAction {
 	decision: PolicyDecision;
@@ -166,6 +167,7 @@ export function formatConfiguration(config: RuntimeConfig): string {
 		`Reviewer revision limit: STANDARD ${config.agents.max_revision_cycles} (default 1, range 0..3); QUICK/R3 0`,
 		`Verification repair: ${config.verification.repair.mode}; maximum one separate STANDARD/EDIT/R1 SELF_CHECK repair; cumulative budget retained`,
 		`Worker timeout: ${config.agents.worker_timeout_ms}ms per role invocation (default 180000, range 10000..600000); cancel signals immediately, awaits cleanup`,
+		`Verifier sandbox: ${config.verification.sandbox.mode === "required" ? "required (network and $HOME/$TMPDIR reads denied)" : `disabled. ${SANDBOX_DISABLED_WARNING}`}`,
 		...Object.entries(config.models.profiles).map(
 			([profile, model]) =>
 				`${profile}: ${displayText(model.provider)}/${displayText(model.model)}${["fast", "creative"].includes(profile) ? " (not auto-selected)" : ""}`,

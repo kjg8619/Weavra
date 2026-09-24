@@ -312,6 +312,11 @@ export async function doctorWeavra(
 				"Session resolution",
 				"agent/sessions/<encoded-cwd>; --session-dir still has CLI precedence; explicit project settings may override the default",
 			);
+		// Project config is not parsed here: this file stays self-contained (no Runtime/YAML imports, no project trust).
+		output(
+			"INFO  Verifier sandbox: per project, default disabled; check with /workflow config inside the project. " +
+				"When disabled, registered checks run with this user's filesystem and network access; set verification.sandbox.mode: required (macOS verified) if the checks need no network or $HOME caches.",
+		);
 		output("No auth refresh, Provider/network call, session creation, chmod or repair was performed.");
 	} catch {
 		report("FAIL", "Isolation / paths", "invalid WEAVRA_HOME or overlap with Pi; no directories created");

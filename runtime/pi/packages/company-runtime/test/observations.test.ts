@@ -15,7 +15,7 @@ import {
 	pageNumber,
 } from "../src/observations.ts";
 import { FileStateStore } from "../src/state-store.ts";
-import { testContract } from "./fixture-contract.ts";
+import { testConfig, testContract } from "./fixture-contract.ts";
 
 function run(): Run {
 	return {
@@ -206,6 +206,18 @@ describe("pure bounded command views", () => {
 		);
 		expect(formatConfiguration(config)).toContain("STANDARD 3");
 		expect(formatConfiguration(config)).toContain("QUICK/R3 0");
+	});
+	it("warns when the verifier sandbox is off and states the required-mode limits", () => {
+		const disabled = formatConfiguration(testConfig());
+		expect(disabled).toContain("Verifier sandbox: disabled. WARNING: registered checks run unsandboxed");
+		expect(disabled).toContain("verification.sandbox.mode: required");
+		expect(disabled).toContain("~/.m2");
+		const required = testConfig();
+		required.verification.sandbox.mode = "required";
+		expect(formatConfiguration(required)).toContain(
+			"Verifier sandbox: required (network and $HOME/$TMPDIR reads denied)",
+		);
+		expect(formatConfiguration(required)).not.toContain("WARNING");
 	});
 });
 

@@ -721,6 +721,8 @@ risk:
 files:
   allowed_paths: [src, test]
 verification:
+  sandbox:
+    mode: required
   checks:
     - id: regression
       kind: test
@@ -739,6 +741,7 @@ verification:
 - `risk.approval_required`: 현재 `[R3]`만 허용. 프로젝트 설정으로 review·state·승인 요구를 끌 수 없다.
 - `files.allowed_paths`: 기본 `[]`. 문자 그대로의 workspace 상대 파일/디렉터리 경로이며 glob이 아니다. S2 Policy와 경로 Adapter가 이 범위 및 보호 파일·symlink를 검사한다.
 - `verification.checks`: 기본 `[]`. check마다 `id`, `kind`, `executable`, 문자열 배열 `args`가 필수다. `kind`는 `build`/`lint`/`test`/`typecheck`/`format`/`custom`이다. 선택 필드는 `cwd`(기본 `.`), `timeout_ms`(기본 `60000`, 범위 `1..3600000`), `required`(기본 `true`), `trust.files`, `repairable_exit_codes`다. ID 중복을 거부한다. `verification.repair.mode`는 `disabled` 기본값 또는 `self-check-once`이며 위 V0.5C 계약을 따른다. `verification.advisory`는 선택이며 `mode: disabled|developer`와 `max_runs`(기본 `5`, `1..20`)를 받는다. 생략하면 정규화 설정에도 나타나지 않아 기존 config digest가 바뀌지 않는다.
+- `verification.sandbox.mode`: 기본값은 `disabled`로 유지한다. sandbox가 network와 `$HOME`/`$TMPDIR` 읽기를 막아 toolchain 캐시(`~/.m2`, `~/.gradle`, `~/.cargo`, `~/.npm`)나 다운로드가 필요한 check를 깨뜨리기 때문이다. 대신 `disabled`이면 Plan Preview와 `/workflow config`가 check가 이 사용자의 파일·네트워크 권한으로(Developer가 쓴 코드 포함) 실행된다는 경고와 `required`로 켜는 방법을 표시하고, `weavra doctor`는 프로젝트별 설정 확인 방법을 안내한다(doctor는 launcher 의존성을 늘리지 않기 위해 프로젝트 config를 파싱하지 않는다). 위 예제와 `examples/config.yaml`은 `required`다.
 
 파일/cwd 경로에는 절대 경로, `..`, Windows 드라이브/역슬래시, glob, 제어 문자를 허용하지 않는다. executable은 명시적 PATH에서 해석한 절대 경로로 고정한다. 설정 파싱 자체가 경로·프로그램의 안전성을 증명하지 않는다. **check 등록과 실행 확인은 신뢰한 코드에 대한 허가이지 OS sandbox가 아니다.** 실행은 필수 check 한 개 이상을 요구한다. S4 첫 Slice의 기본 재작업 1회는 유지하며, STANDARD는 설정한 0~3회까지 지원한다.
 
