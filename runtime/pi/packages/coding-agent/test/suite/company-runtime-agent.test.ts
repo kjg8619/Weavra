@@ -1197,7 +1197,7 @@ describe("Company Runtime correctable worker tool errors (faux only)", () => {
 	});
 
 	it.each([
-		["protected path", "runtime_read", { path: ".ai/state.json" }, "Policy R0/DENY: Protected target"],
+		["protected write", "runtime_write", { path: ".ai/state.json", content: "{}" }, "Protected target"],
 		[
 			"write outside the allowlist",
 			"runtime_write",
@@ -1233,6 +1233,24 @@ describe("Company Runtime correctable worker tool errors (faux only)", () => {
 		expect(errors).toHaveLength(2);
 		expect(readFileSync(join(workspace, "src/app.ts"), "utf8")).toBe("fixed\n");
 		expect(store.snapshot.actions.map((item) => item.status)).toEqual(["DENIED", "DENIED", "SUCCEEDED"]);
+	});
+
+	it("returns a read of a protected path as correctable input without reading it", async () => {
+		const errors: string[] = [];
+		harness.setResponses([
+			call("runtime_read", { path: ".ai/state.json" }),
+			(context) => {
+				errors.push(lastToolError(context));
+				return call("runtime_write", { path: "src/app.ts", content: "fixed\n" });
+			},
+			submitHandoff(),
+		]);
+		await expect(executor.execute(developer())).resolves.toMatchObject({ role: "Developer" });
+		expect(errors[0]).toContain("Policy R0/DENY: Protected target");
+		expect(errors[0]).toContain("Nothing was read");
+		expect(errors[0]).not.toContain('"runs"');
+		expect(readFileSync(join(workspace, "src/app.ts"), "utf8")).toBe("fixed\n");
+		expect(store.snapshot.actions.map((item) => item.status)).toEqual(["DENIED", "SUCCEEDED"]);
 	});
 
 	it("keeps an audit failure fatal after a correctable error", async () => {

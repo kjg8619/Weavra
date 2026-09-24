@@ -542,3 +542,28 @@
   - 목표 문장의 첫 동사가 EDIT 동사 목록(fix/implement/add…)에 없으면 기존 규칙대로 INVALID_GOAL이다.
   - 기준 fixture의 `src/config.ts`는 기본 Policy 보호 이름이라 digest 증명용으로만 쓴다.
 - 커밋 상태: devlop 대상 PR. #16 이슈는 #18 통합 검증 후 닫는다.
+
+## 2026-09-25 KST — 보호 경로 읽기 거부를 수정 가능한 오류로 전환 (실제 모델 COMPLEX smoke 결과)
+
+- 발견: #18 준비 중 실제 모델(commandcode `deepseek/deepseek-v4.1-flash`)로 2작업 COMPLEX Run을 1회 실행했다.
+  - 두 작업은 모두 COMPLETED였고 통합 검사도 PASS였다.
+  - 최종 통합 Reviewer가 `test/parse.test.mjs`를 읽으려 했다. 이 파일은 등록 검사가 실행하는 검증기 소스라 보호 경로다.
+  - 그 거부(`Policy R0/DENY: Protected target`)가 치명 오류로 처리돼 Run이 `BLOCKED/POLICY_DENIED`로 끝났다. 완료 가드가 옳게 막은 것이지만, 무해한 읽기 시도 하나로 전체 작업이 버려졌다.
+- 판단: PR #33은 범위 밖 읽기만 수정 가능한 오류로 바꾸고 보호 경로 읽기는 치명으로 남겼다. 실제 모델이 테스트 파일을 읽는 것은 정상적인 검토 행동이다. 읽기 거부는 내용을 반환하지 않으므로, 계속 진행시켜도 보호 경계는 약해지지 않는다.
+- 변경:
+  - `policy.ts`: `PROTECTED_TARGET_REASON` 상수 export. 판정 로직은 그대로다.
+  - `agent-tools.ts`: read/search/list 도구의 보호 경로 거부를 수정 가능한 오류로 돌려준다. 메시지는 "아무것도 읽지 않았고, Runtime 상태·자격 증명·프로젝트 지시문·등록 검증기 소스는 보호되며, 기록된 검사 증거로 판단하라"이다.
+  - `agent-runner.ts`: 프롬프트의 오류 규칙 문구를 새 규칙에 맞췄다.
+  - `coding-agent` 테스트: 보호 경로 읽기 복구(내용 미노출, DENIED 감사 기록)를 추가했다. 치명 사례는 "보호 경로 쓰기"로 교체했다.
+- 유지한 경계:
+  - 보호 경로와 허용 범위 밖의 쓰기·수정·삭제는 즉시 실패다.
+  - 등록되지 않은 도구, 감사 기록 실패, R3 run의 모든 도구 오류도 즉시 실패다.
+  - 수정 가능한 오류는 기존 예산(기본 8회) 안에서만 허용된다.
+- 현재 검증 (Node 24.19.0):
+  - `npm run check` 통과(포매터가 변경 파일 1개 정리).
+  - coding-agent `company-runtime-agent`·`hardening`·`workflow`·`complex` 204 PASS.
+  - company-runtime `policy`·`anchored-tools`·`hardening`·`context-leakage`·`measurement-evidence`·`complex-kernel`·`complex-ownership`·`list-files` 255 PASS.
+  - 같은 실제 모델 smoke 재실행: **COMPLETED**, 73초, 작업 2개 PASS×3, 통합 PASS×3, worker 호출 5회, 보고 토큰 117,820. App 소비자 검사를 snapshot 140개 모두 통과했다. 감사 기록에서 Reviewer의 보호 경로 읽기 2회가 `DENIED`였고 이어서 리뷰가 완료됐다.
+  - 첫 실행(수정 전)은 BLOCKED, 52초, 보고 토큰은 최종 Reviewer 실패로 UNKNOWN이었다.
+- 비용: 실제 provider 호출 2회분(각 worker 5회 이하). 첫 실행 보고 토큰은 작업 합계 76,753과 알 수 없는 최종 Reviewer분, 두 번째는 117,820이다.
+- 커밋 상태: `fix/recoverable-protected-reads` 브랜치, devlop 대상 PR.
