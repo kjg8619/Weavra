@@ -47,7 +47,7 @@ function entry(id: string) {
 }
 
 describe("benchmark corpus and hidden oracle", () => {
-	it("reuses F01-F10 without the cancellation fixture and adds six benchmark-only tasks", () => {
+	it("reuses F01-F10 without the cancellation fixture and adds ten benchmark-only tasks", () => {
 		expect(BENCHMARK_FIXTURE_IDS).toEqual([
 			"F01",
 			"F02",
@@ -64,6 +64,10 @@ describe("benchmark corpus and hidden oracle", () => {
 			"B04",
 			"B05",
 			"B06",
+			"B07",
+			"B08",
+			"B09",
+			"B10",
 		]);
 		expect(new Set(BENCHMARK_CORPUS.map(benchmarkFixtureDigest)).size).toBe(BENCHMARK_CORPUS.length);
 		for (const item of BENCHMARK_CORPUS) {
@@ -164,12 +168,12 @@ describe("benchmark CLI arguments", () => {
 		const options = parseBenchmarkArgs(["--provider", "openai", "--model", "gpt-5", "--repeat", "3"]);
 		expect(() => assertBenchmarkPaidConfirmation(options)).toThrow(BenchmarkArgsError);
 		expect(() => assertBenchmarkPaidConfirmation(options)).toThrow(
-			/Refusing to run provider "openai" without --confirm-paid[\s\S]*Planned runs: 135 = 3 arms x 15 fixtures x 3 repeat/,
+			/Refusing to run provider "openai" without --confirm-paid[\s\S]*Planned runs: 171 = 3 arms x 19 fixtures x 3 repeat/,
 		);
 		expect(() => assertBenchmarkPaidConfirmation({ ...options, confirmPaid: true })).not.toThrow();
 		const faux = parseBenchmarkArgs(["--provider", "benchmark-faux", "--model", "GOOD", "--arms", "pi,weavra"]);
 		expect(() => assertBenchmarkPaidConfirmation(faux)).not.toThrow();
-		expect(describeBenchmarkPlan(faux).runs).toBe(30);
+		expect(describeBenchmarkPlan(faux).runs).toBe(38);
 	});
 
 	it.each([
