@@ -8,6 +8,8 @@ import {
   type WeavraControlInput,
   type WeavraControlObservation,
   type WeavraComplexExecution,
+  type WeavraComplexExecutionV1,
+  type WeavraComplexExecutionV2,
   type WeavraControlObserveInput,
   type WeavraControlResponse,
   type WeavraControlState,
@@ -1082,7 +1084,7 @@ it("does not interpret JSON key order as a generation change or renew freshness"
   expect(tracker.view(5_100).status).toBe("NEEDS_REFRESH");
 });
 
-const complexRow = (id: string): WeavraComplexExecution["tasks"][number] => ({
+const complexRow = (id: string): WeavraComplexExecutionV1["tasks"][number] => ({
   id,
   status: "PENDING",
   attempt: 0,
@@ -1102,7 +1104,7 @@ const complexRow = (id: string): WeavraComplexExecution["tasks"][number] => ({
 function complexObserved(stateRevision: number, reportedTokens: number | null = 0) {
   const base = observed(10, stateRevision, "complex-run");
   const state = base.state!;
-  const complexExecution: WeavraComplexExecution = {
+  const complexExecution: WeavraComplexExecutionV1 = {
     schemaVersion: 1,
     ownerId: "owner",
     projectRevision: 10,
@@ -1285,5 +1287,63 @@ it.effect(
       const current = yield* waitFor(state, (view) => !view.observation.stale);
       expect(current.observation.state?.complexExecution?.stateRevision).toBe(11);
       expect([...old.sent, ...fresh.sent]).toEqual([]);
+    }).pipe(Effect.scoped),
+);
+
+/** The same Run as a contract v2 projection: both rows implemented in one wave. */
+function parallelObserved(stateRevision: number, handedOff: ReadonlyArray<string> = []) {
+  const base = complexObserved(stateRevision);
+  const { activeTaskId: _activeTaskId, ...fields } = base.state.complexExecution;
+  const complexExecution: WeavraComplexExecutionV2 = {
+    ...fields,
+    schemaVersion: 2,
+    plan: {
+      ...fields.plan,
+      schemaVersion: 2,
+      tasks: fields.plan.tasks.map((task) => ({ ...task, dependsOn: [] })),
+      limits: { ...fields.plan.limits, maxParallel: 2 },
+    },
+    activeTaskIds: ["CT-001", "CT-002"],
+    tasks: fields.tasks.map((row) => ({
+      ...row,
+      status: handedOff.includes(row.id) ? "HANDED_OFF" : "IMPLEMENTING",
+      attempt: 1,
+      workerInvocations: 1,
+      entryWorkspaceDigest: "1".repeat(64),
+    })),
+    budget: { ...fields.budget, workerInvocations: 2 },
+  };
+  return { ...base, state: { ...base.state, complexExecution } } satisfies WeavraControlObservation;
+}
+
+it.effect(
+  "keeps same-revision drift of a v2 wave stale, but lets a reconnected Runtime's other contract version replace it",
+  () =>
+    Effect.gen(function* () {
+      const remote = yield* makeSession();
+      const supervisor = yield* setup(remote.session);
+      const state = yield* makeEnvironmentWeavraControlState(projectId).pipe(
+        Effect.provideService(EnvironmentSupervisor, supervisor),
+      );
+      const subscription = yield* Queue.take(remote.subscriptions);
+      yield* cachedThenChecked(subscription.events, complexObserved(10));
+      yield* waitFor(state, (view) => !view.observation.stale);
+      // Same Run and revision, contract v2 after a Runtime upgrade: a replacement, not drift.
+      const upgraded = parallelObserved(10);
+      yield* Queue.offer(subscription.events, Effect.succeed(upgraded));
+      const replaced = yield* waitFor(
+        state,
+        (view) => view.observation.state?.complexExecution?.schemaVersion === 2,
+      );
+      expect(replaced.observation).toEqual(upgraded);
+      // Within v2, a row handing off without a new revision is not a refresh.
+      yield* Queue.offer(subscription.events, Effect.succeed(parallelObserved(10, ["CT-001"])));
+      const rejected = yield* waitFor(
+        state,
+        (view) => view.observation.errorCode === "REVISION_REGRESSION",
+      );
+      expect(rejected.observation).toMatchObject({ status: "ERROR", stale: true });
+      expect(rejected.observation.state?.complexExecution).toEqual(upgraded.state.complexExecution);
+      expect(remote.sent).toEqual([]);
     }).pipe(Effect.scoped),
 );

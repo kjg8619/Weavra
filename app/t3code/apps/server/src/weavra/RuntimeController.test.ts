@@ -7,7 +7,11 @@ import {
   type WeavraBrowserCandidateSummary,
   type WeavraComplexDraft,
   type WeavraComplexExecution,
-  WeavraComplexPlan,
+  type WeavraComplexExecutionV1,
+  type WeavraComplexExecutionV2,
+  type WeavraComplexPlan,
+  WeavraComplexPlanV1,
+  WeavraComplexPlanV2,
   type WeavraControlCapabilities,
   type WeavraControlMutation,
   type WeavraControlObservation,
@@ -36,8 +40,9 @@ import {
   taskContractDigest,
 } from "./ComplexProjection.ts";
 import { make } from "./RuntimeController.ts";
-// Shared cross-side reference: the Runtime lane keeps its own copy of the same fixture.
+// Shared cross-side references: the Runtime lane keeps its own copies of the same fixtures.
 import reference from "./testFixtures/complexContractV1.json" with { type: "json" };
+import referenceV2 from "./testFixtures/complexContractV2.json" with { type: "json" };
 
 const projectId = ProjectId.make("control-project");
 const decodeCanonical = Schema.decodeEffect(Schema.fromJsonString(WeavraControlState));
@@ -94,8 +99,8 @@ const receipts=new Map();
 const empty={status:{source:'durable-canonical-state',ownerObserved:false,state:'missing',writerPresent:false,run:null},graph:null,graphAvailable:false,evidence:null,configuration:{source:'project-config-not-frozen-run-config',status:'missing'}};
 let state={ownerId,nextRequestId:ownerId+':1',projectRevision:0,stateRevision:null,ownedRunId:null,busy:false,cancelling:false,startFailure:null,preview:null,browserPreview:null,factPreview:null,projectFacts:{status:'available',entries:[]},pendingApproval:null,snapshot:empty};
 if(existsSync('canonical.json')){const old=JSON.parse(readFileSync('canonical.json','utf8'));state={...old,ownerId,nextRequestId:ownerId+':1',ownedRunId:null,busy:false,cancelling:false,preview:null,browserPreview:null,factPreview:null,pendingApproval:null};}
-const complex=mode==='complex';
-const capabilities={authority:'Runtime/Kernel',control:'workflow-control-v1',ownerId,commands:['control.hello','control.snapshot','workflow.prepare','workflow.confirm','workflow.cancel','approval.resolve','browser.inspect','browser.prepare','browser.confirm','facts.prepare','facts.confirm'],maxRequestBytes:32768,maxResponseBytes:65536,resultLimit:64,previewTtlMs:300000,runtimeVersion:'0.85.1',readiness:mode==='not-setup'&&launch===1?'NOT_SETUP':'READY',...(complex?{complexContractVersion:1}:{}),recipes:[]};
+const complex=mode==='complex'?1:mode==='complex-v2'?2:0;
+const capabilities={authority:'Runtime/Kernel',control:'workflow-control-v1',ownerId,commands:['control.hello','control.snapshot','workflow.prepare','workflow.confirm','workflow.cancel','approval.resolve','browser.inspect','browser.prepare','browser.confirm','facts.prepare','facts.confirm'],maxRequestBytes:32768,maxResponseBytes:65536,resultLimit:64,previewTtlMs:300000,runtimeVersion:'0.85.1',readiness:mode==='not-setup'&&launch===1?'NOT_SETUP':'READY',...(complex?{complexContractVersion:complex}:{}),recipes:[]};
 const reply=(request,data,error)=>({protocolVersion:1,type:'control_response',id:request.id,command:request.type,ownerId,runId:state.snapshot.status.run?.runId??null,stateRevision:state.stateRevision,projectRevision:state.projectRevision,eventId:null,timestamp:1000,success:!error,...(error?{error:{code:error}}:{data})});
 const save=()=>writeFileSync('canonical.json',JSON.stringify(state));
 for await(const line of createInterface({input:process.stdin})){
@@ -736,7 +741,7 @@ it.effect("promotes a new subscription only after a refresh checked on the bound
 );
 
 const strictDecode = { onExcessProperty: "error" } as const;
-const referencePlan = Schema.decodeUnknownSync(WeavraComplexPlan, strictDecode)(reference.plan);
+const referencePlan = Schema.decodeUnknownSync(WeavraComplexPlanV1, strictDecode)(reference.plan);
 const referenceParent = Schema.decodeUnknownSync(
   WeavraTaskContract,
   strictDecode,
@@ -793,9 +798,9 @@ const complexCapabilities: WeavraControlCapabilities = {
   ...baselineCapabilities,
   complexContractVersion: 1,
 };
-type Row = WeavraComplexExecution["tasks"][number];
+type Row = WeavraComplexExecutionV1["tasks"][number];
 type RunStatus = NonNullable<WeavraControlState["snapshot"]["status"]["run"]>["status"];
-const sealPlan = (plan: WeavraComplexPlan): WeavraComplexPlan => ({
+const sealPlan = <P extends WeavraComplexPlan>(plan: P): P => ({
   ...plan,
   complexPlanDigest: complexPlanDigest(plan),
 });
@@ -809,7 +814,7 @@ function sealPreview(preview: WeavraControlPreview): WeavraControlPreview {
     complexPlan: sealPlan({ ...plan, parentTaskContractDigest: parentDigest }),
   };
 }
-function withTask(plan: WeavraComplexPlan, index: number, patch: Partial<Row | object>) {
+function withTask<P extends WeavraComplexPlan>(plan: P, index: number, patch: object): P {
   return {
     ...plan,
     tasks: plan.tasks.map((task, position) => (position === index ? { ...task, ...patch } : task)),
@@ -850,7 +855,7 @@ const completedRow = (
   test: "PASS",
   evidenceFreshness,
 });
-function execution(patch: Partial<WeavraComplexExecution> = {}): WeavraComplexExecution {
+function execution(patch: Partial<WeavraComplexExecutionV1> = {}): WeavraComplexExecutionV1 {
   return {
     schemaVersion: 1,
     ownerId: "owner",
@@ -945,7 +950,7 @@ function complexState(
   return value === undefined ? state : { ...state, complexExecution: value };
 }
 const running = execution();
-const withRow = (base: WeavraComplexExecution, index: number, patch: Partial<Row>) =>
+const withRow = (base: WeavraComplexExecutionV1, index: number, patch: Partial<Row>) =>
   execution({
     ...base,
     tasks: base.tasks.map((task, position) => (position === index ? { ...task, ...patch } : task)),
@@ -1041,7 +1046,7 @@ describe("COMPLEX consumer consistency against the shared reference fixture", ()
     expect(complexPlanDigest(reordered)).toBe(reference.complexPlanDigest);
   });
   it("accepts the reference preview and rejects matching but unproven digest pairs", () => {
-    expect(complexPreviewConsistent(complexPreview)).toBe(true);
+    expect(complexPreviewConsistent(complexPreview, 1)).toBe(true);
     const arbitrary = `sha256:${"9".repeat(64)}`;
     const pair = {
       ...complexPreview,
@@ -1065,7 +1070,7 @@ describe("COMPLEX consumer consistency against the shared reference fixture", ()
         complexPlan: { ...referencePlan, complexPlanDigest: `sha256:${"0".repeat(64)}` },
       },
     ]) {
-      expect(complexPreviewConsistent(forged)).toBe(false);
+      expect(complexPreviewConsistent(forged, 1)).toBe(false);
     }
   });
   it("rejects coverage, selection, review, integration and recipe drift even when resealed", () => {
@@ -1097,7 +1102,7 @@ describe("COMPLEX consumer consistency against the shared reference fixture", ()
       }),
       sealPreview({ ...complexPreview, executionMode: "READ_ONLY" }),
     ]) {
-      expect(complexPreviewConsistent(drifted)).toBe(false);
+      expect(complexPreviewConsistent(drifted, 1)).toBe(false);
     }
     const readOnly = sealPreview({
       ...complexPreview,
@@ -1107,7 +1112,7 @@ describe("COMPLEX consumer consistency against the shared reference fixture", ()
         tasks: plan.tasks.map((task) => ({ ...task, ownership: [] })),
       },
     });
-    expect(complexPreviewConsistent(readOnly)).toBe(true);
+    expect(complexPreviewConsistent(readOnly, 1)).toBe(true);
   });
   it("requires the projection exactly when an advertising Runtime's latest Run is COMPLEX", () => {
     expect(complexStateConsistent(complexState(running), complexCapabilities, null)).toBe(true);
@@ -1504,3 +1509,525 @@ for (const [label, mode, patch] of [
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 }
+
+// V0.8A contract v2 (docs/architecture/PARALLEL_AGENTS.md §8) against the shared v2 fixture:
+// CT-001 and CT-002 are independent (wave 1, maxParallel 2); CT-003 depends on both (wave 2).
+const planV2 = Schema.decodeUnknownSync(WeavraComplexPlanV2, strictDecode)(referenceV2.plan);
+const parentV2 = Schema.decodeUnknownSync(WeavraTaskContract, strictDecode)(referenceV2.parent);
+const previewV2: WeavraControlPreview = {
+  ...complexPreview,
+  previewId: "parallel-preview",
+  goal: parentV2.goal,
+  allowedPaths: ["src", "test"],
+  acceptanceCriteria: parentV2.acceptanceCriteria.map((criterion) => ({
+    id: criterion.id,
+    statement: criterion.statement,
+    checkIds: criterion.verification.checkIds,
+    reviewRequired: criterion.verification.reviewRequired,
+  })),
+  taskContractDigest: referenceV2.parentTaskContractDigest,
+  complexPlan: planV2,
+};
+const draftV2: WeavraComplexDraft = {
+  tasks: planV2.tasks.map((task, index) => ({
+    title: task.title,
+    goal: task.goal,
+    dependsOnIndexes: index === 2 ? [1, 2] : [],
+    criterionIndexes: [index + 1],
+    ownership: task.ownership,
+    checkIds: task.checkIds,
+  })),
+};
+const parallelCapabilities: WeavraControlCapabilities = {
+  ...baselineCapabilities,
+  complexContractVersion: 2,
+};
+type RowV2 = WeavraComplexExecutionV2["tasks"][number];
+const claimOf: Record<string, string> = {
+  "CT-001": "src/parse.ts",
+  "CT-002": "src/validate.ts",
+  "CT-003": "src/format.ts",
+};
+const eligible = (id: string): RowV2 => ({ ...pending(id), status: "ELIGIBLE" });
+/** A wave row whose first-attempt Developer is live. */
+const implementing = (id: string): RowV2 => ({
+  ...pending(id),
+  status: "IMPLEMENTING",
+  attempt: 1,
+  workerInvocations: 1,
+  reportedTokens: 1000,
+  entryWorkspaceDigest: "1".repeat(64),
+});
+const handedOff = (id: string): RowV2 => ({
+  ...implementing(id),
+  status: "HANDED_OFF",
+  changedFiles: [claimOf[id]!],
+});
+const verifyingRow = (id: string, status: "SELF_CHECK" | "REVIEW" = "SELF_CHECK"): RowV2 => ({
+  ...handedOff(id),
+  status,
+  selfCheck: status === "SELF_CHECK" ? "RUNNING" : "PASS",
+  review: status === "REVIEW" ? "RUNNING" : "NOT_RUN",
+  workerInvocations: status === "REVIEW" ? 2 : 1,
+});
+/** Accepted REVISE: attempt 2 re-implements alone during its verification turn. */
+const revisingRow = (id: string): RowV2 => ({
+  ...handedOff(id),
+  status: "IMPLEMENTING",
+  attempt: 2,
+  revisionCycle: 1,
+  workerInvocations: 3,
+  reportedTokens: 3000,
+});
+const doneV2 = (id: string): RowV2 => completedRow(id, [claimOf[id]!]);
+const sumOf = (rows: ReadonlyArray<RowV2>, field: "workerInvocations" | "revisionCycle") =>
+  rows.reduce((total, row) => total + row[field], 0);
+function executionV2(
+  activeTaskIds: ReadonlyArray<string>,
+  tasks: ReadonlyArray<RowV2>,
+  patch: Partial<WeavraComplexExecutionV2> = {},
+): WeavraComplexExecutionV2 {
+  return {
+    schemaVersion: 2,
+    ownerId: "owner",
+    projectRevision: 4,
+    runId: "run-2",
+    stateRevision: 11,
+    parent: { ...parentV2, status: "inProgress" },
+    plan: planV2,
+    phase: "TASK_SEQUENCE",
+    activeTaskIds,
+    tasks,
+    integration: running.integration,
+    budget: {
+      workerInvocations: sumOf(tasks, "workerInvocations"),
+      reportedTokens: tasks.reduce((total, row) => total + (row.reportedTokens ?? 0), 0),
+      totalRevisionCycles: sumOf(tasks, "revisionCycle"),
+      status: "WITHIN_LIMITS",
+    },
+    cleanup: "NOT_REQUESTED",
+    partialChanges: false,
+    changesUnknown: false,
+    failureCode: null,
+    ...patch,
+  };
+}
+const consistentV2 = (
+  value: WeavraComplexExecution | undefined,
+  status: RunStatus = "RUNNING",
+  previous: WeavraControlState | null = null,
+) => complexStateConsistent(complexState(value, status), parallelCapabilities, previous);
+/** Freezes plan limits under a resealed digest, so only the rule under test can fail. */
+const planWith = (patch: Partial<WeavraComplexPlanV2["limits"]>, tasks = planV2.tasks) =>
+  sealPlan({ ...planV2, tasks, limits: { ...planV2.limits, ...patch } });
+const withRisk = (state: WeavraControlState, risk: "R1" | "R3"): WeavraControlState => ({
+  ...state,
+  snapshot: {
+    ...state.snapshot,
+    status: {
+      ...state.snapshot.status,
+      run: { ...state.snapshot.status.run!, risk },
+    },
+  },
+});
+
+// Snapshots the V0.8A scheduler produces for the fixture plan, in order.
+const [firstWave = [], secondWave = []] = referenceV2.waves;
+const waveFormed = executionV2(firstWave, [
+  eligible("CT-001"),
+  eligible("CT-002"),
+  pending("CT-003"),
+]);
+const waveLive = executionV2(firstWave, [
+  implementing("CT-001"),
+  implementing("CT-002"),
+  pending("CT-003"),
+]);
+const handingOff = executionV2(firstWave, [
+  handedOff("CT-001"),
+  implementing("CT-002"),
+  pending("CT-003"),
+]);
+const joined = executionV2(firstWave, [
+  handedOff("CT-001"),
+  handedOff("CT-002"),
+  pending("CT-003"),
+]);
+const firstTurn = executionV2(firstWave, [
+  verifyingRow("CT-001"),
+  handedOff("CT-002"),
+  pending("CT-003"),
+]);
+const firstReview = executionV2(firstWave, [
+  verifyingRow("CT-001", "REVIEW"),
+  handedOff("CT-002"),
+  pending("CT-003"),
+]);
+const revising = executionV2(firstWave, [
+  revisingRow("CT-001"),
+  handedOff("CT-002"),
+  pending("CT-003"),
+]);
+const secondTurn = executionV2(
+  ["CT-002"],
+  [doneV2("CT-001"), verifyingRow("CT-002", "REVIEW"), pending("CT-003")],
+);
+const nextWave = executionV2(secondWave, [doneV2("CT-001"), doneV2("CT-002"), eligible("CT-003")]);
+const nextWaveLive = executionV2(secondWave, [
+  doneV2("CT-001"),
+  doneV2("CT-002"),
+  implementing("CT-003"),
+]);
+const cancelling = executionV2(
+  firstWave,
+  [
+    { ...implementing("CT-001"), status: "STOPPING" },
+    { ...handedOff("CT-002"), status: "STOPPING" },
+    pending("CT-003"),
+  ],
+  { phase: "STOPPING", cleanup: "PENDING" },
+);
+// P05: a wave row hit OWNERSHIP_CONFLICT; its sibling and the unstarted row stopped with it.
+const siblingStopped = executionV2(
+  [],
+  [
+    { ...implementing("CT-001"), status: "BLOCKED", failureCode: "OWNERSHIP_CONFLICT" },
+    { ...handedOff("CT-002"), status: "BLOCKED", failureCode: "RUN_STOPPED" },
+    { ...pending("CT-003"), status: "BLOCKED", failureCode: "RUN_STOPPED" },
+  ],
+  {
+    stateRevision: 20,
+    parent: { ...parentV2, status: "blocked" },
+    phase: "TERMINAL",
+    cleanup: "CONFIRMED",
+    partialChanges: true,
+    failureCode: "OWNERSHIP_CONFLICT",
+  },
+);
+
+describe("COMPLEX contract v2 consumer rules (V0.8A waves)", () => {
+  it("reproduces the shared v2 fixture digests under the v2 domain", () => {
+    expect(taskContractDigest(parentV2)).toBe(referenceV2.parentTaskContractDigest);
+    expect(complexPlanDigest(planV2)).toBe(referenceV2.complexPlanDigest);
+    expect(planV2.complexPlanDigest).toBe(referenceV2.complexPlanDigest);
+    expect(previewTaskContractDigest(previewV2, planV2.parentTaskId)).toBe(
+      referenceV2.parentTaskContractDigest,
+    );
+    // A v2 plan never verifies under the v1 domain, and the v1 fixture is unchanged.
+    expect(
+      complexPlanDigest({ ...planV2, schemaVersion: 1 } as unknown as WeavraComplexPlan),
+    ).not.toBe(referenceV2.complexPlanDigest);
+    expect(complexPlanDigest(referencePlan)).toBe(reference.complexPlanDigest);
+    expect(complexPreviewConsistent(previewV2, 2)).toBe(true);
+  });
+  it("accepts the fixture waves as the Runtime reports them, and nothing across a dependency", () => {
+    expect(firstWave).toEqual(["CT-001", "CT-002"]);
+    expect(secondWave).toEqual(["CT-003"]);
+    expect(consistentV2(waveLive)).toBe(true);
+    expect(consistentV2(nextWaveLive)).toBe(true);
+    const acrossDependency = executionV2(
+      ["CT-001", "CT-003"],
+      [implementing("CT-001"), pending("CT-002"), implementing("CT-003")],
+    );
+    expect(consistentV2(acrossDependency)).toBe(false);
+  });
+  it("accepts every wave state: formation, concurrent implementation, hand-off, join, turns and stop", () => {
+    for (const [label, value, status] of [
+      ["wave formed", waveFormed, "RUNNING"],
+      ["both Developers live (P01)", waveLive, "RUNNING"],
+      ["one handed off, one still implementing (P02)", handingOff, "RUNNING"],
+      ["joined: every row waits for its turn", joined, "RUNNING"],
+      ["first verification turn", firstTurn, "RUNNING"],
+      ["first review", firstReview, "RUNNING"],
+      ["REVISE re-implements alone (P08)", revising, "RUNNING"],
+      ["second turn after the first COMPLETED", secondTurn, "RUNNING"],
+      ["next wave formed (P04)", nextWave, "RUNNING"],
+      ["next wave live", nextWaveLive, "RUNNING"],
+      ["cancel settling every live row (P07)", cancelling, "RUNNING"],
+      ["sibling failure settled (P05)", siblingStopped, "BLOCKED"],
+    ] as const) {
+      expect([label, consistentV2(value, status)]).toEqual([label, true]);
+    }
+  });
+  it("rule 1: activeTaskIds lists exactly the active rows in plan order, at most maxParallel", () => {
+    expect(consistentV2({ ...waveLive, activeTaskIds: ["CT-001"] })).toBe(false);
+    expect(consistentV2({ ...waveFormed, activeTaskIds: ["CT-001", "CT-002", "CT-003"] })).toBe(
+      false,
+    );
+    const allIndependent = planV2.tasks.map((task) => ({ ...task, dependsOn: [] }));
+    const threeLive = (maxParallel: number) =>
+      executionV2(
+        ["CT-001", "CT-002", "CT-003"],
+        [implementing("CT-001"), implementing("CT-002"), implementing("CT-003")],
+        { plan: planWith({ maxParallel }, allIndependent) },
+      );
+    expect(consistentV2(threeLive(2))).toBe(false);
+    expect(consistentV2(threeLive(3))).toBe(true);
+    const integrating = executionV2(
+      ["CT-003"],
+      [doneV2("CT-001"), doneV2("CT-002"), doneV2("CT-003")],
+      { phase: "INTEGRATION_CHECK" },
+    );
+    expect(consistentV2(integrating)).toBe(false);
+    expect(consistentV2({ ...integrating, activeTaskIds: [] })).toBe(true);
+  });
+  it("rule 2: active or COMPLETED rows need declared dependencies; maxParallel 1 needs every earlier row", () => {
+    expect(
+      consistentV2(
+        executionV2(
+          ["CT-002", "CT-003"],
+          [doneV2("CT-001"), handedOff("CT-002"), implementing("CT-003")],
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      consistentV2(
+        executionV2(["CT-002"], [doneV2("CT-001"), handedOff("CT-002"), doneV2("CT-003")]),
+      ),
+    ).toBe(false);
+    // CT-002 declares no dependency: a wave may run it, a sequential plan may not.
+    const rows = [pending("CT-001"), implementing("CT-002"), pending("CT-003")];
+    expect(consistentV2(executionV2(["CT-002"], rows))).toBe(true);
+    expect(
+      consistentV2(executionV2(["CT-002"], rows, { plan: planWith({ maxParallel: 1 }) })),
+    ).toBe(false);
+  });
+  it("rule 3: first attempts implement together only beside HANDED_OFF rows", () => {
+    for (const other of [
+      verifyingRow("CT-002"),
+      eligible("CT-002"),
+      { ...handedOff("CT-002"), status: "STOPPING" as const },
+    ]) {
+      expect(
+        consistentV2(executionV2(firstWave, [implementing("CT-001"), other, pending("CT-003")])),
+      ).toBe(false);
+    }
+  });
+  it("rule 4: one row verifies at a time and never beside a first-attempt implementation", () => {
+    for (const rows of [
+      [verifyingRow("CT-001"), verifyingRow("CT-002", "REVIEW")],
+      [revisingRow("CT-001"), implementing("CT-002")],
+      [verifyingRow("CT-001"), eligible("CT-002")],
+      [revisingRow("CT-001"), verifyingRow("CT-002")],
+    ]) {
+      expect(consistentV2(executionV2(firstWave, [...rows, pending("CT-003")]))).toBe(false);
+    }
+  });
+  it("rule 5: HANDED_OFF is implemented, captured and unverified; R3 stays sequential", () => {
+    for (const row of [
+      { ...pending("CT-001"), status: "HANDED_OFF" as const, entryWorkspaceDigest: "1".repeat(64) },
+      { ...handedOff("CT-001"), selfCheck: "PASS" as const },
+      { ...handedOff("CT-001"), entryWorkspaceDigest: null, changesUnknown: true },
+      { ...handedOff("CT-001"), changedFiles: ["src/validate.ts"] },
+    ]) {
+      expect(
+        consistentV2(executionV2(firstWave, [row, implementing("CT-002"), pending("CT-003")])),
+      ).toBe(false);
+    }
+    const waiting = executionV2(
+      ["CT-001"],
+      [
+        { ...implementing("CT-001"), status: "WAITING_APPROVAL" },
+        pending("CT-002"),
+        pending("CT-003"),
+      ],
+    );
+    expect(consistentV2(waiting, "RUNNING")).toBe(false);
+    expect(consistentV2(waiting, "WAITING_APPROVAL")).toBe(true);
+    const single = executionV2(
+      ["CT-001"],
+      [implementing("CT-001"), pending("CT-002"), pending("CT-003")],
+    );
+    const sequentialSingle = { ...single, plan: planWith({ maxParallel: 1 }) };
+    expect(
+      complexStateConsistent(withRisk(complexState(single), "R3"), parallelCapabilities, null),
+    ).toBe(false);
+    expect(
+      complexStateConsistent(
+        withRisk(complexState(sequentialSingle), "R3"),
+        parallelCapabilities,
+        null,
+      ),
+    ).toBe(true);
+    expect(complexPreviewConsistent({ ...previewV2, risk: "R3" }, 2)).toBe(false);
+    expect(
+      complexPreviewConsistent(
+        sealPreview({ ...previewV2, risk: "R3", complexPlan: planWith({ maxParallel: 1 }) }),
+        2,
+      ),
+    ).toBe(true);
+  });
+  it("rule 6: at most two workers per attempt and one global ledger of Σ tasks + one final Reviewer", () => {
+    const overWorked = executionV2(firstWave, [
+      { ...implementing("CT-001"), workerInvocations: 3 },
+      implementing("CT-002"),
+      pending("CT-003"),
+    ]);
+    expect(consistentV2(overWorked)).toBe(false);
+    for (const workerInvocations of [1, 4]) {
+      expect(consistentV2({ ...waveLive, budget: { ...waveLive.budget, workerInvocations } })).toBe(
+        false,
+      );
+    }
+    expect(
+      consistentV2({ ...waveLive, budget: { ...waveLive.budget, workerInvocations: 3 } }),
+    ).toBe(true);
+  });
+  it("binds every shape to the advertised version and never mixes versions on one connection", () => {
+    expect(complexStateConsistent(complexState(waveLive), complexCapabilities, null)).toBe(false);
+    expect(complexStateConsistent(complexState(running), parallelCapabilities, null)).toBe(false);
+    expect(complexStateConsistent(complexState(waveLive), baselineCapabilities, null)).toBe(false);
+    expect(complexStateConsistent(complexState(undefined), parallelCapabilities, null)).toBe(false);
+    expect(complexPreviewConsistent(previewV2, 1)).toBe(false);
+    expect(complexPreviewConsistent(complexPreview, 2)).toBe(false);
+    const previewed = (preview: WeavraControlPreview) => ({
+      ...complexState(undefined, "COMPLETED", "STANDARD"),
+      preview,
+    });
+    expect(complexStateConsistent(previewed(previewV2), parallelCapabilities, null)).toBe(true);
+    expect(complexStateConsistent(previewed(previewV2), complexCapabilities, null)).toBe(false);
+    // A reconnected Runtime of another version replaces, never extends, the old observation.
+    const upgraded = { ...waveLive, runId: running.runId, stateRevision: running.stateRevision };
+    expect(consistentV2(upgraded, "RUNNING", complexState(running))).toBe(true);
+  });
+  it("follows one row IMPLEMENTING → HANDED_OFF → SELF_CHECK → REVIEW → REVISE → HANDED_OFF across snapshots", () => {
+    const secondHandOff = executionV2(firstWave, [
+      { ...revisingRow("CT-001"), status: "HANDED_OFF" },
+      handedOff("CT-002"),
+      pending("CT-003"),
+    ]);
+    const chain = [
+      waveFormed,
+      waveLive,
+      handingOff,
+      joined,
+      firstTurn,
+      firstReview,
+      revising,
+      secondHandOff,
+    ];
+    chain.reduce((before, after, index) => {
+      const previous = complexState({ ...before, stateRevision: 11 + index - 1 });
+      expect([
+        index,
+        consistentV2({ ...after, stateRevision: 11 + index }, "RUNNING", previous),
+      ]).toEqual([index, true]);
+      return after;
+    });
+  });
+  it("rejects same-revision changes, regressions, finished-row rewrites and terminal re-entry", () => {
+    const at = (value: WeavraComplexExecutionV2, stateRevision: number) => ({
+      ...value,
+      stateRevision,
+    });
+    expect(consistentV2(at(handingOff, 11), "RUNNING", complexState(at(waveLive, 11)))).toBe(false);
+    expect(
+      consistentV2(
+        reverseKeys(waveLive) as WeavraComplexExecution,
+        "RUNNING",
+        complexState(waveLive),
+      ),
+    ).toBe(true);
+    // A HANDED_OFF row never returns to PENDING, and an attempt never goes back.
+    const reset = executionV2(
+      ["CT-001"],
+      [handedOff("CT-001"), pending("CT-002"), pending("CT-003")],
+    );
+    expect(consistentV2(reset)).toBe(true);
+    expect(consistentV2(at(reset, 12), "RUNNING", complexState(at(joined, 11)))).toBe(false);
+    expect(consistentV2(at(waveFormed, 12), "RUNNING", complexState(at(joined, 11)))).toBe(false);
+    expect(consistentV2(at(firstTurn, 12), "RUNNING", complexState(at(revising, 11)))).toBe(false);
+    // A finished row keeps its status; alone the rewritten snapshot would be consistent.
+    const terminal = complexState(siblingStopped, "BLOCKED");
+    const rewritten = at(
+      {
+        ...siblingStopped,
+        tasks: [
+          { ...siblingStopped.tasks[0]!, status: "CANCELLED", failureCode: "CANCELLED" },
+          ...siblingStopped.tasks.slice(1),
+        ],
+      },
+      21,
+    );
+    expect(consistentV2(rewritten, "BLOCKED")).toBe(true);
+    expect(consistentV2(rewritten, "BLOCKED", terminal)).toBe(false);
+    expect(consistentV2(at(waveLive, 21), "RUNNING", terminal)).toBe(false);
+  });
+});
+
+it.effect("publishes a v2 preview and wave projection only after version-bound checks", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("complex-v2");
+    const initial = fixture.initial.state!;
+    expect(fixture.initial.capabilities?.complexContractVersion).toBe(2);
+    yield* fixture.fs.writeFileString(
+      `${fixture.root}/complex-preview.json`,
+      encodeJson(previewV2),
+    );
+    const prepared = yield* fixture.controller.command({
+      projectId,
+      request: {
+        ...fields(initial),
+        type: "workflow.prepare",
+        goal: parentV2.goal,
+        acceptanceStatements: parentV2.acceptanceCriteria.map((criterion) => criterion.statement),
+        complexDraft: draftV2,
+      },
+    });
+    expect(prepared).toMatchObject({
+      success: true,
+      data: { kind: "prepared", preview: { workflow: "COMPLEX", complexPlan: planV2 } },
+    });
+    const current = { ...waveLive, ownerId: initial.ownerId, projectRevision: 1 };
+    yield* fixture.fs.writeFileString(
+      `${fixture.root}/state-patch.json`,
+      encodeJson(complexRunPatch(current)),
+    );
+    yield* TestClock.adjust("2 seconds");
+    const projected = yield* next(
+      fixture.queue,
+      (value) => !value.stale && value.state?.complexExecution !== undefined,
+    );
+    expect(projected.state?.complexExecution).toEqual(current);
+    // A v1 projection on a v2 connection is a version mix, not a downgrade.
+    const mixed = execution({
+      ownerId: initial.ownerId,
+      projectRevision: 1,
+      runId: "run-9",
+      stateRevision: 30,
+    });
+    yield* fixture.fs.writeFileString(
+      `${fixture.root}/state-patch.json`,
+      encodeJson(complexRunPatch(mixed)),
+    );
+    yield* TestClock.adjust("2 seconds");
+    const rejected = yield* next(fixture.queue, (value) => value.status === "ERROR");
+    expect(rejected).toMatchObject({ stale: true, errorCode: "INVALID_PAYLOAD" });
+    expect(rejected.state?.complexExecution).toEqual(current);
+    expect(
+      (yield* fixture.fs.readFileString(`${fixture.root}/requests`)).split("\n").filter(Boolean),
+    ).toEqual(["workflow.prepare"]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("rejects a v1 preview from a contract v2 Runtime without publishing it", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("complex-v2");
+    yield* fixture.fs.writeFileString(
+      `${fixture.root}/complex-preview.json`,
+      encodeJson(complexPreview),
+    );
+    const result = yield* fixture.controller
+      .command({
+        projectId,
+        request: {
+          ...fields(fixture.initial.state!),
+          type: "workflow.prepare",
+          goal: reference.parent.goal,
+          complexDraft,
+        },
+      })
+      .pipe(Effect.result);
+    expect(result).toMatchObject({ _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } });
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);

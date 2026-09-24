@@ -698,16 +698,92 @@ for (const [label, patch, code] of [
 
 for (const [label, version, accepted] of [
   ["contract v1", 1, true],
-  ["a future contract version", 2, false],
+  ["contract v2 (parallel waves)", 2, true],
+  ["a future contract version", 3, false],
   ["null", null, false],
-  ["a guessed string version", "1", false],
+  ["a guessed string version", "2", false],
 ] as const) {
   it.effect(`capability advertisement with ${label} is exact, never inferred`, () =>
     Effect.gen(function* () {
       const result = yield* exchangePatched(helloRequest, { complexContractVersion: version });
       expect(result).toMatchObject(
         accepted
-          ? { _tag: "Success", success: { data: { capabilities: { complexContractVersion: 1 } } } }
+          ? {
+              _tag: "Success",
+              success: { data: { capabilities: { complexContractVersion: version } } },
+            }
+          : { _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } },
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+// Contract v2 shapes decode strictly too; which version a connection may carry is the
+// RuntimeController's check against the advertised capability.
+const { activeTaskId: _activeTaskId, ...transportFieldsV2 } = transportExecution;
+const handedOffTransportRow = {
+  ...pendingRow("CT-002"),
+  status: "HANDED_OFF",
+  attempt: 1,
+  workerInvocations: 1,
+  reportedTokens: 10,
+  entryWorkspaceDigest: "c".repeat(64),
+};
+const transportExecutionV2 = {
+  ...transportFieldsV2,
+  schemaVersion: 2,
+  plan: {
+    ...transportExecution.plan,
+    schemaVersion: 2,
+    limits: { ...transportExecution.plan.limits, maxParallel: 2 },
+  },
+  activeTaskIds: ["CT-002"],
+  tasks: [pendingRow("CT-001"), handedOffTransportRow],
+};
+for (const [label, complexExecution, accepted] of [
+  ["a v2 wave projection", transportExecutionV2, true],
+  [
+    "a v2 projection with the v1 activeTaskId",
+    { ...transportExecutionV2, activeTaskId: null },
+    false,
+  ],
+  [
+    "a v1 projection with a HANDED_OFF row",
+    { ...transportExecution, tasks: [pendingRow("CT-001"), handedOffTransportRow] },
+    false,
+  ],
+  [
+    "a v2 projection carrying a v1 plan",
+    { ...transportExecutionV2, plan: transportExecution.plan },
+    false,
+  ],
+  [
+    "a v2 plan above four parallel tasks",
+    {
+      ...transportExecutionV2,
+      plan: {
+        ...transportExecutionV2.plan,
+        limits: { ...transportExecutionV2.plan.limits, maxParallel: 5 },
+      },
+    },
+    false,
+  ],
+  [
+    "a wave of five rows",
+    { ...transportExecutionV2, activeTaskIds: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005"] },
+    false,
+  ],
+  ["an unknown projection version", { ...transportExecutionV2, schemaVersion: 3 }, false],
+] as const) {
+  it.effect(`decodes ${label} strictly before publication`, () =>
+    Effect.gen(function* () {
+      const result = yield* exchangePatched(snapshotRequest, {
+        snapshot: complexSnapshot,
+        complexExecution,
+      });
+      expect(result).toMatchObject(
+        accepted
+          ? { _tag: "Success", success: { data: { state: { complexExecution } } } }
           : { _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } },
       );
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
