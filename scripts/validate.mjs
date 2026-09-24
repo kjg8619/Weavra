@@ -45,7 +45,7 @@ const commands = scope === "pi" ? [
   ["npm", "run", "check:shrinkwrap"],
   ["npm", "run", "check:install-lock:coding-agent"],
   ["node", "--test", "../../scripts/product-independence.test.mjs"],
-  ["npm", "test"],
+  // test.sh runs the same full `npm test` suite with an allowlisted empty environment; running both doubled the time.
   ["bash", "./test.sh"],
   ["bash", "-n", "packages/company-runtime/bin/weavra"],
   ["git", "diff", "--check"],

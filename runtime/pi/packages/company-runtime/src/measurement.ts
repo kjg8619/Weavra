@@ -142,8 +142,8 @@ export class WorkerMeasurementAccumulator {
 export class WorkerExecutionError extends Error {
 	readonly measurement: WorkerMeasurement | undefined;
 
-	constructor(message: string, measurement?: WorkerMeasurement) {
-		super(message);
+	constructor(message: string, measurement?: WorkerMeasurement, options?: ErrorOptions) {
+		super(message, options);
 		this.name = "WorkerExecutionError";
 		this.measurement = measurement;
 	}

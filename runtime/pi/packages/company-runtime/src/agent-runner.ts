@@ -822,10 +822,12 @@ export class PiAgentExecutor implements AgentExecutor {
 				failure = "Worker did not submit a structured result";
 				throw new Error(failure);
 			}
-		} catch {
+		} catch (error) {
 			this.stoppedRuns.add(request.runId);
+			// The persisted message stays a bounded stage label; the original error is kept only as the cause.
 			executionError = new Error(
 				failure ?? (signal.aborted ? "Worker aborted" : `Worker execution failed (${stage})`),
+				{ cause: error },
 			);
 		} finally {
 			active = false;
@@ -856,6 +858,7 @@ export class PiAgentExecutor implements AgentExecutor {
 			throw new WorkerExecutionError(
 				executionError.message,
 				measurement?.finish(parentSignal?.aborted ? "CANCELLED" : "FAILED"),
+				{ cause: executionError.cause },
 			);
 		if (signal.aborted) {
 			this.stoppedRuns.add(request.runId);

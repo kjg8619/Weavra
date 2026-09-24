@@ -14,6 +14,7 @@ import type {
 } from "../../../company-runtime/src/contracts.ts";
 import type { RuntimeEvent } from "../../../company-runtime/src/events.ts";
 import { CompanyKernel } from "../../../company-runtime/src/kernel.ts";
+import { WorkerExecutionError } from "../../../company-runtime/src/measurement.ts";
 import type { AgentExecutionRequest } from "../../../company-runtime/src/ports.ts";
 import { FileStateStore } from "../../../company-runtime/src/state-store.ts";
 import { AgentSession } from "../../src/index.ts";
@@ -749,14 +750,19 @@ describe("Company Runtime S3 SDK adapter (faux only)", () => {
 		expect(harness.faux.state.callCount).toBe(0);
 	});
 	it("does not prompt if session reference persistence fails", async () => {
-		await expect(
-			executor.execute({
+		const failure = new Error("Disk failure");
+		const error = await executor
+			.execute({
 				...developer(),
 				onSessionCreated: async () => {
-					throw new Error("Disk failure");
+					throw failure;
 				},
-			}),
-		).rejects.toThrow();
+			})
+			.catch((caught: unknown) => caught);
+		// The persisted message stays a bounded stage label; the original error survives only as the cause.
+		expect(error).toBeInstanceOf(WorkerExecutionError);
+		expect((error as Error).message).toBe("Worker execution failed (session reference persistence)");
+		expect((error as Error).cause).toBe(failure);
 		expect(workers).toEqual([]);
 		expect(harness.faux.state.callCount).toBe(0);
 		expect(dispose).toHaveBeenCalledTimes(1);

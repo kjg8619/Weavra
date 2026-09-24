@@ -73,7 +73,7 @@ node scripts/validate.mjs t3
 WEAVRA_CHROMIUM=/absolute/path/to/chromium node scripts/run-cross-boundary.mjs
 ```
 
-`validate.mjs pi` runs check, check:ci, shrinkwrap and install-lock gates, npm test, test.sh, launcher syntax and whitespace checks. `validate.mjs t3` runs all recursive workspace tests serially, focused control regressions, typecheck, lint, fmt:check, knip:check, build and whitespace checks. No test is selected by changed paths. Private HOME/temp/config are created and removed; provider credentials and personal sessions are not inherited. Darwin temp paths are canonical and short to respect Unix socket limits. `fd`/`fdfind` and `rg` are test prerequisites.
+`validate.mjs pi` runs check, check:ci, shrinkwrap and install-lock gates, test.sh (the full `npm test` suite in an allowlisted empty environment; the separate duplicate `npm test` run was removed after consolidation), launcher syntax and whitespace checks. `validate.mjs t3` runs all recursive workspace tests serially, focused control regressions, typecheck, lint, fmt:check, knip:check, build and whitespace checks. No test is selected by changed paths. Private HOME/temp/config are created and removed; provider credentials and personal sessions are not inherited. Darwin temp paths are canonical and short to respect Unix socket limits. `fd`/`fdfind` and `rg` are test prerequisites.
 
 Root `Weavra CI` has independent `runtime/pi`, `app/t3code`, and `cross-boundary` jobs. Nested source workflows are inactive. Browser smoke uses actual production T3 transports and the actual executable; only the worker's pending inference peer is an owned loopback fixture, with no paid inference. Fresh Chromium observations and verifier results are real, not mocked.
 
