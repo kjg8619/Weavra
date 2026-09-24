@@ -569,3 +569,61 @@
   - 첫 실행(수정 전)은 BLOCKED, 52초, 보고 토큰은 최종 Reviewer 실패로 UNKNOWN이었다.
 - 비용: 실제 provider 호출 2회분(각 worker 5회 이하). 첫 실행 보고 토큰은 작업 합계 76,753과 알 수 없는 최종 Reviewer분, 두 번째는 117,820이다.
 - 커밋 상태: `fix/recoverable-protected-reads` 브랜치, devlop 대상 PR.
+
+## 2026-09-25 KST — V0.7B #18 COMPLEX 통합 검증 (Runtime→App 실제 경계)
+
+- 목적: #16(Runtime)과 #17(App)을 합친 실제 경계에서 COMPLEX 수명 주기를 검증한다. 거짓 완료 0건을 확인하고, 실제 모델 smoke를 한 번 돌리고, 병렬 단계 진입 조건을 기록한다.
+- 브랜치/worktree: `test/v0.7b-complex-integration`, `Weavra-worktrees/v0.7b-complex-integration`. 선행 PR #34(#17)·#36(#16)·#37(보호 경로 읽기) 머지 후 devlop 기준이다.
+- 추가 파일:
+  - `scripts/complex-integration.mjs`: 실제 Runtime 실행 파일(stdio Host Control)을 운영 App `ControlTransport`로 조작한다. 모든 snapshot은 App 엄격 디코더와 `ComplexProjection` 검사를 통과해야 한다. worker는 대본 루프백 모델과 대화한다.
+  - `scripts/scripted-model-server.mjs`: OpenAI 호환 스트리밍 응답기. usage를 항상 보고해 예산이 알려진 상태로 유지된다.
+  - `scripts/run-complex-integration.mjs`: 격리된 HOME/TMPDIR/git 설정으로 실행한다.
+  - `scripts/complex-live-smoke.mjs`: 선택 실행 유료 smoke. `--confirm-paid`가 필수이고 사용자 자신의 모델 설정을 쓴다.
+  - CI cross-boundary job에 corpus 단계를 추가했다.
+  - `docs/architecture/OVERVIEW.md`: COMPLEX 실행 흐름, 작업 파일 소유권 결정 주체, 검증 명령을 반영했다.
+- 시나리오(14개, 대본 모델, 유료 호출 0). 매 snapshot이 App 소비자 검사를 통과했다.
+  - 양성 대조군(COMPLETED만 허용):
+    - P1 2작업 순차 실행: 통합 PASS×3, worker 호출 5회, 앞 작업이 COMPLETED되기 전에는 뒤 작업이 활성화되지 않음.
+    - P2 REVISE 1회: CT-001 attempt 2 / revision 1, 전역 revision 1, 호출 7회.
+    - P3 READ_ONLY 분해: 변경 파일 0.
+    - P4/C16 R3 삭제: WAITING_APPROVAL(뒤 작업 PENDING) → 사람 승인 → 삭제 → COMPLETED.
+  - 음성(COMPLETED 금지):
+    - C17 R3 거절: BLOCKED/APPROVAL_DENIED, 파일 유지.
+    - C03 다른 작업 claim 파일 쓰기: 효과 전 OWNERSHIP_CONFLICT, 바이트 불변.
+    - C04 claim 없는 파일 쓰기: UNOWNED_PATH, 바이트 불변.
+    - C01/C21 작업 검사 실패: CHECK_FAILED, Reviewer 미호출, 부분 변경 보존.
+    - C07 Reviewer 미제출: FAILED/WORKER_FAILED, review gate UNAVAILABLE(판정 조작 없음).
+    - C08 통합 선택 검사 실패: 두 작업 COMPLETED 후 통합 check FAIL/CHECK_FAILED, 최종 리뷰 미실행.
+    - C12 예산(호출 3회) 소진: EXHAUSTED.
+    - C14/C32 뒤 작업 Developer 실행 중 취소: CANCELLED, 앞 작업 COMPLETED 보존, cleanup CONFIRMED, writer 해제.
+    - C20 완료된 작업 파일의 외부 변경: EXTERNAL_MUTATION.
+    - C19 두 번째 App 연결: 실행 중 소유하지 않은 일관된 투영을 관측했다. 소유 연결 종료 시 Host가 취소해 CANCELLED가 됐고, 재개·재실행은 없었다.
+  - 결과: 양성 4건만 COMPLETED. **falseCompletion = 0**.
+- 실제 모델 smoke(commandcode `deepseek/deepseek-v4.1-flash`, 2작업, 사용자 설정 사용):
+  - 1차(#37 이전): 두 작업과 통합 검사 PASS 뒤, 최종 Reviewer의 보호 테스트 파일 읽기가 치명 처리돼 BLOCKED/POLICY_DENIED로 끝났다. 거짓 완료는 아니다. 이 결과로 #37을 수정했다.
+  - 2차(#37 적용): **COMPLETED**, 73초, 작업별 PASS×3, 통합 PASS×3, 호출 5회, 보고 토큰 117,820(상한 20만 이내). snapshot 140개 모두 App 소비자 검사를 통과했다.
+- 현재 검증(로컬, 메인 세션):
+  - corpus를 3회 연속 실행해 모두 `COMPLEX INTEGRATION PASS: 14 scenarios; falseCompletion=0`였다(약 35초/회).
+  - 새 worktree에서는 `product-independence`·`consolidation-paths`가 Runtime 빌드와 model data 부재로 실패했다. 스크립트와 무관한 환경 요인이며, 의존성이 있는 worktree에서는 통과한다. 전체 게이트는 PR CI가 확인한다.
+- 설계 C-행 대응:
+  - 이 corpus가 다루는 행: C01, C03, C04, C07, C08, C12, C14, C16, C17, C19, C20, C21, C32.
+  - #16 Runtime 테스트가 다루는 행: C02, C05, C06, C09, C11, C13, C15, C18, C24, C27–C31, C33–C37, C39–C42(kernel 57 시나리오와 store·ownership·SDK 테스트).
+  - #16 prepare 테스트가 다루는 행: C10, C23, C25, C26.
+  - #17 App 테스트가 다루는 행: C22, C27, C38(구 App의 엄격 디코더 거부는 설계상 비호환 조합이라 실제 구 App 실행은 하지 않음).
+- 남은 한계(병렬 단계로 넘김):
+  - C37 실제 브라우저 capture 재사용 거부는 가드 수준 테스트만 있다.
+  - Planner가 없어 사람이 구조화된 계획을 직접 쓴다.
+  - 목표 첫 동사가 EDIT 목록 밖이면 INVALID_GOAL이다(예: "Build …").
+  - 검증기 소스는 읽기도 계속 금지다(거부는 복구 가능해졌을 뿐이다).
+- **병렬 단계(V0.8A #19) 진입 조건:**
+  1. devlop CI에서 COMPLEX corpus(14개)가 계속 통과한다.
+  2. 실제 모델 COMPLEX smoke 1회 이상 COMPLETED(충족), 거짓 완료 0(충족).
+  3. #19 설계가 그대로 유지해야 하는 불변:
+     - 정확한 파일 claim과 효과 전후 이중 게이트(Policy ALLOW와 별개).
+     - 작업별 evidence context namespace.
+     - Kernel 단독 완료 권한과 독립 완료 가드.
+     - STOPPING → cleanup 확인 → 종료 순서와 미확인 시 INTERRUPTED + writer 유지.
+     - App은 투영 표시만 하고 전이를 만들지 않는다.
+     - 전역 예산 한 장부와 Σ작업 + 최종 Reviewer 규칙.
+  4. #19 착수 전에 최신 devlop, open PR, CI를 확인한다. 병렬 설계는 위 불변을 약화하지 않는 확장으로만 제안한다.
+- 커밋 상태: devlop 대상 PR. 머지하고 CI가 통과하면 #16·#17·#18을 닫는다.
