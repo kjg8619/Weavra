@@ -51,6 +51,7 @@ import {
 	type PolicyContext,
 	type PolicyPathInspector,
 	PolicyRecheckError,
+	PROTECTED_TARGET_REASON,
 } from "./policy.ts";
 import type {
 	AdvisoryCheckResult,
@@ -418,18 +419,23 @@ export function createWorkerTools(options: {
 		if (result.decision.decision !== "ALLOW") {
 			const { decision, reason } = result.decision;
 			const denial = `Policy ${result.decision.risk}/${decision}: ${reason}`;
-			// Correctable input: a wrong path inside the scope, or a read-only look outside it (nothing was read).
-			// Mutations outside the scope, protected targets and other denials stay fatal.
+			// Correctable input: a wrong path inside the scope, or a read-only look outside it or at a protected path
+			// (nothing was read). Mutations outside the scope or of protected targets and other denials stay fatal.
 			if (decision === "DENY" && reason === NON_FILE_TARGET_REASON)
 				throw new Error(`${denial}. Use runtime_list_files to find existing allowed files.`);
 			const operation = options.policy.tools.find((item) => item.id === tool)?.operation;
+			const readOnly = operation === "read" || operation === "search" || operation === "list";
 			if (
 				decision === "DENY" &&
-				(operation === "read" || operation === "search" || operation === "list") &&
+				readOnly &&
 				(reason === OUTSIDE_ALLOWED_PATHS_REASON || reason === OUTSIDE_LISTING_BOUNDARY_REASON)
 			)
 				throw new Error(
 					`${denial}. Nothing was read; reads are limited to the allowed paths: ${options.policy.allowedPaths.join(", ")}.`,
+				);
+			if (decision === "DENY" && readOnly && reason === PROTECTED_TARGET_REASON)
+				throw new Error(
+					`${denial}. Nothing was read; Runtime state, credentials, project instructions and registered verifier sources are protected from workers. Judge them through the recorded check evidence instead.`,
 				);
 			policyDenial = denial;
 			denialCode ??= "POLICY_DENIED";
