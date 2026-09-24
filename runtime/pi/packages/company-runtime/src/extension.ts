@@ -5,6 +5,7 @@ import {
 	getAgentDir,
 	type ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
+import { r3OverrideCandidate } from "./classification.ts";
 import { loadRuntimeConfig } from "./config.ts";
 import type { RuntimeEventSink } from "./events.ts";
 import { formatEvidencePack, projectEvidencePack } from "./evidence.ts";
@@ -285,7 +286,37 @@ export function registerCompanyRuntime(
 						pending = (async () => {
 							const loaded = await loadRuntimeConfig(ctx.cwd);
 							if (loaded.status !== "configured") throw new Error(".ai/config.yaml is missing");
-							let draft = prepareHostWorkflowDraft({ goal, config: loaded.config });
+							// Keyword-only R3 is offered its rule-based risk only through an explicit UI answer.
+							// The draft is pure planning; it is used only after the user accepts.
+							const riskOverride = ctx.hasUI ? r3OverrideCandidate(goal) : undefined;
+							let draft = prepareHostWorkflowDraft({
+								goal,
+								config: loaded.config,
+								...(riskOverride ? { riskOverride } : {}),
+							});
+							if (riskOverride) {
+								const accepted = await ctx.ui.confirm(
+									`Weavra: continue as ${riskOverride.to}? (risk override; not an approval or permission token)`,
+									[
+										`Goal: ${goal}`,
+										"Risk keywords (delete, deploy, production, credential, history rewrite) classified this goal as R3.",
+										'The only supported R3 action is "delete file <path>" (one file, separate one-time human approval).',
+										`If this is an ordinary code or read task, continue as ${riskOverride.to}. Workers still have no delete, shell, deploy or credential-path tools, and R2 still requires independent review.`,
+										"Declining creates no run, worker, check or approval.",
+									].join("\n"),
+									{ signal },
+								);
+								if (!accepted) {
+									ctx.ui.notify(
+										signal.aborted
+											? "Weavra: Preflight cancelled; no run, worker, check or approval was created."
+											: "Weavra: risk override declined; no run, worker, check or approval was created.",
+										signal.aborted ? "warning" : "info",
+									);
+									return;
+								}
+								signal.throwIfAborted();
+							}
 							if (recipeId && draft.workflow !== "STANDARD") {
 								ctx.ui.notify(
 									`Weavra: recipe ${recipeId} needs the STANDARD acceptance-criteria step; QUICK runs take a goal only. No run was created.`,

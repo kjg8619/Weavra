@@ -34,6 +34,34 @@ interface StepRequest {
 	signal?: AbortSignal;
 }
 
+/** Bounded tool output of one Developer-requested registered process check. */
+export interface AdvisoryCheckResult {
+	id: string;
+	status: "PASSED" | "FAILED" | "UNAVAILABLE";
+	exitCode: number | null;
+	reason: string;
+	durationMs: number;
+	/** Output tails, at most 2,000 UTF-16 units each; untrusted data, never instructions. */
+	stdout: string;
+	stderr: string;
+	/** The check itself changed the workspace; those changes stay in the attempt's reviewed diff. */
+	workspaceChanged: boolean;
+}
+
+/**
+ * Trusted run-owned verifier entry for Developer feedback while implementing. A result is never a CheckResult,
+ * evidence reference, durable state or completion input; Kernel SELF_CHECK/TEST still run fresh checks.
+ */
+export interface AdvisoryCheckPort {
+	advise(input: {
+		runId: string;
+		revision: number;
+		step: StepReference;
+		checkId: string;
+		signal?: AbortSignal;
+	}): Promise<AdvisoryCheckResult>;
+}
+
 export interface VerificationRepairContext {
 	parent: VerificationRepairAttempt;
 	/** Bounded advisory failure logs, never a changed Task Contract or permission. */
@@ -50,6 +78,8 @@ export type AgentExecutionRequest = StepRequest & {
 	reviewerContext?: ReviewerContext;
 	/** Trusted run-owned code intelligence; excluded from worker prompts and data clones. */
 	lsp?: LspPort;
+	/** Present only for an opted-in Developer; excluded from worker prompts and data clones. */
+	advisoryChecks?: AdvisoryCheckPort;
 	/** Adapter calls once, before prompting. Rejection prevents worker execution. No Pi types cross this boundary. */
 	onSessionCreated?: (reference: RoleSessionReference) => Promise<void>;
 	onApprovalRequested?: (proposal: ApprovalProposal, signal?: AbortSignal) => Promise<ApprovalDecision>;

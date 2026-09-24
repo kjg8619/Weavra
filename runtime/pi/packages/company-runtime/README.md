@@ -738,7 +738,7 @@ verification:
 - `review.enabled`, `state.enabled`: `true`만 허용. state 디렉터리는 `.ai`로 고정한다.
 - `risk.approval_required`: 현재 `[R3]`만 허용. 프로젝트 설정으로 review·state·승인 요구를 끌 수 없다.
 - `files.allowed_paths`: 기본 `[]`. 문자 그대로의 workspace 상대 파일/디렉터리 경로이며 glob이 아니다. S2 Policy와 경로 Adapter가 이 범위 및 보호 파일·symlink를 검사한다.
-- `verification.checks`: 기본 `[]`. check마다 `id`, `kind`, `executable`, 문자열 배열 `args`가 필수다. `kind`는 `build`/`lint`/`test`/`typecheck`/`format`/`custom`이다. 선택 필드는 `cwd`(기본 `.`), `timeout_ms`(기본 `60000`, 범위 `1..3600000`), `required`(기본 `true`), `trust.files`, `repairable_exit_codes`다. ID 중복을 거부한다. `verification.repair.mode`는 `disabled` 기본값 또는 `self-check-once`이며 위 V0.5C 계약을 따른다.
+- `verification.checks`: 기본 `[]`. check마다 `id`, `kind`, `executable`, 문자열 배열 `args`가 필수다. `kind`는 `build`/`lint`/`test`/`typecheck`/`format`/`custom`이다. 선택 필드는 `cwd`(기본 `.`), `timeout_ms`(기본 `60000`, 범위 `1..3600000`), `required`(기본 `true`), `trust.files`, `repairable_exit_codes`다. ID 중복을 거부한다. `verification.repair.mode`는 `disabled` 기본값 또는 `self-check-once`이며 위 V0.5C 계약을 따른다. `verification.advisory`는 선택이며 `mode: disabled|developer`와 `max_runs`(기본 `5`, `1..20`)를 받는다. 생략하면 정규화 설정에도 나타나지 않아 기존 config digest가 바뀌지 않는다.
 
 파일/cwd 경로에는 절대 경로, `..`, Windows 드라이브/역슬래시, glob, 제어 문자를 허용하지 않는다. executable은 명시적 PATH에서 해석한 절대 경로로 고정한다. 설정 파싱 자체가 경로·프로그램의 안전성을 증명하지 않는다. **check 등록과 실행 확인은 신뢰한 코드에 대한 허가이지 OS sandbox가 아니다.** 실행은 필수 check 한 개 이상을 요구한다. S4 첫 Slice의 기본 재작업 1회는 유지하며, STANDARD는 설정한 0~3회까지 지원한다.
 
@@ -884,7 +884,9 @@ Kernel → AgentExecutor.execute(request) → PiAgentExecutor → 새 SDK AgentS
 - V0.3B LSP를 명시적으로 활성화하면 위 네 read-only runtime_lsp_* 도구를 같은 역할들(Executor 포함)에 추가한다. Reviewer에게 mutation authority를 추가하지 않는다.
 - 일반 bash·Pi 기본 도구·외부 custom tool을 설치하지 않는다. 파일 도구는 sequential이며 SDK Agent도 sequential로 설정한다.
 - 텍스트 파일은 256 KiB 이하, legacy edit는 유일한 exact match이며 V0.3A optional anchored edit는 위 계약을 따른다. write는 기존 부모 디렉터리만 지원한다. 검색은 최대 32개 명시 파일의 literal 문자열 검색이며 100개 결과에서 잘림을 표시한다. OS sandbox·원자 코드 변경/rollback은 아니다.
-- `runtime_request_check`는 등록 ID만 받아 Pi tool history에 요청을 남기고 **UNAVAILABLE/미실행**을 반환한다. verifier를 호출하거나 PASS 증거를 만들지 않는다.
+- `runtime_request_check`는 기본적으로 등록 ID만 받아 Pi tool history에 요청을 남기고 **UNAVAILABLE/미실행**을 반환한다. verifier를 호출하거나 PASS 증거를 만들지 않는다. `verification.advisory.mode: developer`를 켠 STANDARD/EDIT Developer만 아래 advisory check를 실행한다.
+- **수정 가능한 도구 오류**: 존재하지 않거나 파일이 아닌 허용 범위 안 경로(`Target is missing or not a regular file`), 유일하지 않은 edit match, 잘못된 인자, 크기 초과 파일 같은 오류는 같은 세션의 모델에게 Tool error로 돌려준다. worker당 8회(Host/test `maxToolErrors`, `0..32`)를 넘으면 `Worker tool error limit exceeded`로 실패하고 Evidence Pack은 TOOL로 분류한다. 보호·범위 밖·unsafe 경로의 Policy 거부, audit/storage 실패, intent 뒤 대상 변경, worker에 없는 도구 호출, R3 run의 모든 도구 오류는 이전처럼 즉시 실패한다. 이 예산은 권한·검증 증거·완료 판단이 아니다.
+- **Advisory check**(opt-in): Developer가 구현 중 등록 process check를 실행해 PASSED/FAILED/UNAVAILABLE, exit code, stdout/stderr 끝부분(각 2,000자)을 받는다. SELF_CHECK와 같은 frozen 등록·Policy 판정·audit ledger·sandbox 설정을 쓰지만 결과는 tool 출력일 뿐 CheckResult·evidence reference·Run state·Reviewer 입력·완료 근거가 아니다. Kernel SELF_CHECK/TEST는 항상 새로 실행한다. attempt당 `max_runs`(기본 5, `1..20`)까지이며 browser check, QUICK, READ_ONLY, Reviewer, R3에는 제공하지 않는다. check가 workspace를 바꾸면 그 변경은 이 attempt의 diff에 남아 리뷰 대상이 된다. 출력은 신뢰하지 않는 데이터다.
 - Handoff/Review 제출은 자기 역할의 전용 schema만 받는다. run/task/role/code revision 및 Review diffDigest를 검사한다. 자연어 완료, schema/identity 오류, 다른 도구와 섞인 제출 batch는 실패다. 정상 수락한 제출만 `terminate`로 종료하며 이후 도구 실행을 막는다. Reviewer evidence 참조 오류와 아래 Developer unresolved 표현 오류는 Tool error로 반환하여 기존 시간·턴 한도 안에서 같은 세션의 수정·재제출을 허용한다.
 - Kernel의 기존 독립 Review·요구사항·증거·완료 guard는 유지한다. Adapter의 schema 통과는 COMPLETE 승인이 아니다.
 
@@ -1013,6 +1015,8 @@ S3의 단일 역할 검증에 이어 S4는 아래 전체 순차 흐름을 연결
 ### 지원 범위와 사용
 
 - 초기 grammar는 `Delete file <상대 경로>`, `Remove file <상대 경로>`, `파일 삭제 <상대 경로>`다. 공백 없는 literal 경로 한 개만 받는다. 대상은 clean baseline의 Git 추적 일반 UTF-8 파일이며 256 KiB 이하, `files.allowed_paths` 안이어야 한다.
+- 삭제 키워드는 파일, 디렉터리, 폴더, 브랜치, 데이터, 데이터베이스, 테이블, 레코드 또는 경로를 대상으로 할 때만 R3로 분류한다. "delete 버튼 버그 수정"이나 "delete 엔드포인트 설명" 같은 목표는 기존 규칙대로 R0/R1/R2다. deploy, production, credential, git reset/rebase, force push, 배포, 프로덕션, 자격증명, 히스토리 변경은 계속 R3다. 위 grammar가 아닌 R3 목표는 계획 편집 전 준비 단계에서 거부한다.
+- TUI에서는 키워드 때문에만 R3가 된 목표를 사용자가 명시적으로 확인하면 규칙 기반 위험도로 계속 실행할 수 있다. 이 선택은 Plan Preview와 Run 분류 사유에 기록되고, 오래되거나 위조된 override는 Runtime이 다시 판정해 거부한다. 이 확인은 승인이 아니며 삭제·셸·배포·자격증명 경로 도구를 추가하지 않는다. App Host 프로토콜에는 이 확인 필드가 없다.
 - `.git`, `.ai`/Runtime 설정·정책, 기존 규칙의 credential/secret, 알려진 npm/Cargo/Python/Go manifest/lockfile, node_modules와 symlink/hardlink/특수 파일은 승인으로 우회하지 못한다. 모든 의미적 파일 종류나 숨겨진 비밀을 판별하는 기능은 아니다. 디렉터리·대량 삭제·설치·배포·history·임의 shell은 지원하지 않는다.
 - R3 scope는 새 run에만 고정한다. R1/R2/QUICK에서 자동 승격하지 않으며 R2 binding을 인간 승인으로 취급하지 않는다. R3 Developer에는 delete 요청 외 mutation 도구가 없다. Reviewer는 계속 read-only다.
 - **`runtime_delete` 호출 자체가 승인 요청의 진입점**이다. Developer는 별도의 approval tool이나 승인 권한을 갖지 않으며, 이미 승인받았다고 가정하고 기다리는 구조가 아니다. preselected target으로 호출하면 Runtime이 `WAITING_APPROVAL`을 저장하고 사용자에게 Deny/Approve once를 묻는다. 유효한 1회 승인일 때만 그 tool 안에서 exact tracked text file을 삭제하고 결과를 반환한다. Deny·승인 timeout은 삭제 없이 종료한다. prompt/tool 설명은 승인 요청 능력과 승인 권한을 구분하며, Developer의 직접 승인·우회·tool 확인 전 승인 획득 주장을 금지한다. R3 Reviewer 및 R0/R1/R2에는 이 승인 요청/삭제 도구가 제공되지 않는다.

@@ -396,9 +396,10 @@ describe("Weavra Status Projection on the actual Extension/Kernel/SDK (faux only
 		const owner = host();
 		await owner.call("workflow", "run Explain src/app.ts");
 		await owner.finished("COMPLETED");
-		await owner.call("workflow", "run Fix typo in src/app.ts and delete src/obsolete.ts");
+		// Unsupported R3 is now refused at Host preparation (before any plan prompt), reported as a preflight error.
+		await owner.call("workflow", "run Delete file ../obsolete.ts");
 		await vi.waitFor(() =>
-			expect(owner.notify).toHaveBeenCalledWith(expect.stringContaining("Unsupported classification"), "warning"),
+			expect(owner.notify).toHaveBeenCalledWith(expect.stringContaining("Unsupported classification"), "error"),
 		);
 		expect(owner.statuses.has(key)).toBe(false);
 	});

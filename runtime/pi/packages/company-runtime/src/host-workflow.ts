@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { PiAgentExecutor } from "./agent-runner.ts";
-import { classifyRequest, selectWorkflow } from "./classification.ts";
+import { isSupportedR3Goal } from "./approval.ts";
+import { classifyRequest, type RiskOverride, selectWorkflow } from "./classification.ts";
 import type { RuntimeConfig } from "./config.ts";
 import type { Risk, TaskContract } from "./contracts.ts";
 import { type ExecutionMode, proposeExecutionMode } from "./execution-contract.ts";
@@ -27,6 +28,8 @@ export interface HostWorkflowDraft {
 	executionMode: ExecutionMode;
 	workflow: "QUICK" | "STANDARD";
 	risk: Risk;
+	/** User-confirmed keyword-only R3 override (TUI only); not an approval and adds no tools. */
+	riskOverride?: RiskOverride;
 	statements: string[];
 	recipe?: { id: string; version: number; digest: string };
 }
@@ -37,16 +40,26 @@ export interface HostWorkflowPlan extends HostWorkflowDraft {
 }
 
 /** Deterministic Host-side planning only; no models, workers, checks or writer are created. */
-export function prepareHostWorkflowDraft(input: { goal: string; config: RuntimeConfig }): HostWorkflowDraft {
-	const { goal, config } = input;
+export function prepareHostWorkflowDraft(input: {
+	goal: string;
+	config: RuntimeConfig;
+	riskOverride?: RiskOverride;
+}): HostWorkflowDraft {
+	const { goal, config, riskOverride } = input;
 	const proposal = proposeExecutionMode(goal);
 	if (proposal.requiresConfirmation || !proposal.mode) throw new HostWorkflowError("INVALID_GOAL", proposal.reason);
 	try {
-		const { classification, requiresConfirmation } = classifyRequest(goal);
+		const { classification, requiresConfirmation } = classifyRequest(goal, {}, riskOverride);
 		if (requiresConfirmation || classification.complexity === "COMPLEX")
 			throw new HostWorkflowError(
 				"UNSUPPORTED_WORKFLOW",
 				`Unsupported classification/workflow: ${classification.complexity}/${classification.risk}; no downgrade performed`,
+			);
+		// Refuse before plan editing/confirmation instead of after it (the run would refuse the same goal).
+		if (classification.risk === "R3" && !(proposal.mode === "EDIT" && isSupportedR3Goal(goal)))
+			throw new HostWorkflowError(
+				"UNSUPPORTED_WORKFLOW",
+				`Unsupported classification/workflow: ${classification.complexity}/R3; the only supported R3 action is "delete file <path>" (one safe relative path); no downgrade performed`,
 			);
 		const selection = selectWorkflow(classification, config.runtime.workflow);
 		if (selection.workflow === "COMPLEX")
@@ -62,6 +75,8 @@ export function prepareHostWorkflowDraft(input: { goal: string; config: RuntimeC
 			executionMode: proposal.mode,
 			workflow: selection.workflow,
 			risk: classification.risk,
+			// Copy only the validated fields; classifyRequest already bound `to` to the rule-based risk.
+			...(riskOverride ? { riskOverride: { from: riskOverride.from, to: riskOverride.to } } : {}),
 			statements: [goal],
 		};
 	} catch (error) {
@@ -113,7 +128,7 @@ export function finalizeHostWorkflowPlan(
 	const statementsError = acceptanceStatementsError(statements);
 	if (statementsError) throw new HostWorkflowError("INVALID_CRITERIA", statementsError);
 	const snapshot = structuredClone({ ...draft, statements: [...statements] });
-	const { goal, config, workflow, executionMode, risk, recipe } = snapshot;
+	const { goal, config, workflow, executionMode, risk, riskOverride, recipe } = snapshot;
 	let taskContract: TaskContract;
 	try {
 		taskContract = buildTaskContract({ goal, statements: snapshot.statements, workflow, config });
@@ -131,6 +146,7 @@ export function finalizeHostWorkflowPlan(
 			workflow,
 			executionMode,
 			risk,
+			...(riskOverride ? { riskOverride } : {}),
 			acceptanceCriteria: taskContract.acceptanceCriteria,
 			allowedPaths: config.files.allowed_paths,
 			checks: config.verification.checks,
@@ -164,10 +180,11 @@ export async function createHostWorkflow(options: CreateHostWorkflowOptions): Pr
 	const { cwd, agentDir, signal } = options;
 	signal.throwIfAborted();
 	const { goal, executionMode } = options.plan;
-	const { config, taskContract, recipe } = structuredClone({
+	const { config, taskContract, recipe, riskOverride } = structuredClone({
 		config: options.plan.config,
 		taskContract: options.plan.taskContract,
 		recipe: options.plan.recipe,
+		riskOverride: options.plan.riskOverride,
 	});
 	const models = options.createModels
 		? await options.createModels(signal)
@@ -183,6 +200,7 @@ export async function createHostWorkflow(options: CreateHostWorkflowOptions): Pr
 		taskContract,
 		executionMode,
 		...(recipe ? { recipe } : {}),
+		...(riskOverride ? { riskOverride } : {}),
 		config,
 		signal,
 		events: options.events,

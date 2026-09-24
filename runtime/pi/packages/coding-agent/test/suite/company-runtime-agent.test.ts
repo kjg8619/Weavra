@@ -14,6 +14,7 @@ import type {
 } from "../../../company-runtime/src/contracts.ts";
 import type { RuntimeEvent } from "../../../company-runtime/src/events.ts";
 import { CompanyKernel } from "../../../company-runtime/src/kernel.ts";
+import { WorkerExecutionError } from "../../../company-runtime/src/measurement.ts";
 import type { AgentExecutionRequest } from "../../../company-runtime/src/ports.ts";
 import { FileStateStore } from "../../../company-runtime/src/state-store.ts";
 import { AgentSession } from "../../src/index.ts";
@@ -749,14 +750,19 @@ describe("Company Runtime S3 SDK adapter (faux only)", () => {
 		expect(harness.faux.state.callCount).toBe(0);
 	});
 	it("does not prompt if session reference persistence fails", async () => {
-		await expect(
-			executor.execute({
+		const failure = new Error("Disk failure");
+		const error = await executor
+			.execute({
 				...developer(),
 				onSessionCreated: async () => {
-					throw new Error("Disk failure");
+					throw failure;
 				},
-			}),
-		).rejects.toThrow();
+			})
+			.catch((caught: unknown) => caught);
+		// The persisted message stays a bounded stage label; the original error survives only as the cause.
+		expect(error).toBeInstanceOf(WorkerExecutionError);
+		expect((error as Error).message).toBe("Worker execution failed (session reference persistence)");
+		expect((error as Error).cause).toBe(failure);
 		expect(workers).toEqual([]);
 		expect(harness.faux.state.callCount).toBe(0);
 		expect(dispose).toHaveBeenCalledTimes(1);
@@ -1115,5 +1121,118 @@ describe("Company Runtime S3 SDK adapter (faux only)", () => {
 		await expect(executor.execute(reviewer())).rejects.toThrow();
 		expect(workers).toEqual([]);
 		expect(store.snapshot.actions).toEqual([]);
+	});
+});
+
+describe("Company Runtime correctable worker tool errors (faux only)", () => {
+	const call = (name: string, args: Record<string, unknown>) =>
+		fauxAssistantMessage(fauxToolCall(name, args), { stopReason: "toolUse" });
+	const lastToolError = (context: Context): string => {
+		expect(context.messages.at(-1)).toMatchObject({ role: "toolResult", isError: true });
+		return JSON.stringify(context.messages.at(-1));
+	};
+
+	it("returns a missing path, non-unique edit and invalid arguments to the same Developer session", async () => {
+		writeFileSync(join(workspace, "src/app.ts"), "dup\ndup\n");
+		const errors: string[] = [];
+		let systemPrompt = "";
+		harness.setResponses([
+			(context) => {
+				systemPrompt = context.systemPrompt ?? "";
+				return call("runtime_read", { path: "src/missing.ts" });
+			},
+			(context) => {
+				errors.push(lastToolError(context));
+				return call("runtime_edit", { path: "src/app.ts", oldText: "dup", newText: "fixed" });
+			},
+			(context) => {
+				errors.push(lastToolError(context));
+				return call("runtime_edit", { path: "src/app.ts", oldText: "dup", newText: "fixed", anchor: "1:x" });
+			},
+			(context) => {
+				errors.push(lastToolError(context));
+				return call("runtime_edit", { path: "src/app.ts", oldText: "dup\ndup", newText: "fixed" });
+			},
+			submitHandoff(),
+		]);
+		await expect(executor.execute(developer())).resolves.toMatchObject({ role: "Developer" });
+		expect(errors[0]).toContain("Target is missing or not a regular file");
+		expect(errors[0]).toContain("runtime_list_files");
+		expect(errors[1]).toContain("unique exact match");
+		expect(errors[2]).toContain("anchor and fileDigest must be supplied together");
+		expect(readFileSync(join(workspace, "src/app.ts"), "utf8")).toBe("fixed\n");
+		expect(store.snapshot.actions.map((item) => item.status)).toEqual(["DENIED", "FAILED", "SUCCEEDED"]);
+		expect(systemPrompt).toContain("Correctable tool errors");
+		expect(systemPrompt).toContain("More than 8 such errors end this worker");
+		expect(workers).toHaveLength(1);
+	});
+
+	it("fails with a bounded TOOL failure after the correctable error budget", async () => {
+		const runner = await PiAgentExecutor.create({ ...options, maxToolErrors: 2 });
+		harness.setResponses([
+			call("runtime_read", { path: "src/a.ts" }),
+			call("runtime_read", { path: "src/b.ts" }),
+			call("runtime_read", { path: "src/c.ts" }),
+			submitHandoff(),
+		]);
+		await expect(runner.execute(developer())).rejects.toThrow("Worker tool error limit exceeded");
+		expect(harness.faux.state.callCount).toBe(3);
+	});
+
+	it("keeps the previous fail-fast behavior with a zero budget and rejects invalid budgets", async () => {
+		for (const maxToolErrors of [-1, 33, 1.5])
+			await expect(PiAgentExecutor.create({ ...options, maxToolErrors })).rejects.toThrow("Invalid worker limits");
+		const runner = await PiAgentExecutor.create({ ...options, maxToolErrors: 0 });
+		let systemPrompt = "";
+		harness.setResponses([
+			(context) => {
+				systemPrompt = context.systemPrompt ?? "";
+				return call("runtime_read", { path: "src/missing.ts" });
+			},
+			submitHandoff(),
+		]);
+		await expect(runner.execute(developer())).rejects.toThrow("Worker tool error limit exceeded");
+		expect(harness.faux.state.callCount).toBe(1);
+		expect(systemPrompt).not.toContain("Correctable tool errors");
+	});
+
+	it.each([
+		["protected path", "runtime_read", { path: ".ai/state.json" }, "Policy R0/DENY: Protected target"],
+		["path outside the allowlist", "runtime_read", { path: "README.md" }, "Target outside allowed paths"],
+		["unavailable tool", "bash", { command: "ls" }, "Worker tool failed or was denied"],
+	])("keeps a %s fatal while the correctable budget remains", async (_name, tool, args, message) => {
+		harness.setResponses([call(tool, args), submitHandoff()]);
+		await expect(executor.execute(developer())).rejects.toThrow(message);
+		expect(harness.faux.state.callCount).toBe(1);
+	});
+
+	it("keeps an audit failure fatal after a correctable error", async () => {
+		harness.setResponses([
+			call("runtime_read", { path: "src/missing.ts" }),
+			() => {
+				vi.spyOn(store, "prepare").mockRejectedValue(new Error("Disk failure"));
+				return call("runtime_write", { path: "src/app.ts", content: "late" });
+			},
+			submitHandoff(),
+		]);
+		await expect(executor.execute(developer())).rejects.toThrow("Worker tool failed or was denied");
+		expect(harness.faux.state.callCount).toBe(2);
+		expect(readFileSync(join(workspace, "src/app.ts"), "utf8")).toBe("original\n");
+	});
+
+	it("reports correctable errors to the fitness observer as recoverable", async () => {
+		const results: Array<{ name: string; recoverable: boolean; policyDenied: boolean }> = [];
+		const runner = await PiAgentExecutor.create({
+			...options,
+			fitnessObserver: {
+				toolResult: ({ name, recoverable, policyDenied }) => results.push({ name, recoverable, policyDenied }),
+			},
+		});
+		harness.setResponses([call("runtime_read", { path: "src/missing.ts" }), submitHandoff()]);
+		await runner.execute(developer());
+		expect(results).toEqual([
+			{ name: "runtime_read", recoverable: true, policyDenied: false },
+			{ name: "submit_handoff", recoverable: false, policyDenied: false },
+		]);
 	});
 });

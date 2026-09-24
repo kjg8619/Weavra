@@ -302,3 +302,59 @@
 - **현재 문서 검증:** source/test/doc 상대 링크 67개(고유 67개)가 모두 존재하며 기존 WORK_LOG 74,645 bytes가 그대로 prefix로 보존됐다. C01–C42가 중복·누락 없이 존재하고 Mermaid 4개를 검사했다. Task diagram 14 nodes/28 edges, Approval 6/7, freshness 12/14, Run 17/25에서 각 node가 명시된 terminal/error 경로에 도달한다. 이는 문서 graph 정합성 검사이며 Runtime state machine 실행 proof가 아니다.
 - **설계 리뷰:** wire/App/rollout 독립 리뷰에서 blocking finding은 없었다. Runtime safety 리뷰가 지적한 “RunCreated/활성화 전 취소에 존재하지 않는 task attempt를 요구하는 모순”은 Run-level complexBinding과 task/integration complexContext를 분리해 수정했고 실제 events.ts의 lifecycle variant와 대조했다. 중단된 check/review는 위조 FAIL/BLOCK 대신 UNAVAILABLE로 표시하며 writer release 실패는 이미 저장된 안전한 terminal 결과와 구분하도록 명시했다.
 - `git diff --check`와 `git diff --cached --check` PASS. Staged 파일은 이 architecture 문서와 root WORK_LOG 두 개뿐이며 unstaged/untracked 변경은 없었다. Production Runtime/App, lockfiles, build roots 변경 0이다. 문서 검증 이후 이 결과를 작업 기록에 덧붙였으므로 commit 직전 whitespace/scope gate를 다시 적용한다. 정상 commit/push 및 `devlop` 대상 OPEN PR로 리뷰 요청하고 자동 merge 또는 #16/#17/#18 착수 없이 종료한다.
+
+## 2026-09-24 KST — 외부 리뷰 후속: 도구 오류 복구·advisory check·R3 분류·정리
+
+- **배경:** 사용자가 Claude Code에 프로젝트 평가를 요청했고, 그 개선 제안 중 사용자가 고른 4개 항목을 구현했다. 기준은 `devlop` `677545f54f1f093b34af1263dd91e44a3a07e641`이며 전용 worktree `Weavra-worktrees/runtime-review-followups`의 `feat/runtime-review-followups` 브랜치에서 작업했다. 항목 3(R3 분류)은 별도 worktree의 하위 에이전트가 구현했고, diff를 검토한 뒤 이 브랜치에 적용했다. Kernel 완료 권한, Policy/Approval 의미, Host wire, lockfile, license, source repository는 변경하지 않았다.
+- **항목 1 `a0602792` — 수정 가능한 worker 도구 오류 복구:**
+  - 이전에는 tool error가 한 번만 나도 worker와 run이 실패했다.
+  - 이제 다음 오류는 같은 세션에 Tool error로 돌려준다.
+    - 허용 범위 안의 없는/비파일 대상. 새 Policy reason `Target is missing or not a regular file`.
+    - ALLOW 뒤 실행 실패, 잘못된 인자, 크기 초과.
+  - worker당 8회(`maxToolErrors` 0..32)를 넘으면 `Worker tool error limit exceeded`로 실패하고 Evidence는 TOOL로 분류된다.
+  - 다음은 계속 즉시 실패한다.
+    - 보호/범위 밖/unsafe Policy 거부
+    - audit/storage 실패
+    - intent 뒤 대상 변경 `PolicyRecheckError`
+    - worker에 없는 도구 호출
+    - R3 run의 모든 도구 오류
+  - 첫 구현에서는 READ_ONLY·R0의 미제공 mutation 도구 호출까지 복구 대상이 되어 기존 context/quick 테스트 2건이 실패했다. "계약 밖 도구 호출은 실패"라는 기존 의도를 유지하도록 구현을 고쳤고, 테스트 기대는 바꾸지 않았다.
+- **항목 2 `cbacee9f` — opt-in Developer advisory check:**
+  - `verification.advisory: {mode: developer, max_runs}`(기본 5, 1..20)를 켜면 STANDARD/EDIT/non-R3 Developer의 `runtime_request_check`가 등록 process check를 `RegisteredVerifier.advise`로 실행한다. 결과는 PASSED/FAILED/UNAVAILABLE, exit code, 출력 끝부분(각 2,000자)이다.
+  - 같은 frozen 등록·Policy·audit ledger·sandbox를 사용한다.
+  - 결과는 tool text일 뿐이다. CheckResult, evidence, Run state, Reviewer 입력, 완료 근거가 아니며 SELF_CHECK/TEST는 새로 실행한다.
+  - 설정을 생략하면 정규화 config와 digest가 바뀌지 않는다. App 계약은 run-level repair mode만 mirror하므로 App 변경은 없다.
+- **항목 3 `44038f4f` — R3 분류 오판 완화:**
+  - 삭제가 파일·디렉터리·브랜치·데이터·경로를 대상으로 할 때만 R3다. deploy/production/credential/history 키워드는 그대로 R3다.
+  - 지원되지 않는 R3는 prepare 단계에서 AC 편집 전에 거부한다.
+  - TUI에서 명시적으로 확인하면 규칙 기반 위험도로 진행하는 override를 추가했다. Runtime이 다시 검증하며, stale하거나 위조된 override는 거부한다.
+  - 새 규칙이 의도한 대로 바뀐 기존 테스트 기대가 있다: `execution-contract`, suite `lsp`/`quick`/`status`. status는 prepare 단계 거부라 알림 수준이 `warning`에서 `error`로 바뀌었다.
+- **항목 4 `125ec944` — 정리:**
+  - worker 실패의 원래 오류를 `cause`로 보존했다. 저장되는 메시지는 기존 stage label 그대로다.
+  - `validate.mjs pi`에서 test.sh와 중복되던 `npm test`를 제거했고, consolidation 문서의 gate 설명도 맞췄다.
+  - `app/t3code/AGENTS.md`의 T3 제품 전제와 경로를 고쳤다. `~/.t3/userdata`는 `~/.weavra/app/userdata`로, worktree `.t3`는 `.weavra/app`으로 바꿨다.
+  - dev runner가 쓰는 worktree `.weavra/`가 gitignore되지 않던 문제를 root `.gitignore`로 막았다.
+- **현재 검증(이번 작업에서 실제 실행, 최종 tree = 위 4개 커밋):**
+  - `npm run check` exit 0, 최종 1,479 files, no fixes.
+  - `npm run build` PASS.
+  - `node scripts/validate.mjs pi` **ALL GATES PASS / 284초.** 이 중 test.sh 격리 실행 결과:
+    - coding-agent 279 files / 2,768 PASS / 50 skipped
+    - company-runtime 62 files / 1,600 PASS
+    - agent 711 PASS / 1 skipped
+    - ai 1,069 PASS / 853 skipped
+    - chord 162, client 27, evals 54, protocol 133, server 44, telemetry 15, sqlite backend 105 PASS
+  - `node scripts/run-capability-boundary.mjs` PASS / 21초.
+  - Playwright Chrome for Testing 1234 fresh profile로 `WEAVRA_CHROMIUM=… node scripts/run-cross-boundary.mjs` PASS / 10초, paid provider requests=0.
+  - 각 커밋 단독 상태를 임시 detached worktree에서 `tsgo --noEmit`와 `biome check`로 확인했다. 4개 모두 PASS.
+- **미실행 / 한계:**
+  - `validate.mjs t3`는 실행하지 않았다. App 쪽 변경은 `app/t3code/AGENTS.md` 문서뿐이다.
+  - 원격 CI는 PR 생성 뒤 별도로 확인한다.
+  - 실제 Provider smoke는 유료라 실행하지 않았다.
+  - advisory check와 도구 오류 복구가 실제 모델의 완료율에 미치는 효과는 측정하지 않았다.
+  - App Host 경로에는 R3 override 확인이 없다(TUI 전용).
+  - sandbox 기본값, state store, GUI 방향, 벤치마크, 프로토콜 협상은 범위 밖이다.
+- **절차 기록:**
+  - worktree 준비로 `npm install --ignore-scripts`, `npm run hydrate:model-data`(CI와 같은 네트워크 hydrate), App `pnpm install --frozen-lockfile --ignore-scripts`를 실행했다. lockfile 변경은 없다.
+  - evals 패키지를 한 번 기본 vitest 설정으로 잘못 실행해 `src/*.eval.ts`가 수집됐다. CLI가 빌드되기 전이라 harness-error 39건에서 멈췄다. provider 호출 흔적은 보지 못했지만 없었다고 보장하지는 않는다. 이후 `vitest.test.config.ts`로 다시 실행해 9 files / 54 PASS를 확인했다.
+  - 이전 평가 단계에서 company-runtime 패키지 vitest를 직접 실행한 적이 있다. 이 패키지에는 env로 켜지는 실제 provider e2e가 없음을 확인했다.
+- **커밋 상태:** 위 4개 커밋과 이 작업 기록 커밋을 `devlop` 대상 PR로 올린다. 자동 merge는 하지 않는다.

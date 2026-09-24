@@ -289,7 +289,7 @@ async function executeFixture(
 			if (event.staleReceipt) receiptRejections++;
 			if (event.submissionRejected && event.name === "submit_handoff") handoffRejections++;
 			if (event.submissionRejected && event.name === "submit_review") reviewRejections++;
-			if (event.staleReceipt || event.submissionRejected) retryable.add(event.name);
+			if (event.staleReceipt || event.submissionRejected || event.recoverable) retryable.add(event.name);
 			if (event.policyDenied && ["runtime_edit", "runtime_write", "runtime_delete"].includes(event.name))
 				forbiddenAttempts++;
 		},

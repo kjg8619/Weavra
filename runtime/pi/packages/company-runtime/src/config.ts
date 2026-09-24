@@ -128,6 +128,17 @@ export const RuntimeConfigSchema = Type.Object(
 					repair: Type.Optional(
 						Type.Object({ mode: Type.Optional(Type.Enum(["disabled", "self-check-once"])) }, strict),
 					),
+					// Advisory checks let a STANDARD Developer run registered process checks while implementing.
+					// Output is tool text only: never verification evidence, durable state or completion input.
+					advisory: Type.Optional(
+						Type.Object(
+							{
+								mode: Type.Union([Type.Literal("disabled"), Type.Literal("developer")]),
+								max_runs: Type.Optional(Type.Integer({ minimum: 1, maximum: 20 })),
+							},
+							strict,
+						),
+					),
 					// Verifier sandbox is an OS boundary for registered check processes; not permission or approval.
 					sandbox: Type.Optional(
 						Type.Object(
@@ -299,6 +310,15 @@ export function parseRuntimeConfig(source: string) {
 			trust: { mode: value.verification?.trust?.mode ?? ("compatible" as const) },
 			sandbox: { mode: value.verification?.sandbox?.mode ?? ("disabled" as const) },
 			repair: { mode: value.verification?.repair?.mode ?? ("disabled" as const) },
+			// Absent stays absent so existing configuration digests are unchanged.
+			...(value.verification?.advisory
+				? {
+						advisory: {
+							mode: value.verification.advisory.mode,
+							max_runs: value.verification.advisory.max_runs ?? 5,
+						},
+					}
+				: {}),
 		},
 		mutation: { mode: value.mutation?.mode ?? ("compatible" as const) },
 		...(value.project ? { project: structuredClone(value.project) } : {}),

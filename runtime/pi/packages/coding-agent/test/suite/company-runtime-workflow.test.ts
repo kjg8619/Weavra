@@ -621,3 +621,95 @@ describe("S4 STANDARD vertical slice: real Git/checks and independent faux SDK s
 		expect(existsSync(join(cwd, ".ai/writer.lock"))).toBe(false);
 	});
 });
+
+describe("opt-in Developer advisory checks: real verifier process, no evidence", () => {
+	const requestCheck = () =>
+		fauxAssistantMessage(fauxToolCall("runtime_request_check", { id: "regression" }), { stopReason: "toolUse" });
+	const advisoryOutput = (context: Context) => {
+		expect(context.messages.at(-1)).toMatchObject({
+			role: "toolResult",
+			toolName: "runtime_request_check",
+			isError: false,
+		});
+		return JSON.stringify(context.messages.at(-1));
+	};
+	function enableAdvisory(maxRuns?: number) {
+		config = parseRuntimeConfig(
+			JSON.stringify({
+				...config,
+				verification: {
+					...config.verification,
+					advisory: { mode: "developer", ...(maxRuns ? { max_runs: maxRuns } : {}) },
+				},
+			}),
+		);
+		writeFileSync(join(cwd, ".ai/config.yaml"), JSON.stringify(config));
+		checkpoint();
+	}
+	const verifierActions = () =>
+		(
+			JSON.parse(readFileSync(join(cwd, ".ai/state.json"), "utf8")) as {
+				actions: Array<{ status: string; decision: { role: string } }>;
+			}
+		).actions
+			.filter((action) => action.decision.role === "Verifier")
+			.map((action) => action.status);
+
+	it("returns fresh failing then passing output while SELF_CHECK/TEST stay the only evidence", async () => {
+		enableAdvisory();
+		const outputs: string[] = [];
+		let systemPrompt = "";
+		harness.setResponses([
+			(context) => {
+				systemPrompt = context.systemPrompt ?? "";
+				return requestCheck();
+			},
+			(context) => {
+				outputs.push(advisoryOutput(context));
+				return edit();
+			},
+			requestCheck(),
+			(context) => {
+				outputs.push(advisoryOutput(context));
+				return handoff(context);
+			},
+			review(),
+		]);
+		const result = await create().execute();
+		expect(result.error).toBeUndefined();
+		expect(result.run?.status).toBe("COMPLETED");
+		expect(systemPrompt).toContain("returns ADVISORY output only (at most 5 runs)");
+		expect(outputs[0]).toContain("ADVISORY ONLY: regression FAILED (exit 1)");
+		expect(outputs[0]).toContain("not verification evidence");
+		expect(outputs[1]).toContain("ADVISORY ONLY: regression PASSED (exit 0)");
+		expect(outputs[1]).toContain("CHECK_PASSED");
+		expect(outputs[1]).toContain("Advisory runs left in this attempt: 3");
+		// Two audited advisory processes, then the Kernel's own fresh SELF_CHECK and TEST.
+		expect(verifierActions()).toEqual(["FAILED", "SUCCEEDED", "SUCCEEDED", "SUCCEEDED"]);
+		expect(result.run?.verification.map((check) => check.status)).toEqual(["PASS", "PASS"]);
+		expect(JSON.stringify(result.run)).not.toContain("ADVISORY");
+	});
+
+	it("stops at the per-attempt limit and never runs checks for the Reviewer", async () => {
+		enableAdvisory(1);
+		const outputs: string[] = [];
+		harness.setResponses([
+			edit(),
+			requestCheck(),
+			(context) => {
+				outputs.push(advisoryOutput(context));
+				return requestCheck();
+			},
+			(context) => {
+				outputs.push(advisoryOutput(context));
+				return handoff(context);
+			},
+			review(),
+		]);
+		const result = await create().execute();
+		expect(result.run?.status).toBe("COMPLETED");
+		expect(outputs[0]).toContain("PASSED");
+		expect(outputs[1]).toContain("advisory run limit (1) for this attempt is reached");
+		expect(verifierActions()).toEqual(["SUCCEEDED", "SUCCEEDED", "SUCCEEDED"]);
+	});
+});

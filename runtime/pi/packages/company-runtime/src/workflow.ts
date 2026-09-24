@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
 import { selectR3Scope } from "./approval.ts";
 import { budgetLimitsFromConfig } from "./budget.ts";
-import { classifyRequest, selectWorkflow } from "./classification.ts";
+import { classifyRequest, type RiskOverride, selectWorkflow } from "./classification.ts";
 import type { RuntimeConfig } from "./config.ts";
 import type { QuickScope, R3Scope, Run, TaskContract } from "./contracts.ts";
 import { taskContractDigest } from "./criterion-evidence.ts";
@@ -41,6 +41,8 @@ export interface WorkflowOptions {
 	executionMode: ExecutionMode;
 	/** Reviewed recipe that drafted the criteria, frozen by the Host before the run starts. */
 	recipe?: { id: string; version: number; digest: string };
+	/** User-confirmed keyword-only R3 override from the Host; revalidated here and fails closed when stale. */
+	riskOverride?: RiskOverride;
 	config: RuntimeConfig;
 	createAgents: (
 		store: FileStateStore,
@@ -91,6 +93,7 @@ export class StandardWorkflow {
 			config: structuredClone(options.config),
 			taskContract: structuredClone(options.taskContract),
 			...(options.recipe ? { recipe: structuredClone(options.recipe) } : {}),
+			...(options.riskOverride ? { riskOverride: structuredClone(options.riskOverride) } : {}),
 		};
 	}
 	get snapshot(): Run | undefined {
@@ -130,7 +133,11 @@ export class StandardWorkflow {
 			const runId = randomUUID();
 			const contract = bindExecutionContract(runId, this.options.executionMode);
 			const proposal = proposeExecutionMode(this.options.goal);
-			const { classification, requiresConfirmation } = classifyRequest(this.options.goal);
+			const { classification, requiresConfirmation } = classifyRequest(
+				this.options.goal,
+				{},
+				this.options.riskOverride,
+			);
 			const r3Scope =
 				classification.risk === "R3" && contract.mode === "EDIT"
 					? selectR3Scope(this.options.goal, runId)
@@ -243,6 +250,8 @@ export class StandardWorkflow {
 				};
 			}
 			verifier = await RegisteredVerifier.create(this.options.config, agents.policy, store, workspace, lsp);
+			// Opt-in Developer feedback through the same frozen verifier; results never reach the Kernel.
+			const advisoryChecks = this.options.config.verification.advisory?.mode === "developer" ? verifier : undefined;
 			signal.throwIfAborted();
 			await this.options.startGuard?.(store);
 			this.kernel = await CompanyKernel.create(
@@ -289,14 +298,20 @@ export class StandardWorkflow {
 					})),
 				},
 				{
-					agents: this.lsp
-						? {
-								execute: (request) => agents.executor.execute({ ...request, lsp: this.lsp }),
-								get safeToRelease() {
-									return agents.executor.safeToRelease !== false && !lsp?.cleanupFailed;
-								},
-							}
-						: agents.executor,
+					agents:
+						this.lsp || advisoryChecks
+							? {
+									execute: (request) =>
+										agents.executor.execute({
+											...request,
+											...(this.lsp ? { lsp: this.lsp } : {}),
+											...(advisoryChecks && request.role === "Developer" ? { advisoryChecks } : {}),
+										}),
+									get safeToRelease() {
+										return agents.executor.safeToRelease !== false && !lsp?.cleanupFailed;
+									},
+								}
+							: agents.executor,
 					verifier,
 					store,
 					events: this.options.events,

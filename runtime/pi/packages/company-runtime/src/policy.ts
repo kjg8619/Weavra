@@ -153,6 +153,17 @@ export function isListablePath(path: string, context: Pick<PolicyContext, "allow
 	);
 }
 
+/** Safe, in-scope literal path that is missing or not a regular file where one is required. */
+export const NON_FILE_TARGET_REASON = "Target is missing or not a regular file";
+
+/** The target changed between the durable intent and execution; not a model-correctable input error. */
+export class PolicyRecheckError extends Error {
+	constructor() {
+		super("Target changed after policy evaluation");
+		this.name = "PolicyRecheckError";
+	}
+}
+
 /** Pure decision function. Inspection facts and registrations must come from trusted adapters. */
 export function evaluatePolicy(
 	action: PolicyAction,
@@ -235,15 +246,16 @@ export function evaluatePolicy(
 		reason = "Target outside allowed paths";
 	else if (
 		inspected.length !== action.paths.length ||
+		inspected.some((item, index) => item.path !== action.paths[index] || !item.safe)
+	)
+		reason = "Unsafe or unresolved target";
+	else if (
 		inspected.some(
-			(item, index) =>
-				item.path !== action.paths[index] ||
-				!item.safe ||
-				(!listing && item.kind === "directory") ||
-				(!listing && (!mutation || deletion) && item.kind !== "file"),
+			(item) =>
+				(!listing && item.kind === "directory") || (!listing && (!mutation || deletion) && item.kind !== "file"),
 		)
 	)
-		reason = "Unsafe, unresolved or non-file target";
+		reason = NON_FILE_TARGET_REASON;
 	else {
 		if (risk === "R0" || risk === "R1") {
 			decision = "ALLOW";
@@ -307,7 +319,7 @@ export async function executePolicyAction<T>(
 	try {
 		// Persistence can yield to other code. Reinspect after the intent is durable, immediately before execution.
 		const fresh = evaluatePolicy(action, context, await ports.paths.inspect(action.paths), Date.now());
-		if (fresh.decision !== "ALLOW") throw new Error("Target changed after policy evaluation");
+		if (fresh.decision !== "ALLOW") throw new PolicyRecheckError();
 		await ports.audit.assertWritable();
 		signal?.throwIfAborted();
 		value = await ports.execute(structuredClone(action));

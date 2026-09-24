@@ -654,6 +654,19 @@ describe("C07 closed authority and replay boundary", () => {
 		}
 		expect(harness.faux.state.callCount).toBe(0);
 	});
+	it("refuses keyword-only R3 at prepare and accepts no risk override on the wire", async () => {
+		const r3Goal = "Fix production build warning in src/app.js";
+		expect((await mutation({ type: "workflow.prepare", goal: r3Goal })).response).toMatchObject({
+			success: false,
+			error: { code: "UNSUPPORTED_WORKFLOW" },
+		});
+		expect(
+			(await mutation({ type: "workflow.prepare", goal: r3Goal, riskOverride: { from: "R3", to: "R1" } })).response,
+		).toMatchObject({ success: false, error: { code: "INVALID_REQUEST" } });
+		expect((await client.state()).preview).toBeNull();
+		expect(harness.faux.state.callCount).toBe(0);
+		expect(existsSync(join(cwd, ".ai/writer.lock"))).toBe(false);
+	});
 	it("rejects payload-conflicting reuse and permanently rejects an evicted request ID", async () => {
 		const first = await mutation({ type: "workflow.prepare", goal });
 		expect(await client.request({ ...first.request, goal: "Different task" })).toMatchObject({
