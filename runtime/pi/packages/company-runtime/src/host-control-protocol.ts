@@ -271,8 +271,11 @@ export interface HostControlCapabilities {
 	runtimeVersion: string;
 	readiness: "READY" | "NOT_SETUP" | "CONFIG_INVALID";
 	recipes: { id: string; version: number; title: string; inputTemplate: string }[];
-	/** COMPLEX contract feature version (§10.3); this Runtime always emits 1. Absent (older Runtime) means not exposed. */
-	complexContractVersion?: 1;
+	/**
+	 * COMPLEX contract feature version (§10.3; V0.8A §8): this Runtime always emits 2 (implementation waves). A V0.7B
+	 * Runtime emitted 1; absent (older Runtime) means not exposed. Never mixed on one connection.
+	 */
+	complexContractVersion?: 2;
 }
 export type HostControlData =
 	| { kind: "capabilities"; capabilities: HostControlCapabilities }

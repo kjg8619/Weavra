@@ -124,7 +124,9 @@ export function takeConsumerIssues(): string[] {
 	return observers.splice(0).flatMap((observer) => observer.issues);
 }
 
-export function complexConfig(options: { maxRevisionCycles?: number; budget?: Record<string, number> } = {}) {
+export function complexConfig(
+	options: { maxRevisionCycles?: number; budget?: Record<string, number>; maxParallel?: number } = {},
+) {
 	return parseRuntimeConfig(
 		JSON.stringify({
 			schemaVersion: 1,
@@ -134,7 +136,10 @@ export function complexConfig(options: { maxRevisionCycles?: number; budget?: Re
 					reasoning: { provider: "faux", model: "review" },
 				},
 			},
-			agents: { max_revision_cycles: options.maxRevisionCycles ?? 3 },
+			agents: {
+				max_revision_cycles: options.maxRevisionCycles ?? 3,
+				...(options.maxParallel ? { max_parallel: options.maxParallel } : {}),
+			},
 			...(options.budget ? { budget: options.budget } : {}),
 			files: { allowed_paths: ["src"] },
 			verification: {
@@ -384,6 +389,9 @@ export function complexHarness(options: {
 				};
 			},
 			images: async (paths: readonly string[]) => files.capture(paths),
+			// V0.8A own-claim capture at a handoff: exactly the claimed files, no whole-workspace digest.
+			claimImages: async (paths: readonly string[]) =>
+				Object.fromEntries(paths.map((path) => [path, files.image(path)])),
 		},
 		store: {
 			load: async () => undefined,

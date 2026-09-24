@@ -72,8 +72,9 @@ export function complexChangeDigest(
 
 /**
  * Claims of one frozen plan with their admission images, the expected cumulative image of every claimed file and
- * the single active task lease. The Run-wide baseline is the one clean GitWorkspace baseline; task start/end images
- * are snapshots against it, never new baselines.
+ * one lease per implementing task (V0.8A §5: at most the frozen `maxParallel`, one with `maxParallel = 1`). The
+ * Run-wide baseline is the one clean GitWorkspace baseline; task start/end images are snapshots against it, never
+ * new baselines. Claims stay exact and globally exclusive, so no two leases ever cover the same file.
  */
 export class ComplexOwnershipLedger {
 	private readonly claims: ReadonlyMap<string, Claim>;
@@ -82,14 +83,17 @@ export class ComplexOwnershipLedger {
 	/** create claims whose file this task lineage already created: edit/replace only from then on. */
 	private readonly created = new Set<string>();
 	private readonly deleted = new Set<string>();
-	private lease: ComplexLease | null = null;
+	/** Active leases: task ID → the one attempt allowed to use that task's claims. */
+	private readonly leases = new Map<string, number>();
+	private readonly maxLeases: number;
 	private reconciledDigest: string;
 
-	private constructor(claims: Map<string, Claim>, baseline: Map<string, Image>, digest: string) {
+	private constructor(claims: Map<string, Claim>, baseline: Map<string, Image>, digest: string, maxLeases: number) {
 		this.claims = claims;
 		this.baseline = baseline;
 		for (const [path, image] of baseline) this.expected.set(path, image);
 		this.reconciledDigest = digest;
+		this.maxLeases = maxLeases;
 	}
 
 	/** Claimed paths of a plan in ASCII order (the images the Kernel captures at every boundary). */
@@ -101,7 +105,8 @@ export class ComplexOwnershipLedger {
 	 * Admission under the Run writer: a clean, safe capture whose claimed images fit the claim semantics
 	 * (modify/delete: an existing file; create: a missing leaf). Returns the reason when the checkout cannot admit.
 	 */
-	static admit(plan: ComplexPlan, capture: ComplexWorkspaceImages): ComplexOwnershipLedger | string {
+	static admit(plan: ComplexPlan, capture: ComplexWorkspaceImages, maxLeases = 1): ComplexOwnershipLedger | string {
+		if (!Number.isSafeInteger(maxLeases) || maxLeases < 1) return "Invalid lease bound";
 		if (!capture.safe) return "Admission capture is unsafe (HEAD/index/config or unsupported change)";
 		if (capture.changedFiles.length)
 			return "Admission requires the clean Run baseline; the workspace already changed";
@@ -117,11 +122,14 @@ export class ComplexOwnershipLedger {
 				claims.set(claim.path, { taskId: task.id, operation: claim.operation });
 				baseline.set(claim.path, image === null ? null : { hash: image.hash, mode: image.mode });
 			}
-		return new ComplexOwnershipLedger(claims, baseline, capture.diffDigest);
+		return new ComplexOwnershipLedger(claims, baseline, capture.diffDigest, maxLeases);
 	}
 
-	get activeLease(): ComplexLease | null {
-		return this.lease ? { ...this.lease } : null;
+	/** Every active lease, in task (plan) order. */
+	get activeLeases(): ComplexLease[] {
+		return [...this.leases]
+			.map(([taskId, attempt]) => ({ taskId, attempt }))
+			.sort((left, right) => (left.taskId < right.taskId ? -1 : left.taskId > right.taskId ? 1 : 0));
 	}
 
 	/** Digest of the last capture that reconciled with the expected cumulative state. */
@@ -129,20 +137,39 @@ export class ComplexOwnershipLedger {
 		return this.reconciledDigest;
 	}
 
-	/** ELIGIBLE → IMPLEMENTING or a REVISE attempt: at most one active lease, never another task's claims. */
+	/**
+	 * ELIGIBLE → IMPLEMENTING or a REVISE attempt: one lease per task (a new attempt replaces the task's older one),
+	 * never more than the frozen bound and never another task's claims. No lease is inherited by another task.
+	 */
 	activate(lease: ComplexLease): void {
-		if (this.lease && this.lease.taskId !== lease.taskId) throw new Error("Another task holds the active lease");
-		this.lease = { taskId: lease.taskId, attempt: lease.attempt };
+		if (!this.leases.has(lease.taskId) && this.leases.size >= this.maxLeases)
+			throw new Error(
+				this.maxLeases === 1
+					? "Another task holds the active lease"
+					: `At most ${this.maxLeases} task leases may be active at once`,
+			);
+		this.leases.set(lease.taskId, lease.attempt);
 	}
 
-	/** Safe task settlement or terminal cleanup; the claims stay reserved by the immutable plan. */
-	release(): void {
-		this.lease = null;
+	/**
+	 * Safe settlement of one task (COMPLETED) or, without a task, terminal cleanup of every lease. The claims stay
+	 * reserved by the immutable plan.
+	 */
+	release(taskId?: string): void {
+		if (taskId === undefined) this.leases.clear();
+		else this.leases.delete(taskId);
 	}
 
-	/** Exact ownership and operation semantics (§5.1). Throws a typed denial; returning is still not permission. */
+	private holds(lease: ComplexLease): boolean {
+		return this.leases.get(lease.taskId) === lease.attempt;
+	}
+
+	/**
+	 * Exact ownership and operation semantics (§5.1), checked against the requesting capability's own (taskId,
+	 * attempt) lease. Throws a typed denial; returning is still not permission.
+	 */
 	authorize(lease: ComplexLease, path: string, operation: ComplexMutationOperation): void {
-		if (!this.lease || this.lease.taskId !== lease.taskId || this.lease.attempt !== lease.attempt)
+		if (!this.holds(lease))
 			throw new Error("No active ownership lease for this task attempt; late or foreign callback rejected");
 		const claim = this.claims.get(path);
 		if (!claim)
@@ -174,9 +201,9 @@ export class ComplexOwnershipLedger {
 			);
 	}
 
-	/** Expected-image update after one authorized effect of the active attempt. */
+	/** Expected-image update after one authorized effect of the lease holder's attempt. */
 	recordEffect(lease: ComplexLease, path: string, image: WorkspaceFileImage | null | undefined): void {
-		if (!this.lease || this.lease.taskId !== lease.taskId || this.lease.attempt !== lease.attempt)
+		if (!this.holds(lease))
 			throw new Error("No active ownership lease for this task attempt; late effect not recorded");
 		const claim = this.claims.get(path);
 		if (!claim || claim.taskId !== lease.taskId) throw new Error("Effect outside the active task's claims");
@@ -207,6 +234,30 @@ export class ComplexOwnershipLedger {
 		return undefined;
 	}
 
+	/** Claimed paths of one task in ASCII order. */
+	taskPaths(taskId: string): string[] {
+		return [...this.claims]
+			.filter(([, claim]) => claim.taskId === taskId)
+			.map(([path]) => path)
+			.sort();
+	}
+
+	/**
+	 * V0.8A own-claim check (§4 rules 4 and 6): images of exactly one task's claimed files, read without a whole-
+	 * workspace digest, must equal the expected state after that task's own recorded effects. No sibling can own
+	 * those files, so a difference is unattributed. Returns the reason on mismatch; unknown never matches.
+	 */
+	ownClaimsError(taskId: string, images: Readonly<Record<string, WorkspaceFileImage | null>>): string | undefined {
+		for (const path of this.taskPaths(taskId)) {
+			if (!Object.hasOwn(images, path)) return `Claimed file ${describe(path)} was not captured`;
+			const expected = this.expected.get(path);
+			if (expected === undefined) return `Expected image of ${describe(path)} is unknown after a failed effect read`;
+			if (!sameImage(images[path], expected))
+				return `${describe(path)} differs from the image ${taskId}'s own effects left (unattributed change)`;
+		}
+		return undefined;
+	}
+
 	/** Expected images of every claimed path; a point-in-time copy for later deltas. */
 	snapshot(): Map<string, Expected> {
 		return new Map([...this.expected].map(([path, image]) => [path, image ? { ...image } : image]));
@@ -223,6 +274,11 @@ export class ComplexOwnershipLedger {
 	/** Whether any expected image is unknown (a post-effect read failed). */
 	get unknown(): boolean {
 		return [...this.expected.values()].some((image) => image === undefined);
+	}
+
+	/** Whether an expected image of one task's claims is unknown. */
+	unknownIn(taskId: string): boolean {
+		return this.taskPaths(taskId).some((path) => this.expected.get(path) === undefined);
 	}
 
 	/** Change digest from a snapshot to the current expectation over exactly `paths`. */

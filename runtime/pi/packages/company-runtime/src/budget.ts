@@ -59,7 +59,8 @@ export class BudgetController {
 		this.limits = { ...limits };
 	}
 
-	private counted = false;
+	/** Invocations counted at reservation and not yet settled; settling one never counts it twice. */
+	private outstanding = 0;
 
 	get configured(): boolean {
 		return this.limits.maxWorkerInvocations !== undefined || this.limits.maxReportedTokens !== undefined;
@@ -67,10 +68,22 @@ export class BudgetController {
 
 	/** Pre-invocation check. Throws before any model call, workspace mutation or approval request. */
 	reserve(role: string): void {
+		this.reserveMany(role, 1);
+	}
+
+	/**
+	 * All-or-nothing pre-invocation check for `count` concurrent invocations of one role (a V0.8A wave, in plan
+	 * order): either every invocation is counted or none is, and nothing starts on a denial.
+	 */
+	reserveMany(role: string, count: number): void {
+		if (!Number.isSafeInteger(count) || count < 1) throw new Error("Invalid budget reservation");
 		if (this.denial) throw new BudgetDenied(this.denial);
 		const maxInvocations = this.limits.maxWorkerInvocations;
-		if (maxInvocations !== undefined && this.invocations + 1 > maxInvocations) {
-			this.denial = `Budget exhausted: worker invocation limit ${maxInvocations} reached before ${role}`;
+		if (maxInvocations !== undefined && this.invocations + count > maxInvocations) {
+			this.denial =
+				count === 1
+					? `Budget exhausted: worker invocation limit ${maxInvocations} reached before ${role}`
+					: `Budget exhausted: worker invocation limit ${maxInvocations} cannot cover ${count} concurrent ${role} invocations (${this.invocations} used)`;
 			throw new BudgetDenied(this.denial);
 		}
 		const maxTokens = this.limits.maxReportedTokens;
@@ -86,19 +99,20 @@ export class BudgetController {
 			}
 		}
 		// Exact pre-invocation counting: the session is consumed even if the provider never reports usage.
-		this.invocations += 1;
-		this.counted = true;
+		this.invocations += count;
+		this.outstanding += count;
 	}
 
 	/** The adapter reported no measurement; token accounting stays honest instead of assuming zero. */
 	recordUnavailable(): void {
 		this.usageUnknown = true;
+		if (this.outstanding > 0) this.outstanding -= 1;
 	}
 
 	/** Records the settled invocation. Unavailable usage keeps the ledger honest instead of assuming zero. */
 	record(role: string, measurement: WorkerMeasurement): void {
-		if (!this.counted) this.invocations += 1;
-		this.counted = false;
+		if (this.outstanding > 0) this.outstanding -= 1;
+		else this.invocations += 1;
 		if (measurement.usage.source !== "provider") this.usageUnknown = true;
 		this.tokens += measurement.usage.totalTokens;
 		// Overages after an in-flight call are recorded; the next invocation is denied. Never a billing hard cap.

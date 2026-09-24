@@ -12,12 +12,16 @@ import {
 } from "./complex-ownership.ts";
 import {
 	ACTIVE_TASK_STATUSES,
+	complexWave,
+	FINISHED_TASK_STATUSES,
 	initialComplexState,
 	integrationContext,
 	markStaleEvidence,
 	sameContext,
 	settleComplexState,
 	taskContext,
+	taskReady,
+	VERIFYING_TASK_STATUSES,
 } from "./complex-state.ts";
 import {
 	type CheckGate,
@@ -80,11 +84,13 @@ import { type ExecutionMode, isExecutionMode } from "./execution-contract.ts";
 import { WorkerExecutionError } from "./measurement.ts";
 import { type WorkerMeasurement, WorkerMeasurementSchema } from "./measurement-types.ts";
 import type {
+	AgentExecutionResult,
 	ApprovalPort,
 	ComplexIntegrationInput,
 	ComplexTaskInput,
 	ComplexWorkspaceImages,
 	KernelPorts,
+	WorkspaceFileImage,
 } from "./ports.ts";
 import type { ProjectInstructionMetadata } from "./project-instruction-types.ts";
 import type { Provenance } from "./provenance-types.ts";
@@ -335,12 +341,31 @@ interface ComplexWork {
 
 type GateTarget = "selfCheck" | "review" | "test" | "check";
 
+/** One wave row's Developer invocation (V0.8A §4 rule 3); its failure is recorded, never thrown past the join. */
+interface WaveMember {
+	c: ComplexAdvance;
+	/** A first attempt (ELIGIBLE → IMPLEMENTING); false for a REVISE re-implementation. */
+	first: boolean;
+	measurement?: WorkerMeasurement;
+	handedOff?: boolean;
+	error?: unknown;
+	/** The wave was already aborted (a sibling failure or a cancel) when this row failed. */
+	afterAbort?: boolean;
+}
+
+/** Image equality in the GitWorkspace encoding; absence equals only absence. */
+function sameFileImage(left: WorkspaceFileImage | null | undefined, right: WorkspaceFileImage | null): boolean {
+	if (left === undefined) return false;
+	if (left === null || right === null) return left === right;
+	return left.hash === right.hash && left.mode === right.mode;
+}
+
 /** Per-advance COMPLEX invocation state: callbacks close with the invocation; late use is rejected. */
 interface ComplexAdvance {
 	step: StepReference;
 	signal?: AbortSignal;
 	context: ComplexEvidenceContext;
-	/** Plan index of the active task; -1 during integration. */
+	/** Plan index of this invocation's task (a wave row or the row in its turn); -1 during integration. */
 	taskIndex: number;
 	role?: "Developer" | "Reviewer";
 	sessionRef?: RoleSessionReference;
@@ -764,6 +789,9 @@ export class CompanyKernel {
 	private readonly budget: BudgetController;
 	private busy = false;
 	private storageFailed = false;
+	/** The original storage failure; every later queued save rethrows it (never a weaker error). */
+	private storageError?: unknown;
+	private saveQueue: Promise<void> = Promise.resolve();
 	private handoff?: Handoff | ExecutorHandoff;
 	private developerSession?: RoleSessionReference;
 	private reviewerSession?: RoleSessionReference;
@@ -776,11 +804,20 @@ export class CompanyKernel {
 	private readonly plan?: ComplexPlan;
 	private work?: ComplexWork;
 	private ledger?: ComplexOwnershipLedger;
+	/** Ledger snapshot at each task's first IMPLEMENTING (its task-local delta base). */
 	private readonly taskEntries = new Map<string, ReturnType<ComplexOwnershipLedger["snapshot"]>>();
-	private attemptEntry?: ReturnType<ComplexOwnershipLedger["snapshot"]>;
+	/** Ledger snapshot at the start of each task's current attempt. */
+	private readonly attemptEntries = new Map<string, ReturnType<ComplexOwnershipLedger["snapshot"]>>();
+	/** Validated handoffs of COMPLETED tasks, for the integration aggregate. */
 	private readonly taskHandoffs = new Map<string, Handoff>();
+	/** Current-attempt handoff and own-claim images of every HANDED_OFF or verifying task (V0.8A §4 rules 4, 6). */
+	private readonly handoffs = new Map<
+		string,
+		{ handoff: Handoff; images: Record<string, WorkspaceFileImage | null> }
+	>();
+	/** `taskId@attempt` of the live wave's rows: their session references keep plan order (§7). */
+	private waveKeys = new Set<string>();
 	private captureUnknown = false;
-	private complexHandoff?: Handoff;
 	private complexSelfCheck?: VerificationResult;
 	private complexReview?: ComplexTaskReview;
 	private previousContribution?: ComplexTaskReview;
@@ -796,7 +833,10 @@ export class CompanyKernel {
 		this.checks = structuredClone(request.checks ?? []);
 		this.maxRevisionCycles = state.maxRevisionCycles ?? 0;
 		this.approvalTimeoutMs = request.approvalTimeoutMs ?? 30_000;
-		this.plan = state.complex ? structuredClone(state.complex.plan) : undefined;
+		const plan = state.complex?.plan;
+		// Only a v2 plan executes; a historical v1 plan is read-only history (Amendment A1).
+		if (plan && plan.schemaVersion !== 2) throw new Error("Only a COMPLEX v2 plan executes");
+		this.plan = plan ? structuredClone(plan) : undefined;
 		this.budget = new BudgetController(this.plan ? complexBudgetLimits(this.plan) : (request.budget ?? {}));
 		if (state.complex)
 			this.work = {
@@ -934,7 +974,29 @@ export class CompanyKernel {
 			throw new Error("Invalid transition for the current run state");
 	}
 
-	private async persist(patch: Partial<Run>, details: RuntimeEventDetail[]): Promise<void> {
+	/**
+	 * The one Kernel save queue (V0.8A §4 rule 3, §7): every durable write runs in call order, one at a time, so
+	 * persisted revisions are +1 and event sequence numbers strictly increase across concurrent wave callbacks. A
+	 * function patch is evaluated at this save's turn against the latest committed state; if it throws, nothing is
+	 * saved and storage stays healthy.
+	 */
+	private persist(
+		patch: Partial<Run> | (() => Partial<Run>),
+		details: RuntimeEventDetail[] | (() => RuntimeEventDetail[]),
+	): Promise<void> {
+		const operation = this.saveQueue.then(() => {
+			if (this.storageFailed) throw this.storageError ?? new Error("State persistence already failed");
+			const resolved = typeof patch === "function" ? patch() : patch;
+			return this.persistNow(resolved, typeof details === "function" ? details() : details);
+		});
+		this.saveQueue = operation.then(
+			() => undefined,
+			() => undefined,
+		);
+		return operation;
+	}
+
+	private async persistNow(patch: Partial<Run>, details: RuntimeEventDetail[]): Promise<void> {
 		const previousSequence = this.state.eventSequence;
 		const next = validateContract(RunSchema, {
 			...this.state,
@@ -948,6 +1010,7 @@ export class CompanyKernel {
 		} catch (error) {
 			// No further actions on this instance. The durable state may be older; never emit completion.
 			this.storageFailed = true;
+			this.storageError = error;
 			this.state = {
 				...this.state,
 				status: "FAILED",
@@ -1701,33 +1764,57 @@ export class CompanyKernel {
 	}
 
 	// ------------------------------------------------------------------------------------------------------------
-	// COMPLEX sequential workflow (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md §5–§10). One task step per
-	// advance call under the same busy/persist/session/budget/approval machinery; only the Kernel writes task state.
+	// COMPLEX workflow (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md §5–§10; V0.8A docs/architecture/
+	// PARALLEL_AGENTS.md §4–§7). Implementation runs in waves of concurrent Developers (one wave method); every
+	// verification stage, integration phase and completion keeps the V0.7B one-step-per-advance path on a quiescent
+	// workspace. Only the Kernel writes task state, through the one save queue.
 	// ------------------------------------------------------------------------------------------------------------
 
-	/** Every COMPLEX save writes the whole working copy together with the one global budget ledger. */
-	private async complexSave(patch: Partial<Run>, details: RuntimeEventDetail[]): Promise<void> {
-		const work = this.work;
-		if (!work) throw new Error("COMPLEX state unavailable");
-		await this.persist(
-			{
+	/**
+	 * Every COMPLEX save writes the whole working copy together with the one global budget ledger. A function `change`
+	 * runs at this save's turn in the Kernel save queue, so concurrent wave callbacks each apply their own change to
+	 * the latest state. `activeTaskIds` is always derived from the saved rows (v2 consumer rule 1).
+	 */
+	private complexSave(
+		change: Partial<Run> | ((work: ComplexWork) => Partial<Run>),
+		details: RuntimeEventDetail[],
+	): Promise<void> {
+		return this.persist(() => {
+			const work = this.work;
+			if (!work) throw new Error("COMPLEX state unavailable");
+			const patch = typeof change === "function" ? change(work) : change;
+			work.complex.activeTaskIds = work.complex.tasks
+				.filter((row) => ACTIVE_TASK_STATUSES.has(row.status))
+				.map((row) => row.id);
+			return {
 				...patch,
 				complex: work.complex,
 				complexEvidence: work.evidence,
 				complexReviews: work.reviews,
 				workerMeasurements: work.measurements,
 				budget: this.budget.status,
-			},
-			details,
-		);
+			};
+		}, details);
 	}
 
 	private complexParent(): TaskContract {
 		return this.taskContract();
 	}
 
-	private activeIndex(): number {
-		return this.work?.complex.tasks.findIndex((row) => ACTIVE_TASK_STATUSES.has(row.status)) ?? -1;
+	/** Plan indexes of the active rows, in plan order. */
+	private activeIndexes(): number[] {
+		return (this.work?.complex.tasks ?? []).flatMap((row, index) =>
+			ACTIVE_TASK_STATUSES.has(row.status) ? [index] : [],
+		);
+	}
+
+	/** The one row in its verification turn: a stage, or a revising IMPLEMENTING attempt ≥ 2; -1 when none. */
+	private turnIndex(): number {
+		return (
+			this.work?.complex.tasks.findIndex(
+				(row) => VERIFYING_TASK_STATUSES.has(row.status) || (row.status === "IMPLEMENTING" && row.attempt >= 2),
+			) ?? -1
+		);
 	}
 
 	/** Admission/per-stage binding guard (§4.2): the frozen plan recomputes and binds this unchanged parent. */
@@ -1750,6 +1837,7 @@ export class CompanyKernel {
 	/**
 	 * One whole-workspace capture reconciled with the expected-image ledger (§5.3). Unsafe, unclaimed, unattributed
 	 * or unreadable state blocks as EXTERNAL_MUTATION; an accepted capture refreshes historical evidence freshness.
+	 * Taken only while no worker is live (entry, join, verification stages, completion).
 	 */
 	private async captureReconciled(signal?: AbortSignal): Promise<ComplexWorkspaceImages> {
 		if (!this.plan || !this.ledger || !this.ports.verifier.images)
@@ -1775,6 +1863,46 @@ export class CompanyKernel {
 		return capture;
 	}
 
+	/**
+	 * Own-claim capture at a handoff (V0.8A §4 rule 4): images of exactly the task's claimed files, with no whole-
+	 * workspace digest while siblings may still write, reconciled with the task's own recorded effects.
+	 */
+	private async captureOwnClaims(
+		taskId: string,
+		signal?: AbortSignal,
+	): Promise<Record<string, WorkspaceFileImage | null>> {
+		const ledger = this.ledger;
+		if (!ledger || !this.ports.verifier.claimImages)
+			throw new BlockedError("COMPLEX own-claim capture is unavailable", "EXTERNAL_MUTATION");
+		let images: Record<string, WorkspaceFileImage | null>;
+		try {
+			images = structuredClone(await this.ports.verifier.claimImages(ledger.taskPaths(taskId), signal));
+		} catch (error) {
+			signal?.throwIfAborted();
+			this.captureUnknown = true;
+			throw new BlockedError(
+				`Own-claim capture unavailable: ${errorText(error, "capture failed")}`,
+				"EXTERNAL_MUTATION",
+			);
+		}
+		const mismatch = ledger.ownClaimsError(taskId, images);
+		if (mismatch) throw new BlockedError(`External mutation: ${mismatch}`, "EXTERNAL_MUTATION");
+		return images;
+	}
+
+	/** V0.8A §4 rule 6: at every verification stage each own-claim image still equals its handoff image. */
+	private assertOwnClaims(taskId: string, capture: ComplexWorkspaceImages): void {
+		const images = this.handoffs.get(taskId)?.images;
+		requireComplex(
+			!!images &&
+				Object.entries(images).every(
+					([path, image]) => Object.hasOwn(capture.images, path) && sameFileImage(capture.images[path], image),
+				),
+			`${taskId} claimed files changed after its handoff`,
+			"EXTERNAL_MUTATION",
+		);
+	}
+
 	/** Resource flags from the Workflow settlement port; a missing flag or port is unknown, never confirmed. */
 	private async settleResources(): Promise<boolean> {
 		try {
@@ -1787,8 +1915,13 @@ export class CompanyKernel {
 
 	/** Budget denial happens before any worker call; unknown usage and exhaustion keep their closed codes. */
 	private complexReserve(c: ComplexAdvance, role: "Developer" | "Reviewer"): void {
+		this.complexReserveMany([c], role);
+	}
+
+	/** All-or-nothing reservation in plan order (V0.8A §4 rule 2): on a denial nothing is counted and nothing starts. */
+	private complexReserveMany(invocations: readonly ComplexAdvance[], role: "Developer" | "Reviewer"): void {
 		try {
-			this.budget.reserve(role);
+			this.budget.reserveMany(role, invocations.length);
 		} catch (error) {
 			if (error instanceof BudgetDenied)
 				throw new BlockedError(
@@ -1797,7 +1930,7 @@ export class CompanyKernel {
 				);
 			throw error;
 		}
-		c.reserved = true;
+		for (const c of invocations) c.reserved = true;
 	}
 
 	/** Exactly-once settlement into the global ledger, the task subtotal and the attempt's evidence record. */
@@ -1881,41 +2014,62 @@ export class CompanyKernel {
 		};
 	}
 
-	/** Worker session registration: a fresh session distinct (id and file) from every earlier session of the Run. */
+	/**
+	 * Worker session registration: a fresh session distinct (id and file) from every earlier session of the Run,
+	 * checked at this save's turn because a concurrent sibling may register first. A wave Developer's reference is
+	 * placed before those of later wave rows, so the list keeps plan order whichever session started first (§7).
+	 */
 	private complexSessionCallback(c: ComplexAdvance): (reference: RoleSessionReference) => Promise<void> {
 		return async (reference) => {
 			if (!c.sessionOpen) throw new Error("Worker session registration is closed");
 			c.sessionOpen = false;
 			c.signal?.throwIfAborted();
 			const ref = validateContract(RoleSessionReferenceSchema, structuredClone(reference));
-			if (
-				!c.role ||
-				ref.role !== c.role ||
-				c.sessionRef ||
-				ref.complexContext !== undefined ||
-				this.state.roleSessionRefs.some(
-					(item) => item.sessionId === ref.sessionId || item.sessionFile === ref.sessionFile,
-				)
-			) {
+			if (!c.role || ref.role !== c.role || c.sessionRef || ref.complexContext !== undefined) {
 				c.sessionRejected = true;
 				throw new Error("Invalid or reused worker session reference");
 			}
 			const attributed: RoleSessionReference = { ...ref, complexContext: structuredClone(c.context) };
-			if (c.evidenceIndex !== undefined) this.work?.evidence[c.evidenceIndex].sessionRefs.push(attributed);
-			await this.complexSave({ roleSessionRefs: [...this.state.roleSessionRefs, attributed] }, [
-				{
-					type: "AgentSessionCreated",
-					step: c.step,
-					role: c.role,
-					profile: c.role === "Reviewer" ? "reasoning" : "coding",
-					revision: this.state.revisionCycle,
-					sessionRef: attributed,
-					complexContext: c.context,
+			await this.complexSave(
+				(work) => {
+					const refs = this.state.roleSessionRefs;
+					if (refs.some((item) => item.sessionId === ref.sessionId || item.sessionFile === ref.sessionFile)) {
+						c.sessionRejected = true;
+						throw new Error("Invalid or reused worker session reference");
+					}
+					if (c.evidenceIndex !== undefined) work.evidence[c.evidenceIndex].sessionRefs.push(attributed);
+					return { roleSessionRefs: this.withSessionRef(refs, attributed) };
 				},
-			]);
+				[
+					{
+						type: "AgentSessionCreated",
+						step: c.step,
+						role: c.role,
+						profile: c.role === "Reviewer" ? "reasoning" : "coding",
+						revision: this.state.revisionCycle,
+						sessionRef: attributed,
+						complexContext: c.context,
+					},
+				],
+			);
 			c.sessionRef = attributed;
 			c.signal?.throwIfAborted();
 		};
+	}
+
+	/** Appends a session reference; within the live wave it goes before the references of later wave rows. */
+	private withSessionRef(refs: readonly RoleSessionReference[], ref: RoleSessionReference): RoleSessionReference[] {
+		const key = (item: RoleSessionReference) =>
+			item.complexContext?.scope === "TASK" ? `${item.complexContext.taskId}@${item.complexContext.attempt}` : "";
+		const taskId = ref.complexContext?.taskId ?? "";
+		let at = refs.length;
+		if (this.waveKeys.has(key(ref)))
+			while (at > 0) {
+				const before = refs[at - 1];
+				if (!this.waveKeys.has(key(before)) || (before.complexContext?.taskId ?? "") < taskId) break;
+				at--;
+			}
+		return [...refs.slice(0, at), ref, ...refs.slice(at)];
 	}
 
 	/** Exact one-use R3 deletion Approval for the deleting task only (§7.2); context is part of the binding. */
@@ -1966,24 +2120,28 @@ export class CompanyKernel {
 				throw new Error("Approval proposal identity mismatch or replay");
 			c.approvalInFlight = true;
 			try {
-				work.complex.tasks[c.taskIndex].status = "WAITING_APPROVAL";
 				await this.complexSave(
-					{
-						status: "WAITING_APPROVAL",
-						approvals: [...(this.state.approvals ?? []), { request, status: "PENDING" }],
+					(current) => {
+						current.complex.tasks[c.taskIndex].status = "WAITING_APPROVAL";
+						return {
+							status: "WAITING_APPROVAL",
+							approvals: [...(this.state.approvals ?? []), { request, status: "PENDING" }],
+						};
 					},
 					[{ type: "ApprovalRequested", step: c.step, actionId: request.actionId, complexContext: c.context }],
 				);
 				const combined =
 					workerSignal && c.signal ? AbortSignal.any([workerSignal, c.signal]) : (workerSignal ?? c.signal);
 				const outcome = await awaitApproval(request, port, combined, this.now);
-				work.complex.tasks[c.taskIndex].status = "IMPLEMENTING";
 				await this.complexSave(
-					{
-						status: "RUNNING",
-						approvals: (this.state.approvals ?? []).map((record) =>
-							record.request.actionId === request.actionId ? { ...record, status: outcome.status } : record,
-						),
+					(current) => {
+						current.complex.tasks[c.taskIndex].status = "IMPLEMENTING";
+						return {
+							status: "RUNNING",
+							approvals: (this.state.approvals ?? []).map((record) =>
+								record.request.actionId === request.actionId ? { ...record, status: outcome.status } : record,
+							),
+						};
 					},
 					[
 						{
@@ -2013,11 +2171,11 @@ export class CompanyKernel {
 			)
 				throw new Error("Approval consumption is invalid or late");
 			await this.complexSave(
-				{
-					approvals: this.state.approvals.map((record) =>
+				() => ({
+					approvals: (this.state.approvals ?? []).map((record) =>
 						record.request.actionId === actionId ? { ...record, status: "CONSUMED" as const } : record,
 					),
-				},
+				}),
 				[{ type: "ApprovalConsumed", step: c.step, actionId, complexContext: c.context }],
 			);
 		};
@@ -2036,7 +2194,7 @@ export class CompanyKernel {
 
 	/**
 	 * COMPLEX admission: supported ports and checks, the bound plan, a clean baseline whose claimed images fit the
-	 * claim semantics, then RUNNING with CT-001 ELIGIBLE as a persisted scheduling decision (not permission).
+	 * claim semantics, then RUNNING with the first wave ELIGIBLE as a persisted scheduling decision (not permission).
 	 */
 	private async startComplex(): Promise<Run> {
 		this.busy = true;
@@ -2048,6 +2206,7 @@ export class CompanyKernel {
 				!isExecutionMode(this.state.executionMode) ||
 				!this.ports.verifier.inspect ||
 				!this.ports.verifier.images ||
+				!this.ports.verifier.claimImages ||
 				!this.ports.resources ||
 				!this.checks.some((check) => check.required) ||
 				(this.state.risk === "R3" &&
@@ -2055,7 +2214,7 @@ export class CompanyKernel {
 			try {
 				requireComplex(
 					!unsupported,
-					"Unsupported COMPLEX start: live workspace capture, resource settlement, a required check and (R3) scope and Approval are mandatory",
+					"Unsupported COMPLEX start: live workspace and own-claim capture, resource settlement, a required check and (R3) scope and Approval are mandatory",
 					"RUN_STOPPED",
 				);
 				this.assertComplexBinding();
@@ -2063,7 +2222,8 @@ export class CompanyKernel {
 					requireComplex(
 						plan.tasks[0].ownership.length === 1 &&
 							plan.tasks[0].ownership[0].operation === "delete" &&
-							plan.tasks[0].ownership[0].path === this.state.r3Scope?.targetPath,
+							plan.tasks[0].ownership[0].path === this.state.r3Scope?.targetPath &&
+							plan.limits.maxParallel === 1,
 						"The R3 deletion claim differs from the Runtime-selected target",
 						"PLAN_MISMATCH",
 					);
@@ -2083,7 +2243,7 @@ export class CompanyKernel {
 					"Admission capture digest is malformed",
 					"EXTERNAL_MUTATION",
 				);
-				const ledger = ComplexOwnershipLedger.admit(plan, capture);
+				const ledger = ComplexOwnershipLedger.admit(plan, capture, plan.limits.maxParallel);
 				if (typeof ledger === "string") throw new BlockedError(ledger, "EXTERNAL_MUTATION");
 				this.ledger = ledger;
 			} catch (error) {
@@ -2096,14 +2256,17 @@ export class CompanyKernel {
 				});
 				return this.snapshot;
 			}
-			work.complex.tasks[0].status = "ELIGIBLE";
-			work.complex.activeTaskId = plan.tasks[0].id;
+			// The first wave is decided and persisted before any worker starts (§4 rule 1).
+			const wave = complexWave(plan, work.complex.tasks);
 			await this.complexSave(
-				{
-					status: "RUNNING",
-					phase: "IMPLEMENT",
-					currentStep: { stepId: "implement", attempt: 1 },
-					tasks: this.state.tasks.map((task) => ({ ...task, status: "inProgress" })),
+				(current) => {
+					for (const index of wave) current.complex.tasks[index].status = "ELIGIBLE";
+					return {
+						status: "RUNNING",
+						phase: "IMPLEMENT",
+						currentStep: { stepId: "implement", attempt: 1 },
+						tasks: this.state.tasks.map((task) => ({ ...task, status: "inProgress" })),
+					};
 				},
 				[{ type: "RunStarted" }],
 			);
@@ -2114,9 +2277,11 @@ export class CompanyKernel {
 	}
 
 	/**
-	 * STOPPING → terminal (§9): fence scheduling, persist STOPPING with cleanup PENDING, stop/join every resource,
-	 * capture partial state only when safe, then persist the honest terminal outcome. Unconfirmed cleanup is
-	 * INTERRUPTED with cleanup UNCONFIRMED (writer retained); earlier COMPLETED rows stay historical.
+	 * STOPPING → terminal (§9; V0.8A §6): fence scheduling, persist every active row STOPPING in one save with cleanup
+	 * PENDING, stop/join every resource, capture partial state only when safe, then persist the honest terminal
+	 * outcome. Rows that failed on their own keep their codes and stopped siblings end RUN_STOPPED (CANCELLED on a
+	 * cancel). Unconfirmed cleanup is INTERRUPTED with cleanup UNCONFIRMED (writer retained); COMPLETED rows stay
+	 * historical.
 	 */
 	private async finishComplex(input: {
 		status: "BLOCKED" | "FAILED" | "CANCELLED" | "INTERRUPTED";
@@ -2126,11 +2291,16 @@ export class CompanyKernel {
 		gateTarget?: GateTarget;
 		gate?: CheckGate | ReviewGate;
 		evidenceIndex?: number;
+		/** Rows whose own failure stopped the Run, with the evidence record of their current attempt when one exists. */
+		failures?: Record<
+			string,
+			{ status: "BLOCKED" | "FAILED"; failureCode: ComplexFailureCode; evidenceIndex?: number }
+		>;
 	}): Promise<void> {
 		const work = this.work;
 		const plan = this.plan;
 		if (!work || !plan) throw new Error("COMPLEX state unavailable");
-		const index = this.activeIndex();
+		const index = this.turnIndex();
 		if (input.gateTarget && input.gate) {
 			if (input.gateTarget === "check") {
 				if (work.complex.integration.check === "RUNNING") work.complex.integration.check = input.gate as CheckGate;
@@ -2146,7 +2316,8 @@ export class CompanyKernel {
 				work.complex.integration.test = input.gate as CheckGate;
 		}
 		work.complex.phase = "STOPPING";
-		if (index >= 0) work.complex.tasks[index].status = "STOPPING";
+		// One save moves every active row (working, ELIGIBLE or HANDED_OFF) to STOPPING (Amendment A1 atomic saves).
+		for (const row of work.complex.tasks) if (ACTIVE_TASK_STATUSES.has(row.status)) row.status = "STOPPING";
 		work.complex.cleanup = "PENDING";
 		await this.complexSave({ activeAgents: [], next: [] }, input.events);
 		let confirmed = await this.settleResources();
@@ -2167,27 +2338,44 @@ export class CompanyKernel {
 		const code: ComplexFailureCode = confirmed ? input.code : "CLEANUP_UNCONFIRMED";
 		if (input.evidenceIndex !== undefined && work.evidence[input.evidenceIndex])
 			work.evidence[input.evidenceIndex].failureCode = code;
+		for (const failure of Object.values(input.failures ?? {}))
+			if (failure.evidenceIndex !== undefined && work.evidence[failure.evidenceIndex])
+				work.evidence[failure.evidenceIndex].failureCode = confirmed ? failure.failureCode : code;
 		const changesUnknown = !capture || this.captureUnknown;
-		const task = index >= 0 ? plan.tasks[index] : undefined;
-		const entry = task ? this.taskEntries.get(task.id) : undefined;
+		const ledger = this.ledger;
+		const rows: Record<string, { changedFiles: string[]; changesUnknown: boolean }> = {};
+		if (ledger)
+			for (const [position, row] of work.complex.tasks.entries()) {
+				if (FINISHED_TASK_STATUSES.has(row.status) || row.status === "PENDING" || row.attempt === 0) continue;
+				const task = plan.tasks[position];
+				const entry = this.taskEntries.get(task.id);
+				rows[task.id] = {
+					changedFiles: entry ? ledger.changedSince(entry, task.id) : [],
+					changesUnknown: unattributed || changesUnknown || ledger.unknownIn(task.id),
+				};
+			}
 		work.complex = settleComplexState(work.complex, {
 			taskStatus: status,
 			failureCode: code,
+			// Unconfirmed cleanup interrupts every started row alike; otherwise each failing row keeps its own code.
+			...(confirmed && input.failures
+				? {
+						failures: Object.fromEntries(
+							Object.entries(input.failures).map(([taskId, failure]) => [
+								taskId,
+								{ status: failure.status, failureCode: failure.failureCode },
+							]),
+						),
+					}
+				: {}),
 			cancelled: input.status === "CANCELLED",
 			ownerLost: false,
 			cleanup: confirmed ? "CONFIRMED" : "UNCONFIRMED",
 			partialChanges: capture ? capture.changedFiles.length > 0 : true,
 			changesUnknown,
-			...(task && this.ledger
-				? {
-						activeRow: {
-							changedFiles: entry ? this.ledger.changedSince(entry, task.id) : [],
-							changesUnknown: unattributed || changesUnknown || this.ledger.unknown,
-						},
-					}
-				: {}),
+			rows,
 		});
-		// Unconfirmed cleanup keeps the lease quarantined with the writer for manual inspection (§5.2).
+		// Unconfirmed cleanup keeps every lease quarantined with the writer for manual inspection (§5.2).
 		if (confirmed) this.ledger?.release();
 		const eventType = {
 			BLOCKED: "RunBlocked",
@@ -2232,17 +2420,22 @@ export class CompanyKernel {
 		);
 	}
 
-	/** One COMPLEX step per call: the (phase, task status, step) table decides; the caller cannot skip a stage. */
+	/**
+	 * One COMPLEX step per call: the (phase, row statuses, step) table decides; the caller cannot skip a stage. An
+	 * all-ELIGIBLE active set is a formed wave (implement); otherwise the one row in its verification turn decides.
+	 */
 	private async advanceComplex(expectedStep: StepId, signal?: AbortSignal): Promise<Run> {
 		const plan = this.plan;
 		const work = this.work;
 		const current = this.state.currentStep;
 		if (!plan || !work || !current) throw new Error("COMPLEX state unavailable");
 		const phase = work.complex.phase;
-		const index = this.activeIndex();
-		const row = index >= 0 ? work.complex.tasks[index] : undefined;
+		const rows = work.complex.tasks;
+		const active = this.activeIndexes();
+		const turn = this.turnIndex();
+		const wave = phase === "TASK_SEQUENCE" && active.length > 0 && active.every((i) => rows[i].status === "ELIGIBLE");
+		const row = turn >= 0 ? rows[turn] : undefined;
 		const taskSteps: Partial<Record<ComplexTaskStatus, StepId>> = {
-			ELIGIBLE: "implement",
 			IMPLEMENTING: "implement",
 			SELF_CHECK: "self-check",
 			REVIEW: "review",
@@ -2254,23 +2447,33 @@ export class CompanyKernel {
 			FINAL_TEST: "test",
 			COMPLETING: "complete",
 		};
-		const expected = phase === "TASK_SEQUENCE" ? row && taskSteps[row.status] : integrationSteps[phase];
-		const attempt = phase === "TASK_SEQUENCE" ? (row?.status === "ELIGIBLE" ? 1 : (row?.attempt ?? 0)) : 1;
+		const expected =
+			phase === "TASK_SEQUENCE" ? (wave ? "implement" : row && taskSteps[row.status]) : integrationSteps[phase];
+		const attempt = phase === "TASK_SEQUENCE" ? (wave ? 1 : (row?.attempt ?? 0)) : 1;
 		if (
 			expected !== expectedStep ||
 			current.attempt !== attempt ||
-			(phase === "TASK_SEQUENCE") !== index >= 0 ||
-			work.complex.activeTaskId !== (row?.id ?? null)
+			(phase === "TASK_SEQUENCE") !== active.length > 0 ||
+			capabilityJson(work.complex.activeTaskIds ?? null) !== capabilityJson(active.map((i) => rows[i].id))
 		)
 			throw new Error("Invalid transition: unexpected COMPLEX workflow step");
+		if (expectedStep === "implement") {
+			this.busy = true;
+			try {
+				await this.complexWave(wave ? active : [turn], structuredClone(current), signal);
+				return this.snapshot;
+			} finally {
+				this.busy = false;
+			}
+		}
 		const context = row ? taskContext(plan, row.id, attempt) : integrationContext(plan);
 		const evidenceIndex = work.evidence.findIndex((record) => sameContext(record.complexContext, context));
 		const c: ComplexAdvance = {
 			step: structuredClone(current),
 			signal,
 			context,
-			taskIndex: index,
-			role: expectedStep === "implement" ? "Developer" : expectedStep === "review" ? "Reviewer" : undefined,
+			taskIndex: row ? turn : -1,
+			role: expectedStep === "review" ? "Reviewer" : undefined,
 			sessionOpen: true,
 			sessionRejected: false,
 			approvalOpen: true,
@@ -2283,8 +2486,7 @@ export class CompanyKernel {
 		this.busy = true;
 		try {
 			signal?.throwIfAborted();
-			if (expectedStep === "implement") await this.complexImplement(c);
-			else if (expectedStep === "review")
+			if (expectedStep === "review")
 				await (phase === "TASK_SEQUENCE" ? this.complexTaskReview(c) : this.complexFinalReview(c));
 			else if (expectedStep === "complete") await this.complexComplete(c);
 			else await (phase === "TASK_SEQUENCE" ? this.complexTaskCheck(c) : this.complexIntegrationCheck(c));
@@ -2305,26 +2507,19 @@ export class CompanyKernel {
 		}
 	}
 
-	/** decision 9: known denials BLOCKED with a closed code, faults FAILED, cancel CANCELLED after cleanup. */
-	private async complexFailure(c: ComplexAdvance, error: unknown): Promise<void> {
-		const cancelled = c.signal?.aborted === true;
-		try {
-			this.complexSettleBudget(c, error instanceof WorkerExecutionError ? error.measurement : undefined);
-		} catch {
-			// A malformed measurement was already recorded as unknown usage; the original failure decides.
-		}
+	/** decision 9: known denials BLOCKED with a closed code, faults FAILED (never a cancel; see callers). */
+	private complexOutcome(
+		c: ComplexAdvance,
+		error: unknown,
+	): { status: "BLOCKED" | "FAILED"; code: ComplexFailureCode; reason: string } {
 		const approvalCodes: Partial<Record<ApprovalRecord["status"], ComplexFailureCode>> = {
 			DENIED: "APPROVAL_DENIED",
 			EXPIRED: "APPROVAL_EXPIRED",
 		};
-		let status: "BLOCKED" | "FAILED" | "CANCELLED" = "BLOCKED";
+		let status: "BLOCKED" | "FAILED" = "BLOCKED";
 		let code: ComplexFailureCode;
 		let reason = errorText(error, "Step execution failed");
-		if (cancelled) {
-			status = "CANCELLED";
-			code = "CANCELLED";
-			reason = "Run cancelled";
-		} else if (c.approvalFailure) {
+		if (c.approvalFailure) {
 			code = approvalCodes[c.approvalFailure] ?? "APPROVAL_INVALID";
 			reason = `Human approval ${c.approvalFailure.toLowerCase()}; action was not executed`;
 		} else if (c.ownershipDenial) {
@@ -2340,186 +2535,426 @@ export class CompanyKernel {
 			status = "FAILED";
 			code = "WORKER_FAILED";
 		}
-		const events: RuntimeEventDetail[] =
-			c.verdictEvents ??
-			(c.started
+		return { status, code, reason };
+	}
+
+	/** Failure/cancel events of one started invocation, in its own causal order. */
+	private complexStepFailureEvents(c: ComplexAdvance, reason: string): RuntimeEventDetail[] {
+		if (!c.started) return [];
+		return [
+			...(c.role
 				? [
-						...(c.role
-							? [
-									{
-										type: "AgentFailed" as const,
-										step: c.step,
-										role: c.role,
-										reason,
-										...(c.sessionRef ? { sessionRef: c.sessionRef } : {}),
-										complexContext: c.context,
-									},
-								]
-							: []),
-						...(c.step.stepId === "self-check" || c.step.stepId === "test"
-							? [{ type: "VerificationFailed" as const, step: c.step, reason, complexContext: c.context }]
-							: []),
-						{ type: "StepFailed" as const, step: c.step, reason, complexContext: c.context },
+						{
+							type: "AgentFailed" as const,
+							step: c.step,
+							role: c.role,
+							reason,
+							...(c.sessionRef ? { sessionRef: c.sessionRef } : {}),
+							complexContext: c.context,
+						},
 					]
-				: []);
+				: []),
+			...(c.step.stepId === "self-check" || c.step.stepId === "test"
+				? [{ type: "VerificationFailed" as const, step: c.step, reason, complexContext: c.context }]
+				: []),
+			{ type: "StepFailed" as const, step: c.step, reason, complexContext: c.context },
+		];
+	}
+
+	/**
+	 * decision 9 for one verification/integration step: known denials BLOCKED with a closed code, faults FAILED,
+	 * cancel CANCELLED after cleanup. HANDED_OFF rows waiting for their turn end as stopped siblings.
+	 */
+	private async complexFailure(c: ComplexAdvance, error: unknown): Promise<void> {
+		const cancelled = c.signal?.aborted === true;
+		try {
+			this.complexSettleBudget(c, error instanceof WorkerExecutionError ? error.measurement : undefined);
+		} catch {
+			// A malformed measurement was already recorded as unknown usage; the original failure decides.
+		}
+		const outcome = cancelled
+			? { status: "CANCELLED" as const, code: "CANCELLED" as const, reason: "Run cancelled" }
+			: this.complexOutcome(c, error);
+		const task = c.taskIndex >= 0 ? this.plan?.tasks[c.taskIndex] : undefined;
 		await this.finishComplex({
-			status,
-			code,
-			reason,
-			events,
+			status: outcome.status,
+			code: outcome.code,
+			reason: outcome.reason,
+			events: c.verdictEvents ?? this.complexStepFailureEvents(c, outcome.reason),
 			...(c.gateTarget ? { gateTarget: c.gateTarget } : {}),
 			...(c.gate ? { gate: c.gate } : {}),
 			...(c.evidenceIndex !== undefined ? { evidenceIndex: c.evidenceIndex } : {}),
+			...(task && outcome.status !== "CANCELLED"
+				? { failures: { [task.id]: { status: outcome.status, failureCode: outcome.code } } }
+				: {}),
 		});
 	}
 
 	/**
-	 * IMPLEMENTING (§7.1): verified plan, scheduling guard, reconciled entry capture, reserved budget and the one
-	 * active lease; one Developer with the unchanged parent plus bounded task input and a closed-on-settle ownership
-	 * capability; validated handoff; reconciled exit capture whose task-local delta equals the handoff.
+	 * V0.8A wave (§4 rules 1–5, §5, §6). Scheduling guard, one entry capture and an all-or-nothing reservation happen
+	 * before one save moves every wave row to IMPLEMENTING. Then each row's Developer runs concurrently with its own
+	 * session, (taskId, attempt) capability and context under one wave-scoped abort, and a valid handoff moves it to
+	 * HANDED_OFF. The join barrier waits for every invocation; measurements settle in plan order; one reconciling
+	 * capture precedes the first verification turn. A REVISE re-implementation is a wave of its one row. Any failure
+	 * or cancel aborts every sibling and joins them before STOPPING and the terminal save; no worker outlives it.
 	 */
-	private async complexImplement(c: ComplexAdvance): Promise<void> {
+	private async complexWave(indexes: readonly number[], step: StepReference, signal?: AbortSignal): Promise<void> {
 		const plan = this.plan;
 		const work = this.work;
 		const ledger = this.ledger;
 		if (!plan || !work || !ledger) throw new Error("COMPLEX state unavailable");
-		const index = c.taskIndex;
-		const task = plan.tasks[index];
-		const row = work.complex.tasks[index];
-		this.assertComplexBinding();
-		const first = row.status === "ELIGIBLE";
-		if (first)
-			requireComplex(
-				work.complex.tasks.slice(0, index).every((item) => item.status === "COMPLETED") &&
-					task.dependsOn.every(
-						(dependency) => work.complex.tasks.find((item) => item.id === dependency)?.status === "COMPLETED",
-					),
-				`${task.id} cannot start: a predecessor is not COMPLETED`,
-				"DEPENDENCY_NOT_COMPLETED",
-			);
-		const entry = await this.captureReconciled(c.signal);
-		this.complexReserve(c, "Developer");
-		row.status = "IMPLEMENTING";
-		row.attempt = c.context.attempt;
-		row.entryWorkspaceDigest = entry.diffDigest;
-		row.exitWorkspaceDigest = null;
-		row.workerInvocations += 1;
-		if (first) this.taskEntries.set(task.id, ledger.snapshot());
-		this.attemptEntry = ledger.snapshot();
-		const recordIndex =
-			work.evidence.push({
-				complexContext: structuredClone(c.context),
-				revision: this.state.revisionCycle,
-				entryWorkspaceDigest: entry.diffDigest,
-				exitWorkspaceDigest: null,
-				changedFiles: [],
-				changeDigest: null,
-				checkRefs: [],
-				handoff: false,
-				review: false,
-				sessionRefs: [],
-				measurementIndexes: [],
-				failureCode: null,
-			}) - 1;
-		c.evidenceIndex = recordIndex;
-		ledger.activate({ taskId: task.id, attempt: c.context.attempt });
-		await this.complexSave({ activeAgents: ["Developer"] }, [
-			{ type: "StepStarted", step: c.step, complexContext: c.context },
-			{ type: "AgentStarted", step: c.step, role: "Developer", complexContext: c.context },
-		]);
-		c.started = true;
-		c.signal?.throwIfAborted();
-		const capability = complexOwnershipCapability(
-			ledger,
-			{ taskId: task.id, attempt: c.context.attempt },
-			(denial) => {
-				c.ownershipDenial ??= denial;
-			},
-		);
-		c.closeOwnership = capability.close;
-		const result = await this.ports.agents.execute({
-			...this.complexRequest(c),
-			signal: c.signal,
-			role: "Developer",
-			profile: "coding",
-			onSessionCreated: this.complexSessionCallback(c),
-			complexTask: this.complexTaskInput(index, true),
-			ownership: capability.port,
-			...(this.state.risk === "R3" ? this.complexApprovalCallbacks(c) : {}),
-		});
-		capability.close();
-		// The invocation returned: its measurement is spent evidence, settled before cancellation is re-checked.
-		this.complexSettleBudget(c, result.measurement);
-		c.signal?.throwIfAborted();
-		requireComplex(this.ports.agents.safeToRelease !== false, "Worker cleanup is unconfirmed", "CLEANUP_UNCONFIRMED");
-		c.approvalOpen = false;
-		if (c.ownershipDenial) throw new BlockedError(c.ownershipDenial.message, c.ownershipDenial.code);
-		if (result.role !== "Developer") throw new InvalidResultError("Expected the task Developer handoff");
-		let handoff: Handoff;
-		try {
-			handoff = structuredClone(validateContract(HandoffSchema, result.handoff));
-		} catch {
-			throw new InvalidResultError("Malformed Developer handoff");
-		}
-		requireComplex(
-			sameContext(handoff.complexContext, c.context) &&
-				handoff.runId === this.state.runId &&
-				handoff.revision === this.state.revisionCycle &&
-				handoff.task === this.complexParent().id,
-			"Handoff belongs to another run, work cycle, parent or task attempt",
-			"INVALID_RESULT",
-		);
-		requireComplex(handoff.unresolved.length === 0, "Developer handoff reports unresolved work", "INVALID_RESULT");
-		requireComplex(
-			c.sessionRef?.role === "Developer",
-			"COMPLEX requires a persisted Developer session",
-			"INVALID_RESULT",
-		);
-		const exit = await this.captureReconciled();
-		const entrySnapshot = this.attemptEntry;
-		const attemptDelta = entrySnapshot ? ledger.changedSince(entrySnapshot, task.id) : [];
-		requireComplex(
-			handoff.changed_files.length === attemptDelta.length &&
-				capabilityJson([...handoff.changed_files].sort()) === capabilityJson(attemptDelta),
-			"Handoff changed_files differ from the actual task-local delta",
-			"INVALID_RESULT",
-		);
-		if (this.state.risk === "R3" && task.ownership.some((claim) => claim.operation === "delete"))
-			requireComplex(
-				this.state.approvals?.[0]?.status === "CONSUMED" &&
-					capabilityJson(attemptDelta) === capabilityJson([this.state.r3Scope?.targetPath]),
-				"R3 task requires the one consumed deletion of its exact target",
-				"APPROVAL_INVALID",
-			);
-		const taskEntry = this.taskEntries.get(task.id);
-		row.status = "SELF_CHECK";
-		row.exitWorkspaceDigest = exit.diffDigest;
-		row.changedFiles = taskEntry ? ledger.changedSince(taskEntry, task.id) : attemptDelta;
-		const record = work.evidence[recordIndex];
-		record.exitWorkspaceDigest = exit.diffDigest;
-		record.changedFiles = attemptDelta;
-		record.changeDigest = entrySnapshot ? ledger.changeDigest(entrySnapshot, attemptDelta) : null;
-		record.handoff = true;
-		this.complexHandoff = handoff;
-		await this.complexSave(
-			{
-				handoff,
-				phase: "SELF_CHECK",
-				currentStep: { stepId: "self-check", attempt: c.context.attempt },
-				activeAgents: [],
-				next: ["self-check"],
-			},
-			[
-				{
-					type: "AgentCompleted",
-					step: c.step,
+		const abort = new AbortController();
+		const waveSignal = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal;
+		const members: WaveMember[] = indexes.map((index) => {
+			const row = work.complex.tasks[index];
+			const first = row.status === "ELIGIBLE";
+			return {
+				first,
+				c: {
+					step: structuredClone(step),
+					signal: waveSignal,
+					context: taskContext(plan, row.id, first ? 1 : row.attempt),
+					taskIndex: index,
 					role: "Developer",
-					...(c.sessionRef ? { sessionRef: c.sessionRef } : {}),
-					complexContext: c.context,
+					sessionOpen: true,
+					sessionRejected: false,
+					approvalOpen: true,
+					approvalInFlight: false,
+					reserved: false,
+					settled: false,
+					started: false,
 				},
-				{ type: "StepCompleted", step: c.step, complexContext: c.context },
-			],
-		);
+			};
+		});
+		this.waveKeys = new Set(members.map(({ c }) => `${c.context.taskId}@${c.context.attempt}`));
+		const workers: Array<Promise<void>> = [];
+		try {
+			try {
+				signal?.throwIfAborted();
+				this.assertComplexBinding();
+				for (const { c, first } of members)
+					if (first)
+						requireComplex(
+							taskReady(plan, work.complex.tasks, c.taskIndex),
+							`${plan.tasks[c.taskIndex].id} cannot start: a scheduling dependency is not COMPLETED`,
+							"DEPENDENCY_NOT_COMPLETED",
+						);
+				const entry = await this.captureReconciled(signal);
+				this.complexReserveMany(
+					members.map(({ c }) => c),
+					"Developer",
+				);
+				await this.complexSave(
+					(current) => {
+						for (const { c, first } of members) {
+							const task = plan.tasks[c.taskIndex];
+							const row = current.complex.tasks[c.taskIndex];
+							row.status = "IMPLEMENTING";
+							row.attempt = c.context.attempt;
+							row.entryWorkspaceDigest = entry.diffDigest;
+							row.exitWorkspaceDigest = null;
+							row.workerInvocations += 1;
+							if (first) this.taskEntries.set(task.id, ledger.snapshot());
+							this.attemptEntries.set(task.id, ledger.snapshot());
+							c.evidenceIndex =
+								current.evidence.push({
+									complexContext: structuredClone(c.context),
+									revision: this.state.revisionCycle,
+									entryWorkspaceDigest: entry.diffDigest,
+									exitWorkspaceDigest: null,
+									changedFiles: [],
+									changeDigest: null,
+									checkRefs: [],
+									handoff: false,
+									review: false,
+									sessionRefs: [],
+									measurementIndexes: [],
+									failureCode: null,
+								}) - 1;
+							ledger.activate({ taskId: task.id, attempt: c.context.attempt });
+						}
+						return { activeAgents: ["Developer"] };
+					},
+					members.flatMap(({ c }) => [
+						{ type: "StepStarted" as const, step: c.step, complexContext: c.context },
+						{
+							type: "AgentStarted" as const,
+							step: c.step,
+							role: "Developer" as const,
+							complexContext: c.context,
+						},
+					]),
+				);
+				for (const { c } of members) c.started = true;
+				signal?.throwIfAborted();
+			} catch (error) {
+				if (this.storageFailed) throw error;
+				// A wave-level cause before any worker started is every wave row's own failure.
+				await this.complexWaveFailure(members, signal, error);
+				return;
+			}
+			let stopping = false;
+			const stop = () => {
+				if (stopping) return;
+				stopping = true;
+				abort.abort();
+				// Late tool calls of aborted siblings are rejected at once, before their invocations settle.
+				for (const { c } of members) c.closeOwnership?.();
+			};
+			for (const member of members) workers.push(this.complexWaveWorker(member, waveSignal, stop));
+			// JOIN (§4 rule 5): verification never starts while any wave invocation is live.
+			await Promise.all(workers);
+			if (this.storageFailed) throw this.storageError ?? new Error("State persistence failed");
+			// Spent evidence settles in plan order, never in completion order (§7).
+			for (const { c, measurement } of members)
+				try {
+					this.complexSettleBudget(c, measurement);
+				} catch {
+					// A malformed measurement already failed its row; its spend stays recorded as unknown usage.
+				}
+			if (signal?.aborted || members.some((member) => member.error !== undefined)) {
+				await this.complexWaveFailure(members, signal);
+				return;
+			}
+			try {
+				requireComplex(
+					this.ports.agents.safeToRelease !== false,
+					"Worker cleanup is unconfirmed",
+					"CLEANUP_UNCONFIRMED",
+				);
+				// One full capture reconciles every wave effect before any verification (else EXTERNAL_MUTATION).
+				const capture = await this.captureReconciled(signal);
+				signal?.throwIfAborted();
+				const next = work.complex.tasks.findIndex((row) => row.status === "HANDED_OFF");
+				await this.complexSave((current) => this.startTurn(current, next, capture.diffDigest), []);
+			} catch (error) {
+				if (this.storageFailed) throw error;
+				await this.complexWaveFailure(members, signal, error);
+			}
+		} finally {
+			abort.abort();
+			await Promise.allSettled(workers);
+			for (const { c } of members) {
+				c.sessionOpen = false;
+				c.approvalOpen = false;
+				c.closeOwnership?.();
+			}
+			this.waveKeys = new Set();
+		}
+	}
+
+	/**
+	 * One wave row's Developer (§4 rules 3–4): a fresh session, its own closed-on-settle (taskId, attempt) capability
+	 * and context; a valid handoff whose changed_files equal the attempt's ledger effects and whose own claimed files
+	 * reconcile moves the row to HANDED_OFF. Never throws: a failure is recorded and stops the whole wave.
+	 */
+	private async complexWaveWorker(member: WaveMember, signal: AbortSignal, stop: () => void): Promise<void> {
+		const plan = this.plan;
+		const ledger = this.ledger;
+		const { c } = member;
+		try {
+			if (!plan || !ledger) throw new Error("COMPLEX state unavailable");
+			const task = plan.tasks[c.taskIndex];
+			signal.throwIfAborted();
+			const capability = complexOwnershipCapability(
+				ledger,
+				{ taskId: task.id, attempt: c.context.attempt },
+				(denial) => {
+					c.ownershipDenial ??= denial;
+				},
+			);
+			c.closeOwnership = capability.close;
+			let result: AgentExecutionResult;
+			try {
+				result = await this.ports.agents.execute({
+					...this.complexRequest(c),
+					signal,
+					role: "Developer",
+					profile: "coding",
+					onSessionCreated: this.complexSessionCallback(c),
+					complexTask: this.complexTaskInput(c.taskIndex, true),
+					ownership: capability.port,
+					...(this.state.risk === "R3" ? this.complexApprovalCallbacks(c) : {}),
+				});
+			} finally {
+				capability.close();
+			}
+			// The invocation returned: its measurement is spent evidence, settled at the join.
+			member.measurement = result.measurement;
+			if (result.measurement !== undefined)
+				try {
+					validateContract(WorkerMeasurementSchema, result.measurement);
+				} catch {
+					throw new InvalidResultError("Malformed worker measurement");
+				}
+			signal.throwIfAborted();
+			c.approvalOpen = false;
+			if (c.ownershipDenial) throw new BlockedError(c.ownershipDenial.message, c.ownershipDenial.code);
+			if (result.role !== "Developer") throw new InvalidResultError("Expected the task Developer handoff");
+			let handoff: Handoff;
+			try {
+				handoff = structuredClone(validateContract(HandoffSchema, result.handoff));
+			} catch {
+				throw new InvalidResultError("Malformed Developer handoff");
+			}
+			requireComplex(
+				sameContext(handoff.complexContext, c.context) &&
+					handoff.runId === this.state.runId &&
+					handoff.revision === this.state.revisionCycle &&
+					handoff.task === this.complexParent().id,
+				"Handoff belongs to another run, work cycle, parent or task attempt",
+				"INVALID_RESULT",
+			);
+			requireComplex(handoff.unresolved.length === 0, "Developer handoff reports unresolved work", "INVALID_RESULT");
+			requireComplex(
+				c.sessionRef?.role === "Developer",
+				"COMPLEX requires a persisted Developer session",
+				"INVALID_RESULT",
+			);
+			// changed_files must equal the ledger's effects of this attempt (the task's own claims only).
+			const attemptEntry = this.attemptEntries.get(task.id);
+			const attemptDelta = attemptEntry ? ledger.changedSince(attemptEntry, task.id) : [];
+			requireComplex(
+				handoff.changed_files.length === attemptDelta.length &&
+					capabilityJson([...handoff.changed_files].sort()) === capabilityJson(attemptDelta),
+				"Handoff changed_files differ from the actual task-local delta",
+				"INVALID_RESULT",
+			);
+			if (this.state.risk === "R3" && task.ownership.some((claim) => claim.operation === "delete"))
+				requireComplex(
+					this.state.approvals?.[0]?.status === "CONSUMED" &&
+						capabilityJson(attemptDelta) === capabilityJson([this.state.r3Scope?.targetPath]),
+					"R3 task requires the one consumed deletion of its exact target",
+					"APPROVAL_INVALID",
+				);
+			// The task's own claimed files, which no sibling may touch, are captured at handoff.
+			const images = await this.captureOwnClaims(task.id, signal);
+			signal.throwIfAborted();
+			await this.complexSave(
+				(current) => {
+					const row = current.complex.tasks[c.taskIndex];
+					const taskEntry = this.taskEntries.get(task.id);
+					row.status = "HANDED_OFF";
+					row.changedFiles = taskEntry ? ledger.changedSince(taskEntry, task.id) : attemptDelta;
+					if (c.evidenceIndex !== undefined) {
+						const record = current.evidence[c.evidenceIndex];
+						record.changedFiles = attemptDelta;
+						record.changeDigest = attemptEntry ? ledger.changeDigest(attemptEntry, attemptDelta) : null;
+						record.handoff = true;
+					}
+					this.handoffs.set(task.id, { handoff, images });
+					return {};
+				},
+				[
+					{
+						type: "AgentCompleted",
+						step: c.step,
+						role: "Developer",
+						...(c.sessionRef ? { sessionRef: c.sessionRef } : {}),
+						complexContext: c.context,
+					},
+					{ type: "StepCompleted", step: c.step, complexContext: c.context },
+				],
+			);
+			member.handedOff = true;
+		} catch (error) {
+			if (member.measurement === undefined && error instanceof WorkerExecutionError)
+				member.measurement = error.measurement;
+			member.error = error;
+			member.afterAbort = signal.aborted;
+			stop();
+		} finally {
+			c.sessionOpen = false;
+			c.approvalOpen = false;
+			c.closeOwnership?.();
+		}
+	}
+
+	/** A HANDED_OFF row's verification turn begins at the quiescent workspace digest (§4 rule 6). */
+	private startTurn(work: ComplexWork, index: number, digest: string): Partial<Run> {
+		const plan = this.plan;
+		const row = work.complex.tasks[index];
+		const turn = row ? this.handoffs.get(row.id) : undefined;
+		if (!plan || !row || row.status !== "HANDED_OFF" || !turn)
+			throw new Error("A verification turn needs a HANDED_OFF row with its handoff");
+		row.status = "SELF_CHECK";
+		row.exitWorkspaceDigest = digest;
+		const context = taskContext(plan, row.id, row.attempt);
+		const record = work.evidence.find((item) => sameContext(item.complexContext, context));
+		if (record) record.exitWorkspaceDigest = digest;
+		return {
+			handoff: turn.handoff,
+			phase: "SELF_CHECK",
+			currentStep: { stepId: "self-check", attempt: row.attempt },
+			activeAgents: [],
+			next: ["self-check"],
+		};
+	}
+
+	/**
+	 * Wave settlement (§4 rule 8, §6), after the wave is aborted and joined. A user cancel ends every started row
+	 * CANCELLED. Otherwise each row that failed on its own keeps its own status and code (a wave-level cause is every
+	 * wave row's own), stopped siblings end BLOCKED/RUN_STOPPED, and the Run takes the first failure in plan order.
+	 */
+	private async complexWaveFailure(
+		members: readonly WaveMember[],
+		signal: AbortSignal | undefined,
+		waveError?: unknown,
+	): Promise<void> {
+		const plan = this.plan;
+		if (!plan) throw new Error("COMPLEX plan unavailable");
+		// Every reserved invocation is settled exactly once, as unknown usage when it never reported one.
+		for (const { c, measurement } of members)
+			try {
+				this.complexSettleBudget(c, measurement);
+			} catch {
+				// A malformed measurement already failed its row; its spend stays recorded as unknown usage.
+			}
+		const unfinished = (member: WaveMember) => !member.handedOff;
+		if (signal?.aborted) {
+			await this.finishComplex({
+				status: "CANCELLED",
+				code: "CANCELLED",
+				reason: "Run cancelled",
+				events: members.filter(unfinished).flatMap(({ c }) => this.complexStepFailureEvents(c, "Run cancelled")),
+			});
+			return;
+		}
+		const own = members.flatMap((member) => {
+			const error = waveError ?? member.error;
+			if (error === undefined) return [];
+			const typed =
+				!!member.c.ownershipDenial ||
+				!!member.c.approvalFailure ||
+				member.c.sessionRejected ||
+				(member.error instanceof WorkerExecutionError && !!member.error.denial);
+			// A row that failed only because the wave was aborted is a stopped sibling, not a hidden failure.
+			if (waveError === undefined && member.afterAbort && !typed) return [];
+			return [{ member, ...this.complexOutcome(member.c, error) }];
+		});
+		const first = own[0];
+		const stoppedBy = first ? plan.tasks[first.member.c.taskIndex].id : "a sibling";
+		const events = members.flatMap((member) => {
+			if (!unfinished(member)) return [];
+			const failure = own.find((item) => item.member === member);
+			return this.complexStepFailureEvents(member.c, failure ? failure.reason : `Run stopped: ${stoppedBy} failed`);
+		});
+		await this.finishComplex({
+			status: first?.status ?? "BLOCKED",
+			code: first?.code ?? "RUN_STOPPED",
+			reason: first?.reason ?? "Wave stopped",
+			events,
+			failures: Object.fromEntries(
+				own.map(({ member, status, code }) => [
+					plan.tasks[member.c.taskIndex].id,
+					{
+						status,
+						failureCode: code,
+						...(member.c.evidenceIndex !== undefined ? { evidenceIndex: member.c.evidenceIndex } : {}),
+					},
+				]),
+			),
+		});
 	}
 
 	/**
@@ -2645,7 +3080,10 @@ export class CompanyKernel {
 		}
 	}
 
-	/** Task SELF_CHECK / TEST: the frozen task check subset, fresh, at the handoff (and reviewed) digest. */
+	/**
+	 * Task SELF_CHECK / TEST in the row's verification turn: the frozen task check subset, fresh, at the turn (and
+	 * reviewed) digest, with the row's own claimed files unchanged since its handoff (V0.8A §4 rule 6).
+	 */
 	private async complexTaskCheck(c: ComplexAdvance): Promise<void> {
 		const plan = this.plan;
 		const work = this.work;
@@ -2655,7 +3093,7 @@ export class CompanyKernel {
 		const task = plan.tasks[index];
 		const row = work.complex.tasks[index];
 		const test = c.step.stepId === "test";
-		const handoff = this.complexHandoff;
+		const handoff = this.handoffs.get(task.id)?.handoff;
 		const selfCheck = this.complexSelfCheck;
 		const review = this.complexReview;
 		if (!handoff || !row.exitWorkspaceDigest || (test && (!selfCheck || !review)))
@@ -2668,6 +3106,7 @@ export class CompanyKernel {
 			"Workspace changed after the task handoff",
 			"EXTERNAL_MUTATION",
 		);
+		this.assertOwnClaims(task.id, pre);
 		const checks = this.checks.filter((check) => task.checkIds.includes(check.id));
 		c.gateTarget = test ? "test" : "selfCheck";
 		row[c.gateTarget] = "RUNNING";
@@ -2691,6 +3130,7 @@ export class CompanyKernel {
 			"Workspace changed after task verification",
 			"EXTERNAL_MUTATION",
 		);
+		this.assertOwnClaims(task.id, post);
 		this.assertComplexChecks(c, result, checks, true);
 		if (test && selfCheck) this.assertDistinctCaptures(c, selfCheck, result);
 		// Cancellation fence: a cancel that arrived with the last check wins before any success commit.
@@ -2721,34 +3161,34 @@ export class CompanyKernel {
 		row.evidenceFreshness = "CURRENT";
 		row.failureCode = null;
 		this.taskHandoffs.set(task.id, handoff);
-		ledger.release();
-		this.complexHandoff = undefined;
+		ledger.release(task.id);
+		this.handoffs.delete(task.id);
 		this.complexSelfCheck = undefined;
 		this.complexReview = undefined;
 		this.previousContribution = undefined;
-		const next = index + 1 < plan.tasks.length ? index + 1 : -1;
-		if (next < 0) {
+		// The next HANDED_OFF row of this wave takes its turn in plan order, at this same quiescent digest.
+		const turn = work.complex.tasks.findIndex((item) => item.status === "HANDED_OFF");
+		if (turn >= 0) {
+			await this.complexSave((current) => this.startTurn(current, turn, post.diffDigest), events);
+			return;
+		}
+		if (work.complex.tasks.every((item) => item.status === "COMPLETED")) {
 			work.complex.phase = "INTEGRATION_CHECK";
-			work.complex.activeTaskId = null;
 			await this.complexSave(
 				{ phase: "SELF_CHECK", currentStep: { stepId: "self-check", attempt: 1 }, next: ["self-check"] },
 				events,
 			);
 			return;
 		}
-		// The scheduler considers only the next array entry, and only after every earlier task and declared
-		// dependency COMPLETED; it never searches for another runnable task.
-		const successor = plan.tasks[next];
+		// The next wave forms only after this one COMPLETED (§4 rule 1): plan order, scheduling dependencies
+		// COMPLETED, at most maxParallel rows; with maxParallel = 1 exactly the next row after every earlier one.
+		const wave = complexWave(plan, work.complex.tasks);
 		requireComplex(
-			work.complex.tasks.slice(0, next).every((item) => item.status === "COMPLETED") &&
-				successor.dependsOn.every(
-					(dependency) => work.complex.tasks.find((item) => item.id === dependency)?.status === "COMPLETED",
-				),
-			`${successor.id} cannot become eligible: a predecessor is not COMPLETED`,
+			wave.length > 0 && work.complex.tasks.every((item) => !ACTIVE_TASK_STATUSES.has(item.status)),
+			"The next wave cannot form: a scheduling dependency is not COMPLETED",
 			"DEPENDENCY_NOT_COMPLETED",
 		);
-		work.complex.tasks[next].status = "ELIGIBLE";
-		work.complex.activeTaskId = successor.id;
+		for (const position of wave) work.complex.tasks[position].status = "ELIGIBLE";
 		await this.complexSave(
 			{ phase: "IMPLEMENT", currentStep: { stepId: "implement", attempt: 1 }, next: ["implement"] },
 			events,
@@ -2767,7 +3207,7 @@ export class CompanyKernel {
 		const index = c.taskIndex;
 		const task = plan.tasks[index];
 		const row = work.complex.tasks[index];
-		const handoff = this.complexHandoff;
+		const handoff = this.handoffs.get(task.id)?.handoff;
 		const selfCheck = this.complexSelfCheck;
 		if (!handoff || !selfCheck) throw new Error("Task review requires the task handoff and SELF_CHECK evidence");
 		const pre = await this.captureReconciled(c.signal);
@@ -2776,6 +3216,7 @@ export class CompanyKernel {
 			"Workspace changed before task review",
 			"EXTERNAL_MUTATION",
 		);
+		this.assertOwnClaims(task.id, pre);
 		this.complexReserve(c, "Reviewer");
 		row.review = "RUNNING";
 		row.workerInvocations += 1;
@@ -2841,6 +3282,7 @@ export class CompanyKernel {
 			"Workspace changed during task review",
 			"EXTERNAL_MUTATION",
 		);
+		this.assertOwnClaims(task.id, post);
 		work.reviews.push(review);
 		if (c.evidenceIndex !== undefined) work.evidence[c.evidenceIndex].review = true;
 		const type = { PASS: "ReviewPassed", REVISE: "ReviewRevisionRequested", BLOCK: "ReviewBlocked" } as const;
@@ -2876,7 +3318,8 @@ export class CompanyKernel {
 			this.state.revisionCycle < plan.limits.maxTotalRevisionCycles
 		) {
 			// REVISE is the only local code loop: consume both revision budgets, keep the claim and failure history,
-			// clear current evidence and allocate a fresh attempt/session with NOT_RUN gates.
+			// clear current evidence and allocate a fresh attempt/session with NOT_RUN gates. The row re-implements
+			// alone (a wave of one) while later rows of its wave wait HANDED_OFF, then resumes its turn.
 			const attempt = row.attempt + 1;
 			row.revisionCycle += 1;
 			row.attempt = attempt;
@@ -2889,7 +3332,7 @@ export class CompanyKernel {
 			row.exitWorkspaceDigest = null;
 			ledger.activate({ taskId: task.id, attempt });
 			this.previousContribution = review;
-			this.complexHandoff = undefined;
+			this.handoffs.delete(task.id);
 			this.complexSelfCheck = undefined;
 			this.complexReview = undefined;
 			await this.complexSave(
@@ -3226,7 +3669,6 @@ export class CompanyKernel {
 		if (!review) throw new BlockedError("Completion requires the final review", "REVIEW_MISSING");
 		const parent = this.complexParent();
 		work.complex.phase = "TERMINAL";
-		work.complex.activeTaskId = null;
 		work.complex.cleanup = "CONFIRMED";
 		work.complex.partialChanges = false;
 		work.complex.changesUnknown = false;

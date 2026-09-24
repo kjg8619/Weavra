@@ -5,7 +5,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { type Static, Type } from "typebox";
 import { readAnchoredSource } from "./anchored-files.ts";
-import { ACTIVE_TASK_STATUSES, complexRunError, settleComplexState } from "./complex-state.ts";
+import { complexRunError, settleComplexState } from "./complex-state.ts";
 import { type PolicyDecision, PolicyDecisionSchema, type Run, RunSchema, validateContract } from "./contracts.ts";
 import { createRuntimeEvent, type EventDeliveryFailure, type RuntimeEvent, type RuntimeEventSink } from "./events.ts";
 import { isExecutionMode } from "./execution-contract.ts";
@@ -64,6 +64,29 @@ const StateSchema = Type.Object(
 );
 export type FileRuntimeState = Static<typeof StateSchema>;
 const archiveDigest = (text: string) => `sha256:${createHash("sha256").update(text).digest("hex")}`;
+
+/** FIFO asynchronous mutual exclusion; `acquire` resolves with the release of the acquired turn. */
+class Serial {
+	private tail: Promise<void> = Promise.resolve();
+	async acquire(): Promise<() => void> {
+		let release!: () => void;
+		const turn = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const previous = this.tail;
+		this.tail = previous.then(() => turn);
+		await previous;
+		return release;
+	}
+	async run<T>(operation: () => Promise<T>): Promise<T> {
+		const release = await this.acquire();
+		try {
+			return await operation();
+		} finally {
+			release();
+		}
+	}
+}
 
 /** A dead owner is only provable on this host; EPERM or success means the PID is alive. */
 function processAlive(pid: number): boolean {
@@ -141,6 +164,17 @@ export class StateStoreError extends Error {
 function active(run: Run): boolean {
 	return ["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(run.status);
 }
+/** Rows of a live COMPLEX wave whose Developer may have one action in flight (its tool calls stay sequential). */
+function implementingRows(run: Run): number {
+	if (run.workflow !== "COMPLEX" || !active(run)) return 0;
+	return (
+		run.complex?.tasks.filter((row) => row.status === "IMPLEMENTING" || row.status === "WAITING_APPROVAL").length ?? 0
+	);
+}
+/** Actions one Run may have PREPARED at once: one per implementing V0.8A wave row, otherwise one. */
+function actionSlots(run: Run): number {
+	return Math.max(1, implementingRows(run));
+}
 function assertState(value: unknown): FileRuntimeState {
 	const state = validateContract(StateSchema, value);
 	const runIds = new Set(state.runs.map((run) => run.runId));
@@ -176,7 +210,15 @@ function assertState(value: unknown): FileRuntimeState {
 			throw new Error("Invalid action record");
 		actionIds.add(id);
 	}
-	if (state.actions.filter((action) => action.status === "PREPARED").length > 1) throw new Error("Concurrent actions");
+	const prepared = state.actions.filter((action) => action.status === "PREPARED");
+	const owner = state.runs.find((run) => run.runId === prepared[0]?.decision.runId);
+	if (
+		prepared.length > 1 &&
+		(!owner ||
+			prepared.some((action) => action.decision.runId !== owner.runId) ||
+			prepared.length > actionSlots(owner))
+	)
+		throw new Error("Concurrent actions");
 	return state;
 }
 function projection(state: FileRuntimeState) {
@@ -204,6 +246,16 @@ export class FileStateStore implements StateStore, ActionAudit {
 	private closed = false;
 	private closing?: Promise<void>;
 	private busy = false;
+	/**
+	 * One durable write lane for the Run writer (V0.8A §4 rule 3): Kernel saves and the action intents and outcomes of
+	 * concurrent wave workers are applied one at a time in FIFO order instead of failing as concurrent, so every
+	 * durable write has one total order. Each turn covers one short mutation, never an effect. Two overlapping Kernel
+	 * saves are still rejected rather than losing a revision.
+	 */
+	private readonly lane = new Serial();
+	private saving = false;
+	/** Serializes the state.json replacement with the writability read, so a check never sees a half-applied commit. */
+	private readonly gate = new Serial();
 	private readonly eventFailures: EventDeliveryFailure[] = [];
 	/** Set when open removed a lock whose same-host owner PID no longer exists. */
 	recoveredStaleLock?: { pid: number };
@@ -428,17 +480,19 @@ export class FileStateStore implements StateStore, ActionAudit {
 		}
 	}
 	async assertWritable(): Promise<void> {
-		try {
-			await this.checkOwnership();
-			const persisted = await this.readJson("state.json");
-			if (
-				(persisted !== undefined || this.state.revision > 0) &&
-				JSON.stringify(persisted) !== JSON.stringify(this.state)
-			)
-				throw new StateStoreError("authoritative state changed outside the writer");
-		} catch (error) {
-			await this.fail(error);
-		}
+		await this.gate.run(async () => {
+			try {
+				await this.checkOwnership();
+				const persisted = await this.readJson("state.json");
+				if (
+					(persisted !== undefined || this.state.revision > 0) &&
+					JSON.stringify(persisted) !== JSON.stringify(this.state)
+				)
+					throw new StateStoreError("authoritative state changed outside the writer");
+			} catch (error) {
+				await this.fail(error);
+			}
+		});
 	}
 	private async releaseLock(): Promise<void> {
 		if (!this.lockIdentity) return;
@@ -552,12 +606,14 @@ export class FileStateStore implements StateStore, ActionAudit {
 	private async commit(next: FileRuntimeState, beforeStateRename?: () => void): Promise<void> {
 		next.revision = this.state.revision + 1;
 		assertState(next);
-		try {
-			await this.atomicReplace("state.json", next, beforeStateRename);
-		} catch {
-			throw new StateStoreError("state.json", false);
-		}
-		this.state = structuredClone(next);
+		await this.gate.run(async () => {
+			try {
+				await this.atomicReplace("state.json", next, beforeStateRename);
+			} catch {
+				throw new StateStoreError("state.json", false);
+			}
+			this.state = structuredClone(next);
+		});
 		try {
 			await this.atomicReplace("tasks.json", projection(next));
 		} catch {
@@ -746,6 +802,15 @@ export class FileStateStore implements StateStore, ActionAudit {
 	}
 	async save(run: Run): Promise<void> {
 		run = structuredClone(run);
+		if (this.closed || this.saving) throw new StateStoreError("closed or concurrent operation");
+		this.saving = true;
+		try {
+			await this.lane.run(() => this.saveRun(run));
+		} finally {
+			this.saving = false;
+		}
+	}
+	private async saveRun(run: Run): Promise<void> {
 		await this.mutate((next) => {
 			validateContract(RunSchema, run);
 			const index = next.runs.findIndex((item) => item.runId === run.runId);
@@ -877,13 +942,21 @@ export class FileStateStore implements StateStore, ActionAudit {
 				throw new Error("Stale revision or terminal run; resume is unsupported");
 			if (!previous && (run.status !== "CREATED" || next.runs.some(active)))
 				throw new Error("Project already has an active run");
-			if (next.actions.some((action) => action.status === "PREPARED")) throw new Error("Action still in flight");
+			// A Run is never written while an action is in flight, except that a live V0.8A wave records one row
+			// beside its siblings' in-flight actions (one per implementing row). A stop, a verification turn or a
+			// terminal save with an unfinished action still fails closed.
+			if (next.actions.filter((action) => action.status === "PREPARED").length > implementingRows(run))
+				throw new Error("Action still in flight");
 			if (index < 0) next.runs.push(run);
 			else next.runs[index] = run;
 		});
 	}
+	/** Durable intent, in the write lane: at most one action in flight, or one per implementing wave row. */
 	async prepare(decision: PolicyDecision): Promise<void> {
 		decision = structuredClone(decision);
+		await this.lane.run(() => this.prepareIntent(decision));
+	}
+	private async prepareIntent(decision: PolicyDecision): Promise<void> {
 		await this.mutate((next) => {
 			validateContract(PolicyDecisionSchema, decision);
 			const owner = next.runs.find((run) => run.runId === decision.runId);
@@ -898,21 +971,27 @@ export class FileStateStore implements StateStore, ActionAudit {
 				decision.risk !== "R0"
 			)
 				throw new Error("READ_ONLY worker action cannot mutate");
+			const running = next.runs.find((run) => run.runId === decision.runId && run.status === "RUNNING");
+			const inFlight = next.actions.filter((item) => item.status === "PREPARED");
 			if (
-				!next.runs.some((run) => run.runId === decision.runId && run.status === "RUNNING") ||
+				!running ||
+				inFlight.length >= actionSlots(running) ||
+				inFlight.some((item) => item.decision.runId !== decision.runId) ||
 				next.actions.some(
 					(item) =>
-						item.status === "PREPARED" ||
-						(item.decision.runId === decision.runId &&
-							(item.decision.actionId === decision.actionId ||
-								item.decision.configDigest !== decision.configDigest)),
+						item.decision.runId === decision.runId &&
+						(item.decision.actionId === decision.actionId ||
+							item.decision.configDigest !== decision.configDigest),
 				)
 			)
 				throw new Error("Action requires a running owner, a fresh ID and the same frozen configuration");
 			if (decision.decision === "ALLOW" && (decision.risk === "R2" || decision.risk === "R3")) {
 				const run = next.runs.find((run) => run.runId === decision.runId);
-				// COMPLEX: the attempt is the active task attempt (§10.1), not revisionCycle + 1.
-				const implementing = run?.complex?.tasks.find((row) => ACTIVE_TASK_STATUSES.has(row.status));
+				// COMPLEX: the attempt is an implementing task attempt (§10.1), not revisionCycle + 1; a V0.8A wave has
+				// one IMPLEMENTING row per concurrent Developer, all at the current step attempt.
+				const implementing = run?.complex?.tasks.some(
+					(row) => row.status === "IMPLEMENTING" && row.attempt === run.currentStep?.attempt,
+				);
 				if (
 					!run ||
 					run.risk !== decision.risk ||
@@ -920,9 +999,7 @@ export class FileStateStore implements StateStore, ActionAudit {
 					run.quickScope ||
 					run.phase !== "IMPLEMENT" ||
 					run.currentStep?.stepId !== "implement" ||
-					(run.workflow === "COMPLEX"
-						? implementing?.status !== "IMPLEMENTING" || run.currentStep.attempt !== implementing.attempt
-						: run.currentStep.attempt !== run.revisionCycle + 1) ||
+					(run.workflow === "COMPLEX" ? !implementing : run.currentStep.attempt !== run.revisionCycle + 1) ||
 					decision.role !== "Developer" ||
 					!run.activeAgents.includes("Developer") ||
 					run.roleSessionRefs.at(-1)?.role !== "Developer"
@@ -930,15 +1007,16 @@ export class FileStateStore implements StateStore, ActionAudit {
 					throw new Error("R2 intent requires a persisted STANDARD/R2 Developer session and review obligation");
 			}
 			if (decision.decision === "ALLOW" && decision.role === "Developer" && decision.risk !== "R0") {
-				// COMPLEX mutation intent exists only inside the one IMPLEMENTING task attempt with its Developer session.
+				// COMPLEX mutation intent exists only inside an IMPLEMENTING task attempt with its Developer session.
 				const run = next.runs.find((run) => run.runId === decision.runId);
-				const implementing = run?.complex?.tasks.find((row) => ACTIVE_TASK_STATUSES.has(row.status));
+				const implementing = run?.complex?.tasks.some(
+					(row) => row.status === "IMPLEMENTING" && row.attempt === run.currentStep?.attempt,
+				);
 				if (
 					run?.workflow === "COMPLEX" &&
 					(!run.complex ||
-						implementing?.status !== "IMPLEMENTING" ||
+						!implementing ||
 						run.currentStep?.stepId !== "implement" ||
-						run.currentStep.attempt !== implementing.attempt ||
 						!run.activeAgents.includes("Developer") ||
 						run.roleSessionRefs.at(-1)?.role !== "Developer")
 				)
@@ -968,13 +1046,15 @@ export class FileStateStore implements StateStore, ActionAudit {
 		});
 	}
 	async finish(runId: string, actionId: string, outcome: ActionOutcome): Promise<void> {
-		await this.mutate((next) => {
-			const action = next.actions.find(
-				(item) => item.decision.runId === runId && item.decision.actionId === actionId,
-			);
-			if (!action || action.status !== "PREPARED") throw new Error("No pending action");
-			action.status = outcome;
-		});
+		await this.lane.run(() =>
+			this.mutate((next) => {
+				const action = next.actions.find(
+					(item) => item.decision.runId === runId && item.decision.actionId === actionId,
+				);
+				if (!action || action.status !== "PREPARED") throw new Error("No pending action");
+				action.status = outcome;
+			}),
+		);
 	}
 }
 

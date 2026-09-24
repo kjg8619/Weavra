@@ -122,6 +122,11 @@ export interface PiAgentExecutorOptions {
 	/** Evaluation only: keep the SDK transcript in memory; ordinary workers retain durable sessions. */
 	sessionPersistence?: "memory";
 	fitnessObserver?: FitnessWorkerObserver;
+	/**
+	 * Trusted Host bound (1..4, default 1) on concurrent invocations: a COMPLEX V0.8A wave runs up to its frozen
+	 * `maxParallel` Developers at once. Each invocation keeps its own session, tools and cancellation.
+	 */
+	maxConcurrentWorkers?: number;
 }
 
 function inside(root: string, path: string): boolean {
@@ -320,10 +325,13 @@ export class PiAgentExecutor implements AgentExecutor {
 	private readonly timeoutMs: number;
 	private readonly maxTurns: number;
 	private readonly maxToolErrors: number;
-	private busy = false;
-	private cleanupConfirmed = true;
+	private readonly maxConcurrentWorkers: number;
+	/** Live invocations; never more than `maxConcurrentWorkers`. */
+	private activeInvocations = 0;
+	/** Sticky: one invocation's session cleanup could not be confirmed. */
+	private cleanupFailed = false;
 	get safeToRelease(): boolean {
-		return !this.busy && this.cleanupConfirmed;
+		return this.activeInvocations === 0 && !this.cleanupFailed;
 	}
 	private readonly stoppedRuns = new Set<string>();
 	private constructor(options: PiAgentExecutorOptions, paths: FilePolicyPathInspector, policy: PolicyContext) {
@@ -333,6 +341,7 @@ export class PiAgentExecutor implements AgentExecutor {
 		this.timeoutMs = options.timeoutMs ?? options.config.agents.worker_timeout_ms;
 		this.maxTurns = options.maxTurns ?? 32;
 		this.maxToolErrors = options.maxToolErrors ?? DEFAULT_MAX_TOOL_ERRORS;
+		this.maxConcurrentWorkers = options.maxConcurrentWorkers ?? 1;
 	}
 
 	private observe(callback: (observer: FitnessWorkerObserver) => void): void {
@@ -378,7 +387,10 @@ export class PiAgentExecutor implements AgentExecutor {
 			(options.maxTurns ?? 32) > 128 ||
 			!Number.isInteger(options.maxToolErrors ?? DEFAULT_MAX_TOOL_ERRORS) ||
 			(options.maxToolErrors ?? DEFAULT_MAX_TOOL_ERRORS) < 0 ||
-			(options.maxToolErrors ?? DEFAULT_MAX_TOOL_ERRORS) > 32
+			(options.maxToolErrors ?? DEFAULT_MAX_TOOL_ERRORS) > 32 ||
+			!Number.isInteger(options.maxConcurrentWorkers ?? 1) ||
+			(options.maxConcurrentWorkers ?? 1) < 1 ||
+			(options.maxConcurrentWorkers ?? 1) > 4
 		)
 			throw new Error("Invalid worker limits");
 		const paths = await FilePolicyPathInspector.open(options.cwd);
@@ -502,7 +514,11 @@ export class PiAgentExecutor implements AgentExecutor {
 	}
 
 	private async performExecution(input: AgentExecutionRequest): Promise<AgentExecutionResult> {
-		if (this.busy || !this.cleanupConfirmed || this.stoppedRuns.has(input.runId))
+		if (
+			this.activeInvocations >= this.maxConcurrentWorkers ||
+			this.cleanupFailed ||
+			this.stoppedRuns.has(input.runId)
+		)
 			throw new Error("Worker already active or run stopped");
 		const {
 			signal: parentSignal,
@@ -564,7 +580,9 @@ export class PiAgentExecutor implements AgentExecutor {
 			this.stoppedRuns.add(request.runId);
 			parentSignal.throwIfAborted();
 		}
-		this.busy = true;
+		this.activeInvocations += 1;
+		// This invocation's own session cleanup; concurrent invocations never confirm each other's.
+		let cleanupConfirmed = true;
 		const cancellation = new AbortController();
 		const signal = parentSignal ? AbortSignal.any([parentSignal, cancellation.signal]) : cancellation.signal;
 		let session: AgentSession | undefined;
@@ -721,7 +739,7 @@ export class PiAgentExecutor implements AgentExecutor {
 			}
 			assertActive();
 			creationAttempted = true;
-			this.cleanupConfirmed = false;
+			cleanupConfirmed = false;
 			const created = await createAgentSession({
 				cwd: this.options.cwd,
 				agentDir: this.options.agentDir,
@@ -944,15 +962,16 @@ export class PiAgentExecutor implements AgentExecutor {
 						session?.dispose();
 					}
 				}
-				this.cleanupConfirmed = session !== undefined || !creationAttempted;
+				cleanupConfirmed = session !== undefined || !creationAttempted;
 			} catch {
-				this.cleanupConfirmed = false;
+				cleanupConfirmed = false;
 			} finally {
 				signal.removeEventListener("abort", abort);
-				this.busy = false;
+				if (!cleanupConfirmed) this.cleanupFailed = true;
+				this.activeInvocations -= 1;
 			}
 		}
-		if (!this.cleanupConfirmed) {
+		if (!cleanupConfirmed) {
 			this.stoppedRuns.add(request.runId);
 			throw new Error(`Worker cleanup unconfirmed (${stage}); retain project lock`);
 		}

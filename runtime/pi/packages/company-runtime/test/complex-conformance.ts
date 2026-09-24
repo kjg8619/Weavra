@@ -6,11 +6,14 @@ import { projectHostEvidence, projectHostGraph, projectHostRun } from "../src/ho
 import type { HostControlCapabilities, HostControlState } from "../src/host-control-protocol.ts";
 
 /**
- * Runtime-side restatement of every rule the merged #17 App consumer applies before it publishes a Host Control
- * observation: the strict wire decoder (app/t3code/packages/contracts/src/weavraControl.ts), the COMPLEX cross-field
- * checks (app/t3code/apps/server/src/weavra/ComplexProjection.ts) and the snapshot envelope checks
- * (RuntimeController.consistent). App code is never imported across build roots: each rule is re-stated here, so a
- * Runtime projection the App would reject (and show COMPLEX as unavailable) fails a Runtime test instead.
+ * Runtime-side restatement of every rule the App consumer applies before it publishes a Host Control observation:
+ * the strict wire decoder (app/t3code/packages/contracts/src/weavraControl.ts), the COMPLEX cross-field checks
+ * (app/t3code/apps/server/src/weavra/ComplexProjection.ts) and the snapshot envelope checks
+ * (RuntimeController.consistent). Kept in sync with the V0.8A #21 App (contract v2, PARALLEL_AGENTS.md §8, its
+ * Amendment A1 for terminal historical v1 plans and the atomic-save rules). This Runtime advertises exactly contract
+ * version 2, so only the v2 shapes are restated. App code is never imported across build roots: each rule is
+ * re-stated here, so a Runtime projection the App would reject (and show COMPLEX as unavailable) fails a Runtime
+ * test instead.
  */
 
 type Json = Record<string, unknown>;
@@ -84,10 +87,17 @@ function parentDigest(parent: WireParent): string {
 		})),
 	);
 }
+/** Each plan version hashes in its own domain; a historical v1 plan is recomputed in the v1 domain (A1). */
 function planDigest(plan: WirePlan): string {
 	const { complexPlanDigest: _excluded, ...material } = plan;
-	return sha256(canonicalJson(["weavra-complex-plan-v1", material]));
+	return sha256(
+		canonicalJson([plan.schemaVersion === 1 ? "weavra-complex-plan-v1" : "weavra-complex-plan-v2", material]),
+	);
 }
+/** v1 plans run one task at a time. */
+const maxParallelOf = (plan: WirePlan) => (plan.schemaVersion === 2 ? (plan.limits.maxParallel ?? 0) : 1);
+/** v1 plans, and v2 plans frozen to one worker, schedule only the next row after every earlier one. */
+const sequential = (plan: WirePlan) => maxParallelOf(plan) === 1;
 
 // --- Strict decoder (weavraControl.ts), restated field by field -----------------------------------------------
 
@@ -97,7 +107,7 @@ const WORKSPACE_DIGEST = /^[0-9a-f]{64}$/;
 const TASK_ID = /^CT-00[1-8]$/;
 const CRITERION_ID = /^AC-[0-9]{3}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const TASK_STATUSES = [
+const TASK_STATUSES_V1 = [
 	"PENDING",
 	"ELIGIBLE",
 	"IMPLEMENTING",
@@ -112,6 +122,8 @@ const TASK_STATUSES = [
 	"CANCELLED",
 	"INTERRUPTED",
 ];
+/** v2 adds HANDED_OFF: implemented, waiting for its verification turn. */
+const TASK_STATUSES = [...TASK_STATUSES_V1, "HANDED_OFF"];
 const PHASES = [
 	"TASK_SEQUENCE",
 	"INTEGRATION_CHECK",
@@ -263,14 +275,22 @@ interface WireTask {
 	maxRevisionCycles: number;
 }
 interface WirePlan {
-	schemaVersion: 1;
+	/** 2, or 1 only for a terminal historical V0.7B Run inside a v2 execution (Amendment A1). */
+	schemaVersion: 1 | 2;
 	planId: string;
 	complexPlanDigest: string;
 	parentTaskId: string;
 	parentTaskContractDigest: string;
 	tasks: WireTask[];
 	integration: { criterionIds: string[]; checkIds: string[]; reviewRequired: true; finalChecksRequired: true };
-	limits: { maxTasks: 8; maxWorkerInvocations: number; maxReportedTokens: number; maxTotalRevisionCycles: number };
+	limits: {
+		maxTasks: 8;
+		maxWorkerInvocations: number;
+		maxReportedTokens: number;
+		maxTotalRevisionCycles: number;
+		/** v2 only. */
+		maxParallel?: number;
+	};
 }
 interface WireRow {
 	id: string;
@@ -290,7 +310,7 @@ interface WireRow {
 	failureCode: string | null;
 }
 interface WireExecution {
-	schemaVersion: 1;
+	schemaVersion: 2;
 	ownerId: string;
 	projectRevision: number;
 	runId: string;
@@ -298,7 +318,7 @@ interface WireExecution {
 	parent: WireParent;
 	plan: WirePlan;
 	phase: string;
-	activeTaskId: string | null;
+	activeTaskIds: string[];
 	tasks: WireRow[];
 	integration: {
 		check: string;
@@ -334,7 +354,7 @@ function planShape(value: unknown, path: string, issues: Issues): value is WireP
 		"limits",
 	];
 	if (!closed(value, path, keys, issues)) return false;
-	rule(issues, value.schemaVersion === 1, `${path}.schemaVersion`, "must be 1");
+	rule(issues, value.schemaVersion === 1 || value.schemaVersion === 2, `${path}.schemaVersion`, "must be 1 or 2");
 	rule(issues, matches(value.planId, UUID), `${path}.planId`, "not a canonical lowercase UUID");
 	rule(issues, matches(value.complexPlanDigest, DIGEST), `${path}.complexPlanDigest`, "not a digest");
 	rule(issues, matches(value.parentTaskId, IDENTIFIER), `${path}.parentTaskId`, "not an identifier");
@@ -422,10 +442,23 @@ function planShape(value: unknown, path: string, issues: Issues): value is WireP
 		rule(issues, integration.reviewRequired === true, `${path}.integration.reviewRequired`, "must be true");
 		rule(issues, integration.finalChecksRequired === true, `${path}.integration.finalChecksRequired`, "must be true");
 	}
-	const limitKeys = ["maxTasks", "maxWorkerInvocations", "maxReportedTokens", "maxTotalRevisionCycles"];
+	const limitKeys = [
+		"maxTasks",
+		"maxWorkerInvocations",
+		"maxReportedTokens",
+		"maxTotalRevisionCycles",
+		...(value.schemaVersion === 2 ? ["maxParallel"] : []),
+	];
 	if (closed(value.limits, `${path}.limits`, limitKeys, issues)) {
 		const limits = value.limits as Json;
 		rule(issues, limits.maxTasks === 8, `${path}.limits.maxTasks`, "must be 8");
+		if (value.schemaVersion === 2)
+			rule(
+				issues,
+				isCounter(limits.maxParallel) && limits.maxParallel >= 1 && limits.maxParallel <= 4,
+				`${path}.limits.maxParallel`,
+				"1-4",
+			);
 		rule(
 			issues,
 			isCounter(limits.maxWorkerInvocations) &&
@@ -513,7 +546,7 @@ function parentShape(value: unknown, path: string, issues: Issues): value is Wir
 
 const nullOr = (value: unknown, test: (value: unknown) => boolean) => value === null || test(value);
 
-function rowShape(value: unknown, path: string, issues: Issues) {
+function rowShape(value: unknown, path: string, issues: Issues, statuses: readonly string[]) {
 	const keys = [
 		"id",
 		"status",
@@ -533,7 +566,7 @@ function rowShape(value: unknown, path: string, issues: Issues) {
 	];
 	if (!closed(value, path, keys, issues)) return;
 	rule(issues, matches(value.id, TASK_ID), `${path}.id`, "not a task ID");
-	rule(issues, oneOf(value.status, TASK_STATUSES), `${path}.status`, "unknown status");
+	rule(issues, oneOf(value.status, statuses), `${path}.status`, "unknown status");
 	rule(issues, isCounter(value.attempt) && value.attempt <= 3, `${path}.attempt`, "0-3");
 	rule(issues, isCounter(value.revisionCycle) && value.revisionCycle <= 2, `${path}.revisionCycle`, "0-2");
 	rule(issues, isCounter(value.workerInvocations) && value.workerInvocations <= 6, `${path}.workerInvocations`, "0-6");
@@ -575,7 +608,7 @@ export function complexExecutionShapeIssues(value: unknown, path = "complexExecu
 		"parent",
 		"plan",
 		"phase",
-		"activeTaskId",
+		"activeTaskIds",
 		"tasks",
 		"integration",
 		"budget",
@@ -585,7 +618,7 @@ export function complexExecutionShapeIssues(value: unknown, path = "complexExecu
 		"failureCode",
 	];
 	if (!closed(value, path, keys, issues)) return issues;
-	rule(issues, value.schemaVersion === 1, `${path}.schemaVersion`, "must be 1");
+	rule(issues, value.schemaVersion === 2, `${path}.schemaVersion`, "must be 2");
 	rule(issues, matches(value.ownerId, IDENTIFIER), `${path}.ownerId`, "not an identifier");
 	rule(issues, isCounter(value.projectRevision), `${path}.projectRevision`, "counter");
 	rule(issues, matches(value.runId, IDENTIFIER), `${path}.runId`, "not an identifier");
@@ -593,18 +626,33 @@ export function complexExecutionShapeIssues(value: unknown, path = "complexExecu
 	parentShape(value.parent, `${path}.parent`, issues);
 	planShape(value.plan, `${path}.plan`, issues);
 	rule(issues, oneOf(value.phase, PHASES), `${path}.phase`, "unknown phase");
-	rule(
-		issues,
-		nullOr(value.activeTaskId, (item) => matches(item, TASK_ID)),
-		`${path}.activeTaskId`,
-		"task ID or null",
-	);
+	const activeTaskIds = value.activeTaskIds;
+	if (!Array.isArray(activeTaskIds)) issues.push(`${path}.activeTaskIds: expected an array`);
+	else
+		rule(
+			issues,
+			activeTaskIds.length <= 4 &&
+				activeTaskIds.every((item) => matches(item, TASK_ID)) &&
+				ascending(activeTaskIds as string[]),
+			`${path}.activeTaskIds`,
+			"at most 4 task IDs, strictly ascending",
+		);
 	if (!Array.isArray(value.tasks)) issues.push(`${path}.tasks: expected an array`);
 	else {
 		rule(issues, value.tasks.length >= 2 && value.tasks.length <= 8, `${path}.tasks`, "2-8 rows");
 		value.tasks.forEach((row, index) => {
-			rowShape(row, `${path}.tasks[${index}]`, issues);
+			rowShape(row, `${path}.tasks[${index}]`, issues, TASK_STATUSES);
 		});
+		// Amendment A1: a historical v1 plan carries no wave and only v1 row statuses.
+		if (isRecord(value.plan) && value.plan.schemaVersion === 1)
+			rule(
+				issues,
+				Array.isArray(activeTaskIds) &&
+					activeTaskIds.length === 0 &&
+					value.tasks.every((row) => !isRecord(row) || oneOf(row.status, TASK_STATUSES_V1)),
+				path,
+				"a historical v1 plan has no active rows and no HANDED_OFF row",
+			);
 	}
 	const integrationKeys = ["check", "review", "test", "workspaceDigest", "evidenceFreshness", "failureCode"];
 	if (closed(value.integration, `${path}.integration`, integrationKeys, issues)) {
@@ -700,7 +748,17 @@ function graphShapeIssues(value: unknown, path: string): Issues {
 
 // --- ComplexProjection.ts cross-field rules, restated ------------------------------------------------------------
 
-const ACTIVE = new Set(["ELIGIBLE", "IMPLEMENTING", "WAITING_APPROVAL", "SELF_CHECK", "REVIEW", "TEST", "STOPPING"]);
+const ACTIVE = new Set([
+	"ELIGIBLE",
+	"IMPLEMENTING",
+	"WAITING_APPROVAL",
+	"HANDED_OFF",
+	"SELF_CHECK",
+	"REVIEW",
+	"TEST",
+	"STOPPING",
+]);
+const VERIFYING = new Set(["SELF_CHECK", "REVIEW", "TEST"]);
 const FINISHED = new Set(["COMPLETED", "BLOCKED", "FAILED", "CANCELLED", "INTERRUPTED"]);
 const TERMINAL_RUN = new Set(["BLOCKED", "FAILED", "CANCELLED", "INTERRUPTED", "COMPLETED"]);
 const INTEGRATION = new Set(["INTEGRATION_CHECK", "FINAL_REVIEW", "FINAL_TEST", "COMPLETING"]);
@@ -775,12 +833,14 @@ function planFitsParentIssues(
 
 /**
  * §10.3 preview checks (ComplexProjection.complexPreviewConsistent) plus the prepare-response checks of
- * RuntimeController.command: echoed owner/project revision and COMPLEX iff the request carried a draft.
+ * RuntimeController.command: echoed owner/project revision and COMPLEX iff the request carried a draft. The plan has
+ * exactly the advertised contract version (2 for this Runtime) and an R3 plan implements one task at a time.
  */
 export function complexPreviewIssues(
 	preview: unknown,
 	request?: { ownerId: string; expectedProjectRevision: number; complexDraft?: unknown },
 	path = "preview",
+	version: number | undefined = 2,
 ): Issues {
 	const shape = previewShapeIssues(preview, path);
 	if (shape.length || !isRecord(preview)) return shape;
@@ -818,6 +878,18 @@ export function complexPreviewIssues(
 			criteria.map((criterion) => ({ ...criterion, paths: allowedPaths })),
 		);
 		rule(issues, preview.recipe === null, `${path}.recipe`, "a COMPLEX preview carries no recipe");
+		rule(
+			issues,
+			plan.schemaVersion === version,
+			`${path}.complexPlan.schemaVersion`,
+			"must be the advertised version",
+		);
+		rule(
+			issues,
+			preview.risk !== "R3" || sequential(plan),
+			`${path}.complexPlan.limits`,
+			"an R3 plan implements one task at a time (maxParallel 1)",
+		);
 		rule(issues, preview.taskContractDigest === digest, `${path}.taskContractDigest`, "parent does not recompute");
 		rule(
 			issues,
@@ -838,7 +910,14 @@ export function complexPreviewIssues(
 	return issues;
 }
 
-function rowIssues(row: WireRow, task: WireTask | undefined, earlier: readonly WireRow[], path: string): Issues {
+function rowIssues(
+	row: WireRow,
+	task: WireTask | undefined,
+	rows: readonly WireRow[],
+	index: number,
+	inOrder: boolean,
+	path: string,
+): Issues {
 	const issues: Issues = [];
 	if (!task || row.id !== task.id) return [`${path}: row does not match the plan task in order`];
 	if (row.status === "PENDING") {
@@ -890,12 +969,30 @@ function rowIssues(row: WireRow, task: WireTask | undefined, earlier: readonly W
 		"changed files outside the task claims",
 	);
 	rule(issues, ordered(row.selfCheck, row.review, row.test), path, "gates ran out of order");
+	// v2 rule 2: declared dependencies COMPLETED; sequential plans (v1, maxParallel 1): every earlier row COMPLETED.
+	const completed = (id: string) => rows.some((item) => item.id === id && item.status === "COMPLETED");
+	const ready = inOrder
+		? rows.slice(0, index).every((before) => before.status === "COMPLETED")
+		: task.dependsOn.every(completed);
 	rule(
 		issues,
-		(!ACTIVE.has(row.status) && row.status !== "COMPLETED") ||
-			earlier.every((before) => before.status === "COMPLETED"),
+		(!ACTIVE.has(row.status) && row.status !== "COMPLETED") || ready,
 		path,
-		"active or completed before every earlier task completed",
+		inOrder
+			? "active or completed before every earlier task completed"
+			: "active or completed before its declared dependencies completed",
+	);
+	// v2 rule 5: implemented and entry-captured, every gate still waiting for its verification turn.
+	rule(
+		issues,
+		row.status !== "HANDED_OFF" ||
+			(row.attempt >= 1 &&
+				row.entryWorkspaceDigest !== null &&
+				row.selfCheck === "NOT_RUN" &&
+				row.review === "NOT_RUN" &&
+				row.test === "NOT_RUN"),
+		path,
+		"HANDED_OFF needs an attempt, an entry capture and NOT_RUN gates",
 	);
 	rule(
 		issues,
@@ -915,12 +1012,63 @@ function rowIssues(row: WireRow, task: WireTask | undefined, earlier: readonly W
 
 type RunSummary = NonNullable<HostControlState["snapshot"]["status"]["run"]>;
 
+/**
+ * v2 rules 1, 3 and 4 with the §8 atomic-save amendment (activeRowsConsistent): `activeTaskIds` lists exactly the
+ * active rows in plan order within maxParallel; without a working row the active rows are all ELIGIBLE (one wave
+ * formation save) or any mix of HANDED_OFF and STOPPING (join and settlement); first-attempt implementation
+ * (IMPLEMENTING attempt 1, WAITING_APPROVAL) coexists only with HANDED_OFF rows; exactly one verification-state row
+ * (a stage, or a revising IMPLEMENTING attempt ≥ 2) coexists only with HANDED_OFF rows.
+ */
+function activeRowsIssues(execution: WireExecution, active: readonly WireRow[]): Issues {
+	const issues: Issues = [];
+	const path = "complexExecution";
+	const eligible = active.filter((row) => row.status === "ELIGIBLE");
+	const verifying = active.filter(
+		(row) => VERIFYING.has(row.status) || (row.status === "IMPLEMENTING" && row.attempt >= 2),
+	);
+	const implementing = active.filter(
+		(row) => row.status === "WAITING_APPROVAL" || (row.status === "IMPLEMENTING" && row.attempt < 2),
+	);
+	const othersHandedOff = (working: readonly WireRow[]) =>
+		active.every((row) => working.includes(row) || row.status === "HANDED_OFF");
+	rule(
+		issues,
+		sameList(
+			execution.activeTaskIds,
+			active.map((row) => row.id),
+		),
+		path,
+		"activeTaskIds must list exactly the active rows in plan order",
+	);
+	rule(issues, active.length <= maxParallelOf(execution.plan), path, "more active rows than maxParallel");
+	rule(
+		issues,
+		eligible.length === 0 || eligible.length === active.length,
+		path,
+		"a wave is formed in one save: ELIGIBLE rows are the whole active set",
+	);
+	rule(
+		issues,
+		implementing.length === 0 || (verifying.length === 0 && othersHandedOff(implementing)),
+		path,
+		"first-attempt implementation coexists only with HANDED_OFF rows",
+	);
+	rule(
+		issues,
+		verifying.length === 0 || (verifying.length === 1 && implementing.length === 0 && othersHandedOff(verifying)),
+		path,
+		"exactly one row verifies at a time, beside HANDED_OFF rows only",
+	);
+	return issues;
+}
+
 function executionIssues(execution: WireExecution, run: RunSummary): Issues {
 	const issues: Issues = [];
 	const path = "complexExecution";
 	const { plan, parent, tasks, integration, budget } = execution;
 	const digest = parentDigest(parent);
 	const active = tasks.filter((row) => ACTIVE.has(row.status));
+	const inOrder = sequential(plan);
 	const integrationGates = [integration.check, integration.review, integration.test];
 	const gates = [...tasks.flatMap((row) => [row.selfCheck, row.review, row.test]), ...integrationGates];
 	const taskInvocations = sum(tasks.map((row) => row.workerInvocations));
@@ -946,10 +1094,15 @@ function executionIssues(execution: WireExecution, run: RunSummary): Issues {
 	rule(issues, parent.status !== "completed" || run.status === "COMPLETED", path, "parent completed before the Run");
 	rule(issues, tasks.length === plan.tasks.length, path, "exactly one row per plan task");
 	tasks.forEach((row, index) => {
-		issues.push(...rowIssues(row, plan.tasks[index], tasks.slice(0, index), `${path}.tasks[${index}]`));
+		issues.push(...rowIssues(row, plan.tasks[index], tasks, index, inOrder, `${path}.tasks[${index}]`));
 	});
-	rule(issues, active.length <= 1, path, "at most one active row");
-	rule(issues, execution.activeTaskId === (active[0]?.id ?? null), path, "activeTaskId must name the active row");
+	issues.push(...activeRowsIssues(execution, active));
+	rule(
+		issues,
+		run.risk !== "R3" || sequential(plan),
+		path,
+		"an R3 plan implements one task at a time (maxParallel 1)",
+	);
 	rule(
 		issues,
 		!tasks.some((row) => row.status === "WAITING_APPROVAL") || run.status === "WAITING_APPROVAL",
@@ -1110,15 +1263,17 @@ export function complexConsumerIssues(current: ComplexObservation, previous?: Co
 	const issues: Issues = [];
 	const run = state.snapshot.status.run;
 	const advertised = capabilities.complexContractVersion;
-	rule(issues, advertised === undefined || advertised === 1, "capabilities.complexContractVersion", "must be 1");
+	// This Runtime implements exactly contract v2 (V0.8A §8) and never mixes versions on a connection.
+	rule(issues, advertised === undefined || advertised === 2, "capabilities.complexContractVersion", "must be 2");
 	// Strict decode of the COMPLEX fields (an optional key is absent, never null).
 	const present = Object.hasOwn(state, "complexExecution");
 	if (present) issues.push(...complexExecutionShapeIssues(state.complexExecution));
 	issues.push(...graphShapeIssues(state.snapshot.graph, "snapshot.graph"));
-	if (state.preview) issues.push(...complexPreviewIssues(state.preview, undefined, "preview"));
+	if (state.preview) issues.push(...complexPreviewIssues(state.preview, undefined, "preview", advertised));
 	if (issues.length) return issues;
 	const wire = present ? (state.complexExecution as unknown as WireExecution) : undefined;
-	// WeavraControlState filter: the projection belongs to exactly the enclosing latest COMPLEX Run and observation.
+	// WeavraControlState filter: the projection belongs to exactly the enclosing latest COMPLEX Run and observation,
+	// and a plan of another version than its projection is only a terminal historical Run (Amendment A1).
 	if (wire)
 		rule(
 			issues,
@@ -1126,12 +1281,13 @@ export function complexConsumerIssues(current: ComplexObservation, previous?: Co
 				wire.projectRevision === state.projectRevision &&
 				wire.stateRevision === state.stateRevision &&
 				wire.runId === run?.runId &&
-				run?.workflow === "COMPLEX",
+				run?.workflow === "COMPLEX" &&
+				(wire.plan.schemaVersion === wire.schemaVersion || TERMINAL_RUN.has(run.status)),
 			"complexExecution",
-			"envelope must equal the snapshot ownerId/projectRevision/stateRevision and latest COMPLEX runId",
+			"envelope must equal the snapshot ownerId/projectRevision/stateRevision and latest COMPLEX runId; a v1 plan only on a terminal Run",
 		);
 	// ComplexProjection.complexStateConsistent: presence, then cross-field and cross-snapshot consistency.
-	if (advertised !== 1) {
+	if (advertised === undefined) {
 		rule(issues, wire === undefined, "complexExecution", "an unadvertised Runtime must not send it");
 		rule(
 			issues,
@@ -1141,12 +1297,14 @@ export function complexConsumerIssues(current: ComplexObservation, previous?: Co
 		);
 	} else if (!wire) rule(issues, run?.workflow !== "COMPLEX", "complexExecution", "a latest COMPLEX Run needs it");
 	else if (!run) issues.push("complexExecution: projection without a latest Run");
+	else if (wire.schemaVersion !== advertised)
+		issues.push("complexExecution: schemaVersion differs from the advertised contract version");
 	else
 		try {
 			issues.push(...executionIssues(wire, run));
 			// A new Run replaces the projection; nothing is merged from an older one.
 			const before = previous?.state.complexExecution as WireExecution | undefined;
-			if (before && before.runId === wire.runId) {
+			if (before && before.runId === wire.runId && before.schemaVersion === wire.schemaVersion) {
 				issues.push(...transitionIssues(before, wire));
 				rule(
 					issues,
@@ -1243,7 +1401,8 @@ export function observeDurableRun(
 		try {
 			complexExecution = projectComplexExecution(run, { ...envelope, stateRevision: run.revision });
 			const parent = run.tasks[0];
-			if (run.complex && parent && isTaskContract(parent))
+			// The prepare-time bound applies to plans this Runtime compiles (v2), never to historical v1 plans.
+			if (run.complex?.plan.schemaVersion === 2 && parent && isTaskContract(parent))
 				rule(
 					issues,
 					jsonBytes(complexExecution) <= jsonBytes(maxComplexExecution(parent, run.complex.plan)),
@@ -1290,7 +1449,7 @@ export function observeDurableRun(
 	};
 	return {
 		observation: {
-			capabilities: { complexContractVersion: 1 },
+			capabilities: { complexContractVersion: 2 },
 			state,
 			response: {
 				ownerId: envelope.ownerId,

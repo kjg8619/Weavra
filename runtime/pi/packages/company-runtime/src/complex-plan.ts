@@ -10,6 +10,7 @@ import {
 	COMPLEX_FAILURE_CODES,
 	COMPLEX_IDENTIFIER_PATTERN,
 	COMPLEX_MAX_LOCAL_REVISION_CYCLES,
+	COMPLEX_MAX_PARALLEL,
 	COMPLEX_MAX_REGISTRATIONS,
 	COMPLEX_MAX_REPORTED_TOKENS,
 	COMPLEX_MAX_TASK_ATTEMPTS,
@@ -46,6 +47,7 @@ import { assertTaskContractBinding } from "./task-contract.ts";
 export {
 	assertComplexPlanBinding,
 	COMPLEX_PLAN_DIGEST_DOMAIN,
+	COMPLEX_PLAN_V1_DIGEST_DOMAIN,
 	ComplexPlanBindingError,
 	complexPlanDigest,
 	ownershipPathError,
@@ -90,7 +92,10 @@ export function parseComplexDraft(value: unknown): ComplexDraft {
 	return structuredClone(value);
 }
 
-/** Frozen limits (§6): COMPLEX maxima capped by configured Budget and revision limits; R3 allows no revision. */
+/**
+ * Frozen limits (§6; V0.8A §3): COMPLEX maxima capped by configured Budget and revision limits; R3 allows no
+ * revision and implements one task at a time (`maxParallel = 1`); otherwise `min(agents.max_parallel, 4)`.
+ */
 export function complexPlanLimits(config: RuntimeConfig, risk: Risk): ComplexPlan["limits"] {
 	return {
 		maxTasks: COMPLEX_MAX_TASKS,
@@ -104,6 +109,7 @@ export function complexPlanLimits(config: RuntimeConfig, risk: Risk): ComplexPla
 		),
 		maxTotalRevisionCycles:
 			risk === "R3" ? 0 : Math.min(COMPLEX_MAX_TOTAL_REVISION_CYCLES, config.agents.max_revision_cycles),
+		maxParallel: risk === "R3" ? 1 : Math.min(COMPLEX_MAX_PARALLEL, config.agents.max_parallel),
 	};
 }
 
@@ -141,7 +147,7 @@ function planMaterial(
 ): ComplexPlanMaterial {
 	const byNumber = (left: number, right: number) => left - right;
 	return {
-		schemaVersion: 1,
+		schemaVersion: 2,
 		planId,
 		parentTaskId: parent.id,
 		parentTaskContractDigest: taskContractDigest(parent),
@@ -328,8 +334,9 @@ export async function complexClaimsDenial(input: {
 
 /**
  * Conservative worst-case execution projection for this parent and plan (§10.3): bounded counters at their §6
- * maxima, unbounded revisions/tokens at MAX_SAFE_INTEGER, the longest enum spellings, maximal identifiers,
- * every capture present and every task claim reported as changed. Prepare admits a plan only if this fits.
+ * maxima, unbounded revisions/tokens at MAX_SAFE_INTEGER, the longest enum spellings, maximal identifiers, a full
+ * wave of active tasks, every capture present and every task claim reported as changed. Prepare admits a plan
+ * only if this fits.
  */
 export function maxComplexExecution(parent: TaskContract, plan: ComplexPlan): ComplexExecution {
 	const identifier = "x".repeat(128);
@@ -339,7 +346,7 @@ export function maxComplexExecution(parent: TaskContract, plan: ComplexPlan): Co
 	const evidenceFreshness = longest(EVIDENCE_FRESHNESS);
 	const failureCode = longest(COMPLEX_FAILURE_CODES);
 	return {
-		schemaVersion: 1,
+		schemaVersion: 2,
 		ownerId: identifier,
 		projectRevision: Number.MAX_SAFE_INTEGER,
 		runId: identifier,
@@ -347,7 +354,7 @@ export function maxComplexExecution(parent: TaskContract, plan: ComplexPlan): Co
 		parent: { ...structuredClone(parent), status: longest(COMPLEX_PARENT_STATUSES) },
 		plan: structuredClone(plan),
 		phase: longest(COMPLEX_PHASES),
-		activeTaskId: complexTaskId(1),
+		activeTaskIds: plan.tasks.slice(0, plan.limits.maxParallel).map((task) => task.id),
 		tasks: plan.tasks.map((task) => ({
 			id: task.id,
 			status: longest(COMPLEX_TASK_STATUSES),

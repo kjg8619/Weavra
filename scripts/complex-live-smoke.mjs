@@ -73,7 +73,7 @@ const result = await Effect.runPromise(
     const hello = yield* transport.exchange({ protocolVersion: 1, id: crypto.randomUUID(), type: "control.hello" });
     assert.equal(hello.success, true, JSON.stringify(hello));
     const capabilities = hello.data.capabilities;
-    assert.equal(capabilities.complexContractVersion, 1, "Runtime must advertise COMPLEX contract v1");
+    assert.equal(capabilities.complexContractVersion, 2, "Runtime must advertise COMPLEX contract v2");
     let previous = null;
     let checked = 0;
     const snapshot = () =>

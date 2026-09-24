@@ -4,7 +4,7 @@ Adaptive Agent Workflow Runtime — **Weavra v0.1 RC1 기반 development build**
 
 사용자 설치·Quick Start·기능 범위는 [Weavra README](../../README.md)를 참고한다. 이 문서는 S0~S6 및 RC 수정의 구현 참조다. 내부 `company-runtime`/`CompanyKernel` 명칭과 Pi workspace package 버전 `0.85.1`은 유지하며 Weavra 제품 버전과 구분한다.
 
-Host 독립 Kernel, StateStore·Policy, 독립 Pi SDK 역할에 실제 Git evidence·등록 check·명령/lifecycle을 연결했다. **STANDARD/R0~R2와 QUICK/R0~R1**을 지원한다. R2는 제한된 파일 변경과 독립 리뷰를 결합한 경로다. R3는 명시적 인간 승인을 받은 단일 tracked 텍스트 파일 삭제만 지원한다. COMPLEX는 Host Control로 준비·확인한 구조화 계획의 2~8개 task를 한 Run에서 순차 실행하는 경로로만 지원한다([V0.7B](#v07b-complex-순차-workflow)). 범용 R3 실행, 자동 resume/rollback/commit, 병렬 조직, Planner는 지원하지 않는다. [GPT RC-01~08 validation](../../docs/GPT_RC_VALIDATION_2026-09-16.md)의 한정된 실제 검증을 통과했으며 정식 V0.1 release 선언은 아니다. DeepSeek는 NOT VERIFIED다.
+Host 독립 Kernel, StateStore·Policy, 독립 Pi SDK 역할에 실제 Git evidence·등록 check·명령/lifecycle을 연결했다. **STANDARD/R0~R2와 QUICK/R0~R1**을 지원한다. R2는 제한된 파일 변경과 독립 리뷰를 결합한 경로다. R3는 명시적 인간 승인을 받은 단일 tracked 텍스트 파일 삭제만 지원한다. COMPLEX는 Host Control로 준비·확인한 구조화 계획의 2~8개 task를 한 Run에서 실행하는 경로로만 지원한다([V0.7B](#v07b-complex-순차-workflow)). 독립 task의 구현은 최대 4개까지 wave로 동시에 실행할 수 있고 검증은 항상 한 번에 하나다([V0.8A](#v08a-complex-병렬-구현-wave)). 범용 R3 실행, 자동 resume/rollback/commit, Planner는 지원하지 않는다. [GPT RC-01~08 validation](../../docs/GPT_RC_VALIDATION_2026-09-16.md)의 한정된 실제 검증을 통과했으며 정식 V0.1 release 선언은 아니다. DeepSeek는 NOT VERIFIED다.
 
 ## 로딩
 
@@ -693,17 +693,29 @@ weavra browser observe \
 
 ## V0.7B COMPLEX 순차 workflow
 
-설계 계약: [COMPLEX_SEQUENTIAL_WORKFLOW.md](../../../../docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md). 하나의 frozen parent Task Contract를 사람이 준 2~8개 task로 나눠 **한 Run·한 writer 안에서 순서대로** 실행하고, 필수 integration 검증과 새 독립 final review/checks를 통과한 뒤에만 Kernel이 `COMPLETED`를 기록한다. active task와 mutable worker는 항상 최대 하나다.
+설계 계약: [COMPLEX_SEQUENTIAL_WORKFLOW.md](../../../../docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md). 하나의 frozen parent Task Contract를 사람이 준 2~8개 task로 나눠 **한 Run·한 writer 안에서 순서대로** 실행하고, 필수 integration 검증과 새 독립 final review/checks를 통과한 뒤에만 Kernel이 `COMPLETED`를 기록한다. 기본 `agents.max_parallel: 1`에서는 active task와 mutable worker가 항상 최대 하나다(병렬 구현 wave는 [V0.8A](#v08a-complex-병렬-구현-wave)).
 
 - **준비는 Host Control만.** `workflow.prepare`의 선택적 `complexDraft`(task별 title·goal·앞선 task index·parent AC index·exact-file claim·로컬 registered check ID)를 결정적 compiler가 검증하고 `CT-001…` ID·digest·limits를 부여해 preview에 전체 plan을 싣는다. `workflow.confirm`이 그 preview를 한 번 실행하며, confirm 뒤 plan은 바꿀 수 없다. 구조화 계획 없는 COMPLEX 선택은 `UNSUPPORTED_WORKFLOW`, draft 모양·크기 오류는 `INVALID_REQUEST`, graph·coverage·ownership·check·limit 위반은 `INVALID_CRITERIA`다. TUI `/workflow run`은 goal만 받으므로 COMPLEX 목표를 안내와 함께 거부하고 STANDARD로 낮추지 않는다.
-- **순차 실행.** 다음 배열 항목만 `ELIGIBLE`이 되며 앞선 모든 task와 선언된 dependency가 `COMPLETED`여야 한다. 재정렬·병렬·건너뛰기는 없다.
+- **순차 실행.** `maxParallel = 1`이면 다음 배열 항목만 `ELIGIBLE`이 되며 앞선 모든 task와 선언된 dependency가 `COMPLETED`여야 한다. 재정렬·건너뛰기는 없다. handoff 직후 잠시 `HANDED_OFF`를 거쳐 곧바로 SELF_CHECK로 간다.
 - **정확한 파일 소유.** claim은 exact file의 `modify`/`create`(R3만 `delete`)이고 권한이 아니다. 다른 task의 파일은 `OWNERSHIP_CONFLICT`, 미청구 파일은 `UNOWNED_PATH`로 effect 전에 막고 바이트를 바꾸지 않는다. Policy·보호 경로·R2/R3 규칙은 그대로이며 expected-image ledger가 설명되지 않는 변경을 `EXTERNAL_MUTATION`으로 막는다.
 - **검증.** task마다 선택한 registered check의 SELF_CHECK → 모든 Developer 세션과 다른 새 Reviewer의 기여 review(SUPPORTED/UNSUPPORTED/UNVERIFIED) → TEST를 거친다. 모든 task 뒤 전체 registered check, 이전 모든 세션과 다른 final Reviewer의 parent AC review(모든 AC MET + PASS), 전체 check 재실행을 거친다. task `COMPLETED`는 기여일 뿐 Run 완료가 아니다. `verification.repair`는 COMPLEX에 적용하지 않는다.
 - **완료와 중단.** 완료는 Kernel만 하며 모든 task의 검증 이력, fresh integration 증거, 알려진 budget, 확인된 자원 정리를 다시 확인한다. 실패·거부·취소는 정리 확인 후 `BLOCKED`/`FAILED`/`CANCELLED`, 정리를 확인하지 못하면 `INTERRUPTED`(writer 유지)다. 부분 변경은 보존하고 rollback·자동 resume·재시도는 없다. commit/merge/reset/stash/branch/worktree 같은 Git 자동화와 Planner/Lead 실행도 없다.
 - **한계.** task 2~8, claim은 task당 16·plan당 64, registered check 16, Developer/Reviewer 호출 전체 24회, provider-reported token 200,000(설정 budget이 더 작으면 그 값), revision은 Run 전체 `min(3, agents.max_revision_cycles)`·task당 `min(2, 전체)`이고 REVISE는 그 task의 새 attempt만 만든다. usage를 모르거나 cap에 닿으면 다음 worker와 완료 전에 `BLOCKED`다. R3는 CT-001의 Runtime 선택 tracked text file 삭제 하나와 read-only 후속 task만 허용하고 revision은 0이다. draft·plan은 각 12,288 bytes이며, 최대 실행 projection이 32,768 bytes를 넘을 plan은 prepare에서 거부한다.
-- **관측.** `control.hello`는 `complexContractVersion: 1`을 광고한다(권한이나 준비 완료 표시가 아님). `control.snapshot`은 최신 canonical Run이 COMPLEX일 때만(owned·historical·`INTERRUPTED` 포함) 그 Run에서 만든 `complexExecution`(parent·plan·task 행·integration gate·budget·cleanup·failure code)을 같은 ownerId/projectRevision/stateRevision으로 싣고, 이전 Run에서 가져오거나 잘라 보내지 않는다. 만들 수 없으면 `STATE_UNAVAILABLE`, projection 32 KiB나 응답 64 KiB를 넘으면 `RESPONSE_TOO_LARGE`다. read-only bridge summary에는 task 필드가 없다. TUI `/workflow status`·`/state`·`/workflow history`는 parent와 순서대로의 task 행·integration gate를, `/state evidence`는 prompt·transcript·diff·파일 내용·check 출력 없는 bounded `complex` 요약을 보여준다. `/graph`는 task graph를 그리지 않고 unavailable로 표시한다.
-- **미지원.** 병렬 task·다중 writer, Planner/Lead, confirm 뒤 plan 수정, 자동 resume/retry/rollback, TUI의 COMPLEX 계획 작성, directory/glob/공유 ownership, rename, 여러 파일 삭제 R3.
+- **관측.** `control.hello`는 `complexContractVersion: 2`를 광고한다(V0.8A 계약 v2, 권한이나 준비 완료 표시가 아님). `control.snapshot`은 최신 canonical Run이 COMPLEX일 때만(owned·historical·`INTERRUPTED` 포함) 그 Run에서 만든 `complexExecution`(parent·plan·task 행·integration gate·budget·cleanup·failure code)을 같은 ownerId/projectRevision/stateRevision으로 싣고, 이전 Run에서 가져오거나 잘라 보내지 않는다. 만들 수 없으면 `STATE_UNAVAILABLE`, projection 32 KiB나 응답 64 KiB를 넘으면 `RESPONSE_TOO_LARGE`다. read-only bridge summary에는 task 필드가 없다. TUI `/workflow status`·`/state`·`/workflow history`는 parent와 순서대로의 task 행·integration gate를, `/state evidence`는 prompt·transcript·diff·파일 내용·check 출력 없는 bounded `complex` 요약을 보여준다. `/graph`는 task graph를 그리지 않고 unavailable로 표시한다.
+- **미지원.** 다중 writer, 동시 검증, Planner/Lead, confirm 뒤 plan 수정, 자동 resume/retry/rollback, TUI의 COMPLEX 계획 작성, directory/glob/공유 ownership, rename, 여러 파일 삭제 R3.
 - **검증 범위.** faux provider의 Kernel·StateStore·Host Control·SDK 테스트와 App consumer 규칙 재진술(`test/complex-conformance.ts`)만 근거다. 실제 Runtime→App 결합 lifecycle과 실모델 실행은 #18 전까지 NOT VERIFIED다.
+
+## V0.8A COMPLEX 병렬 구현 wave
+
+설계 계약: [PARALLEL_AGENTS.md](../../../../docs/architecture/PARALLEL_AGENTS.md). `agents.max_parallel`(`1..4`, 기본 `1`)을 compiler가 plan `schemaVersion: 2`의 `limits.maxParallel`로 고정한다(R3는 항상 `1`). 한 Run·한 writer 안에서 선언된 dependency가 모두 `COMPLETED`인 `PENDING` task를 plan 순서로 최대 `maxParallel`개씩 한 wave로 묶어 **구현만** 동시에 실행한다.
+
+- **wave 시작.** wave는 worker 시작 전에 한 번 저장된다(`ELIGIBLE`). 예산은 wave 전체 Developer 호출을 plan 순서로 all-or-nothing 예약하며, 부족하면 어떤 worker도 시작하지 않고 `BLOCKED`/`BUDGET_EXHAUSTED`다. 모든 wave 행은 한 저장에서 공통 entry capture와 함께 `IMPLEMENTING`이 된다.
+- **동시 구현.** Developer마다 자기 세션, `(task, attempt)` 소유권 capability, context를 가진다. 다른 task의 파일은 여전히 effect 전에 `OWNERSHIP_CONFLICT`다. handoff의 변경 파일이 그 attempt의 ledger effect와 같고 자기 claim 파일 capture가 맞으면 `HANDED_OFF`가 된다. 형제가 쓰는 동안 전체 workspace digest는 찍지 않는다.
+- **join과 검증.** 모든 호출이 끝나고 자원이 멈춘 뒤 전체 capture 한 번이 모든 wave effect와 맞아야 한다(아니면 `EXTERNAL_MUTATION`). 그다음 plan 순서로 한 task씩, 조용한 workspace에서 V0.7B와 같은 SELF_CHECK → 기여 review → TEST를 한다. 각 단계에서 그 task의 claim 파일은 handoff 때와 같아야 한다. REVISE는 그 task만 새 attempt로 다시 구현하고 자기 차례를 이어간다.
+- **실패와 취소.** 한 task가 실패하면 wave 범위 abort로 형제를 멈추고 join한 뒤 모든 active 행을 한 저장에서 `STOPPING`으로 바꾸고 종료한다. 실패한 task는 자기 code를, 멈춘 형제는 `BLOCKED`/`RUN_STOPPED`(사용자 취소면 `CANCELLED`)를 받는다. Run `failureCode`는 plan 순서상 첫 실패다. owner가 사라지면 복구 시 끝나지 않은 모든 행이 `INTERRUPTED`/`OWNER_LOST`이며 재개는 없다.
+- **결정성.** 모든 durable 쓰기는 Kernel save queue 하나를 거쳐 revision과 event 순서가 하나로 정해진다. 측정·세션 참조는 plan 순서로 기록되어 worker 완료 순서와 무관하게 최종 상태가 같다(revision·timestamp 제외).
+- **관측.** `complexExecution`은 `schemaVersion: 2`와 `activeTaskIds`(plan 순서, integration·종료 시 빈 목록)를 싣는다. V0.7B Runtime이 남긴 COMPLEX Run(v1 plan)은 읽기 전용 이력이며, 종료된 경우에만 v1 plan과 digest를 그대로 둔 v2 execution으로 투영한다. TUI 행·footer와 `/state evidence`는 active task 전체, task별 wave 번호, `HANDED_OFF`를 보여준다.
+- **검증 범위.** faux provider의 Kernel race corpus(PARALLEL_AGENTS.md §11 P01–P12, P15–P17), StateStore·Host Control·SDK 병렬 테스트, #21 App과 결합한 #18 corpus 14 시나리오(`maxParallel = 1`)가 근거다. 실모델 병렬 smoke, 실제 경계의 재연결·crash(P13/P14)와 속도 향상 측정은 #22 전까지 NOT VERIFIED다.
 
 ## 설정 schema 1
 
@@ -749,7 +761,7 @@ verification:
 
 - 필수: `schemaVersion: 1`, `models.profiles.coding`, `models.profiles.reasoning`. 각 profile에는 비어 있지 않은 `provider`, `model`이 필요하다. `fast`, `creative`는 선택이다.
 - `runtime.workflow`: `adaptive` 기본값 또는 `QUICK`/`STANDARD`/`COMPLEX`. 설정 파싱은 workflow 판정·실행이 아니다.
-- `agents`: 병렬 수는 현재 `1`만 허용. STANDARD의 Reviewer REVISE 한도는 `0..3`, 기본 `1`이다. QUICK/R3의 effective 한도는 항상 0이며 V0.5C verification repair 최대 1회와 별개다.
+- `agents.max_parallel`: COMPLEX 구현 wave의 동시 task 수 `1..4`, 기본 `1`. plan에 고정되며 R3는 `1`이다. QUICK/STANDARD는 무시한다. STANDARD의 Reviewer REVISE 한도는 `0..3`, 기본 `1`이다. QUICK/R3의 effective 한도는 항상 0이며 V0.5C verification repair 최대 1회와 별개다.
 - `agents.worker_timeout_ms`: 기본 `180000`(180초), 정수 `10000..600000`(10~600초). Developer·Reviewer·Executor의 각 역할 호출에 동일하게 적용한다. 전체 run이나 개별 Provider 요청의 timeout이 아니며 여러 tool/retry turns를 포함한 역할 실행 총 예산이다. 역할별 설정·무제한 값은 지원하지 않는다. `/workflow config`로 현재 값을 확인할 수 있다.
 - `review.enabled`, `state.enabled`: `true`만 허용. state 디렉터리는 `.ai`로 고정한다.
 - `risk.approval_required`: 현재 `[R3]`만 허용. 프로젝트 설정으로 review·state·승인 요구를 끌 수 없다.

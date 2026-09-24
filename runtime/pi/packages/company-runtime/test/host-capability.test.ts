@@ -370,8 +370,8 @@ describe("COMPLEX preparation over Host Control (#16 stage A)", () => {
 		const client = await complexClient();
 		expect(client.hello).toMatchObject({ success: true, data: { kind: "capabilities" } });
 		if (!client.hello.success || client.hello.data.kind !== "capabilities") throw new Error("capabilities expected");
-		// #16 stage C: this Runtime implements contract v1 and advertises it; advertisement authorizes nothing.
-		expect(client.hello.data.capabilities.complexContractVersion).toBe(1);
+		// V0.8A: this Runtime implements exactly contract v2 and advertises it; advertisement authorizes nothing.
+		expect(client.hello.data.capabilities.complexContractVersion).toBe(2);
 		const response = await client.mutation({ type: "workflow.prepare", goal, complexDraft });
 		if (!response.success || response.data.kind !== "prepared") throw new Error(JSON.stringify(response));
 		const preview = response.data.preview;
@@ -575,7 +575,7 @@ describe("COMPLEX execution projection over Host Control (#16 stage C)", () => {
 		return run;
 	};
 
-	it("advertises contract v1 and projects the latest COMPLEX Run at the snapshot's exact revisions", async () => {
+	it("advertises contract v2 and projects the latest COMPLEX Run at the snapshot's exact revisions", async () => {
 		const { store, h, run } = await durableComplex();
 		expect(run.status, run.lastError ?? "").toBe("COMPLETED");
 		await store.close();
@@ -583,7 +583,7 @@ describe("COMPLEX execution projection over Host Control (#16 stage C)", () => {
 		expect(h.consumer.projected).toHaveLength(run.revision);
 		const client = await connect();
 		const first = await observation(client);
-		expect(first.capabilities.complexContractVersion).toBe(1);
+		expect(first.capabilities.complexContractVersion).toBe(2);
 		const { state } = first;
 		const stored = await latestRun();
 		expect(state.stateRevision).toBe(stored.revision);
@@ -638,7 +638,7 @@ describe("COMPLEX execution projection over Host Control (#16 stage C)", () => {
 		const client = await connect();
 		const active = await observation(client);
 		expect(active.state.snapshot.status.run).toMatchObject({ status: "RUNNING", workflow: "COMPLEX" });
-		expect(active.state.complexExecution).toMatchObject({ phase: "TASK_SEQUENCE", activeTaskId: "CT-002" });
+		expect(active.state.complexExecution).toMatchObject({ phase: "TASK_SEQUENCE", activeTaskIds: ["CT-002"] });
 		expect(active.state.ownedRunId).toBeNull();
 		expect(complexConsumerIssues(active)).toEqual([]);
 		const recovering = await FileStateStore.open(cwd);
@@ -646,7 +646,7 @@ describe("COMPLEX execution projection over Host Control (#16 stage C)", () => {
 		expect(recovered.state.snapshot.status.run?.status).toBe("INTERRUPTED");
 		expect(recovered.state.complexExecution).toMatchObject({
 			phase: "TERMINAL",
-			activeTaskId: null,
+			activeTaskIds: [],
 			cleanup: "UNCONFIRMED",
 			failureCode: "OWNER_LOST",
 			stateRevision: recovered.state.stateRevision,

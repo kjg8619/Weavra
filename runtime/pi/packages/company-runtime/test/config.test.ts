@@ -50,6 +50,13 @@ describe("runtime config", () => {
 		expect(config.verification.checks).toEqual([]);
 	});
 
+	it("V0.8A: accepts agents.max_parallel 1 to 4 for COMPLEX waves", () => {
+		for (const value of [1, 2, 3, 4])
+			expect(
+				parseRuntimeConfig(JSON.stringify({ ...minimal, agents: { max_parallel: value } })).agents.max_parallel,
+			).toBe(value);
+	});
+
 	it("parses YAML and applies check defaults without executing or interpolating data", () => {
 		const config = parseRuntimeConfig(`schemaVersion: 1
 models:
@@ -97,7 +104,10 @@ verification:
 		{ state: { enabled: false } },
 		{ state: { directory: "../elsewhere" } },
 		{ risk: { approval_required: [] } },
-		{ agents: { max_parallel: 3 } },
+		{ agents: { max_parallel: 0 } },
+		{ agents: { max_parallel: 5 } },
+		{ agents: { max_parallel: 1.5 } },
+		{ agents: { max_parallel: "2" } },
 		{ agents: { max_revision_cycles: -1 } },
 		{ agents: { max_revision_cycles: 4 } },
 		{ agents: { max_revision_cycles: 1.5 } },

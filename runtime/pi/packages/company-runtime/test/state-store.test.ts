@@ -343,6 +343,27 @@ describe("file StateStore", () => {
 		expect((await store.load("run-1"))?.revision).toBe(2);
 	});
 
+	it("V0.8A: applies overlapping mutations one at a time in FIFO order instead of failing them", async () => {
+		const store = await openStore();
+		const run = await kernel(store);
+		await run.start();
+		await store.prepare(decision);
+		const order: string[] = [];
+		// The action outcome, a Kernel save and a writability check overlap; the write lane orders them.
+		await Promise.all([
+			store.finish("run-1", "action-1", "SUCCEEDED").then(() => order.push("finish")),
+			store.save({ ...run.snapshot, revision: 3 }).then(() => order.push("save")),
+			store.assertWritable().then(() => order.push("writable")),
+		]);
+		expect(order.filter((step) => step !== "writable")).toEqual(["finish", "save"]);
+		expect(order).toContain("writable");
+		expect(store.snapshot.actions.map((action) => action.status)).toEqual(["SUCCEEDED"]);
+		expect((await store.load("run-1"))?.revision).toBe(3);
+		// Outside a live COMPLEX wave one action is in flight at a time, and a Run save never lands beside it.
+		await store.prepare({ ...decision, actionId: "action-2", actionDigest: "digest-2" });
+		await expect(store.save({ ...run.snapshot, revision: 4 })).rejects.toBeInstanceOf(StateStoreError);
+	});
+
 	it.each(["state.json", "tasks.json"])("rejects symlinked %s without writing its destination", async (file) => {
 		await (await openStore()).close();
 		const outside = join(root, "outside.json");

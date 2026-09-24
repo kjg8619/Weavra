@@ -9,6 +9,7 @@ import { capabilityJson } from "../src/capability-catalog.ts";
 import {
 	assertComplexPlanBinding,
 	COMPLEX_PLAN_DIGEST_DOMAIN,
+	COMPLEX_PLAN_V1_DIGEST_DOMAIN,
 	type ComplexClaimInspector,
 	type ComplexPathFact,
 	ComplexPlanBindingError,
@@ -19,6 +20,7 @@ import {
 	maxComplexExecution,
 	ownershipPathError,
 } from "../src/complex-plan.ts";
+import { complexWaves } from "../src/complex-state.ts";
 import {
 	COMPLEX_DRAFT_MAX_BYTES,
 	COMPLEX_EXECUTION_MAX_BYTES,
@@ -30,6 +32,8 @@ import {
 	ComplexIntegrationSchema,
 	type ComplexPlan,
 	ComplexPlanSchema,
+	type ComplexPlanV1,
+	ComplexPlanV1Schema,
 	ComplexTaskStateSchema,
 	OwnershipClaimSchema,
 } from "../src/complex-types.ts";
@@ -41,10 +45,11 @@ import { hostComplexClaimInspector } from "../src/host-workflow.ts";
 import { HostWorkflowError } from "../src/host-workflow-error.ts";
 import { buildTaskContract } from "../src/task-contract.ts";
 
+/** The historical V0.7B reference fixture (contract v1): read-only history for a v2 Runtime. */
 interface ContractFixture {
 	parent: TaskContract;
 	parentTaskContractDigest: string;
-	plan: ComplexPlan;
+	plan: ComplexPlanV1;
 	complexPlanDigest: string;
 	complexPlanDigestInput: string;
 	preview: {
@@ -57,6 +62,29 @@ interface ContractFixture {
 const fixture = JSON.parse(
 	readFileSync(new URL("./fixtures/complex-contract-v1.fixture.json", import.meta.url), "utf8"),
 ) as ContractFixture;
+/** The V0.8A reference fixture (contract v2), shared with the App lane as a copy: two waves of three tasks. */
+interface ContractFixtureV2 {
+	parent: TaskContract;
+	parentTaskContractDigest: string;
+	plan: ComplexPlan;
+	complexPlanDigest: string;
+	complexPlanDigestInput: string;
+	waves: string[][];
+}
+const fixtureV2 = JSON.parse(
+	readFileSync(new URL("./fixtures/complex-contract-v2.fixture.json", import.meta.url), "utf8"),
+) as ContractFixtureV2;
+
+/**
+ * What this v2 Runtime compiles from the V0.7B reference decomposition: the same bytes with `schemaVersion: 2`,
+ * `limits.maxParallel: 1` (the default `agents.max_parallel`) and the digest in the v2 domain. A test expectation
+ * only; the Runtime never rewrites or re-digests a frozen plan.
+ */
+function compiledV2(plan: ComplexPlanV1): ComplexPlan {
+	const { complexPlanDigest: _historical, ...material } = plan;
+	const next = { ...material, schemaVersion: 2 as const, limits: { ...material.limits, maxParallel: 1 } };
+	return { ...next, complexPlanDigest: complexPlanDigest(next) };
+}
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -130,11 +158,11 @@ function baseDraft(): ComplexDraft {
 	draft.tasks[0].ownership[0].path = "src/conf.ts";
 	return draft;
 }
-/** The fixture plan with the same substitution and its digest recomputed. */
+/** The fixture decomposition with the same substitution, as this v2 Runtime compiles it. */
 function basePlan(): ComplexPlan {
 	const plan = structuredClone(fixture.plan);
 	plan.tasks[0].ownership[0].path = "src/conf.ts";
-	return { ...plan, complexPlanDigest: complexPlanDigest(plan) };
+	return compiledV2(plan);
 }
 
 function withTask(index: number, fields: Record<string, unknown>): unknown {
@@ -211,20 +239,69 @@ async function project(files: Record<string, string | Buffer> = {}): Promise<str
 	return root;
 }
 
-describe("V0.7B COMPLEX contract identity", () => {
-	it("reproduces the reference fixture parent, plan, canonical digest input and digests exactly", () => {
+describe("COMPLEX contract identity (v2; the V0.7B v1 fixture as history)", () => {
+	it("reproduces the V0.8A v2 reference fixture: parent, plan, digest input, digests and waves", async () => {
+		const config = complexConfig({ agents: { max_revision_cycles: 3, max_parallel: 2 } });
+		const statements = fixtureV2.parent.acceptanceCriteria.map((criterion) => criterion.statement);
+		const parent = parentFor(config, fixtureV2.parent.goal, statements);
+		expect(parent).toEqual(fixtureV2.parent);
+		expect(taskContractDigest(parent)).toBe(fixtureV2.parentTaskContractDigest);
+		expect(fixtureV2.parentTaskContractDigest.startsWith("sha256:92eb75bd")).toBe(true);
+		const { complexPlanDigest: digest, ...material } = fixtureV2.plan;
+		expect(COMPLEX_PLAN_DIGEST_DOMAIN).toBe("weavra-complex-plan-v2");
+		expect(capabilityJson([COMPLEX_PLAN_DIGEST_DOMAIN, material])).toBe(fixtureV2.complexPlanDigestInput);
+		expect(complexPlanDigest(fixtureV2.plan)).toBe(fixtureV2.complexPlanDigest);
+		expect(digest).toBe(fixtureV2.complexPlanDigest);
+		expect(fixtureV2.complexPlanDigest.startsWith("sha256:eea6a2bf")).toBe(true);
+		expect(assertComplexPlanBinding(fixtureV2.plan, parent, { registeredCheckIds: ["test", "lint"] })).toEqual(
+			fixtureV2.plan,
+		);
+		// Waves come only from declared dependencies, plan order and maxParallel 2.
+		expect(complexWaves(fixtureV2.plan)).toEqual(fixtureV2.waves);
+		expect(complexWaves(fixtureV2.plan)).toEqual([["CT-001", "CT-002"], ["CT-003"]]);
+		// The human decomposition compiles byte-for-byte to the reference plan.
+		const plan = await compile({
+			config,
+			parent,
+			planId: fixtureV2.plan.planId,
+			claims: fakeClaims([]),
+			draft: {
+				tasks: fixtureV2.plan.tasks.map((task) => ({
+					title: task.title,
+					goal: task.goal,
+					dependsOnIndexes: task.dependsOn.map((id) => Number(id.slice(3))),
+					criterionIndexes: task.criterionIds.map((id) => Number(id.slice(3))),
+					ownership: task.ownership,
+					checkIds: task.checkIds,
+				})),
+			},
+		});
+		expect(JSON.stringify(plan)).toBe(JSON.stringify(fixtureV2.plan));
+		const projection = maxComplexExecution(parent, plan);
+		expect(Check(ComplexExecutionSchema, projection)).toBe(true);
+		expect(projection.activeTaskIds).toEqual(["CT-001", "CT-002"]);
+		expect(Buffer.byteLength(JSON.stringify(projection))).toBeLessThanOrEqual(COMPLEX_EXECUTION_MAX_BYTES);
+	});
+
+	it("keeps the V0.7B v1 fixture's own identity: its v1 digest recomputes, and a v1 plan never executes", () => {
 		const config = complexConfig();
 		const parent = parentFor(config);
 		expect(parent).toEqual(fixture.parent);
 		expect(taskContractDigest(parent)).toBe(fixture.parentTaskContractDigest);
 		const { complexPlanDigest: digest, ...material } = fixture.plan;
-		expect(capabilityJson([COMPLEX_PLAN_DIGEST_DOMAIN, material])).toBe(fixture.complexPlanDigestInput);
+		expect(capabilityJson([COMPLEX_PLAN_V1_DIGEST_DOMAIN, material])).toBe(fixture.complexPlanDigestInput);
 		expect(complexPlanDigest(fixture.plan)).toBe(fixture.complexPlanDigest);
 		expect(digest).toBe(fixture.complexPlanDigest);
 		expect(Buffer.byteLength(JSON.stringify(fixture.plan))).toBeLessThanOrEqual(COMPLEX_PLAN_MAX_BYTES);
-		expect(assertComplexPlanBinding(fixture.plan, parent, { registeredCheckIds: ["test", "lint"] })).toEqual(
-			fixture.plan,
+		expect(Check(ComplexPlanV1Schema, fixture.plan)).toBe(true);
+		expect(Check(ComplexPlanSchema, fixture.plan)).toBe(false);
+		// Only v2 plans are bound for execution; the same decomposition compiles to v2 with its own digest.
+		expect(() => assertComplexPlanBinding(fixture.plan, parent, { registeredCheckIds: ["test", "lint"] })).toThrow(
+			ComplexPlanBindingError,
 		);
+		const upgraded = compiledV2(fixture.plan);
+		expect(upgraded.complexPlanDigest).not.toBe(fixture.complexPlanDigest);
+		expect(assertComplexPlanBinding(upgraded, parent, { registeredCheckIds: ["test", "lint"] })).toEqual(upgraded);
 	});
 
 	it("compiles the reference decomposition byte-for-byte, except the claim current Policy protects", async () => {
@@ -341,6 +418,7 @@ describe("V0.7B COMPLEX contract identity", () => {
 			maxWorkerInvocations: 10,
 			maxReportedTokens: 5000,
 			maxTotalRevisionCycles: 1,
+			maxParallel: 1,
 		});
 		const generous = complexConfig({ budget: { max_worker_invocations: 100, max_reported_tokens: 1_000_000 } });
 		expect((await compile({ config: generous })).limits).toMatchObject({
@@ -350,10 +428,19 @@ describe("V0.7B COMPLEX contract identity", () => {
 		const none = await compile({ config: complexConfig({ agents: { max_revision_cycles: 0 } }) });
 		expect(none.limits.maxTotalRevisionCycles).toBe(0);
 		expect(none.tasks.every((task) => task.maxRevisionCycles === 0)).toBe(true);
+		// V0.8A: the frozen wave bound is min(agents.max_parallel, 4); QUICK/STANDARD ignore it.
+		for (const maxParallel of [1, 2, 3, 4])
+			expect(
+				(
+					await compile({
+						config: complexConfig({ agents: { max_revision_cycles: 3, max_parallel: maxParallel } }),
+					})
+				).limits.maxParallel,
+			).toBe(maxParallel);
 	});
 
 	it("proves the largest execution projection is schema-valid and fits for the reference plan", () => {
-		const projection = maxComplexExecution(fixture.parent, fixture.plan);
+		const projection = maxComplexExecution(fixture.parent, compiledV2(fixture.plan));
 		expect(Check(ComplexExecutionSchema, projection)).toBe(true);
 		expect(Buffer.byteLength(JSON.stringify(projection))).toBeLessThanOrEqual(COMPLEX_EXECUTION_MAX_BYTES);
 		expect(projection.tasks.map((task) => task.changedFiles)).toEqual([
@@ -931,7 +1018,7 @@ describe("Frozen-plan binding guard for admission, each task and completion", ()
 		}
 		return "BOUND";
 	}
-	const plan = () => structuredClone(fixture.plan);
+	const plan = () => compiledV2(fixture.plan);
 
 	it.each<[string, () => unknown, TaskContract | undefined, string[] | undefined, string]>([
 		["an untouched plan", plan, undefined, ["lint", "test"], "BOUND"],
@@ -950,6 +1037,20 @@ describe("Frozen-plan binding guard for admission, each task and completion", ()
 			"PLAN_MISMATCH",
 		],
 		["an extra field", () => ({ ...plan(), approved: true }), undefined, undefined, "PLAN_MISMATCH"],
+		[
+			"a historical v1 plan (never executed)",
+			() => structuredClone(fixture.plan),
+			undefined,
+			undefined,
+			"PLAN_MISMATCH",
+		],
+		[
+			"a recomputed maxParallel above the bound",
+			() => recompute({ ...plan(), limits: { ...plan().limits, maxParallel: 5 } }),
+			undefined,
+			undefined,
+			"PLAN_MISMATCH",
+		],
 		[
 			"a recomputed forward edge",
 			() => recompute({ ...plan(), tasks: [{ ...plan().tasks[0], dependsOn: ["CT-002"] }, plan().tasks[1]] }),
@@ -1043,7 +1144,8 @@ describe("Closed COMPLEX wire shapes", () => {
 	const examples: Array<[string, TSchema, Record<string, unknown>]> = [
 		["OwnershipClaim", OwnershipClaimSchema, { path: "src/a.ts", operation: "create" }],
 		["ComplexDraft", ComplexDraftSchema, { ...baseDraft() }],
-		["ComplexPlan", ComplexPlanSchema, { ...fixture.plan }],
+		["ComplexPlan", ComplexPlanSchema, { ...fixtureV2.plan }],
+		["ComplexPlanV1", ComplexPlanV1Schema, { ...fixture.plan }],
 		["ComplexTaskState", ComplexTaskStateSchema, pendingRow],
 		[
 			"ComplexIntegration",
@@ -1058,7 +1160,7 @@ describe("Closed COMPLEX wire shapes", () => {
 			},
 		],
 		["ComplexEvidenceContext", ComplexEvidenceContextSchema, context],
-		["ComplexExecution", ComplexExecutionSchema, { ...maxComplexExecution(fixture.parent, fixture.plan) }],
+		["ComplexExecution", ComplexExecutionSchema, { ...maxComplexExecution(fixtureV2.parent, fixtureV2.plan) }],
 	];
 
 	it.each(examples)("accepts a valid %s and rejects unknown or missing fields", (_name, schema, value) => {

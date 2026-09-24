@@ -165,7 +165,7 @@ const connect = (name, project) =>
     const transport = yield* openControlTransport(executable, project, childEnv());
     const hello = yield* transport.exchange({ protocolVersion: 1, id: crypto.randomUUID(), type: "control.hello" });
     assert.equal(hello.success, true, JSON.stringify(hello));
-    assert.equal(hello.data.capabilities.complexContractVersion, 1, `${name}: Runtime must advertise COMPLEX contract v1`);
+    assert.equal(hello.data.capabilities.complexContractVersion, 2, `${name}: Runtime must advertise COMPLEX contract v2`);
     return { transport, capabilities: hello.data.capabilities, ...observer(name, transport, hello.data.capabilities) };
   });
 const start = (name, connection, { draft = DRAFT, goal = GOAL, statements = STATEMENTS } = {}) =>
@@ -441,7 +441,7 @@ await scenario("C12", "global worker budget exhausted before the next worker", f
           project,
           during: (snapshot, connection) =>
             Effect.gen(function* () {
-              if (cancelled || snapshot.complexExecution?.activeTaskId !== "CT-002") return;
+              if (cancelled || snapshot.complexExecution?.activeTaskIds?.join() !== "CT-002") return;
               yield* Effect.promise(() => held.arrived);
               // The worker is now parked on the model: take the revision the cancel must fence against.
               const current = yield* connection.snapshot();
@@ -482,7 +482,7 @@ await scenario("C12", "global worker budget exhausted before the next worker", f
           project,
           during: (snapshot) =>
             Effect.gen(function* () {
-              if (tampered || snapshot.complexExecution?.activeTaskId !== "CT-002") return;
+              if (tampered || snapshot.complexExecution?.activeTaskIds?.join() !== "CT-002") return;
               yield* Effect.promise(() => held.arrived);
               yield* Effect.promise(() => writeFile(join(project, "src/parse.mjs"), "// external edit\n"));
               tampered = true;
@@ -522,12 +522,12 @@ await scenario("C12", "global worker budget exhausted before the next worker", f
             yield* Effect.gen(function* () {
               const owner = yield* connect("C19 owner", project);
               yield* start("C19", owner);
-              yield* waitFor("C19 owner", owner, (state) => state.complexExecution?.activeTaskId === "CT-002");
+              yield* waitFor("C19 owner", owner, (state) => state.complexExecution?.activeTaskIds?.join() === "CT-002");
               yield* Effect.promise(() => held.arrived);
               const seen = yield* observerConnection.snapshot();
               assert.equal(seen.ownedRunId, null);
               assert.equal(seen.snapshot.status.run.status, "RUNNING");
-              assert.equal(seen.complexExecution.activeTaskId, "CT-002");
+              assert.deepEqual(seen.complexExecution.activeTaskIds, ["CT-002"]);
             }).pipe(Effect.scoped);
             // The owner's connection closed: its Host shut down and cancelled the Run it owned. Nothing resumes.
             held.release();

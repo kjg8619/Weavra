@@ -100,11 +100,15 @@ describe("COMPLEX TUI status, history and footer (#16 stage C)", () => {
 				"COMPLEX parent parent-1 [inProgress] | Run RUNNING | phase TASK_SEQUENCE | active CT-002",
 			);
 			expect(text).toContain("a COMPLETED task is a verified contribution, not Run completion");
-			expect(text).toMatch(
-				/ {2}CT-001 COMPLETED \| attempt 2, revisions 1\/2 \| self-check PASS, review PASS, test PASS \| evidence (STALE|CURRENT) \| changed 1\/1 claimed \| failure none \| Task 1\n/,
+			expect(text).toContain("HANDED_OFF waits for its verification turn");
+			expect(text).toContain(
+				"Waves (at most 1 implementing at once; verification one task at a time in plan order): 1: CT-001 | 2: CT-002",
 			);
 			expect(text).toMatch(
-				/ {2}CT-002 REVIEW \| attempt 1, revisions 0\/2 \| self-check PASS, review NOT_RUN, test NOT_RUN \| evidence CURRENT \| changed 1\/1 claimed \| failure none \| Task 2 \| after CT-001\n/,
+				/ {2}CT-001 COMPLETED \| wave 1 \| attempt 2, revisions 1\/2 \| self-check PASS, review PASS, test PASS \| evidence (STALE|CURRENT) \| changed 1\/1 claimed \| failure none \| Task 1\n/,
+			);
+			expect(text).toMatch(
+				/ {2}CT-002 REVIEW \| wave 2 \| attempt 1, revisions 0\/2 \| self-check PASS, review NOT_RUN, test NOT_RUN \| evidence CURRENT \| changed 1\/1 claimed \| failure none \| Task 2 \| after CT-001\n/,
 			);
 			expect(text).toContain(
 				"  Integration: first checks NOT_RUN, final review NOT_RUN, final checks NOT_RUN | workspace not captured | evidence NONE | failure none",
@@ -130,7 +134,7 @@ describe("COMPLEX TUI status, history and footer (#16 stage C)", () => {
 		expect(formatWeavraStatus(run, false)).toBe("Weavra · BLOCKED");
 		const history = formatHistory({ revision: 9, runs: [run], actions: [] });
 		expect(history).toContain("  COMPLEX parent parent-1 [blocked] | Run BLOCKED | phase TERMINAL | active none");
-		expect(history).toContain("    CT-001 COMPLETED | attempt 1 | failure none | Task 1");
+		expect(history).toContain("    CT-001 COMPLETED | wave 1 | attempt 1 | failure none | Task 1");
 		expect(history).toContain("    Integration: first checks FAIL, final review NOT_RUN, final checks NOT_RUN");
 	});
 
@@ -153,7 +157,7 @@ describe("COMPLEX TUI status, history and footer (#16 stage C)", () => {
 				},
 			],
 		});
-		expect(history).toContain("    CT-002 COMPLETED | attempt 1 | failure none | Task 2");
+		expect(history).toContain("    CT-002 COMPLETED | wave 2 | attempt 1 | failure none | Task 2");
 		expect(history).toContain("  COMPLEX task rows: /state archived-complex");
 		const standardOnly = formatHistory({ revision: 1, runs: [standard], actions: [] });
 		expect(standardOnly).not.toContain("COMPLEX");
@@ -211,7 +215,7 @@ describe("COMPLEX graph (#16 stage C)", () => {
 			expect(graph.nodes[0]).toMatchObject({
 				id: "preflight",
 				kind: "preflight",
-				label: "COMPLEX sequential run (task graph unavailable)",
+				label: "COMPLEX run (task graph unavailable)",
 			});
 			expect(graph.nodes[0].status).not.toBe("passed");
 			expect(graph.status).toBe(snapshot.status);
@@ -222,8 +226,8 @@ describe("COMPLEX graph (#16 stage C)", () => {
 		}
 		const text = renderGraphText(projectRunGraph(run));
 		expect(text).toContain("COMPLEX / R1 / COMPLETED");
-		expect(text).toContain("[COMPLEX sequential run (task graph unavailable)] UNKNOWN");
-		expect(text).toContain("/workflow status and /state show the ordered task rows and integration gates");
+		expect(text).toContain("[COMPLEX run (task graph unavailable)] UNKNOWN");
+		expect(text).toContain("/workflow status and /state show the ordered task rows, waves and integration gates");
 		expect(text).not.toMatch(/Complete #|Developer #|PASS required/);
 	});
 
@@ -246,7 +250,7 @@ describe("COMPLEX Evidence Pack (#16 stage C)", () => {
 		const plan = run.complex!.plan;
 		expect(complex).toBeDefined();
 		expect(Object.keys(complex!).sort()).toEqual([
-			"activeTaskId",
+			"activeTaskIds",
 			"attempts",
 			"budget",
 			"changesUnknown",
@@ -258,16 +262,19 @@ describe("COMPLEX Evidence Pack (#16 stage C)", () => {
 			"phase",
 			"plan",
 			"tasks",
+			"waves",
 		]);
 		expect(complex).toMatchObject({
 			parent: { id: "parent-1", digest: plan.parentTaskContractDigest, status: "completed" },
 			plan: {
 				id: plan.planId,
 				digest: plan.complexPlanDigest,
-				limits: { maxWorkerInvocations: 24, maxReportedTokens: 200000, maxTotalRevisionCycles: 3 },
+				schemaVersion: 2,
+				limits: { maxWorkerInvocations: 24, maxReportedTokens: 200000, maxTotalRevisionCycles: 3, maxParallel: 1 },
 			},
 			phase: "TERMINAL",
-			activeTaskId: null,
+			activeTaskIds: [],
+			waves: [["CT-001"], ["CT-002"]],
 			budget: {
 				workerInvocations: 7,
 				reportedTokens: 700,
@@ -284,6 +291,7 @@ describe("COMPLEX Evidence Pack (#16 stage C)", () => {
 			id: "CT-001",
 			title: "Task 1",
 			status: "COMPLETED",
+			wave: 1,
 			dependsOn: [],
 			claims: [{ path: "src/app.ts", operation: "modify" }],
 			attempt: 2,
@@ -340,7 +348,10 @@ describe("COMPLEX Evidence Pack (#16 stage C)", () => {
 		expect(text).toContain(
 			`COMPLEX parent parent-1 ${plan.parentTaskContractDigest} [completed]; plan ${plan.planId}`,
 		);
-		expect(text).toContain("  CT-001 COMPLETED | Task 1 | after none | claims modify src/app.ts");
+		expect(text).toContain("  CT-001 COMPLETED | wave 1 | Task 1 | after none | claims modify src/app.ts");
+		expect(text).toContain(
+			"  Waves (max 1 implementing at once; verification one task at a time in plan order): 1: CT-001 | 2: CT-002",
+		);
 		expect(text).toContain(
 			"    attempt 2, revisions 1/2, invocations 4, reported tokens 400 | changed src/app.ts (sha256:",
 		);

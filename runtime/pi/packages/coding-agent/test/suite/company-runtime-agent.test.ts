@@ -904,6 +904,47 @@ describe("Company Runtime S3 SDK adapter (faux only)", () => {
 		}
 		expect(workers).toHaveLength(1);
 	});
+	it("V0.8A: runs up to maxConcurrentWorkers invocations at once, each in its own session", async () => {
+		await expect(PiAgentExecutor.create({ ...options, maxConcurrentWorkers: 5 })).rejects.toThrow(
+			"Invalid worker limits",
+		);
+		const parallel = await PiAgentExecutor.create({ ...options, maxConcurrentWorkers: 2 });
+		let release!: () => void;
+		const wait = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		let entered = 0;
+		let bothEntered!: () => void;
+		const both = new Promise<void>((resolve) => {
+			bothEntered = resolve;
+		});
+		const gated = async () => {
+			if (++entered === 2) bothEntered();
+			await wait;
+			return submitHandoff();
+		};
+		harness.setResponses([gated, gated]);
+		const sessions: RoleSessionReference[] = [];
+		const register = async (ref: RoleSessionReference) => {
+			sessions.push(ref);
+		};
+		const first = parallel.execute({ ...developer(), onSessionCreated: register });
+		const second = parallel.execute({ ...developer(), onSessionCreated: register });
+		try {
+			await both;
+			// Both Developers are live at once; a third concurrent invocation is refused.
+			expect(parallel.safeToRelease).toBe(false);
+			await expect(parallel.execute({ ...developer(), onSessionCreated: register })).rejects.toThrow(
+				"already active",
+			);
+		} finally {
+			release();
+		}
+		const results = await Promise.all([first, second]);
+		expect(results.map((result) => result.role)).toEqual(["Developer", "Developer"]);
+		expect(new Set(sessions.map((ref) => ref.sessionId)).size).toBe(2);
+		expect(parallel.safeToRelease).toBe(true);
+	});
 	it("rejects agent directories and transcript symlinks inside the workspace", async () => {
 		const local = join(workspace, "..agent");
 		mkdirSync(local);

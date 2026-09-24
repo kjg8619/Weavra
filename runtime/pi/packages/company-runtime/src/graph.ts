@@ -104,20 +104,20 @@ export function projectRunGraph(value: unknown): GraphProjection {
 		edges: [],
 		diagnostics: [],
 	};
-	// COMPLEX (V0.7B) steps carry task attempts, not STANDARD revision attempts: never unroll them as one
+	// COMPLEX steps carry task attempts (and V0.8A waves), not STANDARD revision attempts: never unroll them as one
 	// single-task chain. One run node keeps the stored outcome; task/integration detail is shown as unavailable.
 	if (run.workflow === "COMPLEX") {
 		requireGraph(complexRunError(run) === undefined, "inconsistent COMPLEX state");
 		graph.nodes.push({
 			id: "preflight",
 			kind: "preflight",
-			label: run.complex ? "COMPLEX sequential run (task graph unavailable)" : "Unsupported COMPLEX",
+			label: run.complex ? "COMPLEX run (task graph unavailable)" : "Unsupported COMPLEX",
 			status: terminal ? stopped : "unknown",
 			...(terminal && run.lastError ? { detail: run.lastError } : {}),
 		});
 		graph.diagnostics.push(
 			run.complex
-				? "COMPLEX task and integration detail is not drawn as a graph; /workflow status and /state show the ordered task rows and integration gates. No transition is inferred, and a task COMPLETED is not Run completion."
+				? "COMPLEX task, wave and integration detail is not drawn as a graph; /workflow status and /state show the ordered task rows, waves and integration gates. No transition is inferred, and a task COMPLETED is not Run completion."
 				: "COMPLEX has no supported execution graph; no Planner/Lead/scheduler is inferred.",
 		);
 		return graph;
