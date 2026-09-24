@@ -164,6 +164,17 @@ export class StateStoreError extends Error {
 function active(run: Run): boolean {
 	return ["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(run.status);
 }
+/** Rows of a live COMPLEX wave whose Developer may have one action in flight (its tool calls stay sequential). */
+function implementingRows(run: Run): number {
+	if (run.workflow !== "COMPLEX" || !active(run)) return 0;
+	return (
+		run.complex?.tasks.filter((row) => row.status === "IMPLEMENTING" || row.status === "WAITING_APPROVAL").length ?? 0
+	);
+}
+/** Actions one Run may have PREPARED at once: one per implementing V0.8A wave row, otherwise one. */
+function actionSlots(run: Run): number {
+	return Math.max(1, implementingRows(run));
+}
 function assertState(value: unknown): FileRuntimeState {
 	const state = validateContract(StateSchema, value);
 	const runIds = new Set(state.runs.map((run) => run.runId));
@@ -199,7 +210,15 @@ function assertState(value: unknown): FileRuntimeState {
 			throw new Error("Invalid action record");
 		actionIds.add(id);
 	}
-	if (state.actions.filter((action) => action.status === "PREPARED").length > 1) throw new Error("Concurrent actions");
+	const prepared = state.actions.filter((action) => action.status === "PREPARED");
+	const owner = state.runs.find((run) => run.runId === prepared[0]?.decision.runId);
+	if (
+		prepared.length > 1 &&
+		(!owner ||
+			prepared.some((action) => action.decision.runId !== owner.runId) ||
+			prepared.length > actionSlots(owner))
+	)
+		throw new Error("Concurrent actions");
 	return state;
 }
 function projection(state: FileRuntimeState) {
@@ -228,13 +247,12 @@ export class FileStateStore implements StateStore, ActionAudit {
 	private closing?: Promise<void>;
 	private busy = false;
 	/**
-	 * One durable write lane for the Run writer (V0.8A §4 rule 3): Kernel saves and the action intents/outcomes of
-	 * concurrent wave workers queue here in FIFO order instead of failing as concurrent. An ALLOW intent holds the
-	 * lane from `prepare` until its `finish`, so no other write interleaves with one action's effect and at most one
-	 * action is ever PREPARED. Two overlapping Kernel saves are still rejected rather than losing a revision.
+	 * One durable write lane for the Run writer (V0.8A §4 rule 3): Kernel saves and the action intents and outcomes of
+	 * concurrent wave workers are applied one at a time in FIFO order instead of failing as concurrent, so every
+	 * durable write has one total order. Each turn covers one short mutation, never an effect. Two overlapping Kernel
+	 * saves are still rejected rather than losing a revision.
 	 */
 	private readonly lane = new Serial();
-	private held?: { runId: string; actionId: string; release: () => void };
 	private saving = false;
 	/** Serializes the state.json replacement with the writability read, so a check never sees a half-applied commit. */
 	private readonly gate = new Serial();
@@ -924,25 +942,19 @@ export class FileStateStore implements StateStore, ActionAudit {
 				throw new Error("Stale revision or terminal run; resume is unsupported");
 			if (!previous && (run.status !== "CREATED" || next.runs.some(active)))
 				throw new Error("Project already has an active run");
-			if (next.actions.some((action) => action.status === "PREPARED")) throw new Error("Action still in flight");
+			// A Run is never written while an action is in flight, except that a live V0.8A wave records one row
+			// beside its siblings' in-flight actions (one per implementing row). A stop, a verification turn or a
+			// terminal save with an unfinished action still fails closed.
+			if (next.actions.filter((action) => action.status === "PREPARED").length > implementingRows(run))
+				throw new Error("Action still in flight");
 			if (index < 0) next.runs.push(run);
 			else next.runs[index] = run;
 		});
 	}
-	/** Durable intent; an ALLOW intent keeps the write lane until its `finish` (one action in flight at a time). */
+	/** Durable intent, in the write lane: at most one action in flight, or one per implementing wave row. */
 	async prepare(decision: PolicyDecision): Promise<void> {
 		decision = structuredClone(decision);
-		const release = await this.lane.acquire();
-		let held = false;
-		try {
-			await this.prepareIntent(decision);
-			if (decision.decision === "ALLOW") {
-				this.held = { runId: decision.runId, actionId: decision.actionId, release };
-				held = true;
-			}
-		} finally {
-			if (!held) release();
-		}
+		await this.lane.run(() => this.prepareIntent(decision));
 	}
 	private async prepareIntent(decision: PolicyDecision): Promise<void> {
 		await this.mutate((next) => {
@@ -959,14 +971,17 @@ export class FileStateStore implements StateStore, ActionAudit {
 				decision.risk !== "R0"
 			)
 				throw new Error("READ_ONLY worker action cannot mutate");
+			const running = next.runs.find((run) => run.runId === decision.runId && run.status === "RUNNING");
+			const inFlight = next.actions.filter((item) => item.status === "PREPARED");
 			if (
-				!next.runs.some((run) => run.runId === decision.runId && run.status === "RUNNING") ||
+				!running ||
+				inFlight.length >= actionSlots(running) ||
+				inFlight.some((item) => item.decision.runId !== decision.runId) ||
 				next.actions.some(
 					(item) =>
-						item.status === "PREPARED" ||
-						(item.decision.runId === decision.runId &&
-							(item.decision.actionId === decision.actionId ||
-								item.decision.configDigest !== decision.configDigest)),
+						item.decision.runId === decision.runId &&
+						(item.decision.actionId === decision.actionId ||
+							item.decision.configDigest !== decision.configDigest),
 				)
 			)
 				throw new Error("Action requires a running owner, a fresh ID and the same frozen configuration");
@@ -1031,20 +1046,15 @@ export class FileStateStore implements StateStore, ActionAudit {
 		});
 	}
 	async finish(runId: string, actionId: string, outcome: ActionOutcome): Promise<void> {
-		const hold = this.held?.runId === runId && this.held.actionId === actionId ? this.held : undefined;
-		if (hold) this.held = undefined;
-		const release = hold ? hold.release : await this.lane.acquire();
-		try {
-			await this.mutate((next) => {
+		await this.lane.run(() =>
+			this.mutate((next) => {
 				const action = next.actions.find(
 					(item) => item.decision.runId === runId && item.decision.actionId === actionId,
 				);
 				if (!action || action.status !== "PREPARED") throw new Error("No pending action");
 				action.status = outcome;
-			});
-		} finally {
-			release();
-		}
+			}),
+		);
 	}
 }
 

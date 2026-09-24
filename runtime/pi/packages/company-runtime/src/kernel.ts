@@ -789,6 +789,8 @@ export class CompanyKernel {
 	private readonly budget: BudgetController;
 	private busy = false;
 	private storageFailed = false;
+	/** The original storage failure; every later queued save rethrows it (never a weaker error). */
+	private storageError?: unknown;
 	private saveQueue: Promise<void> = Promise.resolve();
 	private handoff?: Handoff | ExecutorHandoff;
 	private developerSession?: RoleSessionReference;
@@ -983,7 +985,7 @@ export class CompanyKernel {
 		details: RuntimeEventDetail[] | (() => RuntimeEventDetail[]),
 	): Promise<void> {
 		const operation = this.saveQueue.then(() => {
-			if (this.storageFailed) throw new Error("State persistence already failed; no further saves");
+			if (this.storageFailed) throw this.storageError ?? new Error("State persistence already failed");
 			const resolved = typeof patch === "function" ? patch() : patch;
 			return this.persistNow(resolved, typeof details === "function" ? details() : details);
 		});
@@ -1008,6 +1010,7 @@ export class CompanyKernel {
 		} catch (error) {
 			// No further actions on this instance. The durable state may be older; never emit completion.
 			this.storageFailed = true;
+			this.storageError = error;
 			this.state = {
 				...this.state,
 				status: "FAILED",
@@ -2701,8 +2704,7 @@ export class CompanyKernel {
 			for (const member of members) workers.push(this.complexWaveWorker(member, waveSignal, stop));
 			// JOIN (§4 rule 5): verification never starts while any wave invocation is live.
 			await Promise.all(workers);
-			if (this.storageFailed)
-				throw members.find((member) => member.error !== undefined)?.error ?? new Error("State persistence failed");
+			if (this.storageFailed) throw this.storageError ?? new Error("State persistence failed");
 			// Spent evidence settles in plan order, never in completion order (§7).
 			for (const { c, measurement } of members)
 				try {

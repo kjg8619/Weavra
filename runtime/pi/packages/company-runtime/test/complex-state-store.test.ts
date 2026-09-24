@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { classifyRequest } from "../src/classification.ts";
 import { complexPlanDigest } from "../src/complex-plan.ts";
 import type { PolicyDecision, Run } from "../src/contracts.ts";
@@ -11,6 +11,7 @@ import { FileStateStore, type FileStateStoreOptions, StateStoreError } from "../
 import { complexConsumerIssues, observeDurableRun } from "./complex-conformance.ts";
 import {
 	type ComplexTaskSpec,
+	complexConfig,
 	complexHarness,
 	complexPlanFor,
 	driveComplex,
@@ -46,17 +47,28 @@ const TWO_TASKS: ComplexTaskSpec[] = [
 	{ claims: [{ path: "src/new.ts", operation: "create" }] },
 ];
 
-async function durable(options: { specs?: ComplexTaskSpec[]; goal?: string; risk?: "R1" | "R2" } = {}) {
+async function durable(
+	options: { specs?: ComplexTaskSpec[]; goal?: string; risk?: "R1" | "R2"; maxParallel?: number } = {},
+) {
 	const store = await openStore();
 	const files = new FakeFiles({ "src/app.ts": "app\n", "src/util.ts": "util\n" });
 	const { plan, parent } = await complexPlanFor(options.specs ?? TWO_TASKS, {
 		files,
 		...(options.goal ? { goal: options.goal } : {}),
 		...(options.risk ? { risk: options.risk } : {}),
+		...(options.maxParallel ? { config: complexConfig({ maxParallel: options.maxParallel }) } : {}),
 	});
 	const h = complexHarness({ plan, parent, files, ...(options.goal ? { goal: options.goal } : {}) });
 	const kernel = await CompanyKernel.create(h.request(), { ...h.ports, store: h.consumer.wrap(store) }, () => 1000);
 	return { store, h, kernel };
+}
+
+function gate() {
+	let resolve!: () => void;
+	const promise = new Promise<void>((fulfill) => {
+		resolve = fulfill;
+	});
+	return { promise, resolve };
 }
 
 function decision(risk: "R1" | "R2", actionId = "action-1"): PolicyDecision {
@@ -341,6 +353,44 @@ describe("COMPLEX recovery after owner loss (B7)", () => {
 			plan: { schemaVersion: 1, complexPlanDigest: v1Digest },
 		});
 		expect(complexConsumerIssues(observation)).toEqual([]);
+	});
+
+	it("V0.8A: a live wave keeps one action in flight per implementing row; a stop with one in flight fails closed", async () => {
+		const { store, kernel, h } = await durable({
+			specs: [
+				{ claims: [{ path: "src/app.ts", operation: "modify" }], dependsOn: [] },
+				{ claims: [{ path: "src/new.ts", operation: "create" }], dependsOn: [] },
+			],
+			maxParallel: 2,
+		});
+		const entered = { "CT-001": gate(), "CT-002": gate() };
+		const release = { "CT-001": gate(), "CT-002": gate() };
+		h.ports.agents.execute = async (request) => {
+			if (request.role !== "Developer") return h.defaultExecute(request);
+			const task = request.complexContext?.taskId === "CT-001" ? "CT-001" : "CT-002";
+			h.calls.push(request);
+			await h.register(request);
+			entered[task].resolve();
+			await release[task].promise;
+			if (task === "CT-002") throw new Error("Worker provider failed");
+			return { role: "Developer", handoff: await h.develop(request), measurement: measurement(request) };
+		};
+		await kernel.start();
+		const wave = kernel.advance("implement");
+		await Promise.all([entered["CT-001"].promise, entered["CT-002"].promise]);
+		// Each concurrent Developer has one intent in flight at once; a third would exceed the wave's rows.
+		await store.prepare(decision("R1", "action-a"));
+		await store.prepare(decision("R1", "action-b"));
+		expect(store.snapshot.actions.filter((action) => action.status === "PREPARED")).toHaveLength(2);
+		// CT-001's action settles and it hands off beside CT-002's in-flight action: the wave's save is allowed.
+		await store.finish("run-1", "action-a", "SUCCEEDED");
+		release["CT-001"].resolve();
+		await vi.waitFor(() => expect(store.snapshot.runs[0].complex?.tasks[0].status).toBe("HANDED_OFF"));
+		// CT-002 fails and abandons its intent: the STOPPING save cannot land beside it, so storage fails closed.
+		release["CT-002"].resolve();
+		await expect(wave).rejects.toBeInstanceOf(StateStoreError);
+		expect(store.snapshot.actions.map((action) => action.status)).toEqual(["SUCCEEDED", "PREPARED"]);
+		expect(store.snapshot.runs[0].status).toBe("RUNNING");
 	});
 
 	it("settles a gate that was RUNNING when the owner was lost as UNAVAILABLE", async () => {
