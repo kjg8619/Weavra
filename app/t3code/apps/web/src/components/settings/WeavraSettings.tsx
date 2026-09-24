@@ -132,6 +132,12 @@ export function WeavraSettings({
               No current Weavra Run for this checkout.
             </p>
           )}
+          {run?.workflow === "COMPLEX" && (
+            <p className="text-sm text-muted-foreground">
+              COMPLEX Run: this read-only summary covers only the parent Run. Per-task status,
+              attempts and evidence appear only in Workflow control.
+            </p>
+          )}
           <div className="space-y-3 border-t border-border/50 pt-4">
             <h3 className="text-sm font-medium">Runtime graph</h3>
             <p className="text-xs text-muted-foreground">

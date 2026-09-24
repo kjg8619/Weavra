@@ -9,6 +9,8 @@ import {
   type WeavraBrowserAssertion,
   type WeavraBrowserPreview,
   type WeavraBrowserState,
+  type WeavraComplexDraft,
+  type WeavraComplexOwnershipClaim,
   WeavraControlMutation,
   type WeavraControlPreview,
   type WeavraFactPreview,
@@ -27,6 +29,7 @@ import { Textarea } from "../ui/textarea";
 import { SettingsGroup } from "./SettingsGroup";
 import { SettingsSection } from "./settingsLayout";
 import { CapabilityInventory } from "./CapabilityInventory";
+import { ComplexExecutionView, ComplexPlanView } from "./WeavraComplex";
 
 const observations = createEnvironmentWeavraControlStateAtoms(connectionAtomRuntime);
 const command = createEnvironmentWeavraControlCommand(connectionAtomRuntime);
@@ -41,6 +44,55 @@ const idle: CommandState = {
   status: "idle",
   message: "Commands request Runtime actions. Only canonical snapshots establish outcomes.",
 };
+/** Editable only before confirmation; Runtime compiles it and assigns every ID. */
+type ComplexDraftRow = {
+  title: string;
+  goal: string;
+  dependsOnIndexes: number[];
+  criterionIndexes: number[];
+  ownership: Array<{ path: string; operation: WeavraComplexOwnershipClaim["operation"] }>;
+  checkIds: string;
+};
+const emptyComplexRow: ComplexDraftRow = {
+  title: "",
+  goal: "",
+  dependsOnIndexes: [],
+  criterionIndexes: [],
+  ownership: [],
+  checkIds: "",
+};
+const toggled = (values: ReadonlyArray<number>, value: number) =>
+  values.includes(value)
+    ? values.filter((item) => item !== value)
+    : [...values, value].sort((left, right) => left - right);
+/** Local reference checks only; Runtime validates the rest and nothing is repaired here. */
+function complexDraftProblem(rows: ReadonlyArray<ComplexDraftRow>, criteria: number) {
+  if (rows.length < 2 || rows.length > 8) return "A COMPLEX task plan needs 2–8 tasks.";
+  if (criteria < 1 || criteria > 16)
+    return "Enter 1–16 parent acceptance criteria for the task plan, one per line.";
+  for (const [index, row] of rows.entries()) {
+    if (row.criterionIndexes.length === 0)
+      return `Task ${index + 1} does not map any acceptance criterion.`;
+    const missing = row.criterionIndexes.find((criterion) => criterion > criteria);
+    if (missing !== undefined)
+      return `Task ${index + 1} maps acceptance criterion ${missing}, but only ${criteria} are entered.`;
+  }
+  for (let criterion = 1; criterion <= criteria; criterion++) {
+    if (!rows.some((row) => row.criterionIndexes.includes(criterion)))
+      return `Acceptance criterion ${criterion} is not mapped to any task.`;
+  }
+  return null;
+}
+const toComplexDraft = (rows: ReadonlyArray<ComplexDraftRow>): WeavraComplexDraft => ({
+  tasks: rows.map((row) => ({
+    title: row.title,
+    goal: row.goal,
+    dependsOnIndexes: row.dependsOnIndexes,
+    criterionIndexes: row.criterionIndexes,
+    ownership: row.ownership,
+    checkIds: row.checkIds.split(/\s+/).filter(Boolean),
+  })),
+});
 
 export function WeavraControls({
   environmentId,
@@ -61,6 +113,8 @@ export function WeavraControls({
   const [recipeId, setRecipeId] = useState("");
   const [recipeInputs, setRecipeInputs] = useState("{}");
   const [criteria, setCriteria] = useState("");
+  const [complexCriteria, setComplexCriteria] = useState("");
+  const [complexRows, setComplexRows] = useState<ComplexDraftRow[]>([]);
   const [preview, setPreview] = useState<WeavraControlPreview | null>(null);
   const [preparedDraft, setPreparedDraft] = useState<string | null>(null);
   const [commandState, setCommandState] = useState<CommandState>(idle);
@@ -136,35 +190,14 @@ export function WeavraControls({
     state.projectRevision === factPreview.projectRevision &&
     factPreview.expiresAt > observedAt &&
     preparedFactDraft === factDraftIdentity;
-  const latest = useRef({
-    fresh,
-    state,
-    browserPreviewCurrent,
-    browserDraftIdentity,
-    factPreviewCurrent,
-    factDraftIdentity,
-  });
-  useLayoutEffect(() => {
-    latest.current = {
-      fresh,
-      state,
-      browserPreviewCurrent,
-      browserDraftIdentity,
-      factPreviewCurrent,
-      factDraftIdentity,
-    };
-  }, [
-    fresh,
-    state,
-    browserPreviewCurrent,
-    browserDraftIdentity,
-    factPreviewCurrent,
-    factDraftIdentity,
-    latest,
+  const complexSupported = observation?.capabilities?.complexContractVersion === 1;
+  const draftIdentity = JSON.stringify([
+    goal,
+    recipeId,
+    recipeInputs,
+    complexCriteria,
+    complexRows,
   ]);
-  const run = state?.snapshot.status.run;
-  const submitting = commandState.status === "submitting";
-  const draftIdentity = JSON.stringify([goal, recipeId, recipeInputs]);
   const previewCurrent =
     fresh &&
     preview !== null &&
@@ -174,7 +207,41 @@ export function WeavraControls({
     state.projectRevision === preview.projectRevision &&
     preview.expiresAt > observedAt &&
     preparedDraft === draftIdentity &&
-    criteria === preview.acceptanceCriteria.map((criterion) => criterion.statement).join("\n");
+    // COMPLEX parent criteria are edited in the task plan, so only the draft identity binds them.
+    (preview.workflow === "COMPLEX" ||
+      criteria === preview.acceptanceCriteria.map((criterion) => criterion.statement).join("\n"));
+  const latest = useRef({
+    fresh,
+    state,
+    previewCurrent,
+    browserPreviewCurrent,
+    browserDraftIdentity,
+    factPreviewCurrent,
+    factDraftIdentity,
+  });
+  useLayoutEffect(() => {
+    latest.current = {
+      fresh,
+      state,
+      previewCurrent,
+      browserPreviewCurrent,
+      browserDraftIdentity,
+      factPreviewCurrent,
+      factDraftIdentity,
+    };
+  }, [
+    fresh,
+    state,
+    previewCurrent,
+    browserPreviewCurrent,
+    browserDraftIdentity,
+    factPreviewCurrent,
+    factDraftIdentity,
+    latest,
+  ]);
+  const run = state?.snapshot.status.run;
+  const submitting = commandState.status === "submitting";
+  const canEditDraft = fresh && !state?.busy && !submitting;
   const canPrepare =
     fresh &&
     !state?.busy &&
@@ -226,6 +293,10 @@ export function WeavraControls({
         current.state.projectRevision !== request.expectedProjectRevision ||
         ("expectedStateRevision" in request &&
           current.state.stateRevision !== request.expectedStateRevision) ||
+        (request.type === "workflow.confirm" &&
+          (!current.previewCurrent ||
+            current.state.preview?.previewId !== request.previewId ||
+            current.state.preview.previewDigest !== request.previewDigest)) ||
         (request.type === "browser.confirm" &&
           (!current.browserPreviewCurrent ||
             current.browserDraftIdentity !== browserDraftIdentity ||
@@ -255,9 +326,22 @@ export function WeavraControls({
       }
       const response = result.value;
       if (!response.success) {
+        const code = response.error.code;
+        const hint =
+          request.type !== "workflow.prepare"
+            ? ""
+            : request.complexDraft
+              ? code === "INVALID_REQUEST"
+                ? " A task plan is accepted only when Runtime classifies the goal as COMPLEX; discard it for QUICK or STANDARD goals."
+                : code === "INVALID_CRITERIA"
+                  ? " Runtime rejected the task plan's dependencies, criteria coverage, file claims or checks."
+                  : ""
+              : code === "UNSUPPORTED_WORKFLOW" && complexSupported
+                ? " If Runtime classified this goal as COMPLEX, add a structured task plan of 2–8 tasks and prepare again."
+                : "";
         setCommandState({
           status: "rejected",
-          message: `Runtime rejected the command: ${response.error.code}. Review fresh state before trying again.`,
+          message: `Runtime rejected the command: ${code}.${hint} Review fresh state before trying again.`,
         });
         return;
       }
@@ -362,36 +446,64 @@ export function WeavraControls({
     setCriteria("");
     setCommandState(idle);
   };
+  const lines = (text: string) =>
+    text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
   const prepare = () => {
     const fields = common();
     if (!fields || !canPrepare || !goal.trim()) return;
+    const complex = complexRows.length > 0;
+    const complexStatements = lines(complexCriteria);
+    const problem = !complex
+      ? null
+      : !complexSupported
+        ? "This Runtime does not advertise COMPLEX task plans (NOT EXPOSED). Discard the task plan to prepare a QUICK or STANDARD workflow."
+        : recipeId
+          ? "Reviewed recipes are STANDARD-only and are never sent with a COMPLEX task plan. Clear the recipe or discard the task plan."
+          : complexDraftProblem(complexRows, complexStatements.length);
+    if (problem) {
+      setCommandState({ status: "rejected", message: problem });
+      return;
+    }
     try {
       const request = decodeMutation({
         ...fields,
         type: "workflow.prepare",
         goal: goal.trim(),
         ...(recipeId ? { recipeId, recipeInputs: JSON.parse(recipeInputs) as unknown } : {}),
-        ...(preview
+        ...(complex
           ? {
-              acceptanceStatements: criteria
-                .split("\n")
-                .map((line) => line.trim())
-                .filter(Boolean),
+              acceptanceStatements: complexStatements,
+              complexDraft: toComplexDraft(complexRows),
             }
-          : {}),
+          : preview
+            ? { acceptanceStatements: lines(criteria) }
+            : {}),
       });
       void submit(request);
     } catch {
       setCommandState({
         status: "rejected",
-        message:
-          "Invalid goal, recipe JSON or acceptance criteria. Use at most 16 nonempty criteria of 500 characters each.",
+        message: complex
+          ? "Invalid task plan. Each task needs a nonblank title (up to 80 characters) and goal (up to 300), 1–16 unique check IDs (letters, digits, '.', '_', ':' or '-') and at most 16 exact project-relative file claims without globs, '.', '..', backslashes or a leading or trailing '/'. The whole plan must stay within 12,288 bytes."
+          : "Invalid goal, recipe JSON or acceptance criteria. Use at most 16 nonempty criteria of 500 characters each.",
       });
     }
   };
+  const editComplexRows = (update: (rows: ComplexDraftRow[]) => ComplexDraftRow[]) => {
+    invalidateDraft();
+    setComplexRows(update);
+  };
+  const editComplexRow = (index: number, update: (row: ComplexDraftRow) => ComplexDraftRow) =>
+    editComplexRows((rows) =>
+      rows.map((row, position) => (position === index ? update(row) : row)),
+    );
   const confirm = () => {
     const fields = common();
     if (!fields || !previewCurrent || !preview || state?.busy) return;
+    const plan = preview.complexPlan;
     void submit(
       {
         ...fields,
@@ -399,7 +511,11 @@ export function WeavraControls({
         previewId: preview.previewId,
         previewDigest: preview.previewDigest,
       },
-      `Start this exact ${preview.workflow} / ${preview.risk} / ${preview.executionMode} plan for ${workspaceRoot}?\nGoal: ${preview.goal}\nPlan confirmation is not R3 approval. No automatic commit, rollback or cleanup.`,
+      `Start this exact ${preview.workflow} / ${preview.risk} / ${preview.executionMode} plan for ${workspaceRoot}?\nGoal: ${preview.goal}${
+        plan
+          ? `\nTasks, in this order under one Run: ${plan.tasks.map((task) => `${task.id} ${task.title}`).join("; ")}\nPlan digest: ${plan.complexPlanDigest}\nThe plan cannot be edited after confirmation. Completing every task does not complete the Run.`
+          : ""
+      }\nPlan confirmation is not R3 approval. No automatic commit, rollback or cleanup.`,
     );
   };
   const cancel = () => {
@@ -583,6 +699,23 @@ export function WeavraControls({
             )}
           </div>
         )}
+        {run && state?.complexExecution ? (
+          <ComplexExecutionView
+            execution={state.complexExecution}
+            run={run}
+            current={fresh}
+            owned={state.ownedRunId === run.runId}
+            observedAt={observation?.observedAt ?? null}
+            writerPresent={state.snapshot.status.writerPresent}
+          />
+        ) : (
+          run?.workflow === "COMPLEX" && (
+            <p className="text-xs text-muted-foreground">
+              COMPLEX task detail is not exposed by this Runtime. The canonical Run status above
+              remains the only outcome.
+            </p>
+          )
+        )}
         <form
           className="space-y-3"
           onSubmit={(event) => {
@@ -645,6 +778,249 @@ export function WeavraControls({
               />
             </label>
           )}
+          {(complexSupported || complexRows.length > 0) && (
+            <section
+              aria-label="COMPLEX task plan"
+              className="space-y-3 rounded-md border border-border p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-sm font-medium">Structured task plan · COMPLEX (optional)</h4>
+                <Badge variant={complexSupported ? "outline" : "warning"}>
+                  {complexSupported ? "RUNTIME CONTRACT v1" : "NOT EXPOSED"}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Only for goals Runtime classifies as COMPLEX. Tasks run one at a time, in order,
+                under one Runtime-owned Run. Runtime assigns task IDs and validates dependencies,
+                criteria coverage, exact file claims and registered checks. The plan cannot be
+                edited after confirmation.
+              </p>
+              {complexRows.length > 0 && (
+                <label className="block space-y-1 text-sm">
+                  <span>Parent acceptance criteria · one per line (1–16)</span>
+                  <Textarea
+                    aria-label="COMPLEX acceptance criteria"
+                    value={complexCriteria}
+                    maxLength={16384}
+                    disabled={!canEditDraft || !complexSupported}
+                    onChange={(event) => {
+                      invalidateDraft();
+                      setComplexCriteria(event.target.value);
+                    }}
+                  />
+                </label>
+              )}
+              {complexRows.map((row, index) => {
+                const task = index + 1;
+                const editable = canEditDraft && complexSupported;
+                return (
+                  <fieldset
+                    key={task}
+                    aria-label={`Task ${task}`}
+                    className="space-y-2 rounded-md border border-border p-3 text-sm"
+                  >
+                    <legend className="px-1 text-xs font-medium">Task {task}</legend>
+                    <input
+                      aria-label={`Task ${task} title`}
+                      value={row.title}
+                      maxLength={80}
+                      disabled={!editable}
+                      placeholder="Short title"
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      onChange={(event) => {
+                        const title = event.target.value;
+                        editComplexRow(index, (current) => ({ ...current, title }));
+                      }}
+                    />
+                    <Textarea
+                      aria-label={`Task ${task} goal`}
+                      value={row.goal}
+                      maxLength={300}
+                      disabled={!editable}
+                      placeholder="Bounded contribution to the parent goal"
+                      onChange={(event) => {
+                        const taskGoal = event.target.value;
+                        editComplexRow(index, (current) => ({ ...current, goal: taskGoal }));
+                      }}
+                    />
+                    {index > 0 && (
+                      <div className="flex flex-wrap gap-3 text-xs">
+                        <span className="text-muted-foreground">Depends on</span>
+                        {Array.from({ length: index }, (_, earlier) => earlier + 1).map(
+                          (dependency) => (
+                            <label key={dependency} className="flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                aria-label={`Task ${task} depends on task ${dependency}`}
+                                checked={row.dependsOnIndexes.includes(dependency)}
+                                disabled={!editable}
+                                onChange={() =>
+                                  editComplexRow(index, (current) => ({
+                                    ...current,
+                                    dependsOnIndexes: toggled(current.dependsOnIndexes, dependency),
+                                  }))
+                                }
+                              />
+                              Task {dependency}
+                            </label>
+                          ),
+                        )}
+                      </div>
+                    )}
+                    <div className="space-y-1 text-xs">
+                      <span className="text-muted-foreground">
+                        Acceptance criteria it contributes to
+                      </span>
+                      {lines(complexCriteria).map((statement, position) => (
+                        // A criterion's number is its position; the draft sends 1-based indexes.
+                        // oxlint-disable-next-line react/no-array-index-key
+                        <label key={position} className="flex items-start gap-1 break-words">
+                          <input
+                            type="checkbox"
+                            aria-label={`Task ${task} maps criterion ${position + 1}`}
+                            checked={row.criterionIndexes.includes(position + 1)}
+                            disabled={!editable}
+                            onChange={() =>
+                              editComplexRow(index, (current) => ({
+                                ...current,
+                                criterionIndexes: toggled(current.criterionIndexes, position + 1),
+                              }))
+                            }
+                          />
+                          {position + 1}. {statement}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="space-y-1 text-xs">
+                      <span className="text-muted-foreground">
+                        Exact file claims · responsibility, not permission
+                      </span>
+                      {row.ownership.map((claim, position) => (
+                        // Claims are positional rows of controlled inputs and are never reordered.
+                        // oxlint-disable-next-line react/no-array-index-key
+                        <div key={position} className="flex flex-wrap items-center gap-2">
+                          <select
+                            aria-label={`Task ${task} claim ${position + 1} operation`}
+                            value={claim.operation}
+                            disabled={!editable}
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                            onChange={(event) => {
+                              const operation = event.target.value;
+                              if (
+                                operation === "modify" ||
+                                operation === "create" ||
+                                operation === "delete"
+                              )
+                                editComplexRow(index, (current) => ({
+                                  ...current,
+                                  ownership: current.ownership.map((item, at) =>
+                                    at === position ? { ...item, operation } : item,
+                                  ),
+                                }));
+                            }}
+                          >
+                            <option value="modify">modify</option>
+                            <option value="create">create</option>
+                            <option value="delete">delete</option>
+                          </select>
+                          <input
+                            aria-label={`Task ${task} claim ${position + 1} path`}
+                            value={claim.path}
+                            maxLength={256}
+                            disabled={!editable}
+                            placeholder="src/exact-file.ts"
+                            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 font-mono text-xs"
+                            onChange={(event) => {
+                              const path = event.target.value;
+                              editComplexRow(index, (current) => ({
+                                ...current,
+                                ownership: current.ownership.map((item, at) =>
+                                  at === position ? { ...item, path } : item,
+                                ),
+                              }));
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            aria-label={`Remove task ${task} claim ${position + 1}`}
+                            disabled={!editable}
+                            onClick={() =>
+                              editComplexRow(index, (current) => ({
+                                ...current,
+                                ownership: current.ownership.filter((_, at) => at !== position),
+                              }))
+                            }
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={`Add task ${task} file claim`}
+                        disabled={!editable || row.ownership.length >= 16}
+                        onClick={() =>
+                          editComplexRow(index, (current) => ({
+                            ...current,
+                            ownership: [...current.ownership, { path: "", operation: "modify" }],
+                          }))
+                        }
+                      >
+                        Add file claim
+                      </Button>
+                    </div>
+                    <input
+                      aria-label={`Task ${task} check IDs`}
+                      value={row.checkIds}
+                      maxLength={2200}
+                      disabled={!editable}
+                      placeholder="Registered check IDs, separated by spaces"
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-xs"
+                      onChange={(event) => {
+                        const checkIds = event.target.value;
+                        editComplexRow(index, (current) => ({ ...current, checkIds }));
+                      }}
+                    />
+                  </fieldset>
+                );
+              })}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!canEditDraft || !complexSupported || complexRows.length >= 8}
+                  onClick={() => editComplexRows((rows) => [...rows, emptyComplexRow])}
+                >
+                  Add task
+                </Button>
+                {complexRows.length > 0 && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!canEditDraft || !complexSupported}
+                      onClick={() => editComplexRows((rows) => rows.slice(0, -1))}
+                    >
+                      Remove last task
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!canEditDraft}
+                      onClick={() => {
+                        editComplexRows(() => []);
+                        setComplexCriteria("");
+                      }}
+                    >
+                      Discard task plan
+                    </Button>
+                  </>
+                )}
+              </div>
+            </section>
+          )}
           <Button size="sm" type="submit" disabled={!canPrepare || !goal.trim()}>
             {preview ? "Refresh Plan Preview" : "Prepare workflow"}
           </Button>
@@ -696,24 +1072,36 @@ export function WeavraControls({
                 ))}
               </ul>
             </div>
-            <label className="block space-y-1 text-sm">
-              <span>Acceptance criteria · one line per criterion</span>
-              <Textarea
-                aria-label="Acceptance criteria"
-                value={criteria}
-                maxLength={16384}
-                disabled={!fresh || submitting || !!state?.busy}
-                onChange={(event) => setCriteria(event.target.value)}
-              />
-            </label>
+            {preview.complexPlan ? (
+              <p className="text-xs text-muted-foreground">
+                Parent acceptance criteria come from the task plan. Edit the task plan and prepare
+                again to change them.
+              </p>
+            ) : (
+              <label className="block space-y-1 text-sm">
+                <span>Acceptance criteria · one line per criterion</span>
+                <Textarea
+                  aria-label="Acceptance criteria"
+                  value={criteria}
+                  maxLength={16384}
+                  disabled={!fresh || submitting || !!state?.busy}
+                  onChange={(event) => setCriteria(event.target.value)}
+                />
+              </label>
+            )}
             <ul className="space-y-1 text-xs text-muted-foreground">
               {preview.acceptanceCriteria.map((criterion) => (
-                <li key={criterion.id}>
-                  {criterion.id} · checks: {criterion.checkIds.join(", ") || "none"} · independent
-                  review: {criterion.reviewRequired ? "required" : "not required"}
+                <li key={criterion.id} className="break-words">
+                  {criterion.id}
+                  {preview.complexPlan ? ` · ${criterion.statement}` : ""} · checks:{" "}
+                  {criterion.checkIds.join(", ") || "none"} · independent review:{" "}
+                  {criterion.reviewRequired ? "required" : "not required"}
                 </li>
               ))}
             </ul>
+            {preview.complexPlan && (
+              <ComplexPlanView plan={preview.complexPlan} criteria={preview.acceptanceCriteria} />
+            )}
             <p className="text-xs text-muted-foreground">
               Editing criteria requires a fresh Runtime preview. T3 never assigns criterion IDs,
               verification mappings or the frozen contract. Confirmation is not an approval token.
