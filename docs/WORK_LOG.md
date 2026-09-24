@@ -555,6 +555,7 @@
   - `agent-tools.ts`: read/search/list 도구의 보호 경로 거부를 수정 가능한 오류로 돌려준다. 메시지는 "아무것도 읽지 않았고, Runtime 상태·자격 증명·프로젝트 지시문·등록 검증기 소스는 보호되며, 기록된 검사 증거로 판단하라"이다.
   - `agent-runner.ts`: 프롬프트의 오류 규칙 문구를 새 규칙에 맞췄다.
   - `coding-agent` 테스트: 보호 경로 읽기 복구(내용 미노출, DENIED 감사 기록)를 추가했다. 치명 사례는 "보호 경로 쓰기"로 교체했다.
+  - `evals` 벤치마크 테스트(`benchmark-faux-e2e`): 보호된 검증기 입력 읽기가 worker를 끝낸다는 옛 전제를 바꿨다. 이제 거부 메시지가 "Protected target / Nothing was read"이고 검사 바이트가 없음을 단언한다. PR CI 첫 실행에서 이 테스트만 실패했다(목록 조회가 9번 쌓임).
 - 유지한 경계:
   - 보호 경로와 허용 범위 밖의 쓰기·수정·삭제는 즉시 실패다.
   - 등록되지 않은 도구, 감사 기록 실패, R3 run의 모든 도구 오류도 즉시 실패다.
@@ -563,6 +564,7 @@
   - `npm run check` 통과(포매터가 변경 파일 1개 정리).
   - coding-agent `company-runtime-agent`·`hardening`·`workflow`·`complex` 204 PASS.
   - company-runtime `policy`·`anchored-tools`·`hardening`·`context-leakage`·`measurement-evidence`·`complex-kernel`·`complex-ownership`·`list-files` 255 PASS.
+  - evals 전체(`vitest.test.config.ts`) 11 files / 110 PASS.
   - 같은 실제 모델 smoke 재실행: **COMPLETED**, 73초, 작업 2개 PASS×3, 통합 PASS×3, worker 호출 5회, 보고 토큰 117,820. App 소비자 검사를 snapshot 140개 모두 통과했다. 감사 기록에서 Reviewer의 보호 경로 읽기 2회가 `DENIED`였고 이어서 리뷰가 완료됐다.
   - 첫 실행(수정 전)은 BLOCKED, 52초, 보고 토큰은 최종 Reviewer 실패로 UNKNOWN이었다.
 - 비용: 실제 provider 호출 2회분(각 worker 5회 이하). 첫 실행 보고 토큰은 작업 합계 76,753과 알 수 없는 최종 Reviewer분, 두 번째는 117,820이다.
