@@ -320,8 +320,9 @@ establishes PASS or COMPLETE. This is not generic R3, a session-wide grant, or s
 
 #### COMPLEX task plans
 
-Only a Runtime that advertises COMPLEX contract v1 gets **Structured task plan · COMPLEX
-(optional)**; a Runtime without it never receives a task plan. A goal the Runtime classifies as
+Only a Runtime that advertises a COMPLEX contract version (1: sequential, 2: parallel
+implementation waves) gets **Structured task plan · COMPLEX (optional)**; a Runtime without it
+never receives a task plan. A goal the Runtime classifies as
 COMPLEX needs the plan (without it preparation returns `UNSUPPORTED_WORKFLOW`), and a plan on a
 QUICK/STANDARD goal returns `INVALID_REQUEST`. Enter 1–16 parent acceptance criteria, then 2–8
 tasks in execution order: title, goal, dependencies on earlier tasks, the criteria each task
@@ -331,14 +332,23 @@ sends it as `complexDraft` on `workflow.prepare`; Runtime assigns task IDs and v
 coverage, dependencies, claims and checks. Review the complete preview and confirm it once; the
 plan cannot be edited afterwards.
 
-After confirmation the view shows the Runtime's read-only projection: active task, task
-statuses, attempts and revision cycles, gates and evidence freshness, integration check, final
-review and final test, budget use (unreported usage is `unknown`, never 0), cleanup, partial or
-unknown changes and failure codes. Completed tasks never mean a completed Run; only the
-canonical Run status is the outcome. There are no task complete/retry/skip/start-next/reorder
-controls; Cancel and the existing R3 decision remain the only actions. T3 treats a projection
-whose digests, task rows or budgets are inconsistent, that regresses, or that changes at an
-unchanged Run revision as unavailable rather than current.
+With contract 2, tasks whose dependencies are complete are implemented together, up to the
+plan's `maxParallel` (1–4, from the Runtime's `agents.max_parallel`; R3 plans always 1). The
+preview shows it read-only and the plan form has no scheduling input: add a dependency to force
+an order. Checks and reviews still run one task at a time in plan order.
+
+After confirmation the view shows the Runtime's read-only projection: the active task (contract
+
+1. or the current wave as the Runtime reports it (contract 2; `HANDED_OFF` rows are implemented
+   and wait for their verification turn), each task's dependencies, statuses, attempts and revision
+   cycles, gates and evidence freshness, integration check, final review and final test, budget
+   use (unreported usage is `unknown`, never 0), the cancel or stop state, cleanup, partial or
+   unknown changes and failure codes (`RUN_STOPPED`: stopped because a sibling task failed or the
+   Run stopped). Completed tasks never mean a completed Run; only the canonical Run status is the
+   outcome. There are no task complete/retry/skip/start-next/reorder controls; Cancel and the
+   existing R3 decision remain the only actions. T3 treats a projection whose digests, task rows,
+   wave or budgets are inconsistent, that regresses, that changes at an unchanged Run revision, or
+   whose contract version differs from the advertised one as unavailable rather than current.
 
 #### Unavailable state and limits
 
@@ -350,7 +360,7 @@ protocol errors before reopening the view; restart T3 when changing its server e
 Do not remove a writer lock or infer owner liveness from it to bypass unavailable controls.
 
 This slice supports the existing QUICK/STANDARD Workflow paths and, when advertised, the
-sequential COMPLEX projection above; not arbitrary write/edit/tool/shell dispatch, generic R3,
+COMPLEX projection above; not arbitrary write/edit/tool/shell dispatch, generic R3,
 resume/recovery, rollback, or fallback. T3 remains a Host requesting Runtime actions and showing
 bounded canonical summaries; it never becomes the Task Contract, Policy, approval-consumption,
 task-scheduling or completion authority.
