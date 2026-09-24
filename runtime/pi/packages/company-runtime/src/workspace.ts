@@ -13,7 +13,10 @@ type FileImage = { mode: number; hash: string; text: string; binary: boolean };
 export interface DiffEvidence extends NonNullable<Run["workspace"]> {
 	diff: string;
 }
-const owned = new Set([".ai/state.json", ".ai/tasks.json", ".ai/writer.lock"]);
+const owned = new Set([".ai/state.json", ".ai/tasks.json", ".ai/writer.lock", ".ai/writer.lock.recovery"]);
+/** Runtime-owned: canonical state, projection, lock/recovery guard and immutable terminal-run archives. */
+export const isRuntimeOwnedPath = (path: string): boolean =>
+	owned.has(path) || /^\.ai\/runs\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.json$/.test(path);
 const hash = (content: string | Buffer) => createHash("sha256").update(content).digest("hex");
 
 /** Full byte/mode snapshots plus Git HEAD/index identity. No stash/reset/checkout/clean/commit. */
@@ -70,7 +73,7 @@ export class GitWorkspace {
 			.split("\0")
 			.filter(Boolean);
 		for (const entry of status)
-			if (!owned.has(entry.slice(3)) && !generated.has(entry.slice(3)))
+			if (!isRuntimeOwnedPath(entry.slice(3)) && !generated.has(entry.slice(3)))
 				throw new Error("Dirty workspace: preserve existing changes; no automatic cleanup was performed");
 	}
 	static async open(cwd: string, policy: PolicyContext, signal?: AbortSignal): Promise<GitWorkspace> {
@@ -81,7 +84,7 @@ export class GitWorkspace {
 			throw new Error("Run must start at the Git project root");
 		const tracked = (await workspace.command(["ls-files", "-z"])).split("\0").filter(Boolean);
 		const generated = await ownedObservationPaths(workspace.cwd);
-		if (tracked.some((path) => owned.has(path) || generated.has(path)))
+		if (tracked.some((path) => isRuntimeOwnedPath(path) || generated.has(path)))
 			throw new Error("Runtime operating files must not be tracked in Git");
 		await workspace.assertClean(signal);
 		workspace.head = (await workspace.command(["rev-parse", "HEAD"])).trim();
@@ -121,7 +124,7 @@ export class GitWorkspace {
 		const names = new Set(
 			(await this.command(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], signal))
 				.split("\0")
-				.filter((path) => path && !owned.has(path)),
+				.filter((path) => path && !isRuntimeOwnedPath(path)),
 		);
 		names.add(".ai/config.yaml");
 		for (const path of OBSERVATION_FILES) names.add(path);
@@ -142,7 +145,7 @@ export class GitWorkspace {
 			if (stat.isDirectory() && !stat.isSymbolicLink()) {
 				if (path.split("/").some((part) => [".git", ".ai", ".pi", "node_modules"].includes(part))) continue;
 				for (const name of await readdir(join(this.cwd, path))) pending.push(`${path}/${name}`);
-			} else if (!owned.has(path)) names.add(path);
+			} else if (!isRuntimeOwnedPath(path)) names.add(path);
 		}
 		for (const path of await ownedObservationPaths(this.cwd)) names.delete(path);
 		if (names.size > 5000) throw new Error("Workspace evidence file limit");

@@ -14,10 +14,22 @@ export interface ObservationAction {
 	decision: PolicyDecision;
 	status: "DENIED" | "PREPARED" | "SUCCEEDED" | "FAILED" | "INTERRUPTED";
 }
+/** Index entry of an archived terminal run; the full run is read through FileStateStore.readArchivedRun. */
+export interface ArchivedRunSummary {
+	runId: string;
+	status: string;
+	workflow: string;
+	risk: string;
+	phase: string;
+	goal: string;
+	updatedAt: number;
+}
 export interface ObservationState {
 	revision: number;
 	runs: readonly Run[];
 	actions: readonly ObservationAction[];
+	/** Older than every inline run, oldest first. */
+	archivedRuns?: readonly ArchivedRunSummary[];
 }
 export interface RunView {
 	run?: Run;
@@ -149,13 +161,18 @@ function checkLine(check: CheckResult, index: number): string {
 	return `${index + 1}. ${displayText(check.id)} | ${check.step ? `${check.step.stepId}@${check.step.attempt}` : "step not recorded"} | code revision ${check.revision} | ${check.kind}/${check.required ? "required" : "optional"} | ${check.status} | ${check.kind === "browser" ? "fresh browser assertion; no command exit status" : `exit ${check.exitCode ?? "not available"}`}`;
 }
 export function formatHistory(state: ObservationState, number = 1): string {
-	const selected = page([...state.runs].reverse(), number);
+	// Newest first: inline runs, then archived terminal runs (all older than every inline run).
+	const rows: Array<ArchivedRunSummary & { archived: boolean }> = [
+		...[...state.runs].reverse().map((run) => ({ ...run, archived: false })),
+		...[...(state.archivedRuns ?? [])].reverse().map((run) => ({ ...run, archived: true })),
+	];
+	const selected = page(rows, number);
 	return [
 		`Stored run history; project revision ${state.revision}. Not a live worker/diff check.`,
 		selected.label,
 		...selected.items.map(
 			(run) =>
-				`${displayText(run.runId)} | ${run.workflow}/${run.risk} | ${run.status}/${run.phase} | ${timestamp(run.updatedAt)}\n  ${displayText(run.goal, 300)}`,
+				`${displayText(run.runId)} | ${run.workflow}/${run.risk} | ${run.status}/${run.phase} | ${timestamp(run.updatedAt)}${run.archived ? " | archived" : ""}\n  ${displayText(run.goal, 300)}`,
 		),
 		"Use /state <full-run-id>; stored completion and PASS refer only to their recorded snapshot.",
 	].join("\n");

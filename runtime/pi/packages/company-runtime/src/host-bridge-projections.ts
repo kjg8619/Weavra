@@ -23,7 +23,10 @@ export async function readHostObservation(cwd: string, runId?: string): Promise<
 	const emptyIdentity = { runId: null, stateRevision: null, projectRevision: null, eventId: null };
 	try {
 		const snapshot = await FileStateStore.readSnapshot(cwd);
-		const run = runId ? snapshot.state?.runs.find((value) => value.runId === runId) : snapshot.state?.runs.at(-1);
+		const inline = runId ? snapshot.state?.runs.find((value) => value.runId === runId) : snapshot.state?.runs.at(-1);
+		// An older terminal run lives in a digest-checked archive; a missing or changed archive reads as absent.
+		const run =
+			inline ?? (runId ? (await FileStateStore.readArchivedRun(cwd, runId).catch(() => undefined))?.run : undefined);
 		return {
 			identity: {
 				runId: run?.runId ?? null,

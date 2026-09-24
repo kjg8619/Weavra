@@ -1,6 +1,6 @@
 import { execFileSync, fork } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -228,7 +228,7 @@ describe("S6 filesystem/crash safety", () => {
 		expect(existsSync(join(cwd, ".ai/writer.lock"))).toBe(false);
 	});
 	it.each(["state-before-projection", "effect-before-result"])(
-		"crash at %s keeps a stale lease and never infers success on owned recovery",
+		"crash at %s recovers only the dead owner's lease and never infers success",
 		async (phase) => {
 			const statePath = new URL("../src/state-store.ts", import.meta.url).href;
 			const kernelPath = new URL("../src/kernel.ts", import.meta.url).href;
@@ -241,11 +241,11 @@ armed=true; await kernel.start(); await store.prepare({executionMode:'EDIT',runI
 			const before = await FileStateStore.readSnapshot(cwd);
 			expect(before.state?.runs[0].status).toBe("RUNNING");
 			expect(before.writerPresent).toBe(true);
-			await expect(FileStateStore.open(cwd)).rejects.toThrow();
-			// Only this fixture child has exited. Production never guesses that a crash lock is safe to steal.
-			await unlink(join(cwd, ".ai/writer.lock"));
+			const lock = JSON.parse(await readFile(join(cwd, ".ai/writer.lock"), "utf8")) as { pid: number };
+			// The fixture child is provably dead on this host, so its lease is recovered; nothing is resumed.
 			const recovered = await FileStateStore.open(cwd);
 			stores.push(recovered);
+			expect(recovered.recoveredStaleLock).toEqual({ pid: lock.pid });
 			expect(recovered.snapshot.runs[0].status).toBe("INTERRUPTED");
 			if (phase === "effect-before-result") {
 				expect(recovered.snapshot.actions[0].status).toBe("INTERRUPTED");

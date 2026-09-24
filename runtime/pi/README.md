@@ -185,7 +185,7 @@ Open 성공 시 기존 fork-local CLI/Extension을 `exec`하므로 argv/stdio/ex
 
 1. 작업할 **Git 프로젝트 루트**에서 `.ai/config.yaml`을 직접 작성한다. 아래 예제를 수정하고 `scripts/check.mjs`에 실제 프로젝트 검증을 연결한다. 실행 파일과 간접 실행 코드까지 검토한다.
 2. `weavra setup` 뒤 Weavra 안의 `/login` 또는 명시적으로 import한 auth/`models.json`으로 provider/model을 준비한다. YAML에 API key를 넣지 않는다.
-3. 설정·검증 script를 포함한 사용자 변경을 직접 검토하고 commit하여 clean Git baseline과 기존 HEAD를 준비한다. Runtime은 이를 대신하지 않는다. `.ai/state.json`, `tasks.json`, `writer.lock` 및 generated export는 Git 추적하지 않는다.
+3. 설정·검증 script를 포함한 사용자 변경을 직접 검토하고 commit하여 clean Git baseline과 기존 HEAD를 준비한다. Runtime은 이를 대신하지 않는다. `.ai/state.json`, `tasks.json`, `writer.lock`, 보관 run `.ai/runs/` 및 generated export는 Git 추적하지 않는다.
 4. `weavra`에서 다음 명령을 사용한다. `src/calculator.js`는 프로젝트의 실제 허용 파일로 바꾼다.
 
 ```text

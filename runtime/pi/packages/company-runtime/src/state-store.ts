@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { type FileHandle, lstat, mkdir, open, realpath, rename, unlink } from "node:fs/promises";
+import { hostname } from "node:os";
 import { join } from "node:path";
 import { type Static, Type } from "typebox";
 import { readAnchoredSource } from "./anchored-files.ts";
@@ -13,11 +14,39 @@ import type { StateStore } from "./ports.ts";
 import { PROJECT_FACT_LIMIT, type ProjectFact, ProjectFactSchema } from "./project-fact-types.ts";
 
 const counter = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
+const STATE_MAX_BYTES = 16 * 1024 * 1024;
+/** Terminal runs kept inline; older ones move to `.ai/runs/<runId>.json` when a writer opens the store. */
+export const INLINE_TERMINAL_RUNS = 20;
+/** Run IDs that are safe as archive file names; other runs simply stay inline. */
+const ARCHIVE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const ActionRecordSchema = Type.Object(
 	{
 		decision: PolicyDecisionSchema,
 		status: Type.Enum(["DENIED", "PREPARED", "SUCCEEDED", "FAILED", "INTERRUPTED"]),
 	},
+	{ additionalProperties: false },
+);
+type ActionRecord = Static<typeof ActionRecordSchema>;
+const label = Type.String({ minLength: 1, maxLength: 32 });
+/** Bounded index entry for an archived terminal run; the archive file is verified against `digest` on every read. */
+const ArchivedRunSchema = Type.Object(
+	{
+		runId: Type.String({ pattern: ARCHIVE_RUN_ID.source }),
+		status: label,
+		workflow: label,
+		risk: label,
+		phase: label,
+		goal: Type.String({ maxLength: 300 }),
+		createdAt: counter,
+		updatedAt: counter,
+		actions: counter,
+		digest: Type.String({ pattern: "^sha256:[0-9a-f]{64}$" }),
+	},
+	{ additionalProperties: false },
+);
+export type ArchivedRun = Static<typeof ArchivedRunSchema>;
+const RunArchiveSchema = Type.Object(
+	{ schemaVersion: Type.Literal(1), run: RunSchema, actions: Type.Array(ActionRecordSchema) },
 	{ additionalProperties: false },
 );
 const StateSchema = Type.Object(
@@ -28,10 +57,64 @@ const StateSchema = Type.Object(
 		runs: Type.Array(RunSchema),
 		actions: Type.Array(ActionRecordSchema),
 		projectFacts: Type.Optional(Type.Array(ProjectFactSchema, { maxItems: PROJECT_FACT_LIMIT })),
+		archivedRuns: Type.Optional(Type.Array(ArchivedRunSchema)),
 	},
 	{ additionalProperties: false },
 );
 export type FileRuntimeState = Static<typeof StateSchema>;
+const archiveDigest = (text: string) => `sha256:${createHash("sha256").update(text).digest("hex")}`;
+
+/** A dead owner is only provable on this host; EPERM or success means the PID is alive. */
+function processAlive(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code !== "ESRCH";
+	}
+}
+
+/** Reads a regular single-link file under `.ai` without following links; undefined when absent. */
+async function readRuntimeOwnedFile(directories: readonly string[], path: string): Promise<string | undefined> {
+	for (const directory of directories) {
+		try {
+			const stat = await lstat(directory);
+			if (!stat.isDirectory() || stat.isSymbolicLink()) throw new StateStoreError("unsafe runtime directory");
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+			throw error;
+		}
+	}
+	let handle: FileHandle;
+	try {
+		handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+		throw error;
+	}
+	try {
+		const stat = await handle.stat();
+		if (!stat.isFile() || stat.nlink !== 1 || stat.size > STATE_MAX_BYTES)
+			throw new StateStoreError("unsafe runtime file");
+		return await handle.readFile("utf8");
+	} finally {
+		await handle.close();
+	}
+}
+
+/** Digest-checked archive read; a missing, changed or mismatched archive is an integrity error. */
+async function loadArchive(project: string, entry: ArchivedRun): Promise<{ run: Run; actions: ActionRecord[] }> {
+	const directory = join(project, ".ai");
+	const text = await readRuntimeOwnedFile(
+		[directory, join(directory, "runs")],
+		join(directory, "runs", `${entry.runId}.json`),
+	).catch(() => undefined);
+	if (text === undefined || archiveDigest(text) !== entry.digest) throw new StateStoreError("archived run integrity");
+	const archive = validateContract(RunArchiveSchema, JSON.parse(text));
+	if (archive.run.runId !== entry.runId || archive.actions.some((action) => action.decision.runId !== entry.runId))
+		throw new StateStoreError("archived run integrity");
+	return { run: archive.run, actions: archive.actions };
+}
 type StateFile = "state.json" | "tasks.json";
 export interface FileStateStoreOptions {
 	now?: () => number;
@@ -67,6 +150,12 @@ function assertState(value: unknown): FileRuntimeState {
 	)
 		throw new Error("Conflicting project facts");
 	if (runIds.size !== state.runs.length || state.runs.filter(active).length > 1) throw new Error("Conflicting runs");
+	const archived = state.archivedRuns ?? [];
+	if (
+		new Set(archived.map((entry) => entry.runId)).size !== archived.length ||
+		archived.some((entry) => runIds.has(entry.runId))
+	)
+		throw new Error("Conflicting archived runs");
 	for (const run of state.runs) {
 		const taskIds = new Set(run.tasks.map((task) => task.id));
 		if (taskIds.size !== run.tasks.length || !taskIds.has(run.currentTask) || run.revision < 1)
@@ -112,6 +201,8 @@ export class FileStateStore implements StateStore, ActionAudit {
 	private closing?: Promise<void>;
 	private busy = false;
 	private readonly eventFailures: EventDeliveryFailure[] = [];
+	/** Set when open removed a lock whose same-host owner PID no longer exists. */
+	recoveredStaleLock?: { pid: number };
 
 	private constructor(projectPath: string, options: FileStateStoreOptions) {
 		this.projectPath = projectPath;
@@ -130,12 +221,26 @@ export class FileStateStore implements StateStore, ActionAudit {
 			const directory = await lstat(store.directory);
 			if (!directory.isDirectory() || directory.isSymbolicLink()) throw new StateStoreError("directory");
 			store.directoryIdentity = { dev: directory.dev, ino: directory.ino };
-			const lock = await open(store.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+			const createLock = () =>
+				open(store.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+			let lock: FileHandle;
+			try {
+				lock = await createLock();
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code !== "EEXIST" || !(await store.recoverStaleLock())) throw error;
+				lock = await createLock();
+			}
 			try {
 				const identity = await lock.stat();
 				store.lockIdentity = { dev: identity.dev, ino: identity.ino };
 				await lock.writeFile(
-					JSON.stringify({ schemaVersion: 1, projectPath: canonical, token: store.token, pid: process.pid }),
+					JSON.stringify({
+						schemaVersion: 1,
+						projectPath: canonical,
+						token: store.token,
+						pid: process.pid,
+						hostname: hostname(),
+					}),
 				);
 				await lock.sync();
 			} finally {
@@ -152,6 +257,61 @@ export class FileStateStore implements StateStore, ActionAudit {
 				failure.cleanupFailed = true;
 			}
 			throw failure;
+		}
+	}
+	/**
+	 * Removes a lock only when its same-host owner PID provably no longer exists. A recovery guard created with
+	 * O_EXCL excludes concurrent recoverers; normal openers never touch an existing lock, so no fresh lock is removed.
+	 * Locks without a hostname (older format), other hosts, live or unverifiable owners and a leftover guard are kept.
+	 */
+	private async recoverStaleLock(): Promise<boolean> {
+		const guardPath = join(this.directory, "writer.lock.recovery");
+		let guard: FileHandle;
+		try {
+			guard = await open(guardPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+		} catch {
+			return false;
+		}
+		try {
+			await guard.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname(), token: this.token }));
+			let stale: { dev: number; ino: number; pid: number } | undefined;
+			try {
+				const handle = await open(this.lockPath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+				try {
+					const stat = await handle.stat();
+					if (!stat.isFile() || stat.nlink !== 1 || stat.size > 4096) return false;
+					const owner: unknown = JSON.parse(await handle.readFile("utf8"));
+					if (
+						owner &&
+						typeof owner === "object" &&
+						"schemaVersion" in owner &&
+						owner.schemaVersion === 1 &&
+						"projectPath" in owner &&
+						owner.projectPath === this.projectPath &&
+						"hostname" in owner &&
+						owner.hostname === hostname() &&
+						"pid" in owner &&
+						typeof owner.pid === "number" &&
+						Number.isSafeInteger(owner.pid) &&
+						owner.pid > 0 &&
+						!processAlive(owner.pid)
+					)
+						stale = { dev: stat.dev, ino: stat.ino, pid: owner.pid };
+				} finally {
+					await handle.close();
+				}
+			} catch {
+				return false;
+			}
+			if (!stale) return false;
+			const current = await lstat(this.lockPath);
+			if (current.dev !== stale.dev || current.ino !== stale.ino) return false;
+			await unlink(this.lockPath);
+			this.recoveredStaleLock = { pid: stale.pid };
+			return true;
+		} finally {
+			await guard.close();
+			await unlink(guardPath);
 		}
 	}
 	/** Final-use canonical validation for advisory inputs; no recovery, migration or lock mutation. */
@@ -208,7 +368,19 @@ export class FileStateStore implements StateStore, ActionAudit {
 			throw new Error("Export requires an idle writer and terminal runs; no recovery/resume is performed");
 		this.busy = true;
 		try {
-			return await writeObservationFiles(this, this.snapshot, this.options.beforeAtomicStep);
+			const snapshot = this.snapshot;
+			// Exports cover all history: archived runs are digest-checked and placed before the inline ones.
+			const archives: Array<{ run: Run; actions: ActionRecord[] }> = [];
+			for (const entry of snapshot.archivedRuns ?? []) archives.push(await loadArchive(this.projectPath, entry));
+			return await writeObservationFiles(
+				this,
+				{
+					revision: snapshot.revision,
+					runs: [...archives.map((archive) => archive.run), ...snapshot.runs],
+					actions: [...archives.flatMap((archive) => archive.actions), ...snapshot.actions],
+				},
+				this.options.beforeAtomicStep,
+			);
 		} finally {
 			this.busy = false;
 		}
@@ -422,6 +594,7 @@ export class FileStateStore implements StateStore, ActionAudit {
 				events.push(createRuntimeEvent(run, run.eventSequence, { type: "RunInterrupted", reason: run.lastError }));
 			}
 		for (const action of next.actions) if (action.status === "PREPARED") action.status = "INTERRUPTED";
+		if (this.options.recoverInterrupted !== false) await this.archiveTerminalRuns(next);
 		if (JSON.stringify(next) !== JSON.stringify(this.state)) await this.commit(next);
 		else {
 			if (this.options.recoverInterrupted === false) return;
@@ -441,6 +614,78 @@ export class FileStateStore implements StateStore, ActionAudit {
 				this.eventFailures.push({ sequence: event.sequence, type: event.type });
 			}
 		}
+	}
+	/**
+	 * Moves terminal runs beyond the newest INLINE_TERMINAL_RUNS (with their actions) to immutable archive files, then
+	 * lets the caller commit the smaller state. Archive files are written first, so a crash leaves an unreferenced but
+	 * byte-identical archive that the next open reuses; terminal runs never change.
+	 */
+	private async archiveTerminalRuns(next: FileRuntimeState): Promise<void> {
+		const terminal = next.runs.filter((run) => !active(run) && ARCHIVE_RUN_ID.test(run.runId));
+		const selected = terminal.slice(0, Math.max(0, terminal.length - INLINE_TERMINAL_RUNS));
+		if (!selected.length) return;
+		const archived = next.archivedRuns ?? [];
+		for (const run of selected) {
+			const actions = next.actions.filter((action) => action.decision.runId === run.runId);
+			archived.push({
+				runId: run.runId,
+				status: run.status,
+				workflow: run.workflow,
+				risk: run.risk,
+				phase: run.phase,
+				goal: run.goal.slice(0, 300),
+				createdAt: run.createdAt,
+				updatedAt: run.updatedAt,
+				actions: actions.length,
+				digest: await this.writeArchive(run, actions),
+			});
+		}
+		const moved = new Set(selected.map((run) => run.runId));
+		next.runs = next.runs.filter((run) => !moved.has(run.runId));
+		next.actions = next.actions.filter((action) => !moved.has(action.decision.runId));
+		next.archivedRuns = archived;
+	}
+	private async writeArchive(run: Run, actions: ActionRecord[]): Promise<string> {
+		const content = `${JSON.stringify({ schemaVersion: 1, run, actions }, null, 2)}\n`;
+		if (Buffer.byteLength(content, "utf8") > STATE_MAX_BYTES) throw new StateStoreError("archive size limit");
+		const digest = archiveDigest(content);
+		await this.checkOwnership();
+		const directory = join(this.directory, "runs");
+		await mkdir(directory, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => {
+			if (error.code !== "EEXIST") throw error;
+		});
+		const target = join(directory, `${run.runId}.json`);
+		const existing = await readRuntimeOwnedFile([this.directory, directory], target);
+		if (existing !== undefined) {
+			if (archiveDigest(existing) !== digest) throw new StateStoreError("archive conflict");
+			return digest;
+		}
+		const temporary = join(directory, `.${run.runId}.${randomUUID()}.tmp`);
+		const handle = await open(temporary, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+		try {
+			try {
+				await handle.writeFile(content);
+				await handle.sync();
+			} finally {
+				await handle.close();
+			}
+			await this.checkOwnership();
+			await rename(temporary, target);
+		} finally {
+			await unlink(temporary).catch((error: NodeJS.ErrnoException) => {
+				if (error.code !== "ENOENT") throw error;
+			});
+		}
+		return digest;
+	}
+	/** Read-only lookup of an archived terminal run through the canonical index; no lock, repair or migration. */
+	static async readArchivedRun(
+		projectPath: string,
+		runId: string,
+	): Promise<{ run: Run; actions: ActionRecord[] } | undefined> {
+		const { state } = await FileStateStore.readSnapshot(projectPath);
+		const entry = state?.archivedRuns?.find((item) => item.runId === runId);
+		return entry ? loadArchive(await realpath(projectPath), entry) : undefined;
 	}
 	private async mutate(change: (next: FileRuntimeState) => void, beforeStateRename?: () => void): Promise<void> {
 		if (this.closed || this.busy) throw new StateStoreError("closed or concurrent operation");

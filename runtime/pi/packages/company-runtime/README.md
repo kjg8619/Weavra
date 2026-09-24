@@ -821,16 +821,17 @@ AgentExecutor에는 역할·profile·task·handoff·증거를, Verifier에는 ch
 
 ### 저장소와 소유권
 
-- `FileStateStore.open(projectPath, options?)`: `realpath`로 프로젝트를 정규화하고 `.ai/writer.lock`을 배타 생성한다. 별칭 경로와 다른 프로세스도 같은 lock을 사용한다. PID는 참고 정보이며 생존 여부로 자동 탈취하지 않는다.
+- `FileStateStore.open(projectPath, options?)`: `realpath`로 프로젝트를 정규화하고 `.ai/writer.lock`을 배타 생성한다. 별칭 경로와 다른 프로세스도 같은 lock을 사용한다. lock에는 PID와 hostname을 기록한다. 기존 lock은 **같은 hostname·같은 프로젝트이고 기록된 PID가 이 호스트에 존재하지 않을 때만**(`kill(pid, 0)`이 ESRCH) 복구한다. `writer.lock.recovery`를 O_EXCL로 만들어 복구자끼리 배제하고, 같은 inode인지 다시 확인한 뒤 지우고 새 lock을 배타 생성한다. 살아 있거나 확인할 수 없는 PID, 다른 호스트, hostname 없는 이전 형식 lock, 남은 recovery guard는 이전처럼 건드리지 않는다. 복구 결과는 `recoveredStaleLock`과 workflow diagnostic으로 보인다. 설계: [STATE_STORE.md](../../../../docs/architecture/STATE_STORE.md).
 - `load/save`: 기존 StateStore Port 구현. Run revision은 정확히 1씩 증가해야 하며 terminal run은 덮어쓰지 않는다. 이전 run ID를 보존하고 활성 run은 프로젝트당 하나만 허용한다.
 - `state.json`: `{schemaVersion, revision, runs, actions}`가 원본이다. 프로젝트 revision은 action 저장에서도 증가하며, Kernel의 Run revision·code revisionCycle과 별개다.
+- 보관: writer가 열 때 활성 run과 최근 terminal run 20개(`INLINE_TERMINAL_RUNS`)만 inline으로 남긴다. 더 오래된 terminal run은 그 action과 함께 불변 파일 `.ai/runs/<runId>.json`으로 먼저 원자 저장하고, `state.json`에는 선택 필드 `archivedRuns`(id·상태·workflow·risk·phase·300자 goal·시각·action 수·sha256)만 남긴다. 그 사이 crash가 나면 다음 open이 같은 바이트를 재사용한다. `/state <runId>`, `/workflow history`, Host bridge 조회, `/state export`는 digest를 확인한 보관 파일을 읽으며 누락·변경은 무결성 오류다. `tasks.json`은 inline run만 투영한다. Git workspace 검사는 `.ai/runs/<id>.json`과 recovery guard를 Runtime 소유 파일로 취급하며 Git에 추적하면 안 된다.
 - `tasks.json`: 같은 프로젝트 revision을 가진 pending/inProgress/completed/blocked projection이다. 누락·손상·내용 불일치는 state에서 다시 만든다. state가 없는데 tasks만 있거나 state가 손상됐으면 열기를 거부한다.
 - `prepare/finish`: `(runId, actionId)`를 중복 방지 ID로 사용한다. decision/digest와 PREPARED → SUCCEEDED/FAILED/INTERRUPTED 또는 DENIED만 저장한다. 입력 내용·출력·대화·tool history를 복제하지 않는다. `.ai/decisions.md`, 별도 logs/check 증거의 사용자용 출력은 S4/S5에 남겨둔다. config는 S0의 사용자 관리 파일을 유지한다.
 - `close()`: 자신이 소유한 lock만 해제한다. `withFileStateStore(path, async store => …)`는 정상 반환·취소·예외에서 `finally`로 닫는다. 호출자는 **worker 종료를 기다린 뒤** scope를 끝내야 한다. 장기 실행 Host lifecycle 연결은 S3/S4 범위다.
 
-저장은 같은 디렉터리의 무작위 temp 생성 → write → file sync → close → rename 순서다. state를 먼저 교체하고 tasks를 교체한다. `StateStoreError.stage/stateCommitted/cleanupFailed`로 부분 저장과 정리 실패를 구분한다. 저장 오류는 해당 인스턴스의 추가 변경을 차단하지만 lock을 즉시 해제하지 않는다. 실행 소유자가 worker/process 종료를 확인한 뒤 명시적으로 close해야 한다. 초기 open 실패처럼 worker가 아직 없는 경로만 자체 lock을 정리한다. 성공 상태의 state 교체 뒤 tasks 저장이 실패해도 호출 결과는 실패다. 디렉터리 fsync에 의한 전원 장애 내구성이나 여러 파일의 transaction은 보장하지 않는다. 파일당 16 MiB를 넘으면 거부하며 자동 보관·분할은 없다.
+저장은 같은 디렉터리의 무작위 temp 생성 → write → file sync → close → rename 순서다. state를 먼저 교체하고 tasks를 교체한다. `StateStoreError.stage/stateCommitted/cleanupFailed`로 부분 저장과 정리 실패를 구분한다. 저장 오류는 해당 인스턴스의 추가 변경을 차단하지만 lock을 즉시 해제하지 않는다. 실행 소유자가 worker/process 종료를 확인한 뒤 명시적으로 close해야 한다. 초기 open 실패처럼 worker가 아직 없는 경로만 자체 lock을 정리한다. 성공 상태의 state 교체 뒤 tasks 저장이 실패해도 호출 결과는 실패다. 디렉터리 fsync에 의한 전원 장애 내구성이나 여러 파일의 transaction은 보장하지 않는다. 파일당 16 MiB를 넘으면 거부한다. 위 terminal run 보관 덕분에 이 한도는 전체 이력이 아니라 활성 run·최근 20개·색인에 적용된다.
 
-다음 소유자가 열면 CREATED/RUNNING/WAITING_APPROVAL은 INTERRUPTED로 바꾸고 activeAgents/next를 비운다. PREPARED action도 실행 여부를 추정하지 않고 INTERRUPTED로 남긴다. 저장 후 기존 `RunInterrupted` 이벤트를 발행하며 sink 실패는 `deliveryFailures`에만 기록한다. 기존 Step ID/attempt는 유지한다. 자동 resume/retry, 승인·PASS 재사용, 이벤트 재생은 없다. crash가 남긴 lock은 소유 프로세스 종료를 사용자가 확인하고 수동으로 정리해야 한다. 불명확하면 열지 않는다.
+다음 소유자가 열면 CREATED/RUNNING/WAITING_APPROVAL은 INTERRUPTED로 바꾸고 activeAgents/next를 비운다. PREPARED action도 실행 여부를 추정하지 않고 INTERRUPTED로 남긴다. 저장 후 기존 `RunInterrupted` 이벤트를 발행하며 sink 실패는 `deliveryFailures`에만 기록한다. 기존 Step ID/attempt는 유지한다. 자동 resume/retry, 승인·PASS 재사용, 이벤트 재생은 없다. crash가 남긴 lock은 위 조건으로 소유 프로세스의 부재가 증명될 때만 자동 복구하고, 그 밖에는 사용자가 소유 프로세스 종료를 확인하고 수동으로 정리해야 한다. 불명확하면 열지 않는다. 호스트명을 공유하는 다른 PID namespace(예: host UTS를 쓰는 컨테이너)의 살아 있는 owner를 죽은 것으로 볼 수 있으며, 그 owner는 다음 소유권 확인에서 `lock lost`로 실패 처리된다.
 
 ### Policy와 경로 Adapter
 

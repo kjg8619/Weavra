@@ -115,9 +115,19 @@ export function registerCompanyRuntime(
 				source: "live Kernel + action audit",
 			};
 		const snapshot = await FileStateStore.readSnapshot(ctx.cwd);
-		const run = id ? snapshot.state?.runs.find((run) => run.runId === id) : snapshot.state?.runs.at(-1);
-		if (id && !run) throw new ObservationInputError("Unknown run ID; use /workflow history");
+		let run = id ? snapshot.state?.runs.find((run) => run.runId === id) : snapshot.state?.runs.at(-1);
+		let state: RunView["state"] = snapshot.state;
 		const diagnostics: string[] = [];
+		if (id && !run && snapshot.state?.archivedRuns?.some((entry) => entry.runId === id)) {
+			// Digest-checked archive of an older terminal run; an integrity failure is reported, never repaired.
+			const archived = await FileStateStore.readArchivedRun(ctx.cwd, id);
+			if (archived) {
+				run = archived.run;
+				state = { revision: snapshot.state.revision, runs: [archived.run], actions: archived.actions };
+				diagnostics.push("Archived terminal run: read from .ai/runs after digest verification");
+			}
+		}
+		if (id && !run) throw new ObservationInputError("Unknown run ID; use /workflow history");
 		if (snapshot.state && !snapshot.tasksCurrent)
 			diagnostics.push("tasks.json is unavailable or out of sync; no repair was performed");
 		if (snapshot.writerPresent)
@@ -133,14 +143,14 @@ export function registerCompanyRuntime(
 			return {
 				run: local.run,
 				report: local,
-				state: snapshot.state,
+				state,
 				diagnostics,
 				source: `local failure / stored project revision ${snapshot.state?.revision}`,
 			};
 		}
 		return {
 			run,
-			state: snapshot.state,
+			state,
 			diagnostics,
 			source: `stored project revision ${snapshot.state?.revision ?? "none"}`,
 			report: local?.run?.runId === run?.runId || !run ? local : undefined,
