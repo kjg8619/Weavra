@@ -6,6 +6,7 @@ import {
 	type RegisteredBrowserCheck,
 } from "./browser-types.ts";
 import type { CapabilityInventory } from "./capability-types.ts";
+import { ComplexDraftSchema, type ComplexExecution, type ComplexPlan } from "./complex-types.ts";
 import type { CheckResult, StepReference } from "./contracts.ts";
 import type { HostBridgeIdentity, HostSnapshotSummary } from "./host-bridge-protocol.ts";
 import type { ProjectFactsProjection } from "./project-fact-types.ts";
@@ -74,6 +75,8 @@ export const HostControlRequestSchema = Type.Union([
 			acceptanceStatements: Type.Optional(
 				Type.Array(Type.String({ minLength: 1, maxLength: 500, pattern: "\\S" }), { minItems: 1, maxItems: 16 }),
 			),
+			/** Structured COMPLEX proposal (§4); required for COMPLEX, rejected otherwise and with a recipe. */
+			complexDraft: Type.Optional(ComplexDraftSchema),
 		},
 		strict,
 	),
@@ -157,7 +160,7 @@ export interface HostControlPreview {
 	projectRevision: number;
 	expiresAt: number;
 	goal: string;
-	workflow: "QUICK" | "STANDARD";
+	workflow: "QUICK" | "STANDARD" | "COMPLEX";
 	executionMode: "EDIT" | "READ_ONLY";
 	risk: "R0" | "R1" | "R2" | "R3";
 	allowedPaths: string[];
@@ -173,6 +176,11 @@ export interface HostControlPreview {
 		verificationRepairMode: "disabled" | "self-check-once";
 		lspEnabled: boolean;
 	};
+	/**
+	 * Present iff workflow is COMPLEX, absent otherwise: the complete immutable plan, bound to
+	 * `taskContractDigest` and covered by `previewDigest`. Confirmation is still not an approval.
+	 */
+	complexPlan?: ComplexPlan;
 }
 export interface HostControlApproval {
 	approvalId: string;
@@ -245,6 +253,8 @@ export interface HostControlState {
 	pendingApproval: HostControlApproval | null;
 	snapshot: HostSnapshotSummary;
 	capabilityInventory?: CapabilityInventory;
+	/** Present iff the latest canonical Run is COMPLEX (§10.3); not emitted until COMPLEX execution exists. */
+	complexExecution?: ComplexExecution;
 }
 export interface HostControlCapabilities {
 	authority: "Runtime/Kernel";
@@ -258,6 +268,8 @@ export interface HostControlCapabilities {
 	runtimeVersion: string;
 	readiness: "READY" | "NOT_SETUP" | "CONFIG_INVALID";
 	recipes: { id: string; version: number; title: string; inputTemplate: string }[];
+	/** COMPLEX contract feature version (§10.3). Absent means COMPLEX is not exposed; not advertised before execution exists. */
+	complexContractVersion?: 1;
 }
 export type HostControlData =
 	| { kind: "capabilities"; capabilities: HostControlCapabilities }

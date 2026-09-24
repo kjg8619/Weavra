@@ -14,6 +14,8 @@ import {
 import { browserDigest, browserProjectId } from "./browser-types.ts";
 import { boundCapabilityInventory, createCapabilityBroker, type RuntimeCapabilityBroker } from "./capability-broker.ts";
 import { capabilityJson } from "./capability-catalog.ts";
+import { complexDraftBytes } from "./complex-plan.ts";
+import { COMPLEX_DRAFT_MAX_BYTES } from "./complex-types.ts";
 import { loadRuntimeConfig } from "./config.ts";
 import type { ApprovalDecision, ApprovalRequest, Run } from "./contracts.ts";
 import { taskContractDigest } from "./criterion-evidence.ts";
@@ -48,6 +50,7 @@ import {
 import {
 	applyHostWorkflowRecipe,
 	createHostWorkflow,
+	finalizeComplexHostWorkflowPlan,
 	finalizeHostWorkflowPlan,
 	HostWorkflowError,
 	prepareHostWorkflowDraft,
@@ -563,13 +566,30 @@ export class HostControlBridge {
 			);
 		}
 		if (request.type === "workflow.prepare") {
+			const { complexDraft } = request;
+			// Recipes stay STANDARD-only; the structured draft is byte-bounded before any compilation.
+			if (
+				complexDraft !== undefined &&
+				(request.recipeId !== undefined ||
+					request.recipeInputs !== undefined ||
+					complexDraftBytes(complexDraft) > COMPLEX_DRAFT_MAX_BYTES)
+			)
+				throw new ControlError("INVALID_REQUEST");
 			await this.idleRevision(request.expectedProjectRevision);
 			const config = await this.configuration();
-			let draft = prepareHostWorkflowDraft({ goal: request.goal, config });
+			let draft = prepareHostWorkflowDraft({
+				goal: request.goal,
+				config,
+				...(complexDraft !== undefined ? { complexDraft } : {}),
+			});
 			if (request.recipeInputs && !request.recipeId) throw new ControlError("INVALID_RECIPE");
 			if (request.recipeId)
 				draft = applyHostWorkflowRecipe(draft, { recipeId: request.recipeId, inputs: request.recipeInputs ?? {} });
-			const plan = finalizeHostWorkflowPlan(draft, request.acceptanceStatements ?? draft.statements);
+			const statements = request.acceptanceStatements ?? draft.statements;
+			const plan =
+				draft.workflow === "COMPLEX"
+					? await finalizeComplexHostWorkflowPlan(draft, statements, { cwd: this.root.path })
+					: finalizeHostWorkflowPlan(draft, statements);
 			const fields = {
 				previewId: randomUUID(),
 				ownerId: this.ownerId,
@@ -597,6 +617,8 @@ export class HostControlBridge {
 					verificationRepairMode: config.verification.repair.mode,
 					lspEnabled: config.code_intelligence?.lsp.enabled === true,
 				},
+				// Absent (not null) for QUICK/STANDARD; the preview digest below covers the complete plan.
+				...(plan.complexPlan ? { complexPlan: plan.complexPlan } : {}),
 			};
 			const preview: HostControlPreview = {
 				...fields,

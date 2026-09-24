@@ -6,7 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACTION_TOOL_SCHEMAS } from "../src/action-tool-schemas.ts";
+import { complexPlanDigest } from "../src/complex-plan.ts";
 import * as configuration from "../src/config.ts";
+import { taskContractDigest } from "../src/criterion-evidence.ts";
 import * as projections from "../src/host-bridge-projections.ts";
 import { HostControlBridge } from "../src/host-control.ts";
 import {
@@ -291,5 +293,217 @@ describe("Host-only capability observation", () => {
 			error: { code: "RESPONSE_TOO_LARGE" },
 		});
 		expect(await readFile(join(cwd, ".ai/config.yaml"), "utf8")).toBe(JSON.stringify(source));
+	});
+});
+
+describe("COMPLEX preparation over Host Control (#16 stage A)", () => {
+	const goal = "Refactor the parser across multiple modules";
+	const complexSource = {
+		...source,
+		agents: { max_revision_cycles: 3 },
+		verification: {
+			checks: [
+				{ id: "lint", kind: "lint", executable: "/usr/bin/true", args: [], required: false },
+				{ id: "test", kind: "test", executable: "/usr/bin/true", args: [] },
+			],
+		},
+	};
+	const complexDraft = {
+		tasks: [
+			{
+				title: "Extract parser",
+				goal: "Move parsing into src/parse.ts",
+				dependsOnIndexes: [],
+				criterionIndexes: [1],
+				ownership: [
+					{ path: "src/app.ts", operation: "modify" },
+					{ path: "src/parse.ts", operation: "create" },
+				],
+				checkIds: ["test"],
+			},
+			{
+				title: "Add validation",
+				goal: "Reject duplicate keys",
+				dependsOnIndexes: [1],
+				criterionIndexes: [1],
+				ownership: [],
+				checkIds: ["test"],
+			},
+		],
+	};
+	async function complexClient() {
+		await configure(complexSource);
+		await writeFile(join(cwd, "src/app.ts"), "export const app = 1;\n");
+		const client = await connect();
+		const mutation = async (fields: Record<string, unknown>) => {
+			const state = await client.state();
+			return client.send({
+				id: state.nextRequestId,
+				ownerId: state.ownerId,
+				expectedProjectRevision: state.projectRevision,
+				...fields,
+			});
+		};
+		return { ...client, mutation };
+	}
+	beforeEach(async () => {
+		await mkdir(join(cwd, "src"), { recursive: true });
+	});
+
+	it("previews the complete bound plan without a writer, Run, model or capability advertisement", async () => {
+		const client = await complexClient();
+		expect(client.hello).toMatchObject({ success: true, data: { kind: "capabilities" } });
+		if (!client.hello.success || client.hello.data.kind !== "capabilities") throw new Error("capabilities expected");
+		expect("complexContractVersion" in client.hello.data.capabilities).toBe(false);
+		const response = await client.mutation({ type: "workflow.prepare", goal, complexDraft });
+		if (!response.success || response.data.kind !== "prepared") throw new Error(JSON.stringify(response));
+		const preview = response.data.preview;
+		const plan = preview.complexPlan!;
+		expect(preview).toMatchObject({ workflow: "COMPLEX", executionMode: "EDIT", risk: "R1", recipe: null });
+		expect(plan.tasks.map((task) => [task.id, task.dependsOn, task.criterionIds, task.ownership])).toEqual([
+			[
+				"CT-001",
+				[],
+				["AC-001"],
+				[
+					{ path: "src/app.ts", operation: "modify" },
+					{ path: "src/parse.ts", operation: "create" },
+				],
+			],
+			["CT-002", ["CT-001"], ["AC-001"], []],
+		]);
+		expect(plan.integration).toEqual({
+			criterionIds: ["AC-001"],
+			checkIds: ["lint", "test"],
+			reviewRequired: true,
+			finalChecksRequired: true,
+		});
+		expect(plan.complexPlanDigest).toBe(complexPlanDigest(plan));
+		// §10.3: the consumer reconstructs the pending parent from preview fields and recomputes its digest.
+		const parentDigest = taskContractDigest({
+			id: plan.parentTaskId,
+			goal: preview.goal,
+			acceptanceCriteria: preview.acceptanceCriteria.map(({ id, statement, checkIds, reviewRequired }) => ({
+				id,
+				statement,
+				scope: { paths: preview.allowedPaths },
+				verification: { checkIds, reviewRequired },
+			})),
+			status: "pending",
+		});
+		expect(parentDigest).toBe(preview.taskContractDigest);
+		expect(plan.parentTaskContractDigest).toBe(preview.taskContractDigest);
+		expect(preview.acceptanceCriteria.every((criterion) => criterion.reviewRequired)).toBe(true);
+		expect(Buffer.byteLength(client.lines.at(-1)!)).toBeLessThanOrEqual(65536);
+		const state = await client.state();
+		expect(state.preview).toEqual(preview);
+		expect("complexExecution" in state).toBe(false);
+		expect(await readdir(join(cwd, ".ai"))).toEqual(["config.yaml"]);
+		expect(client.createModels).not.toHaveBeenCalled();
+	});
+
+	it.each<[string, Record<string, unknown>, string]>([
+		["COMPLEX without a structured plan", { goal }, "UNSUPPORTED_WORKFLOW"],
+		["a draft on a STANDARD goal", { goal: "Fix bug in src/app.ts", complexDraft }, "INVALID_REQUEST"],
+		[
+			"a recipe with a draft",
+			{ goal, complexDraft, recipeId: "bugfix", recipeInputs: { reproduction: "x" } },
+			"INVALID_REQUEST",
+		],
+		[
+			"a forged task identity",
+			{
+				goal,
+				complexDraft: { tasks: complexDraft.tasks.map((task, index) => ({ ...task, id: `CT-00${index + 1}` })) },
+			},
+			"INVALID_REQUEST",
+		],
+		[
+			"a forged plan digest",
+			{ goal, complexDraft: { ...complexDraft, complexPlanDigest: `sha256:${"0".repeat(64)}` } },
+			"INVALID_REQUEST",
+		],
+		[
+			"a draft over 12,288 bytes",
+			{
+				goal,
+				complexDraft: {
+					tasks: [0, 1, 2].map((taskIndex) => ({
+						...complexDraft.tasks[1],
+						dependsOnIndexes: [],
+						ownership: Array.from({ length: 16 }, (_, index) => ({
+							path: `src/${"a".repeat(240)}-${taskIndex}-${index}.ts`,
+							operation: "create",
+						})),
+					})),
+				},
+			},
+			"INVALID_REQUEST",
+		],
+		[
+			"a self dependency",
+			{
+				goal,
+				complexDraft: { tasks: [complexDraft.tasks[0], { ...complexDraft.tasks[1], dependsOnIndexes: [2] }] },
+			},
+			"INVALID_CRITERIA",
+		],
+		[
+			"a claim outside allowed paths",
+			{
+				goal,
+				complexDraft: {
+					tasks: [
+						complexDraft.tasks[0],
+						{ ...complexDraft.tasks[1], ownership: [{ path: "docs/a.md", operation: "create" }] },
+					],
+				},
+			},
+			"INVALID_CRITERIA",
+		],
+	])("rejects %s with no preview, writer or Run", async (_name, fields, code) => {
+		const client = await complexClient();
+		expect(await client.mutation({ type: "workflow.prepare", ...fields })).toMatchObject({
+			success: false,
+			error: { code },
+		});
+		expect((await client.state()).preview).toBeNull();
+		expect(await readdir(join(cwd, ".ai"))).toEqual(["config.yaml"]);
+		expect(client.createModels).not.toHaveBeenCalled();
+	});
+
+	it("fails a confirmed COMPLEX preview closed at start: consumed, no model, writer or Run", async () => {
+		const client = await complexClient();
+		const prepared = await client.mutation({ type: "workflow.prepare", goal, complexDraft });
+		if (!prepared.success || prepared.data.kind !== "prepared") throw new Error(JSON.stringify(prepared));
+		const { previewId, previewDigest } = prepared.data.preview;
+		expect(await client.mutation({ type: "workflow.confirm", previewId, previewDigest })).toMatchObject({
+			success: true,
+			data: { kind: "accepted", command: "workflow.confirm", runId: null },
+		});
+		let state = await client.state();
+		await vi.waitFor(async () => {
+			state = await client.state();
+			expect(state.busy).toBe(false);
+		});
+		expect(state).toMatchObject({ startFailure: "START_FAILED", preview: null, ownedRunId: null });
+		expect(state.snapshot.status.run).toBeNull();
+		expect(await client.mutation({ type: "workflow.confirm", previewId, previewDigest })).toMatchObject({
+			success: false,
+			error: { code: "PLAN_CONSUMED" },
+		});
+		expect(await readdir(join(cwd, ".ai"))).toEqual(["config.yaml"]);
+		expect(client.createModels).not.toHaveBeenCalled();
+	});
+
+	it("keeps STANDARD previews and snapshots free of COMPLEX fields", async () => {
+		const client = await complexClient();
+		const response = await client.mutation({ type: "workflow.prepare", goal: "Fix bug in src/app.ts" });
+		if (!response.success || response.data.kind !== "prepared") throw new Error(JSON.stringify(response));
+		expect(response.data.preview.workflow).toBe("STANDARD");
+		expect("complexPlan" in response.data.preview).toBe(false);
+		const state = await client.state();
+		expect("complexPlan" in state.preview!).toBe(false);
+		expect("complexExecution" in state).toBe(false);
 	});
 });
