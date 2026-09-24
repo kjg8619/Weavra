@@ -253,7 +253,10 @@ export interface HostControlState {
 	pendingApproval: HostControlApproval | null;
 	snapshot: HostSnapshotSummary;
 	capabilityInventory?: CapabilityInventory;
-	/** Present iff the latest canonical Run is COMPLEX (§10.3); not emitted until COMPLEX execution exists. */
+	/**
+	 * Present iff the latest canonical Run is COMPLEX (§10.3), owned or historical; absent (never null) otherwise and
+	 * never projected from an older Run. Its ownerId/projectRevision/stateRevision/runId equal this snapshot's.
+	 */
 	complexExecution?: ComplexExecution;
 }
 export interface HostControlCapabilities {
@@ -268,7 +271,7 @@ export interface HostControlCapabilities {
 	runtimeVersion: string;
 	readiness: "READY" | "NOT_SETUP" | "CONFIG_INVALID";
 	recipes: { id: string; version: number; title: string; inputTemplate: string }[];
-	/** COMPLEX contract feature version (§10.3). Absent means COMPLEX is not exposed; not advertised before execution exists. */
+	/** COMPLEX contract feature version (§10.3); this Runtime always emits 1. Absent (older Runtime) means not exposed. */
 	complexContractVersion?: 1;
 }
 export type HostControlData =

@@ -6,19 +6,35 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACTION_TOOL_SCHEMAS } from "../src/action-tool-schemas.ts";
+import { classifyRequest } from "../src/classification.ts";
 import { complexPlanDigest } from "../src/complex-plan.ts";
+import { projectComplexExecution } from "../src/complex-state.ts";
+import type { ComplexPlan } from "../src/complex-types.ts";
 import * as configuration from "../src/config.ts";
+import type { Run } from "../src/contracts.ts";
 import { taskContractDigest } from "../src/criterion-evidence.ts";
 import * as projections from "../src/host-bridge-projections.ts";
 import { HostControlBridge } from "../src/host-control.ts";
 import {
 	HOST_CONTROL_COMMANDS,
+	type HostControlCapabilities,
 	type HostControlResponse,
 	type HostControlState,
 } from "../src/host-control-protocol.ts";
+import { CompanyKernel } from "../src/kernel.ts";
 import * as lsp from "../src/lsp/manager.ts";
 import * as facts from "../src/project-facts.ts";
 import { FileStateStore } from "../src/state-store.ts";
+import { type ComplexObservation, complexConsumerIssues, complexPreviewIssues } from "./complex-conformance.ts";
+import {
+	type ComplexTaskSpec,
+	complexHarness,
+	complexPlanFor,
+	driveComplex,
+	FakeFiles,
+	takeConsumerIssues,
+} from "./complex-fixture.ts";
+import { testContract } from "./fixture-contract.ts";
 
 const source = {
 	schemaVersion: 1,
@@ -350,14 +366,19 @@ describe("COMPLEX preparation over Host Control (#16 stage A)", () => {
 		await mkdir(join(cwd, "src"), { recursive: true });
 	});
 
-	it("previews the complete bound plan without a writer, Run, model or capability advertisement", async () => {
+	it("previews the complete bound plan without a writer, Run or model", async () => {
 		const client = await complexClient();
 		expect(client.hello).toMatchObject({ success: true, data: { kind: "capabilities" } });
 		if (!client.hello.success || client.hello.data.kind !== "capabilities") throw new Error("capabilities expected");
-		expect("complexContractVersion" in client.hello.data.capabilities).toBe(false);
+		// #16 stage C: this Runtime implements contract v1 and advertises it; advertisement authorizes nothing.
+		expect(client.hello.data.capabilities.complexContractVersion).toBe(1);
 		const response = await client.mutation({ type: "workflow.prepare", goal, complexDraft });
 		if (!response.success || response.data.kind !== "prepared") throw new Error(JSON.stringify(response));
 		const preview = response.data.preview;
+		// Every App preview/prepare-response rule holds for the real preview (complex-conformance.ts).
+		expect(
+			complexPreviewIssues(preview, { ownerId: client.bridge.ownerId, expectedProjectRevision: 0, complexDraft }),
+		).toEqual([]);
 		const plan = preview.complexPlan!;
 		expect(preview).toMatchObject({ workflow: "COMPLEX", executionMode: "EDIT", risk: "R1", recipe: null });
 		expect(plan.tasks.map((task) => [task.id, task.dependsOn, task.criterionIds, task.ownership])).toEqual([
@@ -506,5 +527,238 @@ describe("COMPLEX preparation over Host Control (#16 stage A)", () => {
 		const state = await client.state();
 		expect("complexPlan" in state.preview!).toBe(false);
 		expect("complexExecution" in state).toBe(false);
+	});
+});
+
+describe("COMPLEX execution projection over Host Control (#16 stage C)", () => {
+	const TWO_TASKS: ComplexTaskSpec[] = [
+		{ claims: [{ path: "src/app.ts", operation: "modify" }] },
+		{ claims: [{ path: "src/new.ts", operation: "create" }] },
+	];
+	afterEach(() => {
+		takeConsumerIssues();
+	});
+	/** A durable COMPLEX Run in `cwd` through the real validating FileStateStore; every save is App-checked. */
+	async function durableComplex(options: { stop?: (run: Run) => boolean; statements?: string[] } = {}) {
+		const store = await FileStateStore.open(cwd);
+		const files = new FakeFiles({ "src/app.ts": "app\n", "src/util.ts": "util\n" });
+		const { plan, parent } = await complexPlanFor(TWO_TASKS, {
+			files,
+			...(options.statements ? { statements: options.statements } : {}),
+		});
+		const h = complexHarness({ plan, parent, files });
+		const kernel = await CompanyKernel.create(h.request(), { ...h.ports, store: h.consumer.wrap(store) }, () => 1000);
+		const run = await driveComplex(kernel, options.stop);
+		return { store, h, run, kernel };
+	}
+	/** One full control observation through the real request/response path. */
+	async function observation(client: Awaited<ReturnType<typeof connect>>): Promise<ComplexObservation> {
+		if (!client.hello.success || client.hello.data.kind !== "capabilities") throw new Error("capabilities expected");
+		const capabilities: HostControlCapabilities = client.hello.data.capabilities;
+		const response = await client.send({ type: "control.snapshot" });
+		if (!response.success || response.data.kind !== "snapshot") throw new Error(JSON.stringify(response));
+		expect(Buffer.byteLength(client.lines.at(-1)!)).toBeLessThanOrEqual(65536);
+		return {
+			capabilities,
+			state: response.data.state,
+			response: {
+				ownerId: response.ownerId,
+				runId: response.runId,
+				stateRevision: response.stateRevision,
+				projectRevision: response.projectRevision,
+			},
+		};
+	}
+	const latestRun = async (): Promise<Run> => {
+		const run = (await FileStateStore.readSnapshot(cwd)).state?.runs.at(-1);
+		if (!run) throw new Error("no durable run");
+		return run;
+	};
+
+	it("advertises contract v1 and projects the latest COMPLEX Run at the snapshot's exact revisions", async () => {
+		const { store, h, run } = await durableComplex();
+		expect(run.status, run.lastError ?? "").toBe("COMPLETED");
+		await store.close();
+		expect(h.consumer.issues).toEqual([]);
+		expect(h.consumer.projected).toHaveLength(run.revision);
+		const client = await connect();
+		const first = await observation(client);
+		expect(first.capabilities.complexContractVersion).toBe(1);
+		const { state } = first;
+		const stored = await latestRun();
+		expect(state.stateRevision).toBe(stored.revision);
+		expect(state.complexExecution).toEqual(
+			projectComplexExecution(stored, {
+				ownerId: client.bridge.ownerId,
+				projectRevision: state.projectRevision,
+				stateRevision: stored.revision,
+			}),
+		);
+		expect(state.complexExecution).toMatchObject({
+			ownerId: state.ownerId,
+			projectRevision: state.projectRevision,
+			stateRevision: state.stateRevision,
+			runId: state.snapshot.status.run?.runId,
+			phase: "TERMINAL",
+			cleanup: "CONFIRMED",
+		});
+		// Historical and unowned: the projection belongs to the latest Run, not to an owned execution.
+		expect(state.ownedRunId).toBeNull();
+		expect(Buffer.byteLength(JSON.stringify(state.complexExecution))).toBeLessThanOrEqual(32768);
+		expect(complexConsumerIssues(first)).toEqual([]);
+		// An unchanged Run is observed again with byte-identical canonical data.
+		const second = await observation(client);
+		expect(complexConsumerIssues(second, first)).toEqual([]);
+		expect(second.state.complexExecution).toEqual(state.complexExecution);
+		// The ordinary read-only summary keeps its existing fields and values; task detail lives only in the DTO.
+		expect(JSON.stringify(state.snapshot)).not.toMatch(/CT-00\d|complexExecution|complexContext/);
+		expect(Object.keys(state.snapshot.status.run ?? {}).sort()).toEqual([
+			"activeAgentCount",
+			"codeRevision",
+			"createdAt",
+			"currentStep",
+			"executionMode",
+			"phase",
+			"risk",
+			"runId",
+			"status",
+			"taskContractDigest",
+			"updatedAt",
+			"workflow",
+		]);
+		expect(state.snapshot.graph?.nodes).toEqual([{ id: "preflight", kind: "preflight", status: "unknown" }]);
+	});
+
+	it("projects historical, unowned and recovered COMPLEX Runs, and never one from an older Run", async () => {
+		const { store } = await durableComplex({
+			stop: (run) => run.complex?.tasks[1].status === "ELIGIBLE",
+		});
+		// The owner stops without cleanup: the durable Run stays RUNNING until the next writer recovers it.
+		await store.close();
+		const client = await connect();
+		const active = await observation(client);
+		expect(active.state.snapshot.status.run).toMatchObject({ status: "RUNNING", workflow: "COMPLEX" });
+		expect(active.state.complexExecution).toMatchObject({ phase: "TASK_SEQUENCE", activeTaskId: "CT-002" });
+		expect(active.state.ownedRunId).toBeNull();
+		expect(complexConsumerIssues(active)).toEqual([]);
+		const recovering = await FileStateStore.open(cwd);
+		const recovered = await observation(client);
+		expect(recovered.state.snapshot.status.run?.status).toBe("INTERRUPTED");
+		expect(recovered.state.complexExecution).toMatchObject({
+			phase: "TERMINAL",
+			activeTaskId: null,
+			cleanup: "UNCONFIRMED",
+			failureCode: "OWNER_LOST",
+			stateRevision: recovered.state.stateRevision,
+		});
+		expect(recovered.state.complexExecution?.tasks.map((row) => row.status)).toEqual(["COMPLETED", "INTERRUPTED"]);
+		// Recovery is an allowed transition of the same Run for the consumer.
+		expect(complexConsumerIssues(recovered, active)).toEqual([]);
+		// A later STANDARD Run replaces the latest Run: no projection, no stale one from the COMPLEX Run.
+		const kernel = await CompanyKernel.create(
+			{
+				executionMode: "EDIT",
+				runId: "standard-after-complex",
+				task: testContract("Fix bug", { taskId: "task-standard" }),
+				classification: classifyRequest("Fix bug").classification,
+			},
+			{
+				store: recovering,
+				agents: { execute: async () => Promise.reject(new Error("unused")) },
+				verifier: { verify: async () => Promise.reject(new Error("unused")) },
+			},
+		);
+		await kernel.start();
+		await recovering.close();
+		const replaced = await observation(client);
+		expect(replaced.state.snapshot.status.run).toMatchObject({
+			runId: "standard-after-complex",
+			workflow: "STANDARD",
+		});
+		expect("complexExecution" in replaced.state).toBe(false);
+		expect(complexConsumerIssues(replaced, recovered)).toEqual([]);
+	});
+
+	it("never publishes a partial projection: planless or oversized latest COMPLEX Runs fail closed", async () => {
+		// A COMPLEX Run without a Host-confirmed plan (refused before execution) has no projection to publish.
+		const legacy = await FileStateStore.open(cwd);
+		const goal = "Refactor the parser across multiple modules";
+		const planless = await CompanyKernel.create(
+			{
+				executionMode: "EDIT",
+				runId: "planless-complex",
+				task: testContract(goal, { taskId: "task-planless" }),
+				classification: classifyRequest(goal).classification,
+				workflow: "COMPLEX",
+			},
+			{
+				store: legacy,
+				agents: { execute: async () => Promise.reject(new Error("unused")) },
+				verifier: { verify: async () => Promise.reject(new Error("unused")) },
+			},
+		);
+		expect((await planless.start()).status).toBe("BLOCKED");
+		await legacy.close();
+		const first = await connect();
+		expect(await first.send({ type: "control.snapshot" })).toMatchObject({
+			success: false,
+			error: { code: "STATE_UNAVAILABLE" },
+		});
+		// A projection over 32,768 bytes (a parent the Host compiler would never admit) is RESPONSE_TOO_LARGE.
+		const files = new FakeFiles({ "src/app.ts": "app\n", "src/util.ts": "util\n" });
+		const statements = Array.from({ length: 16 }, (_, index) => `Criterion ${index + 1} holds`);
+		const { plan: small, parent: smallParent } = await complexPlanFor(TWO_TASKS, { files, statements });
+		const parent = structuredClone(smallParent);
+		for (const criterion of parent.acceptanceCriteria)
+			criterion.scope.paths = Array.from({ length: 32 }, (_, index) => `area-${index}-${"s".repeat(200)}`);
+		const { complexPlanDigest: _stale, ...material } = {
+			...small,
+			parentTaskContractDigest: taskContractDigest(parent),
+		};
+		const plan: ComplexPlan = { ...material, complexPlanDigest: complexPlanDigest(material) };
+		const store = await FileStateStore.open(cwd);
+		const h = complexHarness({ plan, parent, files });
+		await CompanyKernel.create(h.request(), { ...h.ports, store }, () => 1000);
+		await store.close();
+		const client = await connect();
+		expect(await client.send({ type: "control.snapshot" })).toMatchObject({
+			success: false,
+			error: { code: "RESPONSE_TOO_LARGE" },
+		});
+		expect(client.lines.join("")).not.toContain("complexExecution");
+	});
+
+	it("drops only whole inventory rows under response pressure and never shortens the projection", async () => {
+		await configure();
+		const { store } = await durableComplex();
+		await store.close();
+		const client = await connect();
+		const baseline = await observation(client);
+		expect(baseline.state.capabilityInventory?.omitted).toBe(0);
+		const lineBytes = Buffer.byteLength(client.lines.at(-1)!);
+		const inventoryBytes = Buffer.byteLength(JSON.stringify(baseline.state.capabilityInventory));
+		const rows = [
+			{
+				id: "fixture",
+				statement: "",
+				sourceRef: "fixture",
+				sourceDigest: `sha256:${"0".repeat(64)}`,
+				reviewedAt: 0,
+				status: "VALID" as const,
+			},
+		];
+		vi.spyOn(facts, "loadProjectFactProjection").mockResolvedValue(() => rows);
+		const entryBytes = Buffer.byteLength(JSON.stringify(rows[0])) + 1;
+		// Synthetic canonical-state pressure (3-byte characters), not an accepted Project Fact registration.
+		rows[0].statement = "한".repeat(Math.ceil((65536 - lineBytes - entryBytes + 600) / 3));
+		const pressured = await observation(client);
+		expect(pressured.state.capabilityInventory!.omitted).toBeGreaterThan(0);
+		expect(pressured.state.complexExecution).toEqual(baseline.state.complexExecution);
+		expect(complexConsumerIssues(pressured, baseline)).toEqual([]);
+		rows[0].statement = "한".repeat(Math.ceil((65536 - lineBytes - entryBytes + inventoryBytes + 600) / 3));
+		expect(await client.send({ type: "control.snapshot" })).toMatchObject({
+			success: false,
+			error: { code: "RESPONSE_TOO_LARGE" },
+		});
 	});
 });

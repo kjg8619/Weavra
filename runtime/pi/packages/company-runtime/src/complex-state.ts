@@ -1,9 +1,12 @@
+import { Check } from "typebox/value";
 import { capabilityJson } from "./capability-catalog.ts";
 import {
 	type CheckGate,
+	COMPLEX_EXECUTION_MAX_BYTES,
 	COMPLEX_MAX_TASK_CLAIMS,
 	type ComplexEvidenceContext,
 	type ComplexExecution,
+	ComplexExecutionSchema,
 	type ComplexFailureCode,
 	type ComplexPhase,
 	type ComplexPlan,
@@ -170,6 +173,83 @@ export function complexBudget(
 					? "EXHAUSTED"
 					: "WITHIN_LIMITS",
 	};
+}
+
+/** Why a latest COMPLEX Run has no publishable projection: an existing Host Control error code, never a partial DTO. */
+export class ComplexProjectionError extends Error {
+	readonly code: "STATE_UNAVAILABLE" | "RESPONSE_TOO_LARGE";
+
+	constructor(code: "STATE_UNAVAILABLE" | "RESPONSE_TOO_LARGE", message: string) {
+		super(message);
+		this.name = "ComplexProjectionError";
+		this.code = code;
+	}
+}
+
+/**
+ * Opt-in Host Control projection (§10.2, §10.3): a pure function of one durable COMPLEX Run (frozen parent and plan,
+ * task rows, integration, the one global budget ledger and work cycle) and the enclosing snapshot envelope. The
+ * canonical Run stays the outcome authority; nothing is inferred, merged from another Run, shortened or repaired.
+ * A Run without a Host-confirmed plan, an inconsistent Run or a DTO outside the closed shape is STATE_UNAVAILABLE;
+ * a DTO over 32,768 UTF-8 bytes is RESPONSE_TOO_LARGE.
+ */
+export function projectComplexExecution(
+	run: Run,
+	envelope: { ownerId: string; projectRevision: number; stateRevision: number },
+): ComplexExecution {
+	const state = run.complex;
+	const parent = run.tasks[0];
+	if (run.workflow !== "COMPLEX" || !state || run.tasks.length !== 1 || !parent || !isTaskContract(parent))
+		throw new ComplexProjectionError("STATE_UNAVAILABLE", "The Run has no Host-confirmed COMPLEX plan to project");
+	// The projection belongs to exactly this durable snapshot: its revision is the enclosing stateRevision.
+	if (envelope.stateRevision !== run.revision)
+		throw new ComplexProjectionError("STATE_UNAVAILABLE", "The snapshot stateRevision is not this Run revision");
+	const inconsistent = complexRunError(run);
+	if (inconsistent) throw new ComplexProjectionError("STATE_UNAVAILABLE", inconsistent);
+	const execution: ComplexExecution = {
+		schemaVersion: 1,
+		ownerId: envelope.ownerId,
+		projectRevision: envelope.projectRevision,
+		runId: run.runId,
+		stateRevision: run.revision,
+		// Allowlisted wire copy of the frozen parent plus its lifecycle status.
+		parent: {
+			id: parent.id,
+			goal: parent.goal,
+			acceptanceCriteria: parent.acceptanceCriteria.map((criterion) => ({
+				id: criterion.id,
+				statement: criterion.statement,
+				scope: { paths: [...criterion.scope.paths] },
+				verification: {
+					checkIds: [...criterion.verification.checkIds],
+					reviewRequired: criterion.verification.reviewRequired,
+				},
+			})),
+			status: parent.status,
+		},
+		plan: structuredClone(state.plan),
+		phase: state.phase,
+		activeTaskId: state.activeTaskId,
+		tasks: structuredClone(state.tasks),
+		integration: structuredClone(state.integration),
+		budget: complexBudget(run, state.plan),
+		cleanup: state.cleanup,
+		partialChanges: state.partialChanges,
+		changesUnknown: state.changesUnknown,
+		failureCode: state.failureCode,
+	};
+	if (!Check(ComplexExecutionSchema, execution))
+		throw new ComplexProjectionError(
+			"STATE_UNAVAILABLE",
+			"The COMPLEX projection does not fit its closed wire shape",
+		);
+	const bytes = Buffer.byteLength(JSON.stringify(execution), "utf8");
+	if (bytes > COMPLEX_EXECUTION_MAX_BYTES)
+		throw new ComplexProjectionError(
+			"RESPONSE_TOO_LARGE",
+			`The COMPLEX projection is ${bytes} UTF-8 bytes; the limit is ${COMPLEX_EXECUTION_MAX_BYTES} and nothing is truncated`,
+		);
+	return execution;
 }
 
 export interface ComplexSettlement {

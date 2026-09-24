@@ -14,6 +14,7 @@ import {
 	driveComplex,
 	FakeFiles,
 	measurement,
+	takeConsumerIssues,
 } from "./complex-fixture.ts";
 import { testContract } from "./fixture-contract.ts";
 
@@ -28,6 +29,9 @@ beforeEach(async () => {
 afterEach(async () => {
 	for (const store of stores.splice(0)) await store.close().catch(() => {});
 	await rm(root, { recursive: true, force: true });
+	// #16 stage C: every durable snapshot the Kernel saved through the real store, and every transition between
+	// them (including owner-loss recovery observed below), satisfies the App consumer rules.
+	expect(takeConsumerIssues()).toEqual([]);
 });
 async function openStore(options?: FileStateStoreOptions) {
 	const store = await FileStateStore.open(root, options);
@@ -49,7 +53,7 @@ async function durable(options: { specs?: ComplexTaskSpec[]; goal?: string; risk
 		...(options.risk ? { risk: options.risk } : {}),
 	});
 	const h = complexHarness({ plan, parent, files, ...(options.goal ? { goal: options.goal } : {}) });
-	const kernel = await CompanyKernel.create(h.request(), { ...h.ports, store }, () => 1000);
+	const kernel = await CompanyKernel.create(h.request(), { ...h.ports, store: h.consumer.wrap(store) }, () => 1000);
 	return { store, h, kernel };
 }
 
@@ -74,6 +78,8 @@ describe("durable COMPLEX runs", () => {
 		const run = await driveComplex(kernel);
 		expect(run.status, run.lastError ?? "").toBe("COMPLETED");
 		expect(h.invariantErrors).toEqual([]);
+		// Every durable save through the real store was projected and App-checked (afterEach asserts no issue).
+		expect(h.consumer.projected).toEqual(Array.from({ length: run.revision }, (_, index) => index + 1));
 		await store.close();
 		const reopened = await openStore();
 		expect(await reopened.load("run-1")).toEqual(run);
@@ -255,12 +261,14 @@ describe("durable COMPLEX mutation gates", () => {
 
 describe("COMPLEX recovery after owner loss (B7)", () => {
 	it("interrupts every unfinished row, keeps COMPLETED history and never replays", async () => {
-		const { store, kernel } = await durable();
+		const { store, kernel, h } = await durable();
 		await driveComplex(kernel, (run) => run.complex?.tasks[1].status === "ELIGIBLE");
 		await store.close();
 		const events: RuntimeEvent[] = [];
 		const recovered = await openStore({ events: { emit: (event) => void events.push(event) } });
 		const run = recovered.snapshot.runs[0];
+		// The recovered snapshot is a consistent later revision of the same Run for the App consumer.
+		h.consumer.observe(run);
 		expect(run.status).toBe("INTERRUPTED");
 		expect(run.complex).toMatchObject({
 			phase: "TERMINAL",
@@ -304,6 +312,7 @@ describe("COMPLEX recovery after owner loss (B7)", () => {
 		await expect(kernel.advance("self-check")).rejects.toBeInstanceOf(StateStoreError);
 		const recovered = await openStore();
 		const run = recovered.snapshot.runs[0];
+		h.consumer.observe(run);
 		expect(run.status).toBe("INTERRUPTED");
 		expect(run.complex?.tasks[0]).toMatchObject({
 			status: "INTERRUPTED",

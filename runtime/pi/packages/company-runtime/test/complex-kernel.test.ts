@@ -1,5 +1,5 @@
 import { Check } from "typebox/value";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { ComplexOwnershipDenied } from "../src/complex-ownership.ts";
 import { ComplexPlanBindingError } from "../src/complex-plan.ts";
 import { COMPLEX_FAILURE_CODES, ComplexParentSchema } from "../src/complex-types.ts";
@@ -23,10 +23,16 @@ import {
 	driveComplex,
 	FakeFiles,
 	measurement,
+	takeConsumerIssues,
 } from "./complex-fixture.ts";
 
 // #16 stage B: the Kernel COMPLEX task machine with fake ports. The fixture store checks every persisted
 // snapshot against the durable COMPLEX invariants (the #17 consumer rules); `invariantErrors` must stay empty.
+// #16 stage C: every durable snapshot of every scenario is also projected for Host Control and must pass every
+// App consumer rule, alone and against the previous snapshot of the same Run (complex-conformance.ts).
+afterEach(() => {
+	expect(takeConsumerIssues()).toEqual([]);
+});
 
 const EXISTING_EVENTS = new Set([
 	"RunCreated",

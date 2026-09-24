@@ -1,28 +1,24 @@
 import { createHash } from "node:crypto";
-import { Check } from "typebox/value";
 import { classifyRequest } from "../src/classification.ts";
 import { type ComplexPathFact, compileComplexPlan } from "../src/complex-plan.ts";
-import { complexBudget, complexRunError } from "../src/complex-state.ts";
+import { complexRunError, projectComplexExecution } from "../src/complex-state.ts";
 import {
-	COMPLEX_EXECUTION_MAX_BYTES,
 	type ComplexEvidenceContext,
 	type ComplexExecution,
-	ComplexExecutionSchema,
 	type ComplexPlan,
 	evidenceNamespace,
 	type OwnershipClaim,
 } from "../src/complex-types.ts";
 import { parseRuntimeConfig, type RuntimeConfig } from "../src/config.ts";
-import {
-	type CheckRequirement,
-	type ComplexTaskReview,
-	type Handoff,
-	isTaskContract,
-	type Review,
-	type Risk,
-	type Run,
-	type TaskContract,
-	type VerificationResult,
+import type {
+	CheckRequirement,
+	ComplexTaskReview,
+	Handoff,
+	Review,
+	Risk,
+	Run,
+	TaskContract,
+	VerificationResult,
 } from "../src/contracts.ts";
 import type { RuntimeEvent } from "../src/events.ts";
 import { CompanyKernel, type CreateRunRequest } from "../src/kernel.ts";
@@ -33,10 +29,12 @@ import type {
 	ApprovalPort,
 	ComplexWorkspaceImages,
 	KernelPorts,
+	StateStore,
 	VerificationRequest,
 	WorkspaceFileImage,
 } from "../src/ports.ts";
 import { buildTaskContract } from "../src/task-contract.ts";
+import { type ComplexObservation, complexConsumerIssues, observeDurableRun } from "./complex-conformance.ts";
 
 /** In-memory project files with the GitWorkspace image encoding (sha256 hex of bytes, permission bits). */
 export class FakeFiles {
@@ -81,30 +79,49 @@ export class FakeFiles {
 export const COMPLEX_GOAL = "Refactor the parser across multiple modules";
 
 /**
- * The §10.2 control projection as a pure function of one durable Run plus the transport envelope: Stage C only
- * serializes this. `stateRevision` is `Run.revision`.
+ * The production §10.2 control projection of one durable Run under a fixed test envelope (`stateRevision` is
+ * `Run.revision`), exactly as Host Control serializes it.
  */
 export function complexProjection(run: Run, envelope = { ownerId: "owner-1", projectRevision: 1 }): ComplexExecution {
-	const parent = run.tasks[0];
-	if (!run.complex || !isTaskContract(parent)) throw new Error("not a COMPLEX run");
-	return {
-		schemaVersion: 1,
-		ownerId: envelope.ownerId,
-		projectRevision: envelope.projectRevision,
-		runId: run.runId,
-		stateRevision: run.revision,
-		parent,
-		plan: run.complex.plan,
-		phase: run.complex.phase,
-		activeTaskId: run.complex.activeTaskId,
-		tasks: run.complex.tasks,
-		integration: run.complex.integration,
-		budget: complexBudget(run, run.complex.plan),
-		cleanup: run.complex.cleanup,
-		partialChanges: run.complex.partialChanges,
-		changesUnknown: run.complex.changesUnknown,
-		failureCode: run.complex.failureCode,
+	return projectComplexExecution(run, { ...envelope, stateRevision: run.revision });
+}
+
+/**
+ * Observes every durable save of one Run the way one App connection would: each snapshot is checked against every
+ * #17 App consumer rule, and against the previous observation of the same Run (cross-snapshot rules).
+ */
+export function consumerObserver(ownerId = "owner-1") {
+	const issues: string[] = [];
+	/** Durable Run revisions observed with a projection present. */
+	const projected: number[] = [];
+	let previous: ComplexObservation | undefined;
+	let projectRevision = 0;
+	const observe = (run: Run): void => {
+		const observed = observeDurableRun(run, { ownerId, projectRevision: ++projectRevision });
+		const found = [...observed.issues, ...complexConsumerIssues(observed.observation, previous)];
+		for (const issue of found) issues.push(`revision ${run.revision}: ${issue}`);
+		if (observed.observation.state.complexExecution) projected.push(run.revision);
+		previous = observed.observation;
 	};
+	return {
+		issues,
+		projected,
+		observe,
+		/** A store that persists through `store` first and then observes the durable snapshot. */
+		wrap: (store: StateStore): StateStore => ({
+			load: (runId) => store.load(runId),
+			save: async (run) => {
+				await store.save(run);
+				observe(structuredClone(run));
+			},
+		}),
+	};
+}
+
+const observers: Array<ReturnType<typeof consumerObserver>> = [];
+/** App consumer violations recorded by every harness created since the previous call; then forgotten. */
+export function takeConsumerIssues(): string[] {
+	return observers.splice(0).flatMap((observer) => observer.issues);
 }
 
 export function complexConfig(options: { maxRevisionCycles?: number; budget?: Record<string, number> } = {}) {
@@ -228,6 +245,9 @@ export function complexHarness(options: {
 	const saved: Run[] = [];
 	const events: RuntimeEvent[] = [];
 	const invariantErrors: string[] = [];
+	// #16 stage C: the App consumer rules over the production projection of every durable snapshot.
+	const consumer = consumerObserver();
+	observers.push(consumer);
 	const calls: AgentExecutionRequest[] = [];
 	let sessions = 0;
 	const register = async (request: AgentExecutionRequest, reuse?: string) => {
@@ -371,14 +391,10 @@ export function complexHarness(options: {
 				if (control.failWhen?.(run)) throw new Error("disk full");
 				const error = complexRunError(run, saved.at(-1));
 				if (error) invariantErrors.push(`revision ${run.revision}: ${error}`);
-				if (run.complex) {
-					const projection = complexProjection(run);
-					if (!Check(ComplexExecutionSchema, projection))
-						invariantErrors.push(`revision ${run.revision}: projection violates the frozen schema`);
-					if (Buffer.byteLength(JSON.stringify(projection)) > COMPLEX_EXECUTION_MAX_BYTES)
-						invariantErrors.push(`revision ${run.revision}: projection exceeds its byte bound`);
-				}
 				saved.push(structuredClone(run));
+				const before = consumer.issues.length;
+				consumer.observe(structuredClone(run));
+				invariantErrors.push(...consumer.issues.slice(before));
 			},
 		},
 		events: {
@@ -405,6 +421,7 @@ export function complexHarness(options: {
 		events,
 		calls,
 		invariantErrors,
+		consumer,
 		ports,
 		control,
 		settlement,
