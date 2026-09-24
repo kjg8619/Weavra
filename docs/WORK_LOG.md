@@ -627,3 +627,19 @@
      - 전역 예산 한 장부와 Σ작업 + 최종 Reviewer 규칙.
   4. #19 착수 전에 최신 devlop, open PR, CI를 확인한다. 병렬 설계는 위 불변을 약화하지 않는 확장으로만 제안한다.
 - 커밋 상태: devlop 대상 PR. 머지하고 CI가 통과하면 #16·#17·#18을 닫는다.
+
+## 2026-09-25 KST — V0.8A #19 병렬 에이전트 설계 계약
+
+- 목적: 검증된 V0.7B COMPLEX 경계 위에서 병렬 실행을 설계한다(#19). 설계만 하며 Runtime/App 동작은 바꾸지 않는다.
+- 착수 전 확인: devlop `4e4c6410`(#38 머지), #16–#18 CLOSED, open PR 0, COMPLEX corpus 14개가 CI에서 통과. 브랜치/worktree는 `design/v0.8a-parallel-contract`.
+- 결정(`docs/architecture/PARALLEL_AGENTS.md`):
+  - **웨이브 모델:** 의존성이 모두 COMPLETED인 작업을 계획 순서로 최대 `maxParallel`(1–4)개 묶어 **구현(Developer) 단계만** 동시에 실행한다. 모든 구현이 끝나면(join) 작업 공간이 멈춘 상태에서 계획 순서대로 하나씩 self-check·review·test를 진행한다.
+  - 이유: 검사·리뷰는 작업 공간 전체 digest에 증거를 묶는다. 검사 중 다른 작업이 파일을 바꾸면 증거가 실제 상태를 설명하지 못한다. 작업별 체크아웃은 복사·병합, 즉 자동 통합이 필요해 #19 금지 사항에 걸린다. 시간이 가장 많이 드는 구현만 병렬화한다.
+  - 소유권은 이미 계획 전체에서 배타적이라 같은 파일 동시 수정은 구조적으로 불가능하다. ledger는 작업마다 lease를 하나씩 갖는다.
+  - 예산은 웨이브 시작 전에 전원분을 전부 예약하거나 하나도 예약하지 않는다. 형제 작업이 실패하면 wave-scoped abort → join → STOPPING → 종료 순서로 끝나며, 각 행이 자기 실패 코드를 유지한다.
+  - 저장은 한 큐로 직렬화해 이벤트 순서가 전체 순서가 된다.
+  - 새 상태 `HANDED_OFF`, 투영 `activeTaskIds`, plan v2(`limits.maxParallel`, digest domain v2), capability 2를 둔다. App은 1·2를 모두 받고, #21 소비자 → #20 생산자 순서로 머지한다.
+  - `maxParallel = 1`은 V0.7B와 같은 스케줄·결과다. R3는 1로 고정한다.
+- #22 경쟁 corpus 설계: P01–P17(동시 구현 관측, 인계 순서와 무관한 검증 순서, 의존성 웨이브, 소유권 충돌 중 형제 중단, 형제 실패, 동시 취소, REVISE, 예산 전원 예약 실패, 사용량 미상, 외부 변경, 통합 실패, 재연결, 소유자 강제 종료 복구, 이벤트 순서, V0.7B corpus 동등성, R3 고정). 실제 모델 병렬 smoke 또는 NOT VERIFIED 표기.
+- 현재 검증: `git diff --check`. 이 문서와 작업 기록만 바뀌었다. 구현·테스트·속도 향상 주장은 없다.
+- 커밋 상태: devlop 대상 설계 PR. 머지 후 #20(Runtime)·#21(App)을 각자 worktree에서 병렬로 개발한다.
