@@ -243,6 +243,8 @@ export class StandardWorkflow {
 				};
 			}
 			verifier = await RegisteredVerifier.create(this.options.config, agents.policy, store, workspace, lsp);
+			// Opt-in Developer feedback through the same frozen verifier; results never reach the Kernel.
+			const advisoryChecks = this.options.config.verification.advisory?.mode === "developer" ? verifier : undefined;
 			signal.throwIfAborted();
 			await this.options.startGuard?.(store);
 			this.kernel = await CompanyKernel.create(
@@ -289,14 +291,20 @@ export class StandardWorkflow {
 					})),
 				},
 				{
-					agents: this.lsp
-						? {
-								execute: (request) => agents.executor.execute({ ...request, lsp: this.lsp }),
-								get safeToRelease() {
-									return agents.executor.safeToRelease !== false && !lsp?.cleanupFailed;
-								},
-							}
-						: agents.executor,
+					agents:
+						this.lsp || advisoryChecks
+							? {
+									execute: (request) =>
+										agents.executor.execute({
+											...request,
+											...(this.lsp ? { lsp: this.lsp } : {}),
+											...(advisoryChecks && request.role === "Developer" ? { advisoryChecks } : {}),
+										}),
+									get safeToRelease() {
+										return agents.executor.safeToRelease !== false && !lsp?.cleanupFailed;
+									},
+								}
+							: agents.executor,
 					verifier,
 					store,
 					events: this.options.events,

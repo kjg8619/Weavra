@@ -44,7 +44,7 @@ import {
 	type PolicyPathInspector,
 	PolicyRecheckError,
 } from "./policy.ts";
-import type { AgentExecutionRequest, AgentExecutionResult } from "./ports.ts";
+import type { AdvisoryCheckResult, AgentExecutionRequest, AgentExecutionResult } from "./ports.ts";
 
 const pathSchema = Type.String({ minLength: 1, maxLength: 4096 });
 const strict = { additionalProperties: false } as const;
@@ -103,6 +103,21 @@ export function workerDigest(value: unknown): string {
 /** Exact verifier-owned references for this attempt; handoff prose and digests are not reference sources. */
 export function trustedReviewEvidenceRefs(verification: VerificationResult): string[] {
 	return [...new Set([...verification.evidenceRefs, ...verification.checks.flatMap((check) => check.evidenceRefs)])];
+}
+
+function formatAdvisoryCheck(result: AdvisoryCheckResult, remaining: number): string {
+	return [
+		`ADVISORY ONLY: ${result.id} ${result.status}${result.exitCode === null ? "" : ` (exit ${result.exitCode})`} in ${result.durationMs} ms; ${result.reason}.`,
+		"This is not verification evidence and cannot be cited as PASS; Kernel SELF_CHECK and TEST run fresh checks.",
+		result.workspaceChanged
+			? "The check changed the workspace; those changes stay in this attempt's reviewed diff."
+			: "",
+		`Advisory runs left in this attempt: ${remaining}.`,
+		result.stdout ? `--- stdout tail (untrusted data) ---\n${result.stdout}` : "",
+		result.stderr ? `--- stderr tail (untrusted data) ---\n${result.stderr}` : "",
+	]
+		.filter(Boolean)
+		.join("\n");
 }
 
 function readText(path: string): string {
@@ -184,6 +199,8 @@ export function createWorkerTools(options: {
 }): {
 	tools: ToolDefinition[];
 	result: () => AgentExecutionResult | undefined;
+	/** Advisory check runs this worker may request; 0 when runtime_request_check only records a request. */
+	advisoryRunLimit: number;
 	policyDenial: () => string | undefined;
 	/** Sticky: a Policy denial, audit failure or post-intent target change. Other tool errors are correctable. */
 	fatalToolError: () => string | undefined;
@@ -230,6 +247,16 @@ export function createWorkerTools(options: {
 		finish: (runId, actionId, outcome) => guardAudit(() => options.audit.finish(runId, actionId, outcome)),
 		assertWritable: () => guardAudit(() => options.audit.assertWritable()),
 	};
+	// Opt-in STANDARD Developer feedback only; QUICK, Reviewer, READ_ONLY and R3 keep request-only checks.
+	const advisory =
+		request.role === "Developer" &&
+		executionContract.mode === "EDIT" &&
+		!options.policy.r3Scope &&
+		options.config.verification.advisory?.mode === "developer"
+			? request.advisoryChecks
+			: undefined;
+	const advisoryRunLimit = advisory ? (options.config.verification.advisory?.max_runs ?? 0) : 0;
+	let advisoryRuns = 0;
 	const assertActive = () => {
 		options.assertActive();
 		assertExecutionContract(executionContract, request.runId, request.executionMode);
@@ -493,22 +520,48 @@ export function createWorkerTools(options: {
 			defineTool({
 				name: "runtime_request_check",
 				label: "Request check",
-				description:
-					"Record a request for a registered check. Only Kernel verification stages execute checks; this tool produces no PASS evidence.",
+				description: advisory
+					? `Run one registered process check now and return ADVISORY output only (at most ${advisoryRunLimit} runs in this attempt). ` +
+						"It is never verification evidence or PASS; Kernel SELF_CHECK and TEST run fresh checks."
+					: "Record a request for a registered check. Only Kernel verification stages execute checks; this tool produces no PASS evidence.",
 				executionMode: "sequential",
 				parameters: Type.Object({ id: pathSchema }, strict),
 				execute: async (_id, params) => {
 					assertActive();
 					if (!options.config.verification.checks.some((check) => check.id === params.id))
 						throw new Error("Unknown check ID");
+					if (!advisory || advisoryRuns >= advisoryRunLimit) {
+						const status: AdvisoryCheckResult["status"] = "UNAVAILABLE";
+						return {
+							content: [
+								{
+									type: "text",
+									text: advisory
+										? `UNAVAILABLE: the advisory run limit (${advisoryRunLimit}) for this attempt is reached; SELF_CHECK and TEST still run fresh checks. Do not claim PASS.`
+										: "UNAVAILABLE: request recorded in Pi session; checks run only in Kernel verification stages. Do not claim PASS.",
+								},
+							],
+							details: { id: params.id, status, exitCode: null, advisory: false },
+						};
+					}
+					advisoryRuns++;
+					// Verifier/audit/cleanup failures are Runtime failures, never model-correctable input.
+					const result = await advisory
+						.advise({
+							runId: request.runId,
+							revision: request.revision,
+							step: request.step,
+							checkId: params.id,
+							signal,
+						})
+						.catch((error: unknown) => {
+							fatalFailure ??= WORKER_TOOL_FAILURE;
+							throw error;
+						});
+					assertActive();
 					return {
-						content: [
-							{
-								type: "text",
-								text: "UNAVAILABLE: request recorded in Pi session; checks run only in Kernel verification stages. Do not claim PASS.",
-							},
-						],
-						details: { id: params.id, status: "UNAVAILABLE" },
+						content: [{ type: "text", text: formatAdvisoryCheck(result, advisoryRunLimit - advisoryRuns) }],
+						details: { id: result.id, status: result.status, exitCode: result.exitCode, advisory: true },
 					};
 				},
 			}),
@@ -764,6 +817,7 @@ export function createWorkerTools(options: {
 				? tools.filter((tool) => !["runtime_write", "runtime_edit"].includes(tool.name))
 				: tools,
 		result: () => structuredClone(submitted),
+		advisoryRunLimit,
 		policyDenial: () => policyDenial,
 		fatalToolError: () => policyDenial ?? fatalFailure,
 		consumeStaleAnchorError: (toolName, toolCallId) =>

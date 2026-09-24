@@ -429,7 +429,15 @@ export class PiAgentExecutor implements AgentExecutor {
 	private async performExecution(input: AgentExecutionRequest): Promise<AgentExecutionResult> {
 		if (this.busy || !this.cleanupConfirmed || this.stoppedRuns.has(input.runId))
 			throw new Error("Worker already active or run stopped");
-		const { signal: parentSignal, onSessionCreated, onApprovalRequested, onApprovalConsumed, lsp, ...data } = input;
+		const {
+			signal: parentSignal,
+			onSessionCreated,
+			onApprovalRequested,
+			onApprovalConsumed,
+			lsp,
+			advisoryChecks,
+			...data
+		} = input;
 		const request: AgentExecutionRequest = {
 			...structuredClone(data),
 			signal: parentSignal,
@@ -437,6 +445,7 @@ export class PiAgentExecutor implements AgentExecutor {
 			onApprovalRequested,
 			onApprovalConsumed,
 			lsp,
+			advisoryChecks,
 		};
 		if (
 			this.options.r3Scope &&
@@ -553,7 +562,9 @@ export class PiAgentExecutor implements AgentExecutor {
 							? "Perform only the preselected deletion through runtime_delete. Submit a structured handoff alone. Checks requested here are NOT executed."
 							: request.executionMode === "READ_ONLY"
 								? "Inspect and explain only. Submit a structured handoff alone with changed_files: []. Checks requested here are NOT executed."
-								: "Implement only allowed ordinary code changes. Submit a structured handoff alone. Checks requested here are NOT executed."
+								: worker.advisoryRunLimit > 0
+									? `Implement only allowed ordinary code changes. Submit a structured handoff alone. runtime_request_check runs a registered check now and returns ADVISORY output only (at most ${worker.advisoryRunLimit} runs); it is never verification evidence or PASS, and Kernel SELF_CHECK and TEST still run fresh checks.`
+									: "Implement only allowed ordinary code changes. Submit a structured handoff alone. Checks requested here are NOT executed."
 						: "Independently review the explicit handoff, diff and evidence. Never mutate files. Submit structured PASS/REVISE/BLOCK alone. " +
 							"Judge every frozen acceptance criterion exactly once by its exact ID; never add, remove, replace or restate criteria. " +
 							"For top-level evidenceRefs and every criteria[].evidenceRefs, copy only exact strings from trustedEvidenceRefs in the input. " +

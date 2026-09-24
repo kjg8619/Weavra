@@ -19,7 +19,7 @@ import { collectLspEvidence, markStaleLspEvidence } from "./lsp/evidence.ts";
 import type { LspEvidence, LspPort } from "./lsp/types.ts";
 import { type ActionAudit, evaluateRegisteredCheck, type PolicyContext, type RegisteredCheck } from "./policy.ts";
 import { FilePolicyPathInspector } from "./policy-paths.ts";
-import type { VerificationRequest, Verifier } from "./ports.ts";
+import type { AdvisoryCheckPort, AdvisoryCheckResult, VerificationRequest, Verifier } from "./ports.ts";
 import { ProcessCleanupError, resolveExecutable, runProcess, verificationEnvironment } from "./process-runner.ts";
 import {
 	buildSandboxPolicy,
@@ -44,7 +44,9 @@ import {
 } from "./verifier-trust.ts";
 import type { DiffEvidence, GitWorkspace } from "./workspace.ts";
 
-export class RegisteredVerifier implements Verifier {
+const ADVISORY_OUTPUT_UNITS = 2000;
+
+export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 	readonly workspace: GitWorkspace;
 	private processCleanupConfirmed = true;
 	get safeToRelease(): boolean {
@@ -236,6 +238,113 @@ export class RegisteredVerifier implements Verifier {
 	async inspect(signal?: AbortSignal) {
 		const { diff: _diff, ...snapshot } = await this.workspace.inspect(signal);
 		return snapshot;
+	}
+
+	/**
+	 * One Developer-requested run of a registered process check while implementing, with the same frozen
+	 * registration, Policy decision, audit ledger and sandbox as verification. The result is bounded tool text only:
+	 * never a CheckResult, evidence reference, trust/sandbox evidence or durable state. SELF_CHECK/TEST run fresh.
+	 */
+	async advise(input: Parameters<AdvisoryCheckPort["advise"]>[0]): Promise<AdvisoryCheckResult> {
+		if (!this.safeToRelease) throw new ProcessCleanupError();
+		if (input.runId !== this.policy.executionRunId || this.policy.r3Scope || input.step.stepId !== "implement")
+			throw new Error("Advisory check binding mismatch");
+		const index = this.config.verification.checks.findIndex((check) => check.id === input.checkId);
+		const check = this.config.verification.checks[index];
+		if (!check) throw new Error("Unknown check ID");
+		const unavailable = (reason: string): AdvisoryCheckResult => ({
+			id: check.id,
+			status: "UNAVAILABLE",
+			exitCode: null,
+			reason,
+			durationMs: 0,
+			stdout: "",
+			stderr: "",
+			workspaceChanged: false,
+		});
+		if (check.kind === "browser") return unavailable("Browser checks run only in Kernel verification stages");
+		const registration = this.registrations[index];
+		if (!registration) return unavailable("Registered executable unavailable");
+		const before = await this.workspace.inspect(input.signal);
+		if (!before.safe) return unavailable("Unsupported workspace mutation; SELF_CHECK will report it");
+		const action = structuredClone(registration);
+		const decision = evaluateRegisteredCheck(
+			{
+				runId: input.runId,
+				actionId: randomUUID(),
+				actionDigest: workerDigest({
+					executionContract: { runId: this.policy.executionRunId, mode: this.policy.executionMode },
+					projectInstructionDigest: this.policy.projectInstruction?.digest ?? null,
+					request: action,
+					step: input.step,
+					revision: input.revision,
+					advisory: true,
+				}),
+			},
+			action,
+			registration,
+			this.policy,
+			await this.cwdSafe(action.cwd),
+		);
+		await this.audit.prepare(decision);
+		if (decision.decision !== "ALLOW") return unavailable("Check blocked by execution policy");
+		let intentOpen = true;
+		try {
+			await this.audit.assertWritable();
+			if (!(await this.cwdSafe(action.cwd))) {
+				intentOpen = false;
+				await this.audit.finish(decision.runId, decision.actionId, "FAILED");
+				return unavailable("Check cwd changed after intent persistence");
+			}
+			input.signal?.throwIfAborted();
+			this.processCleanupConfirmed = false;
+			const run = {
+				executable: action.executable,
+				argv: action.argv,
+				cwd: join(this.workspace.cwd, action.cwd),
+				env: action.env,
+				timeoutMs: action.timeoutMs,
+				signal: input.signal,
+			};
+			const sandboxRun = this.sandbox ? await runSandboxedCheck({ snapshot: this.sandbox, ...run }) : undefined;
+			const result = sandboxRun?.result ?? (await runProcess(run));
+			this.processCleanupConfirmed = result.cleanupConfirmed;
+			intentOpen = false;
+			if (!this.safeToRelease) {
+				await this.audit.finish(decision.runId, decision.actionId, "INTERRUPTED");
+				throw new ProcessCleanupError();
+			}
+			const enforced = !sandboxRun || sandboxRun.status === "ENFORCED";
+			const passed = enforced && result.reason === "exited" && result.exitCode === 0 && !input.signal?.aborted;
+			await this.audit.finish(
+				decision.runId,
+				decision.actionId,
+				input.signal?.aborted ? "INTERRUPTED" : passed ? "SUCCEEDED" : "FAILED",
+			);
+			const after = await this.workspace.inspect().catch(() => undefined);
+			if (!after && !this.workspace.safeToRelease) throw new ProcessCleanupError();
+			return {
+				id: check.id,
+				status: !enforced || result.reason === "unavailable" ? "UNAVAILABLE" : passed ? "PASSED" : "FAILED",
+				exitCode: result.exitCode,
+				reason: enforced
+					? `Check ${input.signal?.aborted ? "cancelled" : result.reason}`
+					: "Verifier sandbox was not enforced",
+				durationMs: result.finishedAt - result.startedAt,
+				stdout: result.stdout.slice(-ADVISORY_OUTPUT_UNITS),
+				stderr: result.stderr.slice(-ADVISORY_OUTPUT_UNITS),
+				workspaceChanged: !after?.safe || after.diffDigest !== before.diffDigest,
+			};
+		} catch (error) {
+			if (!this.safeToRelease) throw new ProcessCleanupError();
+			if (intentOpen)
+				await this.audit.finish(
+					decision.runId,
+					decision.actionId,
+					input.signal?.aborted ? "INTERRUPTED" : "FAILED",
+				);
+			throw error;
+		}
 	}
 
 	private async verifyBrowserCheck(
