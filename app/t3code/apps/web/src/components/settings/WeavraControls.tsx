@@ -190,7 +190,10 @@ export function WeavraControls({
     state.projectRevision === factPreview.projectRevision &&
     factPreview.expiresAt > observedAt &&
     preparedFactDraft === factDraftIdentity;
-  const complexSupported = observation?.capabilities?.complexContractVersion === 1;
+  // Contract v1 runs tasks one at a time; v2 may implement independent tasks together. The draft
+  // is the same for both: dependencies express order, and maxParallel is Runtime configuration.
+  const complexVersion = observation?.capabilities?.complexContractVersion;
+  const complexSupported = complexVersion !== undefined;
   const draftIdentity = JSON.stringify([
     goal,
     recipeId,
@@ -513,7 +516,11 @@ export function WeavraControls({
       },
       `Start this exact ${preview.workflow} / ${preview.risk} / ${preview.executionMode} plan for ${workspaceRoot}?\nGoal: ${preview.goal}${
         plan
-          ? `\nTasks, in this order under one Run: ${plan.tasks.map((task) => `${task.id} ${task.title}`).join("; ")}\nPlan digest: ${plan.complexPlanDigest}\nThe plan cannot be edited after confirmation. Completing every task does not complete the Run.`
+          ? `\n${
+              plan.schemaVersion === 2 && plan.limits.maxParallel > 1
+                ? `Tasks under one Run, in plan order; up to ${plan.limits.maxParallel} whose dependencies are complete are implemented at once, then checked and reviewed one at a time`
+                : "Tasks, in this order under one Run"
+            }: ${plan.tasks.map((task) => `${task.id} ${task.title}`).join("; ")}\nPlan digest: ${plan.complexPlanDigest}\nThe plan cannot be edited after confirmation. Completing every task does not complete the Run.`
           : ""
       }\nPlan confirmation is not R3 approval. No automatic commit, rollback or cleanup.`,
     );
@@ -707,6 +714,7 @@ export function WeavraControls({
             owned={state.ownedRunId === run.runId}
             observedAt={observation?.observedAt ?? null}
             writerPresent={state.snapshot.status.writerPresent}
+            cancelling={state.cancelling}
           />
         ) : (
           run?.workflow === "COMPLEX" && (
@@ -786,14 +794,16 @@ export function WeavraControls({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className="text-sm font-medium">Structured task plan · COMPLEX (optional)</h4>
                 <Badge variant={complexSupported ? "outline" : "warning"}>
-                  {complexSupported ? "RUNTIME CONTRACT v1" : "NOT EXPOSED"}
+                  {complexSupported ? `RUNTIME CONTRACT v${complexVersion}` : "NOT EXPOSED"}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Only for goals Runtime classifies as COMPLEX. Tasks run one at a time, in order,
-                under one Runtime-owned Run. Runtime assigns task IDs and validates dependencies,
-                criteria coverage, exact file claims and registered checks. The plan cannot be
-                edited after confirmation.
+                Only for goals Runtime classifies as COMPLEX.{" "}
+                {complexVersion === 2
+                  ? "Tasks whose dependencies are complete may be implemented at the same time, up to the Runtime's configured limit; checks and reviews still run one task at a time in plan order. Add a dependency to force an order."
+                  : "Tasks run one at a time, in order, under one Runtime-owned Run."}{" "}
+                Runtime assigns task IDs and validates dependencies, criteria coverage, exact file
+                claims and registered checks. The plan cannot be edited after confirmation.
               </p>
               {complexRows.length > 0 && (
                 <label className="block space-y-1 text-sm">

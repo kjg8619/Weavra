@@ -232,8 +232,11 @@ const projectFact = Schema.Union([
   Schema.Struct({ ...factIdentity, status: Schema.Literal("STALE"), statement: Schema.Null }),
 ]);
 
-// COMPLEX sequential workflow, contract v1 (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md
-// §4, §10). Duplicated from the Runtime wire shapes; never imported across build roots.
+// COMPLEX workflow wire contract, duplicated from the Runtime wire shapes and never imported
+// across build roots. v1 is the sequential V0.7B contract
+// (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md §4, §10); v2 adds implementation waves
+// (docs/architecture/PARALLEL_AGENTS.md §8). The unversioned plan and execution schemas accept
+// either version; the server requires every shape on a connection to match the advertised version.
 // Structural rules that need no parent or hashing live here; digests and cross-object
 // consistency are checked by the server consumer before publication.
 export const WEAVRA_COMPLEX_MAX_DRAFT_BYTES = 12_288;
@@ -350,8 +353,7 @@ export const WeavraComplexTask = Schema.Struct({
 });
 export type WeavraComplexTask = typeof WeavraComplexTask.Type;
 
-export const WeavraComplexPlan = Schema.Struct({
-  schemaVersion: Schema.Literal(1),
+const planFields = {
   planId: canonicalUuid,
   complexPlanDigest: digest,
   parentTaskId: identifier,
@@ -371,29 +373,49 @@ export const WeavraComplexPlan = Schema.Struct({
     reviewRequired: Schema.Literal(true),
     finalChecksRequired: Schema.Literal(true),
   }),
+};
+const planLimits = {
+  maxTasks: Schema.Literal(8),
+  maxWorkerInvocations: counter.check(Schema.isBetween({ minimum: 1, maximum: 24 })),
+  maxReportedTokens: counter.check(Schema.isBetween({ minimum: 1, maximum: 200_000 })),
+  maxTotalRevisionCycles: counter.check(Schema.isLessThanOrEqualTo(3)),
+};
+/** Order, edge, exclusivity and byte rules shared by both plan versions. */
+function planRulesHold(plan: {
+  readonly tasks: ReadonlyArray<WeavraComplexTask>;
+  readonly limits: { readonly maxTotalRevisionCycles: number };
+}) {
+  const paths = plan.tasks.flatMap((task) => task.ownership.map((claim) => claim.path));
+  return (
+    jsonBytes(plan) <= WEAVRA_COMPLEX_MAX_PLAN_BYTES &&
+    paths.length <= 64 &&
+    new Set(paths).size === paths.length &&
+    plan.tasks.every(
+      (task, index) =>
+        task.id === `CT-00${index + 1}` &&
+        task.maxRevisionCycles <= plan.limits.maxTotalRevisionCycles &&
+        // Fixed-width IDs order like their indexes: every edge points to an earlier task.
+        task.dependsOn.every((dependency) => dependency < task.id),
+    )
+  );
+}
+export const WeavraComplexPlanV1 = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  ...planFields,
+  limits: Schema.Struct(planLimits),
+}).check(Schema.makeFilter((plan) => planRulesHold(plan)));
+export type WeavraComplexPlanV1 = typeof WeavraComplexPlanV1.Type;
+/** V0.8A: the frozen number of tasks whose implementation may run at once (Runtime config). */
+export const WeavraComplexPlanV2 = Schema.Struct({
+  schemaVersion: Schema.Literal(2),
+  ...planFields,
   limits: Schema.Struct({
-    maxTasks: Schema.Literal(8),
-    maxWorkerInvocations: counter.check(Schema.isBetween({ minimum: 1, maximum: 24 })),
-    maxReportedTokens: counter.check(Schema.isBetween({ minimum: 1, maximum: 200_000 })),
-    maxTotalRevisionCycles: counter.check(Schema.isLessThanOrEqualTo(3)),
+    ...planLimits,
+    maxParallel: counter.check(Schema.isBetween({ minimum: 1, maximum: 4 })),
   }),
-}).check(
-  Schema.makeFilter((plan) => {
-    const paths = plan.tasks.flatMap((task) => task.ownership.map((claim) => claim.path));
-    return (
-      jsonBytes(plan) <= WEAVRA_COMPLEX_MAX_PLAN_BYTES &&
-      paths.length <= 64 &&
-      new Set(paths).size === paths.length &&
-      plan.tasks.every(
-        (task, index) =>
-          task.id === `CT-00${index + 1}` &&
-          task.maxRevisionCycles <= plan.limits.maxTotalRevisionCycles &&
-          // Fixed-width IDs order like their indexes: every edge points to an earlier task.
-          task.dependsOn.every((dependency) => dependency < task.id),
-      )
-    );
-  }),
-);
+}).check(Schema.makeFilter((plan) => planRulesHold(plan)));
+export type WeavraComplexPlanV2 = typeof WeavraComplexPlanV2.Type;
+export const WeavraComplexPlan = Schema.Union([WeavraComplexPlanV1, WeavraComplexPlanV2]);
 export type WeavraComplexPlan = typeof WeavraComplexPlan.Type;
 
 const scopePath = Schema.String.check(
@@ -427,7 +449,7 @@ export const WeavraTaskContract = Schema.Struct({
 });
 export type WeavraTaskContract = typeof WeavraTaskContract.Type;
 
-export const WeavraComplexTaskStatus = Schema.Literals([
+const taskStatusesV1 = [
   "PENDING",
   "ELIGIBLE",
   "IMPLEMENTING",
@@ -441,8 +463,11 @@ export const WeavraComplexTaskStatus = Schema.Literals([
   "FAILED",
   "CANCELLED",
   "INTERRUPTED",
-]);
-export type WeavraComplexTaskStatus = typeof WeavraComplexTaskStatus.Type;
+] as const;
+export const WeavraComplexTaskStatusV1 = Schema.Literals(taskStatusesV1);
+/** v2 adds HANDED_OFF: implemented, waiting for its verification turn. */
+export const WeavraComplexTaskStatusV2 = Schema.Literals([...taskStatusesV1, "HANDED_OFF"]);
+export type WeavraComplexTaskStatus = typeof WeavraComplexTaskStatusV2.Type;
 export const WeavraComplexPhase = Schema.Literals([
   "TASK_SEQUENCE",
   "INTEGRATION_CHECK",
@@ -505,9 +530,7 @@ export const WeavraComplexReviewGate = Schema.Literals([
 ]);
 const evidenceFreshness = Schema.Literals(["NONE", "CURRENT", "STALE", "UNKNOWN"]);
 
-export const WeavraComplexTaskState = Schema.Struct({
-  id: complexTaskId,
-  status: WeavraComplexTaskStatus,
+const taskStateFields = {
   attempt: counter.check(Schema.isLessThanOrEqualTo(3)),
   revisionCycle: counter.check(Schema.isLessThanOrEqualTo(2)),
   workerInvocations: counter.check(Schema.isLessThanOrEqualTo(6)),
@@ -521,8 +544,19 @@ export const WeavraComplexTaskState = Schema.Struct({
   test: WeavraComplexCheckGate,
   evidenceFreshness,
   failureCode: Schema.NullOr(WeavraComplexFailureCode),
+};
+export const WeavraComplexTaskStateV1 = Schema.Struct({
+  id: complexTaskId,
+  status: WeavraComplexTaskStatusV1,
+  ...taskStateFields,
 });
-export type WeavraComplexTaskState = typeof WeavraComplexTaskState.Type;
+export const WeavraComplexTaskStateV2 = Schema.Struct({
+  id: complexTaskId,
+  status: WeavraComplexTaskStatusV2,
+  ...taskStateFields,
+});
+/** A task row of either contract version; v1 rows are the subset without HANDED_OFF. */
+export type WeavraComplexTaskState = typeof WeavraComplexTaskStateV2.Type;
 export const WeavraComplexIntegration = Schema.Struct({
   check: WeavraComplexCheckGate,
   review: WeavraComplexReviewGate,
@@ -532,18 +566,14 @@ export const WeavraComplexIntegration = Schema.Struct({
   failureCode: Schema.NullOr(WeavraComplexFailureCode),
 });
 
-/** Read-only Runtime projection of the latest COMPLEX Run; the snapshot status stays the outcome. */
-export const WeavraComplexExecution = Schema.Struct({
-  schemaVersion: Schema.Literal(1),
+const executionIdentity = {
   ownerId: identifier,
   projectRevision: counter,
   runId: identifier,
   stateRevision: counter,
   parent: WeavraTaskContract,
-  plan: WeavraComplexPlan,
-  phase: WeavraComplexPhase,
-  activeTaskId: Schema.NullOr(complexTaskId),
-  tasks: Schema.Array(WeavraComplexTaskState).check(Schema.isMinLength(2), Schema.isMaxLength(8)),
+};
+const executionOutcome = {
   integration: WeavraComplexIntegration,
   budget: Schema.Struct({
     workerInvocations: counter.check(Schema.isLessThanOrEqualTo(24)),
@@ -555,10 +585,56 @@ export const WeavraComplexExecution = Schema.Struct({
   partialChanges: Schema.Boolean,
   changesUnknown: Schema.Boolean,
   failureCode: Schema.NullOr(WeavraComplexFailureCode),
-}).check(
-  Schema.makeFilter((execution) => jsonBytes(execution) <= WEAVRA_COMPLEX_MAX_EXECUTION_BYTES),
+};
+const withinExecutionBytes = Schema.makeFilter(
+  (execution: unknown) => jsonBytes(execution) <= WEAVRA_COMPLEX_MAX_EXECUTION_BYTES,
 );
+/** Read-only Runtime projection of the latest COMPLEX Run; the snapshot status stays the outcome. */
+export const WeavraComplexExecutionV1 = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  ...executionIdentity,
+  plan: WeavraComplexPlanV1,
+  phase: WeavraComplexPhase,
+  activeTaskId: Schema.NullOr(complexTaskId),
+  tasks: Schema.Array(WeavraComplexTaskStateV1).check(Schema.isMinLength(2), Schema.isMaxLength(8)),
+  ...executionOutcome,
+}).check(withinExecutionBytes);
+export type WeavraComplexExecutionV1 = typeof WeavraComplexExecutionV1.Type;
+/**
+ * v2: the Runtime-reported active rows of the current wave, in plan order (never more than 4).
+ * Amendment A1: a historical V0.7B Run keeps its frozen v1 plan, with no wave and only v1 row
+ * statuses; the enclosing snapshot must show that Run terminal.
+ */
+export const WeavraComplexExecutionV2 = Schema.Struct({
+  schemaVersion: Schema.Literal(2),
+  ...executionIdentity,
+  plan: Schema.Union([WeavraComplexPlanV2, WeavraComplexPlanV1]),
+  phase: WeavraComplexPhase,
+  activeTaskIds: Schema.Array(complexTaskId).check(Schema.isMaxLength(4), strictlyAscending),
+  tasks: Schema.Array(WeavraComplexTaskStateV2).check(Schema.isMinLength(2), Schema.isMaxLength(8)),
+  ...executionOutcome,
+}).check(
+  withinExecutionBytes,
+  Schema.makeFilter(
+    (execution) =>
+      execution.plan.schemaVersion === 2 ||
+      (execution.activeTaskIds.length === 0 &&
+        execution.tasks.every((row) => row.status !== "HANDED_OFF")),
+  ),
+);
+export type WeavraComplexExecutionV2 = typeof WeavraComplexExecutionV2.Type;
+export const WeavraComplexExecution = Schema.Union([
+  WeavraComplexExecutionV1,
+  WeavraComplexExecutionV2,
+]);
 export type WeavraComplexExecution = typeof WeavraComplexExecution.Type;
+const terminalRunStatuses: ReadonlySet<string> = new Set([
+  "BLOCKED",
+  "FAILED",
+  "CANCELLED",
+  "INTERRUPTED",
+  "COMPLETED",
+]);
 
 export const WeavraControlMutation = Schema.Union([
   Schema.Struct({
@@ -904,7 +980,10 @@ export const WeavraControlState = Schema.Struct({
           state.complexExecution.projectRevision === state.projectRevision &&
           state.complexExecution.stateRevision === state.stateRevision &&
           state.complexExecution.runId === state.snapshot.status.run?.runId &&
-          state.snapshot.status.run.workflow === "COMPLEX")),
+          state.snapshot.status.run.workflow === "COMPLEX" &&
+          // A plan of another version than its projection is only a terminal historical Run.
+          (state.complexExecution.plan.schemaVersion === state.complexExecution.schemaVersion ||
+            terminalRunStatuses.has(state.snapshot.status.run.status)))),
   ),
 );
 export type WeavraControlState = typeof WeavraControlState.Type;
@@ -932,8 +1011,9 @@ export const WeavraControlCapabilities = Schema.Struct({
   previewTtlMs: counter,
   runtimeVersion: boundedText,
   readiness: Schema.Literals(["READY", "NOT_SETUP", "CONFIG_INVALID"]),
-  // Absent means COMPLEX is NOT_EXPOSED; never inferred from readiness or version text.
-  complexContractVersion: Schema.optionalKey(Schema.Literal(1)),
+  // Absent means COMPLEX is NOT_EXPOSED; never inferred from readiness or version text. A Runtime
+  // advertises exactly one version: 1 (sequential, V0.7B) or 2 (implementation waves, V0.8A).
+  complexContractVersion: Schema.optionalKey(Schema.Literals([1, 2])),
   recipes: Schema.Array(
     Schema.Struct({
       id: identifier,

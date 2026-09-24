@@ -6,8 +6,10 @@ import {
   type WeavraBrowserCandidateSummary,
   type WeavraBrowserPreview,
   type WeavraBrowserState,
-  type WeavraComplexExecution,
-  type WeavraComplexPlan,
+  type WeavraComplexExecutionV1,
+  type WeavraComplexExecutionV2,
+  type WeavraComplexPlanV1,
+  type WeavraComplexPlanV2,
   type WeavraControlObservation,
   type WeavraControlPreview,
   type WeavraControlResponse,
@@ -814,7 +816,7 @@ describe("Weavra browser registration authority", () => {
   });
 });
 
-const complexPlan: WeavraComplexPlan = {
+const complexPlan: WeavraComplexPlanV1 = {
   schemaVersion: 1,
   planId: "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a",
   complexPlanDigest: `sha256:${"7".repeat(64)}`,
@@ -872,7 +874,7 @@ const complexPreview: WeavraControlPreview = {
   ],
   complexPlan,
 };
-type ComplexRow = WeavraComplexExecution["tasks"][number];
+type ComplexRow = WeavraComplexExecutionV1["tasks"][number];
 const idleRow = (id: string): ComplexRow => ({
   id,
   status: "PENDING",
@@ -904,7 +906,7 @@ const completedTask = (id: string, freshness: ComplexRow["evidenceFreshness"]): 
   test: "PASS",
   evidenceFreshness: freshness,
 });
-function complexExecution(patch: Partial<WeavraComplexExecution> = {}): WeavraComplexExecution {
+function complexExecution(patch: Partial<WeavraComplexExecutionV1> = {}): WeavraComplexExecutionV1 {
   return {
     schemaVersion: 1,
     ownerId: "owner",
@@ -947,10 +949,10 @@ function complexExecution(patch: Partial<WeavraComplexExecution> = {}): WeavraCo
     ...patch,
   };
 }
-function advertiseComplex() {
+function advertiseComplex(version: 1 | 2 = 1) {
   data.observation = {
     ...data.observation!,
-    capabilities: { ...data.observation!.capabilities!, complexContractVersion: 1 },
+    capabilities: { ...data.observation!.capabilities!, complexContractVersion: version },
   };
 }
 function complexRunning() {
@@ -994,8 +996,8 @@ function elements(tree: unknown, type: string) {
   });
   return found;
 }
-async function draftTwoTasks() {
-  advertiseComplex();
+async function draftTwoTasks(version: 1 | 2 = 1) {
+  advertiseComplex(version);
   change("Workflow goal", preview.goal);
   await click("Add task");
   await click("Add task");
@@ -1212,5 +1214,206 @@ describe("COMPLEX task plan and execution projection", () => {
     ]) {
       expect(projection).toContain(expected);
     }
+  });
+});
+
+// Contract v2 (V0.8A): CT-001 and CT-002 are independent; CT-003 waits for both.
+const parallelPlan: WeavraComplexPlanV2 = {
+  ...complexPlan,
+  schemaVersion: 2,
+  tasks: [
+    { ...complexPlan.tasks[0]!, dependsOn: [] },
+    {
+      ...complexPlan.tasks[1]!,
+      dependsOn: [],
+      ownership: [{ path: "src/validate.ts", operation: "create" }],
+    },
+    {
+      id: "CT-003",
+      title: "Add formatter",
+      goal: "Render parsed pairs back to text",
+      dependsOn: ["CT-001", "CT-002"],
+      criterionIds: ["AC-002"],
+      ownership: [{ path: "src/format.ts", operation: "create" }],
+      checkIds: ["test"],
+      maxRevisionCycles: 2,
+    },
+  ],
+  limits: { ...complexPlan.limits, maxParallel: 2 },
+};
+const parallelPreview: WeavraControlPreview = {
+  ...complexPreview,
+  previewId: "parallel-preview",
+  complexPlan: parallelPlan,
+};
+const liveRow = (id: string): ComplexRow => ({
+  ...idleRow(id),
+  status: "IMPLEMENTING",
+  attempt: 1,
+  workerInvocations: 1,
+  reportedTokens: 1200,
+  entryWorkspaceDigest: "1".repeat(64),
+});
+function parallelExecution(
+  patch: Partial<WeavraComplexExecutionV2> = {},
+): WeavraComplexExecutionV2 {
+  const { activeTaskId: _activeTaskId, ...fields } = complexExecution();
+  return {
+    ...fields,
+    schemaVersion: 2,
+    plan: parallelPlan,
+    phase: "TASK_SEQUENCE",
+    activeTaskIds: ["CT-001", "CT-002"],
+    tasks: [
+      liveRow("CT-001"),
+      {
+        ...liveRow("CT-002"),
+        status: "HANDED_OFF",
+        reportedTokens: null,
+        changedFiles: ["src/validate.ts"],
+      },
+      idleRow("CT-003"),
+    ],
+    integration: {
+      check: "NOT_RUN",
+      review: "NOT_RUN",
+      test: "NOT_RUN",
+      workspaceDigest: null,
+      evidenceFreshness: "NONE",
+      failureCode: null,
+    },
+    budget: {
+      workerInvocations: 2,
+      reportedTokens: null,
+      totalRevisionCycles: 0,
+      status: "UNKNOWN",
+    },
+    ...patch,
+  };
+}
+function parallelRunning(execution = parallelExecution()) {
+  complexRunning();
+  advertiseComplex(2);
+  update({ complexExecution: execution });
+}
+
+describe("COMPLEX contract v2 (parallel waves) projection", () => {
+  it("shows the Runtime-reported wave and HANDED_OFF rows waiting their turn, with no task controls", () => {
+    parallelRunning();
+    const tree = render();
+    const projection = child(tree, ComplexExecutionView);
+    const shown = words(projection);
+    for (const expected of [
+      "Current wave, as reported by Runtime: CT-001 · Extract parser, CT-002 · Add validation",
+      "at most 2 implemented at once; checks and reviews run one task at a time",
+      "CT-002 · Add validation CURRENT WAVE HANDED_OFF Implemented; waiting for its verification turn",
+      "CT-003 · Add formatter PENDING Depends on: CT-001, CT-002",
+      "worker invocations 1 · reported tokens unknown",
+    ]) {
+      expect(shown).toContain(expected);
+    }
+    expect(shown).not.toContain("active task");
+    // Membership is exactly what Runtime reported, never inferred from dependencies.
+    expect(
+      elements(projection, "span").filter((node) => text(node) === "CURRENT WAVE"),
+    ).toHaveLength(2);
+    for (const type of ["button", "input", "select", "textarea", "form"]) {
+      expect(elements(projection, type)).toEqual([]);
+    }
+    for (const label of elements(tree, "button").map((button) => text(button).trim())) {
+      expect(label).not.toMatch(/complete|retry|skip|next|reorder|resume|pass|wave|parallel/i);
+    }
+  });
+  it("explains sibling stops and the cancel state only from the canonical snapshot", () => {
+    parallelRunning(
+      parallelExecution({
+        phase: "STOPPING",
+        cleanup: "PENDING",
+        tasks: [
+          { ...liveRow("CT-001"), status: "STOPPING" },
+          { ...liveRow("CT-002"), status: "STOPPING" },
+          idleRow("CT-003"),
+        ],
+      }),
+    );
+    update({ cancelling: true });
+    expect(words(child(render(), ComplexExecutionView))).toContain(
+      "Cancel requested: Runtime stops every live task and waits for all of them to settle before it records the outcome. Cleanup: PENDING.",
+    );
+    const current = data.observation!.state!;
+    update({
+      busy: false,
+      cancelling: false,
+      complexExecution: parallelExecution({
+        phase: "TERMINAL",
+        activeTaskIds: [],
+        cleanup: "CONFIRMED",
+        partialChanges: true,
+        failureCode: "OWNERSHIP_CONFLICT",
+        tasks: [
+          { ...liveRow("CT-001"), status: "BLOCKED", failureCode: "OWNERSHIP_CONFLICT" },
+          { ...liveRow("CT-002"), status: "BLOCKED", failureCode: "RUN_STOPPED" },
+          { ...idleRow("CT-003"), status: "BLOCKED", failureCode: "RUN_STOPPED" },
+        ],
+      }),
+      snapshot: {
+        ...current.snapshot,
+        status: {
+          ...current.snapshot.status,
+          writerPresent: false,
+          run: { ...current.snapshot.status.run!, status: "BLOCKED" },
+        },
+      },
+    });
+    const shown = words(child(render(), ComplexExecutionView));
+    for (const expected of [
+      "Canonical Run outcome: BLOCKED",
+      "Current wave, as reported by Runtime: none",
+      "Failure: OWNERSHIP_CONFLICT",
+      "Failure: RUN_STOPPED — stopped because a sibling task failed or the Run stopped",
+    ]) {
+      expect(shown).toContain(expected);
+    }
+    expect(shown).not.toContain("Cancel requested");
+  });
+  it("keeps the draft editor unchanged for contract v2 and shows maxParallel read-only", async () => {
+    await draftTwoTasks(2);
+    toggle("Task 2 maps criterion 2");
+    const editor = words(control(render(), "COMPLEX task plan"));
+    expect(editor).toContain("RUNTIME CONTRACT v2");
+    expect(editor).toContain("may be implemented at the same time");
+    data.invoke.mockResolvedValue(
+      AsyncResult.success(response({ kind: "prepared", preview: parallelPreview })),
+    );
+    await submitPrepare();
+    const sent = data.invoke.mock.calls[0]?.[0].input.request;
+    expect(Object.keys(sent.complexDraft.tasks[0]).toSorted()).toEqual([
+      "checkIds",
+      "criterionIndexes",
+      "dependsOnIndexes",
+      "goal",
+      "ownership",
+      "title",
+    ]);
+    expect(sent).not.toHaveProperty("maxParallel");
+    update({ preview: parallelPreview, nextRequestId: "owner:2" });
+    const plan = words(child(control(render(), "Runtime Plan Preview"), ComplexPlanView));
+    for (const expected of [
+      "at most 2 tasks implemented at once (Runtime configuration, read-only)",
+      "CT-003 · Add formatter Render parsed pairs back to text Depends on: CT-001, CT-002",
+      "implemented together, up to 2 at once; checks and reviews then run one task at a time",
+    ]) {
+      expect(plan).toContain(expected);
+    }
+    expect(
+      visitElements(render(), (node) =>
+        /parallel|wave|concurren/i.test(String(node.props["aria-label"] ?? "")),
+      ),
+    ).toBeNull();
+    accepted("workflow.confirm");
+    await click("Confirm and start");
+    expect(data.confirm.mock.calls[0]?.[0]).toContain(
+      "up to 2 whose dependencies are complete are implemented at once",
+    );
   });
 });

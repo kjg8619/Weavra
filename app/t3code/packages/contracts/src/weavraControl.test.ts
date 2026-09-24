@@ -11,8 +11,12 @@ import {
   WEAVRA_COMPLEX_MAX_PLAN_BYTES,
   WeavraComplexDraft,
   type WeavraComplexExecution,
+  WeavraComplexExecutionV1,
+  WeavraComplexExecutionV2,
   WeavraComplexOwnershipClaim,
   WeavraComplexPlan,
+  WeavraComplexPlanV1,
+  WeavraComplexPlanV2,
   WeavraControlCapabilities,
   WeavraControlApproval,
   WeavraControlInput,
@@ -936,11 +940,15 @@ describe("COMPLEX contract v1 wire shapes", () => {
       expect(() => decodeClaim({ path: "src/a.ts", operation })).toThrow();
     }
   });
-  it("advertises only the exact feature version and never null", () => {
+  it("advertises only an exact known feature version and never null", () => {
     expect(decodeCapabilities(complexCapabilities).complexContractVersion).toBe(1);
+    expect(
+      decodeCapabilities({ ...complexCapabilities, complexContractVersion: 2 })
+        .complexContractVersion,
+    ).toBe(2);
     const { complexContractVersion: _version, ...baseline } = complexCapabilities;
     expect(decodeCapabilities(baseline)).not.toHaveProperty("complexContractVersion");
-    for (const version of [2, 0, null, "1", true]) {
+    for (const version of [3, 0, null, "1", "2", true, 1.5]) {
       expect(() =>
         decodeCapabilities({ ...complexCapabilities, complexContractVersion: version }),
       ).toThrow();
@@ -1105,5 +1113,144 @@ describe("COMPLEX contract v1 wire shapes", () => {
     expect(() => decodeState(complexState(heavy))).toThrow();
     const ascii = JSON.parse(JSON.stringify(heavy).replaceAll("한", "x")) as unknown;
     expect(decodeState(complexState(ascii)).complexExecution?.parent.goal).toHaveLength(2048);
+  });
+});
+
+const decodePlanV1 = Schema.decodeUnknownSync(WeavraComplexPlanV1, strict);
+const decodePlanV2 = Schema.decodeUnknownSync(WeavraComplexPlanV2, strict);
+const decodeExecutionV1 = Schema.decodeUnknownSync(WeavraComplexExecutionV1, strict);
+const decodeExecutionV2 = Schema.decodeUnknownSync(WeavraComplexExecutionV2, strict);
+// Two independent tasks, so both may be implemented in one wave.
+const parallelPlan = {
+  ...complexPlan,
+  schemaVersion: 2,
+  tasks: [complexPlan.tasks[0], { ...complexPlan.tasks[1], dependsOn: [] }],
+  limits: { ...complexPlan.limits, maxParallel: 2 },
+} as const;
+const { activeTaskId: _activeTaskId, ...executionFields } = complexExecution;
+const parallelExecution = {
+  ...executionFields,
+  schemaVersion: 2,
+  plan: parallelPlan,
+  activeTaskIds: ["CT-001", "CT-002"],
+  tasks: [
+    complexExecution.tasks[0],
+    {
+      ...pendingRow,
+      id: "CT-002",
+      status: "HANDED_OFF",
+      attempt: 1,
+      workerInvocations: 1,
+      entryWorkspaceDigest: "c".repeat(64),
+      changedFiles: ["src/validate.ts"],
+    },
+  ],
+} as const;
+
+describe("COMPLEX contract v2 (parallel waves) wire shapes", () => {
+  it("decodes a v2 plan with a bounded maxParallel and keeps both plan versions closed", () => {
+    expect(decodePlanV2(parallelPlan)).toEqual(parallelPlan);
+    expect(decodePlan(parallelPlan).schemaVersion).toBe(2);
+    expect(decodePlan(complexPlan).schemaVersion).toBe(1);
+    for (const maxParallel of [0, 5, 1.5, "2", null]) {
+      expect(() =>
+        decodePlan({ ...parallelPlan, limits: { ...parallelPlan.limits, maxParallel } }),
+      ).toThrow();
+    }
+    const { maxParallel: _maxParallel, ...v1Limits } = parallelPlan.limits;
+    for (const invalid of [
+      // v2 needs maxParallel; v1 never carries it; unknown versions are not guessed.
+      { ...parallelPlan, limits: v1Limits },
+      { ...parallelPlan, schemaVersion: 1 },
+      { ...parallelPlan, schemaVersion: 3 },
+      { ...parallelPlan, planRevision: 1 },
+    ]) {
+      expect(() => decodePlan(invalid)).toThrow();
+    }
+    expect(() => decodePlanV1(parallelPlan)).toThrow();
+    expect(() => decodePlanV2(complexPlan)).toThrow();
+  });
+  it("adds HANDED_OFF and the reported wave only to v2 projections", () => {
+    expect(decodeExecutionV2(parallelExecution)).toEqual(parallelExecution);
+    expect(decodeState(complexState(parallelExecution)).complexExecution).toEqual(
+      parallelExecution,
+    );
+    // v1 stays exactly as it was: no HANDED_OFF row and no wave list.
+    expect(decodeExecutionV1(complexExecution)).toEqual(complexExecution);
+    expect(() =>
+      decodeExecutionV1({
+        ...complexExecution,
+        tasks: [complexExecution.tasks[0], parallelExecution.tasks[1]],
+      }),
+    ).toThrow();
+    expect(() =>
+      decodeState(complexState({ ...complexExecution, activeTaskIds: ["CT-001"] })),
+    ).toThrow();
+    for (const invalid of [
+      { ...parallelExecution, activeTaskId: "CT-001" },
+      executionFields,
+      { ...parallelExecution, activeTaskIds: ["CT-002", "CT-001"] },
+      { ...parallelExecution, activeTaskIds: ["CT-001", "CT-001"] },
+      { ...parallelExecution, activeTaskIds: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005"] },
+      { ...parallelExecution, activeTaskIds: ["CT-9"] },
+      { ...parallelExecution, activeTaskIds: null },
+      { ...parallelExecution, schemaVersion: 3 },
+      {
+        ...parallelExecution,
+        tasks: [complexExecution.tasks[0], { ...pendingRow, id: "CT-002", status: "WAVE" }],
+      },
+      { ...parallelExecution, wave: 1 },
+    ]) {
+      expect(() => decodeState(complexState(invalid))).toThrow();
+    }
+  });
+  it("never mixes plan versions inside one projection, except a terminal historical v1 Run", () => {
+    expect(() => decodeState(complexState({ ...parallelExecution, plan: complexPlan }))).toThrow();
+    expect(() => decodeState(complexState({ ...complexExecution, plan: parallelPlan }))).toThrow();
+    // Amendment A1: after an upgrade a v2 Runtime shows a V0.7B Run with its frozen v1 plan,
+    // no wave and v1 statuses. Such a Run is terminal; the helper's Run is still RUNNING.
+    const historical = {
+      ...parallelExecution,
+      plan: complexPlan,
+      phase: "TERMINAL",
+      activeTaskIds: [],
+      tasks: [
+        { ...complexExecution.tasks[0], status: "INTERRUPTED", failureCode: "OWNER_LOST" },
+        { ...pendingRow, id: "CT-002", status: "INTERRUPTED", failureCode: "OWNER_LOST" },
+      ],
+    };
+    const interrupted = (execution: unknown) => {
+      const state = complexState(execution);
+      const run = { ...state.snapshot.status.run, status: "INTERRUPTED" };
+      return {
+        ...state,
+        snapshot: { ...state.snapshot, status: { ...state.snapshot.status, run } },
+      };
+    };
+    expect(() => decodeState(complexState(historical))).toThrow();
+    expect(decodeState(interrupted(historical)).complexExecution).toEqual(historical);
+    for (const invalid of [
+      { ...historical, activeTaskIds: ["CT-001"] },
+      { ...historical, tasks: [historical.tasks[0], parallelExecution.tasks[1]] },
+    ]) {
+      expect(() => decodeState(interrupted(invalid))).toThrow();
+    }
+  });
+  it("accepts a v2 plan only in a COMPLEX preview", () => {
+    const preview = { ...complexPreview, complexPlan: parallelPlan };
+    expect(decodePreview(preview).complexPlan).toEqual(parallelPlan);
+    expect(() => decodePreview({ ...preview, workflow: "STANDARD" })).toThrow();
+  });
+  it("keeps scheduling out of the draft: dependencies express order, maxParallel is Runtime config", () => {
+    for (const forged of [
+      { complexDraft: { ...draft, maxParallel: 4 } },
+      { complexDraft: { tasks: [{ ...draftTask, wave: 1 }, draft.tasks[1]] } },
+      { complexDraft: { tasks: [{ ...draftTask, parallel: true }, draft.tasks[1]] } },
+      { maxParallel: 2 },
+    ]) {
+      expect(() =>
+        decodeRpc({ projectId: "project", request: { ...complexPrepare, ...forged } }),
+      ).toThrow();
+    }
   });
 });
