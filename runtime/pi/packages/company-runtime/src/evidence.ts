@@ -163,7 +163,7 @@ function failureCategory(run: Run, error: string | undefined): EvidenceFailureCa
 	if (text.startsWith("Policy ")) return "POLICY";
 	if (text.startsWith("Budget ")) return "BUDGET";
 	if (text === "Worker provider failed") return "PROVIDER";
-	if (text === "Worker tool failed or was denied") return "TOOL";
+	if (text === "Worker tool failed or was denied" || text === "Worker tool error limit exceeded") return "TOOL";
 	if (text.startsWith("Runtime storage failed")) return "STORAGE";
 	if (text.includes("cleanup unconfirmed") || text.includes("Resource cleanup unconfirmed")) return "CLEANUP";
 	if (text.startsWith("Unsupported classification/workflow")) return "PREFLIGHT";

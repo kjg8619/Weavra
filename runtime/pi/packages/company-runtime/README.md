@@ -885,6 +885,7 @@ Kernel → AgentExecutor.execute(request) → PiAgentExecutor → 새 SDK AgentS
 - 일반 bash·Pi 기본 도구·외부 custom tool을 설치하지 않는다. 파일 도구는 sequential이며 SDK Agent도 sequential로 설정한다.
 - 텍스트 파일은 256 KiB 이하, legacy edit는 유일한 exact match이며 V0.3A optional anchored edit는 위 계약을 따른다. write는 기존 부모 디렉터리만 지원한다. 검색은 최대 32개 명시 파일의 literal 문자열 검색이며 100개 결과에서 잘림을 표시한다. OS sandbox·원자 코드 변경/rollback은 아니다.
 - `runtime_request_check`는 등록 ID만 받아 Pi tool history에 요청을 남기고 **UNAVAILABLE/미실행**을 반환한다. verifier를 호출하거나 PASS 증거를 만들지 않는다.
+- **수정 가능한 도구 오류**: 존재하지 않거나 파일이 아닌 허용 범위 안 경로(`Target is missing or not a regular file`), 유일하지 않은 edit match, 잘못된 인자, 크기 초과 파일 같은 오류는 같은 세션의 모델에게 Tool error로 돌려준다. worker당 8회(Host/test `maxToolErrors`, `0..32`)를 넘으면 `Worker tool error limit exceeded`로 실패하고 Evidence Pack은 TOOL로 분류한다. 보호·범위 밖·unsafe 경로의 Policy 거부, audit/storage 실패, intent 뒤 대상 변경, worker에 없는 도구 호출, R3 run의 모든 도구 오류는 이전처럼 즉시 실패한다. 이 예산은 권한·검증 증거·완료 판단이 아니다.
 - Handoff/Review 제출은 자기 역할의 전용 schema만 받는다. run/task/role/code revision 및 Review diffDigest를 검사한다. 자연어 완료, schema/identity 오류, 다른 도구와 섞인 제출 batch는 실패다. 정상 수락한 제출만 `terminate`로 종료하며 이후 도구 실행을 막는다. Reviewer evidence 참조 오류와 아래 Developer unresolved 표현 오류는 Tool error로 반환하여 기존 시간·턴 한도 안에서 같은 세션의 수정·재제출을 허용한다.
 - Kernel의 기존 독립 Review·요구사항·증거·완료 guard는 유지한다. Adapter의 schema 통과는 COMPLETE 승인이 아니다.
 

@@ -39,8 +39,10 @@ import {
 	type ActionAudit,
 	evaluatePolicy,
 	executePolicyAction,
+	NON_FILE_TARGET_REASON,
 	type PolicyContext,
 	type PolicyPathInspector,
+	PolicyRecheckError,
 } from "./policy.ts";
 import type { AgentExecutionRequest, AgentExecutionResult } from "./ports.ts";
 
@@ -81,6 +83,9 @@ function criterionCoverageError(
 		"Nothing was accepted. Correct the fields and resubmit alone in this same session."
 	);
 }
+
+/** Worker failure text for a fatal non-Policy tool error; Evidence Packs classify it as TOOL. */
+export const WORKER_TOOL_FAILURE = "Worker tool failed or was denied";
 
 export const WORKER_FILE_TOOLS = [
 	{ id: "runtime_read", operation: "read" },
@@ -180,6 +185,8 @@ export function createWorkerTools(options: {
 	tools: ToolDefinition[];
 	result: () => AgentExecutionResult | undefined;
 	policyDenial: () => string | undefined;
+	/** Sticky: a Policy denial, audit failure or post-intent target change. Other tool errors are correctable. */
+	fatalToolError: () => string | undefined;
 	consumeSubmissionValidationError: (toolName: string, toolCallId: string) => boolean;
 	consumeStaleAnchorError: (toolName: string, toolCallId: string) => boolean;
 } {
@@ -208,6 +215,21 @@ export function createWorkerTools(options: {
 	};
 	let submitted: AgentExecutionResult | undefined;
 	let policyDenial: string | undefined;
+	let fatalFailure: string | undefined;
+	// Audit/storage failures belong to the Runtime, never to the model's input.
+	const guardAudit = async (operation: () => Promise<void>) => {
+		try {
+			await operation();
+		} catch (error) {
+			fatalFailure ??= WORKER_TOOL_FAILURE;
+			throw error;
+		}
+	};
+	const audit: ActionAudit = {
+		prepare: (decision) => guardAudit(() => options.audit.prepare(decision)),
+		finish: (runId, actionId, outcome) => guardAudit(() => options.audit.finish(runId, actionId, outcome)),
+		assertWritable: () => guardAudit(() => options.audit.assertWritable()),
+	};
 	const assertActive = () => {
 		options.assertActive();
 		assertExecutionContract(executionContract, request.runId, request.executionMode);
@@ -250,16 +272,23 @@ export function createWorkerTools(options: {
 			options.policy,
 			{
 				paths: options.paths,
-				audit: options.audit,
+				audit,
 				execute: async () => {
 					assertActive();
 					return execute();
 				},
 			},
 			signal,
-		);
+		).catch((error: unknown) => {
+			if (error instanceof PolicyRecheckError) fatalFailure ??= WORKER_TOOL_FAILURE;
+			throw error;
+		});
 		if (result.decision.decision !== "ALLOW") {
-			policyDenial = `Policy ${result.decision.risk}/${result.decision.decision}: ${result.decision.reason}`;
+			const denial = `Policy ${result.decision.risk}/${result.decision.decision}: ${result.decision.reason}`;
+			// A wrong path inside the allowed scope is correctable input; scope and protection denials stay fatal.
+			if (result.decision.decision === "DENY" && result.decision.reason === NON_FILE_TARGET_REASON)
+				throw new Error(`${denial}. Use runtime_list_files to find existing allowed files.`);
+			policyDenial = denial;
 			throw new Error(policyDenial);
 		}
 		return { content: [{ type: "text" as const, text: result.value ?? "" }], details: { actionId: action.actionId } };
@@ -736,6 +765,7 @@ export function createWorkerTools(options: {
 				: tools,
 		result: () => structuredClone(submitted),
 		policyDenial: () => policyDenial,
+		fatalToolError: () => policyDenial ?? fatalFailure,
 		consumeStaleAnchorError: (toolName, toolCallId) =>
 			(toolName === "runtime_edit" || toolName === "runtime_write") && staleAnchorErrors.delete(toolCallId),
 		consumeSubmissionValidationError: (toolName, toolCallId) =>

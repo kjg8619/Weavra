@@ -7,8 +7,10 @@ import {
 	evaluatePolicy,
 	executePolicyAction,
 	type InspectedPath,
+	NON_FILE_TARGET_REASON,
 	type PolicyAction,
 	type PolicyContext,
+	PolicyRecheckError,
 } from "../src/policy.ts";
 import { FilePolicyPathInspector } from "../src/policy-paths.ts";
 import { FileStateStore } from "../src/state-store.ts";
@@ -142,6 +144,33 @@ describe("pure execution policy", () => {
 		expect(evaluatePolicy(action, context, inspected).decision).toBe("ALLOW");
 		expect(evaluatePolicy({ ...action, tool: "read" }, context, inspected).decision).toBe("DENY");
 	});
+	it("names a safe missing or directory target separately from an unsafe or forged one", () => {
+		const read = { ...action, tool: "read", risk: "R0" as const };
+		for (const kind of ["missing", "directory"] as const)
+			expect(evaluatePolicy(read, context, [{ path: action.paths[0], safe: true, kind }])).toMatchObject({
+				decision: "DENY",
+				reason: NON_FILE_TARGET_REASON,
+			});
+		expect(evaluatePolicy(action, context, [{ path: action.paths[0], safe: true, kind: "directory" }]).reason).toBe(
+			NON_FILE_TARGET_REASON,
+		);
+		for (const inspected of [
+			[{ path: action.paths[0], safe: false, kind: "missing" }],
+			[{ path: action.paths[0], safe: false, kind: "file" }],
+			facts(["src/other.ts"]),
+		] satisfies InspectedPath[][])
+			expect(evaluatePolicy(read, context, inspected)).toMatchObject({
+				decision: "DENY",
+				reason: "Unsafe or unresolved target",
+			});
+		// Scope and protection are decided before existence and never become a missing-target reason.
+		expect(evaluatePolicy({ ...read, paths: ["docs/a.md"] }, context, facts(["docs/a.md"])).reason).toBe(
+			"Target outside allowed paths",
+		);
+		expect(evaluatePolicy({ ...read, paths: ["src/.env"] }, context, facts(["src/.env"])).reason).toBe(
+			"Protected target",
+		);
+	});
 });
 
 let root: string;
@@ -262,7 +291,7 @@ describe("filesystem path adapter and execution gate", () => {
 					calls++;
 				},
 			}),
-		).rejects.toThrow("Target changed");
+		).rejects.toThrow(PolicyRecheckError);
 		expect(calls).toBe(0);
 		expect(store.snapshot.actions[0].status).toBe("FAILED");
 	});
