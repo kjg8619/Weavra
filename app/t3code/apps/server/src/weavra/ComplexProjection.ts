@@ -99,7 +99,10 @@ export function previewTaskContractDigest(preview: WeavraControlPreview, parentT
   );
 }
 
-/** Each plan version hashes under its own domain, so a plan never verifies as another version. */
+/**
+ * Each plan version hashes under its own domain, so a plan never verifies as another version. A
+ * historical v1 plan inside a v2 projection (Amendment A1) is recomputed in the v1 domain.
+ */
 const PLAN_DIGEST_DOMAIN: Record<WeavraComplexPlan["schemaVersion"], string> = {
   1: "weavra-complex-plan-v1",
   2: "weavra-complex-plan-v2",
@@ -108,9 +111,11 @@ export function complexPlanDigest(plan: WeavraComplexPlan) {
   const { complexPlanDigest: _excluded, ...material } = plan;
   return sha256(canonicalJson([PLAN_DIGEST_DOMAIN[plan.schemaVersion], material]));
 }
+/** v1 plans run one task at a time. */
+const maxParallelOf = (plan: WeavraComplexPlan) =>
+  plan.schemaVersion === 2 ? plan.limits.maxParallel : 1;
 /** v1 plans, and v2 plans frozen to one worker, schedule only the next row after every earlier one. */
-const sequential = (plan: WeavraComplexPlan) =>
-  plan.schemaVersion === 1 || plan.limits.maxParallel === 1;
+const sequential = (plan: WeavraComplexPlan) => maxParallelOf(plan) === 1;
 /** R3 keeps the narrow one-deletion flow: its plans freeze maxParallel = 1 (v2 §8 rule 5). */
 const riskFits = (risk: Run["risk"], plan: WeavraComplexPlan) => risk !== "R3" || sequential(plan);
 
@@ -292,8 +297,9 @@ function rowConsistent(
 
 /**
  * Which rows are active, and which may be active together. v1 has at most one active row. v2 lists
- * every active row (rule 1) and constrains the rows doing work (rules 3 and 4); rows only ELIGIBLE,
- * HANDED_OFF or STOPPING are between those states (wave formation, join, settlement).
+ * every active row (rule 1) and constrains the rows doing work (rules 3 and 4). Without a working
+ * row the active rows are all ELIGIBLE (one wave-formation save) or HANDED_OFF and STOPPING (join
+ * and settlement), per the §8 atomic-save amendment.
  */
 function activeRowsConsistent(
   execution: WeavraComplexExecution,
@@ -301,6 +307,7 @@ function activeRowsConsistent(
 ) {
   if (execution.schemaVersion === 1)
     return active.length <= 1 && execution.activeTaskId === (active[0]?.id ?? null);
+  const eligible = active.filter((row) => row.status === "ELIGIBLE");
   // A revising row (attempt ≥ 2) re-implements alone during its verification turn.
   const verifying = active.filter(
     (row) => VERIFYING.has(row.status) || (row.status === "IMPLEMENTING" && row.attempt >= 2),
@@ -318,7 +325,9 @@ function activeRowsConsistent(
       execution.activeTaskIds,
       active.map((row) => row.id),
     ) &&
-    active.length <= execution.plan.limits.maxParallel &&
+    active.length <= maxParallelOf(execution.plan) &&
+    // A wave is formed in one save: ELIGIBLE rows are the whole active set.
+    (eligible.length === 0 || eligible.length === active.length) &&
     // Rule 3: first attempts implement together; the other active rows wait HANDED_OFF.
     (implementing.length === 0 || (verifying.length === 0 && othersHandedOff(implementing))) &&
     // Rule 4: one row verifies at a time on a quiescent workspace, never beside a first attempt.

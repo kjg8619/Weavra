@@ -1204,9 +1204,37 @@ describe("COMPLEX contract v2 (parallel waves) wire shapes", () => {
       expect(() => decodeState(complexState(invalid))).toThrow();
     }
   });
-  it("never mixes plan versions inside one projection", () => {
+  it("never mixes plan versions inside one projection, except a terminal historical v1 Run", () => {
     expect(() => decodeState(complexState({ ...parallelExecution, plan: complexPlan }))).toThrow();
     expect(() => decodeState(complexState({ ...complexExecution, plan: parallelPlan }))).toThrow();
+    // Amendment A1: after an upgrade a v2 Runtime shows a V0.7B Run with its frozen v1 plan,
+    // no wave and v1 statuses. Such a Run is terminal; the helper's Run is still RUNNING.
+    const historical = {
+      ...parallelExecution,
+      plan: complexPlan,
+      phase: "TERMINAL",
+      activeTaskIds: [],
+      tasks: [
+        { ...complexExecution.tasks[0], status: "INTERRUPTED", failureCode: "OWNER_LOST" },
+        { ...pendingRow, id: "CT-002", status: "INTERRUPTED", failureCode: "OWNER_LOST" },
+      ],
+    };
+    const interrupted = (execution: unknown) => {
+      const state = complexState(execution);
+      const run = { ...state.snapshot.status.run, status: "INTERRUPTED" };
+      return {
+        ...state,
+        snapshot: { ...state.snapshot, status: { ...state.snapshot.status, run } },
+      };
+    };
+    expect(() => decodeState(complexState(historical))).toThrow();
+    expect(decodeState(interrupted(historical)).complexExecution).toEqual(historical);
+    for (const invalid of [
+      { ...historical, activeTaskIds: ["CT-001"] },
+      { ...historical, tasks: [historical.tasks[0], parallelExecution.tasks[1]] },
+    ]) {
+      expect(() => decodeState(interrupted(invalid))).toThrow();
+    }
   });
   it("accepts a v2 plan only in a COMPLEX preview", () => {
     const preview = { ...complexPreview, complexPlan: parallelPlan };

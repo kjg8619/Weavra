@@ -322,9 +322,9 @@ establishes PASS or COMPLETE. This is not generic R3, a session-wide grant, or s
 
 Only a Runtime that advertises a COMPLEX contract version (1: sequential, 2: parallel
 implementation waves) gets **Structured task plan · COMPLEX (optional)**; a Runtime without it
-never receives a task plan. A goal the Runtime classifies as
-COMPLEX needs the plan (without it preparation returns `UNSUPPORTED_WORKFLOW`), and a plan on a
-QUICK/STANDARD goal returns `INVALID_REQUEST`. Enter 1–16 parent acceptance criteria, then 2–8
+never receives a task plan. A goal the Runtime classifies as COMPLEX needs the plan (without it
+preparation returns `UNSUPPORTED_WORKFLOW`), and a plan on a QUICK/STANDARD goal returns
+`INVALID_REQUEST`. Enter 1–16 parent acceptance criteria, then 2–8
 tasks in execution order: title, goal, dependencies on earlier tasks, the criteria each task
 contributes to, exact file claims (`modify`, `create` or `delete` of one project-relative file;
 no directories or globs) and registered check IDs. Recipes are never combined with a plan. T3
@@ -337,18 +337,19 @@ plan's `maxParallel` (1–4, from the Runtime's `agents.max_parallel`; R3 plans 
 preview shows it read-only and the plan form has no scheduling input: add a dependency to force
 an order. Checks and reviews still run one task at a time in plan order.
 
-After confirmation the view shows the Runtime's read-only projection: the active task (contract
-
-1. or the current wave as the Runtime reports it (contract 2; `HANDED_OFF` rows are implemented
-   and wait for their verification turn), each task's dependencies, statuses, attempts and revision
-   cycles, gates and evidence freshness, integration check, final review and final test, budget
-   use (unreported usage is `unknown`, never 0), the cancel or stop state, cleanup, partial or
-   unknown changes and failure codes (`RUN_STOPPED`: stopped because a sibling task failed or the
-   Run stopped). Completed tasks never mean a completed Run; only the canonical Run status is the
-   outcome. There are no task complete/retry/skip/start-next/reorder controls; Cancel and the
-   existing R3 decision remain the only actions. T3 treats a projection whose digests, task rows,
-   wave or budgets are inconsistent, that regresses, that changes at an unchanged Run revision, or
-   whose contract version differs from the advertised one as unavailable rather than current.
+After confirmation the view shows the Runtime's read-only projection: with contract 1 the
+active task, with contract 2 the current wave as the Runtime reports it (`HANDED_OFF` rows are
+implemented and wait for their verification turn); each task's dependencies, statuses, attempts
+and revision cycles, gates and evidence freshness, integration check, final review and final
+test, budget use (unreported usage is `unknown`, never 0), the cancel or stop state, cleanup,
+partial or unknown changes and failure codes (`RUN_STOPPED`: stopped because a sibling task
+failed or the Run stopped). Completed tasks never mean a completed Run; only the canonical Run
+status is the outcome. There are no task complete/retry/skip/start-next/reorder controls; Cancel
+and the existing R3 decision remain the only actions. T3 treats a projection whose digests, task
+rows, wave or budgets are inconsistent, that regresses, that changes at an unchanged Run
+revision, or whose contract version differs from the advertised one as unavailable rather than
+current. The one exception: after a Runtime upgrade, a finished Run recorded under contract 1
+keeps its frozen contract 1 plan inside a contract 2 projection.
 
 #### Unavailable state and limits
 

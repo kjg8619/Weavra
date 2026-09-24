@@ -1386,13 +1386,13 @@ it.effect("does not forward a COMPLEX draft to a Runtime that does not advertise
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
-const complexRunPatch = (value: WeavraComplexExecution) => {
-  const state = complexState(value);
+const complexRunPatch = (value: WeavraComplexExecution, status: RunStatus = "RUNNING") => {
+  const state = complexState(value, status);
   return {
     projectRevision: state.projectRevision,
     stateRevision: state.stateRevision,
     ownedRunId: state.ownedRunId,
-    busy: true,
+    busy: state.busy,
     preview: null,
     snapshot: state.snapshot,
     complexExecution: value,
@@ -1809,9 +1809,48 @@ describe("COMPLEX contract v2 consumer rules (V0.8A waves)", () => {
       [revisingRow("CT-001"), implementing("CT-002")],
       [verifyingRow("CT-001"), eligible("CT-002")],
       [revisingRow("CT-001"), verifyingRow("CT-002")],
+      [verifyingRow("CT-001"), { ...handedOff("CT-002"), status: "STOPPING" as const }],
     ]) {
       expect(consistentV2(executionV2(firstWave, [...rows, pending("CT-003")]))).toBe(false);
     }
+  });
+  it("without a working row accepts only all ELIGIBLE, or HANDED_OFF and STOPPING (atomic saves)", () => {
+    const stopping = (id: string): RowV2 => ({ ...implementing(id), status: "STOPPING" });
+    const stopped = { phase: "STOPPING", cleanup: "PENDING" } as const;
+    for (const [label, rows, patch, accepted] of [
+      ["all ELIGIBLE", [eligible("CT-001"), eligible("CT-002")], {}, true],
+      ["all HANDED_OFF", [handedOff("CT-001"), handedOff("CT-002")], {}, true],
+      ["all STOPPING", [stopping("CT-001"), stopping("CT-002")], stopped, true],
+      ["HANDED_OFF beside STOPPING", [stopping("CT-001"), handedOff("CT-002")], stopped, true],
+      ["ELIGIBLE beside HANDED_OFF", [eligible("CT-001"), handedOff("CT-002")], {}, false],
+      ["ELIGIBLE beside STOPPING", [eligible("CT-001"), stopping("CT-002")], stopped, false],
+    ] as const) {
+      expect([
+        label,
+        consistentV2(executionV2(firstWave, [...rows, pending("CT-003")], patch)),
+      ]).toEqual([label, accepted]);
+    }
+  });
+  it("accepts a terminal historical v1 plan in a v2 projection, digested in its own domain (A1)", () => {
+    // After an upgrade the v2 Runtime shows the V0.7B Run it recovered, frozen plan unchanged.
+    const { activeTaskId: _activeTaskId, ...recorded } = blocked;
+    const historical: WeavraComplexExecutionV2 = {
+      ...recorded,
+      schemaVersion: 2,
+      activeTaskIds: [],
+    };
+    expect(historical.plan.schemaVersion).toBe(1);
+    expect(complexPlanDigest(historical.plan)).toBe(reference.complexPlanDigest);
+    expect(consistentV2(historical, "BLOCKED")).toBe(true);
+    // The v1 observation of the same Run from before the upgrade is replaced, not compared.
+    expect(consistentV2(historical, "BLOCKED", complexState(blocked, "BLOCKED"))).toBe(true);
+    const forged = { ...historical.plan, complexPlanDigest: referenceV2.complexPlanDigest };
+    expect(consistentV2({ ...historical, plan: forged }, "BLOCKED")).toBe(false);
+    // Previews and v1 connections stay strict.
+    expect(complexPreviewConsistent(complexPreview, 2)).toBe(false);
+    expect(
+      complexStateConsistent(complexState(historical, "BLOCKED"), complexCapabilities, null),
+    ).toBe(false);
   });
   it("rule 5: HANDED_OFF is implemented, captured and unverified; R3 stays sequential", () => {
     for (const row of [
@@ -2030,4 +2069,57 @@ it.effect("rejects a v1 preview from a contract v2 Runtime without publishing it
       .pipe(Effect.result);
     expect(result).toMatchObject({ _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } });
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect(
+  "publishes a terminal historical v1 Run from a v2 Runtime, never a live v1 plan (A1)",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup("complex-v2");
+      const initial = fixture.initial.state!;
+      const { activeTaskId: _activeTaskId, ...recorded } = blocked;
+      const historical: WeavraComplexExecutionV2 = {
+        ...recorded,
+        schemaVersion: 2,
+        activeTaskIds: [],
+        ownerId: initial.ownerId,
+        projectRevision: 1,
+      };
+      yield* fixture.fs.writeFileString(
+        `${fixture.root}/state-patch.json`,
+        encodeJson(complexRunPatch(historical, "BLOCKED")),
+      );
+      yield* TestClock.adjust("2 seconds");
+      const published = yield* next(
+        fixture.queue,
+        (value) => !value.stale && value.state?.complexExecution !== undefined,
+      );
+      expect(published.state?.complexExecution).toEqual(historical);
+      // The same v1-plan shape on a Run that is not terminal fails the strict decoder.
+      const live: WeavraComplexExecutionV2 = {
+        ...historical,
+        runId: "run-live",
+        stateRevision: 40,
+        parent: { ...referenceParent, status: "inProgress" },
+        phase: "TASK_SEQUENCE",
+        tasks: [pending("CT-001"), pending("CT-002")],
+        budget: {
+          workerInvocations: 0,
+          reportedTokens: 0,
+          totalRevisionCycles: 0,
+          status: "WITHIN_LIMITS",
+        },
+        cleanup: "NOT_REQUESTED",
+        partialChanges: false,
+        failureCode: null,
+      };
+      yield* fixture.fs.writeFileString(
+        `${fixture.root}/state-patch.json`,
+        encodeJson(complexRunPatch(live, "RUNNING")),
+      );
+      yield* TestClock.adjust("2 seconds");
+      const rejected = yield* next(fixture.queue, (value) => value.status === "ERROR");
+      expect(rejected).toMatchObject({ stale: true, errorCode: "INVALID_PAYLOAD" });
+      expect(rejected.state?.complexExecution).toEqual(historical);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );

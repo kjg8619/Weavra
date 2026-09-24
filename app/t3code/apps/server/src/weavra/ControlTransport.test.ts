@@ -753,7 +753,7 @@ for (const [label, complexExecution, accepted] of [
     false,
   ],
   [
-    "a v2 projection carrying a v1 plan",
+    "a v2 projection carrying a v1 plan with a live wave",
     { ...transportExecutionV2, plan: transportExecution.plan },
     false,
   ],
@@ -784,6 +784,46 @@ for (const [label, complexExecution, accepted] of [
       expect(result).toMatchObject(
         accepted
           ? { _tag: "Success", success: { data: { state: { complexExecution } } } }
+          : { _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } },
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+// Amendment A1: a v2 Runtime shows a V0.7B Run with its frozen v1 plan, only once terminal.
+const historicalTransport = {
+  ...transportExecutionV2,
+  plan: transportExecution.plan,
+  phase: "TERMINAL",
+  activeTaskIds: [],
+  tasks: [
+    { ...pendingRow("CT-001"), status: "INTERRUPTED", failureCode: "OWNER_LOST" },
+    { ...pendingRow("CT-002"), status: "INTERRUPTED", failureCode: "OWNER_LOST" },
+  ],
+  cleanup: "UNCONFIRMED",
+};
+for (const [label, status, accepted] of [
+  ["a terminal", "INTERRUPTED", true],
+  ["a running", "RUNNING", false],
+] as const) {
+  it.effect(`decodes a historical v1 plan inside a v2 projection only for ${label} Run`, () =>
+    Effect.gen(function* () {
+      const result = yield* exchangePatched(snapshotRequest, {
+        snapshot: {
+          ...complexSnapshot,
+          status: {
+            ...complexSnapshot.status,
+            run: { ...complexSnapshot.status.run, status },
+          },
+        },
+        complexExecution: historicalTransport,
+      });
+      expect(result).toMatchObject(
+        accepted
+          ? {
+              _tag: "Success",
+              success: { data: { state: { complexExecution: historicalTransport } } },
+            }
           : { _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } },
       );
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),

@@ -600,22 +600,41 @@ export const WeavraComplexExecutionV1 = Schema.Struct({
   ...executionOutcome,
 }).check(withinExecutionBytes);
 export type WeavraComplexExecutionV1 = typeof WeavraComplexExecutionV1.Type;
-/** v2: the Runtime-reported active rows of the current wave, in plan order (never more than 4). */
+/**
+ * v2: the Runtime-reported active rows of the current wave, in plan order (never more than 4).
+ * Amendment A1: a historical V0.7B Run keeps its frozen v1 plan, with no wave and only v1 row
+ * statuses; the enclosing snapshot must show that Run terminal.
+ */
 export const WeavraComplexExecutionV2 = Schema.Struct({
   schemaVersion: Schema.Literal(2),
   ...executionIdentity,
-  plan: WeavraComplexPlanV2,
+  plan: Schema.Union([WeavraComplexPlanV2, WeavraComplexPlanV1]),
   phase: WeavraComplexPhase,
   activeTaskIds: Schema.Array(complexTaskId).check(Schema.isMaxLength(4), strictlyAscending),
   tasks: Schema.Array(WeavraComplexTaskStateV2).check(Schema.isMinLength(2), Schema.isMaxLength(8)),
   ...executionOutcome,
-}).check(withinExecutionBytes);
+}).check(
+  withinExecutionBytes,
+  Schema.makeFilter(
+    (execution) =>
+      execution.plan.schemaVersion === 2 ||
+      (execution.activeTaskIds.length === 0 &&
+        execution.tasks.every((row) => row.status !== "HANDED_OFF")),
+  ),
+);
 export type WeavraComplexExecutionV2 = typeof WeavraComplexExecutionV2.Type;
 export const WeavraComplexExecution = Schema.Union([
   WeavraComplexExecutionV1,
   WeavraComplexExecutionV2,
 ]);
 export type WeavraComplexExecution = typeof WeavraComplexExecution.Type;
+const terminalRunStatuses: ReadonlySet<string> = new Set([
+  "BLOCKED",
+  "FAILED",
+  "CANCELLED",
+  "INTERRUPTED",
+  "COMPLETED",
+]);
 
 export const WeavraControlMutation = Schema.Union([
   Schema.Struct({
@@ -961,7 +980,10 @@ export const WeavraControlState = Schema.Struct({
           state.complexExecution.projectRevision === state.projectRevision &&
           state.complexExecution.stateRevision === state.stateRevision &&
           state.complexExecution.runId === state.snapshot.status.run?.runId &&
-          state.snapshot.status.run.workflow === "COMPLEX")),
+          state.snapshot.status.run.workflow === "COMPLEX" &&
+          // A plan of another version than its projection is only a terminal historical Run.
+          (state.complexExecution.plan.schemaVersion === state.complexExecution.schemaVersion ||
+            terminalRunStatuses.has(state.snapshot.status.run.status)))),
   ),
 );
 export type WeavraControlState = typeof WeavraControlState.Type;
