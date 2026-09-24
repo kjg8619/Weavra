@@ -6,7 +6,7 @@ import type { Run } from "./contracts.ts";
 import { OBSERVATION_FILES, ownedObservationPaths } from "./observation-files.ts";
 import { evaluatePolicy, isPolicyPath, type PolicyContext } from "./policy.ts";
 import { FilePolicyPathInspector } from "./policy-paths.ts";
-import type { ComplexWorkspaceImages } from "./ports.ts";
+import type { ComplexWorkspaceImages, WorkspaceFileImage } from "./ports.ts";
 import { ProcessCleanupError, resolveExecutable, runProcess, verificationEnvironment } from "./process-runner.ts";
 import { changedLineCount } from "./quick.ts";
 
@@ -202,6 +202,34 @@ export class GitWorkspace {
 			images[path] = image ? { hash: image.hash, mode: image.mode } : null;
 		}
 		return { diffDigest, safe, changedFiles, images };
+	}
+	/**
+	 * V0.8A own-claim capture at a task handoff: the byte hash and permission bits of exactly the given claimed files
+	 * (null when absent), read without Git and without a whole-workspace digest, because concurrent siblings may still
+	 * be writing their own files. Unsafe or unsupported files fail closed.
+	 */
+	async claimImages(
+		paths: readonly string[],
+		signal?: AbortSignal,
+	): Promise<Record<string, WorkspaceFileImage | null>> {
+		const images: Record<string, WorkspaceFileImage | null> = {};
+		for (const path of paths) {
+			signal?.throwIfAborted();
+			if (!isPolicyPath(path) || isRuntimeOwnedPath(path)) throw new Error("Unsupported claimed path");
+			let stat: Stats;
+			try {
+				stat = await lstat(join(this.cwd, path));
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+				images[path] = null;
+				continue;
+			}
+			if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 2 * 1024 * 1024)
+				throw new Error("Unsupported workspace file (link, special file or size)");
+			if (!(await this.paths.inspect([path]))[0].safe) throw new Error("Unsafe workspace path");
+			images[path] = { hash: hash(await readFile(join(this.cwd, path))), mode: stat.mode & 0o777 };
+		}
+		return images;
 	}
 	private async evidence(capture: {
 		images: Map<string, FileImage>;

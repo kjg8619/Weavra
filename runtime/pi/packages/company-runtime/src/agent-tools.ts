@@ -293,10 +293,10 @@ export function createWorkerTools(options: {
 	 * before the effect, then the observed post-image is recorded in the Kernel ledger.
 	 */
 	const firstImages = new Map<string, WorkspaceFileImage | null | undefined>();
-	const ownedEffect = async <T>(
+	const ownedEffect = <T>(
 		mutation: { path: string; operation: ComplexMutationOperation } | undefined,
 		effect: () => T | Promise<T>,
-	): Promise<T> => {
+	): T | Promise<T> => {
 		if (!mutation || !ownership) return effect();
 		const target = join(options.cwd, mutation.path);
 		const before = fileImage(target);
@@ -306,14 +306,30 @@ export function createWorkerTools(options: {
 			mutation.operation === "write" ? (before === null ? "create" : "replace") : mutation.operation,
 		);
 		if (!firstImages.has(mutation.path)) firstImages.set(mutation.path, before);
-		let value: T;
-		try {
-			value = await effect();
-		} catch (error) {
-			// Partial I/O is never described as zero mutation: an unexplained image stays unknown to the ledger.
+		// Partial I/O is never described as zero mutation: an unexplained image stays unknown to the ledger.
+		const unexplained = () => {
 			if (!sameFileImage(before, fileImage(target))) ownership.recordEffect(mutation.path, undefined);
+		};
+		let value: T | Promise<T>;
+		try {
+			value = effect();
+		} catch (error) {
+			unexplained();
 			throw error;
 		}
+		if (value instanceof Promise)
+			return value.then(
+				(settled) => {
+					ownership.recordEffect(mutation.path, fileImage(target));
+					return settled;
+				},
+				(error: unknown) => {
+					unexplained();
+					throw error;
+				},
+			);
+		// V0.8A §5: the file effects are synchronous, so the late gate, the effect and its post-image record run
+		// without a yield; a concurrent sibling's tool call can never interleave between one effect and its record.
 		ownership.recordEffect(mutation.path, fileImage(target));
 		return value;
 	};

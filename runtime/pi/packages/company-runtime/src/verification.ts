@@ -26,6 +26,7 @@ import type {
 	ComplexWorkspaceImages,
 	VerificationRequest,
 	Verifier,
+	WorkspaceFileImage,
 } from "./ports.ts";
 import { ProcessCleanupError, resolveExecutable, runProcess, verificationEnvironment } from "./process-runner.ts";
 import {
@@ -261,6 +262,13 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 	/** COMPLEX ledger capture through the same GitWorkspace evaluation as `inspect`. */
 	async images(paths: readonly string[], signal?: AbortSignal): Promise<ComplexWorkspaceImages> {
 		return this.workspace.complexImages(paths, signal);
+	}
+	/** V0.8A own-claim images at a task handoff: exactly the task's claimed files, no whole-workspace digest. */
+	async claimImages(
+		paths: readonly string[],
+		signal?: AbortSignal,
+	): Promise<Record<string, WorkspaceFileImage | null>> {
+		return this.workspace.claimImages(paths, signal);
 	}
 	/**
 	 * Frozen registration indexes a verification context runs: the task's frozen `checkIds` in TASK scope, every

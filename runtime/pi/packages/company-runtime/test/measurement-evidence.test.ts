@@ -147,6 +147,30 @@ describe("V0.3F budget controller", () => {
 		expect(budget.status.reportedTokens).toBeNull();
 		expect(() => budget.reserve("Reviewer")).toThrow(BudgetDenied);
 	});
+
+	it("V0.8A: reserves a wave all-or-nothing and settles each concurrent invocation exactly once", () => {
+		const short = new BudgetController({ maxWorkerInvocations: 2 });
+		short.reserve("Developer");
+		short.record("Developer", measurement());
+		// One invocation left for a two-row wave: nothing is counted and nothing may start.
+		expect(() => short.reserveMany("Developer", 2)).toThrow("cannot cover 2 concurrent Developer invocations");
+		expect(short.status).toMatchObject({ workerInvocations: 1, exceeded: true });
+		expect(() => short.reserve("Developer")).toThrow(BudgetDenied);
+		const wave = new BudgetController({ maxWorkerInvocations: 5, maxReportedTokens: 1_000 });
+		wave.reserveMany("Developer", 2);
+		expect(wave.status.workerInvocations).toBe(2);
+		// Settlement in any order counts neither invocation twice.
+		wave.record("Developer", measurement({ totalTokens: 10 }));
+		wave.record("Developer", measurement({ totalTokens: 20 }));
+		expect(wave.status).toMatchObject({ workerInvocations: 2, reportedTokens: 30, exceeded: false });
+		wave.reserveMany("Developer", 2);
+		wave.record("Developer", measurement());
+		// Unknown usage of one wave row settles that row and blocks the next reservation.
+		wave.recordUnavailable();
+		expect(wave.status).toMatchObject({ workerInvocations: 4, reportedTokens: null });
+		expect(() => wave.reserve("Reviewer")).toThrow("Budget accounting unavailable");
+		expect(() => new BudgetController({}).reserveMany("Developer", 0)).toThrow("Invalid budget reservation");
+	});
 });
 
 describe("V0.3F provenance", () => {

@@ -119,6 +119,53 @@ describe("COMPLEX expected-image ledger", () => {
 		expect(() => ledger.authorize(revision, "src/new.ts", "edit")).toThrow("No active ownership lease");
 	});
 
+	it("V0.8A: holds one lease per implementing task with the unchanged exact denials", async () => {
+		const { plan } = await ledgerFixture();
+		const admission = capture({ "src/app.ts": image("app\n"), "src/new.ts": null, "src/other.ts": image("other\n") });
+		const ledger = ComplexOwnershipLedger.admit(plan, admission, 2);
+		if (typeof ledger === "string") throw new Error(ledger);
+		const first: ComplexLease = { taskId: "CT-001", attempt: 1 };
+		const second: ComplexLease = { taskId: "CT-002", attempt: 1 };
+		ledger.activate(second);
+		ledger.activate(first);
+		expect(ledger.activeLeases).toEqual([first, second]);
+		const denial = (lease: ComplexLease, path: string) => {
+			try {
+				ledger.authorize(lease, path, "edit");
+			} catch (error) {
+				if (error instanceof ComplexOwnershipDenied) return error.code;
+				throw error;
+			}
+			return "ALLOWED";
+		};
+		// Each capability is checked against its own lease: a sibling's file stays OWNERSHIP_CONFLICT, running or not.
+		expect(denial(first, "src/app.ts")).toBe("ALLOWED");
+		expect(denial(first, "src/other.ts")).toBe("OWNERSHIP_CONFLICT");
+		expect(denial(second, "src/other.ts")).toBe("ALLOWED");
+		expect(denial(second, "src/app.ts")).toBe("OWNERSHIP_CONFLICT");
+		expect(denial(second, "src/util.ts")).toBe("UNOWNED_PATH");
+		expect(() => ledger.recordEffect(first, "src/other.ts", image("x"))).toThrow("outside the active task's claims");
+		ledger.recordEffect(second, "src/other.ts", image("other v2\n"));
+		// Own-claim images at a handoff: exactly the task's files, against its own recorded effects.
+		expect(ledger.ownClaimsError("CT-002", { "src/other.ts": image("other v2\n") })).toBeUndefined();
+		expect(ledger.ownClaimsError("CT-002", { "src/other.ts": image("other\n") })).toContain("unattributed");
+		expect(ledger.ownClaimsError("CT-001", { "src/app.ts": image("app\n") })).toContain("was not captured");
+		expect(ledger.ownClaimsError("CT-001", { "src/app.ts": image("app\n"), "src/new.ts": null })).toBeUndefined();
+		// A REVISE attempt replaces only its own task's lease; settling one task never touches another.
+		ledger.activate({ taskId: "CT-002", attempt: 2 });
+		expect(() => ledger.authorize(second, "src/other.ts", "edit")).toThrow("No active ownership lease");
+		ledger.release("CT-001");
+		expect(() => ledger.authorize(first, "src/app.ts", "edit")).toThrow("No active ownership lease");
+		expect(denial({ taskId: "CT-002", attempt: 2 }, "src/other.ts")).toBe("ALLOWED");
+		// A closed capability of an aborted sibling rejects its late call while the other lease stays usable.
+		const late = complexOwnershipCapability(ledger, { taskId: "CT-002", attempt: 2 }, () => {});
+		late.close();
+		expect(() => late.port.authorize("src/other.ts", "edit")).toThrow("closed");
+		ledger.release();
+		expect(ledger.activeLeases).toEqual([]);
+		expect(ComplexOwnershipLedger.admit(plan, admission, 0)).toBe("Invalid lease bound");
+	});
+
 	it("reconciles captures against the expected cumulative state and detects unattributed changes", async () => {
 		const { ledger } = await ledgerFixture();
 		const lease = { taskId: "CT-001", attempt: 1 };

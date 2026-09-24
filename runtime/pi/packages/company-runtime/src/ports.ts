@@ -191,6 +191,11 @@ export interface Verifier {
 	inspect?(signal?: AbortSignal): Promise<NonNullable<Run["workspace"]>>;
 	/** COMPLEX expected-image ledger capture (required for COMPLEX): no checks, no mutation, no Git write. */
 	images?(paths: readonly string[], signal?: AbortSignal): Promise<ComplexWorkspaceImages>;
+	/**
+	 * V0.8A own-claim capture at a task handoff (required for COMPLEX): images of exactly these claimed files,
+	 * null when absent, without a whole-workspace digest while siblings may still write.
+	 */
+	claimImages?(paths: readonly string[], signal?: AbortSignal): Promise<Record<string, WorkspaceFileImage | null>>;
 }
 
 /** One run snapshot at a time. Files, locks and durable storage are S2 adapter responsibilities. */

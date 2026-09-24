@@ -65,6 +65,29 @@ const StateSchema = Type.Object(
 export type FileRuntimeState = Static<typeof StateSchema>;
 const archiveDigest = (text: string) => `sha256:${createHash("sha256").update(text).digest("hex")}`;
 
+/** FIFO asynchronous mutual exclusion; `acquire` resolves with the release of the acquired turn. */
+class Serial {
+	private tail: Promise<void> = Promise.resolve();
+	async acquire(): Promise<() => void> {
+		let release!: () => void;
+		const turn = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const previous = this.tail;
+		this.tail = previous.then(() => turn);
+		await previous;
+		return release;
+	}
+	async run<T>(operation: () => Promise<T>): Promise<T> {
+		const release = await this.acquire();
+		try {
+			return await operation();
+		} finally {
+			release();
+		}
+	}
+}
+
 /** A dead owner is only provable on this host; EPERM or success means the PID is alive. */
 function processAlive(pid: number): boolean {
 	try {
@@ -204,6 +227,17 @@ export class FileStateStore implements StateStore, ActionAudit {
 	private closed = false;
 	private closing?: Promise<void>;
 	private busy = false;
+	/**
+	 * One durable write lane for the Run writer (V0.8A §4 rule 3): Kernel saves and the action intents/outcomes of
+	 * concurrent wave workers queue here in FIFO order instead of failing as concurrent. An ALLOW intent holds the
+	 * lane from `prepare` until its `finish`, so no other write interleaves with one action's effect and at most one
+	 * action is ever PREPARED. Two overlapping Kernel saves are still rejected rather than losing a revision.
+	 */
+	private readonly lane = new Serial();
+	private held?: { runId: string; actionId: string; release: () => void };
+	private saving = false;
+	/** Serializes the state.json replacement with the writability read, so a check never sees a half-applied commit. */
+	private readonly gate = new Serial();
 	private readonly eventFailures: EventDeliveryFailure[] = [];
 	/** Set when open removed a lock whose same-host owner PID no longer exists. */
 	recoveredStaleLock?: { pid: number };
@@ -428,17 +462,19 @@ export class FileStateStore implements StateStore, ActionAudit {
 		}
 	}
 	async assertWritable(): Promise<void> {
-		try {
-			await this.checkOwnership();
-			const persisted = await this.readJson("state.json");
-			if (
-				(persisted !== undefined || this.state.revision > 0) &&
-				JSON.stringify(persisted) !== JSON.stringify(this.state)
-			)
-				throw new StateStoreError("authoritative state changed outside the writer");
-		} catch (error) {
-			await this.fail(error);
-		}
+		await this.gate.run(async () => {
+			try {
+				await this.checkOwnership();
+				const persisted = await this.readJson("state.json");
+				if (
+					(persisted !== undefined || this.state.revision > 0) &&
+					JSON.stringify(persisted) !== JSON.stringify(this.state)
+				)
+					throw new StateStoreError("authoritative state changed outside the writer");
+			} catch (error) {
+				await this.fail(error);
+			}
+		});
 	}
 	private async releaseLock(): Promise<void> {
 		if (!this.lockIdentity) return;
@@ -552,12 +588,14 @@ export class FileStateStore implements StateStore, ActionAudit {
 	private async commit(next: FileRuntimeState, beforeStateRename?: () => void): Promise<void> {
 		next.revision = this.state.revision + 1;
 		assertState(next);
-		try {
-			await this.atomicReplace("state.json", next, beforeStateRename);
-		} catch {
-			throw new StateStoreError("state.json", false);
-		}
-		this.state = structuredClone(next);
+		await this.gate.run(async () => {
+			try {
+				await this.atomicReplace("state.json", next, beforeStateRename);
+			} catch {
+				throw new StateStoreError("state.json", false);
+			}
+			this.state = structuredClone(next);
+		});
 		try {
 			await this.atomicReplace("tasks.json", projection(next));
 		} catch {
@@ -746,6 +784,15 @@ export class FileStateStore implements StateStore, ActionAudit {
 	}
 	async save(run: Run): Promise<void> {
 		run = structuredClone(run);
+		if (this.closed || this.saving) throw new StateStoreError("closed or concurrent operation");
+		this.saving = true;
+		try {
+			await this.lane.run(() => this.saveRun(run));
+		} finally {
+			this.saving = false;
+		}
+	}
+	private async saveRun(run: Run): Promise<void> {
 		await this.mutate((next) => {
 			validateContract(RunSchema, run);
 			const index = next.runs.findIndex((item) => item.runId === run.runId);
@@ -882,8 +929,22 @@ export class FileStateStore implements StateStore, ActionAudit {
 			else next.runs[index] = run;
 		});
 	}
+	/** Durable intent; an ALLOW intent keeps the write lane until its `finish` (one action in flight at a time). */
 	async prepare(decision: PolicyDecision): Promise<void> {
 		decision = structuredClone(decision);
+		const release = await this.lane.acquire();
+		let held = false;
+		try {
+			await this.prepareIntent(decision);
+			if (decision.decision === "ALLOW") {
+				this.held = { runId: decision.runId, actionId: decision.actionId, release };
+				held = true;
+			}
+		} finally {
+			if (!held) release();
+		}
+	}
+	private async prepareIntent(decision: PolicyDecision): Promise<void> {
 		await this.mutate((next) => {
 			validateContract(PolicyDecisionSchema, decision);
 			const owner = next.runs.find((run) => run.runId === decision.runId);
@@ -968,13 +1029,20 @@ export class FileStateStore implements StateStore, ActionAudit {
 		});
 	}
 	async finish(runId: string, actionId: string, outcome: ActionOutcome): Promise<void> {
-		await this.mutate((next) => {
-			const action = next.actions.find(
-				(item) => item.decision.runId === runId && item.decision.actionId === actionId,
-			);
-			if (!action || action.status !== "PREPARED") throw new Error("No pending action");
-			action.status = outcome;
-		});
+		const hold = this.held?.runId === runId && this.held.actionId === actionId ? this.held : undefined;
+		if (hold) this.held = undefined;
+		const release = hold ? hold.release : await this.lane.acquire();
+		try {
+			await this.mutate((next) => {
+				const action = next.actions.find(
+					(item) => item.decision.runId === runId && item.decision.actionId === actionId,
+				);
+				if (!action || action.status !== "PREPARED") throw new Error("No pending action");
+				action.status = outcome;
+			});
+		} finally {
+			release();
+		}
 	}
 }
 

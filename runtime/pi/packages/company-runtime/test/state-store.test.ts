@@ -343,6 +343,34 @@ describe("file StateStore", () => {
 		expect((await store.load("run-1"))?.revision).toBe(2);
 	});
 
+	it("V0.8A: queues concurrent action intents and a Kernel save behind the one in-flight action", async () => {
+		const store = await openStore();
+		const run = await kernel(store);
+		await run.start();
+		await store.prepare(decision);
+		const order: string[] = [];
+		// Two wave workers and the Kernel save queue share one write lane instead of failing as concurrent.
+		const second = store
+			.prepare({ ...decision, actionId: "action-2", actionDigest: "digest-2" })
+			.then(() => order.push("prepare-2"));
+		const saved = store.save({ ...run.snapshot, revision: 3 }).then(() => order.push("save"));
+		const writable = store.assertWritable().then(() => order.push("writable"));
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(order).toEqual(["writable"]);
+		expect(store.snapshot.actions.filter((action) => action.status === "PREPARED")).toHaveLength(1);
+		await store.finish("run-1", "action-1", "SUCCEEDED");
+		await second;
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		// The save still waits for the second action's outcome: never a Run write during an in-flight effect.
+		expect(order).toEqual(["writable", "prepare-2"]);
+		await store.finish("run-1", "action-2", "INTERRUPTED");
+		await Promise.all([saved, writable]);
+		expect(order).toEqual(["writable", "prepare-2", "save"]);
+		expect(store.snapshot.actions.map((action) => action.status)).toEqual(["SUCCEEDED", "INTERRUPTED"]);
+		expect((await store.load("run-1"))?.revision).toBe(3);
+		await store.assertWritable();
+	});
+
 	it.each(["state.json", "tasks.json"])("rejects symlinked %s without writing its destination", async (file) => {
 		await (await openStore()).close();
 		const outside = join(root, "outside.json");
