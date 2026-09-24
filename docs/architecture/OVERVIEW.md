@@ -39,6 +39,8 @@ Paths below are relative to `runtime/pi/packages/company-runtime/src`.
 
 QUICK uses one Executor instead of Developer + Reviewer, and only for R0/R1. R2 (dependency/build files) always needs STANDARD with independent review. R3 supports exactly one action, `delete file <path>`, with a one-time human approval bound to the file's fingerprint.
 
+COMPLEX ([design](COMPLEX_SEQUENTIAL_WORKFLOW.md)) runs one frozen parent Task Contract as 2–8 human-planned tasks, strictly in order under one Run and one writer. It is prepared only through Host Control with a structured plan (the App's task-plan editor); `/workflow run` refuses it and there is no Planner model. `complex-plan.ts` compiles the plan deterministically. Each task runs implement → self-check → contribution review → test. It may change only its exact claimed files (`complex-ownership.ts` checks before Policy and again at the effect). Then integration runs every registered check, a new independent final Reviewer and the checks again. `assertCanCompleteComplex` (`kernel.ts`) decides completion. The App shows the Runtime's `complexExecution` projection and cannot advance tasks.
+
 ## Who decides what
 
 | Decision | Owner | Not decided by |
@@ -47,6 +49,7 @@ QUICK uses one Executor instead of Developer + Reviewer, and only for R0/R1. R2 
 | A deletion (R3) | the human, once, for one fingerprinted file | Plan confirmation, R2 binding |
 | Check results (evidence) | `RegisteredVerifier` fresh runs | advisory runs, browser candidates, handoff text |
 | Review verdict | an independent Reviewer session | the Developer |
+| Which task may change which file (COMPLEX) | the confirmed plan's exact-file claims, checked before and at each effect | Policy ALLOW alone, dependencies between tasks, the App |
 | Completion | the Kernel, after `assertCanComplete` | the App, transport success, any worker |
 
 Browser observations are `CANDIDATE_ONLY`. Registering a browser check is not verification; only fresh captures by `RegisteredVerifier` count. Reviewed project facts are advisory context only.
@@ -71,7 +74,7 @@ None of these may be tracked in Git. Worker session transcripts live under the W
   - V0.4A–C strict mutation, verifier trust, sandbox
   - V0.5C verification repair
   - V0.6A Host bridge/control, V0.6C browser observation, V0.6D project facts
-  - V0.7A capability broker, V0.7B COMPLEX design
+  - V0.7A capability broker, V0.7B COMPLEX sequential workflow
 - **C0x / FIX-0x / FEAT-0x:** capability or issue codes from the roadmap. C06 is the provider Fitness harness, C07 Host control, C08 browser observation, C09 project facts.
 - **LOG-###:** entries in the historical Runtime work log. Current work is logged in the root `docs/WORK_LOG.md`.
 - **AC-###:** Host-assigned acceptance-criterion IDs inside a Task Contract.
@@ -80,6 +83,6 @@ None of these may be tracked in Git. Worker session transcripts live under the W
 
 - Runtime: `npm run check` in `runtime/pi` (lint, types, dependency and lock checks), focused vitest files, then `node scripts/validate.mjs pi` from the root, which runs the full isolated `test.sh` suite.
 - App: `node scripts/validate.mjs t3`.
-- Across the boundary: `node scripts/run-cross-boundary.mjs` (needs `WEAVRA_CHROMIUM`) and `node scripts/run-capability-boundary.mjs`.
-- Tests use faux providers only. Real model runs (`weavra fitness`, `npm run benchmark`) require an explicit paid opt-in.
+- Across the boundary: `node scripts/run-cross-boundary.mjs` (needs `WEAVRA_CHROMIUM`), `node scripts/run-capability-boundary.mjs` and `node scripts/run-complex-integration.mjs` (COMPLEX Runtime→App corpus with a scripted loopback model).
+- Tests use faux or scripted loopback models only. Real model runs (`weavra fitness`, `npm run benchmark`, `scripts/complex-live-smoke.mjs`) require an explicit paid opt-in.
 - CI runs the same three gates on every PR to `devlop`.
