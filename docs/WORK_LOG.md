@@ -723,3 +723,50 @@
   - P13 App 재연결, P14 실제 소유 프로세스 강제 종료 복구.
   - 실제 모델 병렬 smoke와 속도 향상 수치: 현재 NOT VERIFIED. faux 기준으로 웨이브가 순차 합보다 짧았다는 것만 확인했다.
 - 커밋 상태: devlop 대상 PR. #20 이슈는 #22 뒤에 닫는다.
+
+## 2026-09-25 KST — V0.8A #22 병렬 경쟁·충돌·취소·예산 검증 (실제 경계)
+
+- 목적: #20(Runtime)·#21(App)을 합친 실제 경계에서 병렬 웨이브를 검증한다. 속도보다 정확성과 권한을 우선하는지, 거짓 완료가 0건인지 확인한다. 실제 모델 병렬 smoke도 실행한다.
+- 브랜치/worktree: `test/v0.8a-parallel-stress`. 선행 PR #41(#21)·#42(#20) 머지 후 devlop 기준이다.
+- 추가·변경 파일:
+  - `scripts/complex-harness.mjs`(신규): 두 corpus의 공용 헬퍼. 운영 App `ControlTransport`, 엄격 디코더, `ComplexProjection` 검사를 모든 snapshot에 적용하는 관찰자, 대본 루프백 모델, 프로젝트 생성(`max_parallel` 설정 포함), 시나리오 실행기(거짓 완료 집계)를 담았다.
+  - `scripts/complex-integration.mjs`: 공용 헬퍼를 쓰도록 리팩터링했다. 14개 시나리오의 동작은 그대로다.
+  - `scripts/parallel-integration.mjs`(신규): 병렬 corpus.
+  - `scripts/run-complex-integration.mjs`: 두 corpus를 차례로 실행한다(`complex`·`parallel` 선택 가능). CI cross-boundary job이 둘 다 돌린다.
+  - `scripts/complex-live-smoke.mjs`: `--independent`, `--max-parallel` 옵션을 추가했다.
+- 병렬 corpus(9개 시나리오, 대본 모델, 유료 호출 0). 모든 snapshot이 v2 App 소비자 검사를 통과했다.
+  - P01: 두 Developer의 첫 모델 호출이 서로를 기다리는 barrier로 동시 실행을 증명했다. 두 행이 함께 IMPLEMENTING인 snapshot을 관측했다. 검증은 CT-001 → CT-002 → CT-003 → 통합 순서이고 2차 웨이브(CT-003)는 1차 완료 후에만 시작했다. COMPLETED, 호출 7회.
+  - P02/P03: CT-002가 먼저 인계해 HANDED_OFF로 기다리는 동안 CT-001은 IMPLEMENTING이었다. join 전 Reviewer 호출은 0이었고 검증은 A → B 순서였다.
+  - P05: A가 실행 중인 B의 claim 파일을 쓰려 해 A는 BLOCKED/OWNERSHIP_CONFLICT, B는 BLOCKED/RUN_STOPPED가 됐다. 파일은 생성되지 않았고, cleanup CONFIRMED, writer 해제.
+  - P07: 두 Developer가 실행 중일 때 취소해 세 행 모두 CANCELLED, cleanup CONFIRMED, writer 해제.
+  - P09: 두 행 웨이브에 호출 예산 1이 남은 상태에서 전원 예약에 실패해 BLOCKED/EXHAUSTED가 됐다. 모델 호출은 0이었다.
+  - P13: 두 번째 App 연결이 실행 중 두 활성 행을 소유하지 않은 상태로 일관되게 관측했다. 소유 연결 종료 시 CANCELLED가 됐고 재실행은 없었다.
+  - P14: 소유 Host 프로세스를 웨이브 도중 SIGKILL했다.
+    - 새 Host(App 경로)에서 고아 Run은 RUNNING(행 IMPLEMENTING/IMPLEMENTING/PENDING, writerPresent true)으로 일관되게 보였다.
+    - 새 Run 준비는 `WRITER_PRESENT`로 거부됐고, 자동 재개나 무단 인수는 없었다.
+    - **발견한 제품 공백:** Host Control 시작 경로는 설계상 복구를 하지 않는다("guarded starts never recover"). 그래서 App만으로는 이 프로젝트를 복구할 수 없다. 복구(INTERRUPTED/OWNER_LOST)는 #20 Runtime 테스트가 검증한 비-Host 경로(TUI `/workflow run` 등)에서만 일어난다. 설계 P14의 "새 Host에서 복구" 기대와 다르므로 후속 과제로 넘긴다.
+  - 속도(대본 모델 지연 400ms): 순차 5.9초, 웨이브 5.0초(0.84배). 검증이 순차라 향상 폭이 작다.
+  - 결과: 양성 4건만 COMPLETED. **falseCompletion = 0**.
+- 기존 COMPLEX corpus(14개): 리팩터링 뒤에도 v2 Runtime·v2 App에서 모두 통과했다(P16 동등성, `max_parallel` 기본 1).
+- 실제 모델 병렬 smoke(commandcode `deepseek/deepseek-v4.1-flash`, 독립 2작업, 각 1회):
+
+  | 설정 | 결과 | 시간 | 보고 토큰 | 검사 snapshot |
+  |---|---|---|---|---|
+  | `max_parallel 1` | COMPLETED, 작업·통합 PASS×3 | 100초 | 148,291 | 194 |
+  | `max_parallel 2` | COMPLETED, 작업·통합 PASS×3 | 52초 | 109,246 | 100 |
+
+  - 실제 모델에서 약 1.9배 빨라졌다. 구현 단계가 시간 대부분을 차지하기 때문이다.
+  - 각 1회라 통계 결과는 아니다. 토큰 차이는 모델 응답 편차다.
+- 현재 검증(로컬, 메인 세션):
+  - 병렬 corpus `PARALLEL INTEGRATION PASS: 9 scenarios; falseCompletion=0`.
+  - 리팩터링된 COMPLEX corpus `COMPLEX INTEGRATION PASS: 14 scenarios; falseCompletion=0`.
+  - 전체 게이트는 PR CI가 확인한다.
+- 설계 P-행 대응:
+  - 실제 경계 corpus: P01, P02/P03, P05, P07, P09, P13, P14, P16.
+  - #20 Kernel 경쟁 테스트: P01–P12, P15–P17.
+  - 실제 모델: 병렬 smoke와 속도 측정.
+- 남은 후속 과제:
+  - Host Control 경로에서 증명된 죽은 소유자(같은 호스트)의 고아 Run을 복구하는 방법(설계 결정 필요).
+  - 실제 브라우저 capture 재사용 거부(C37) 실측.
+  - 더 많은 반복의 속도·비용 측정.
+- 커밋 상태: devlop 대상 PR. 머지하고 CI가 통과하면 #20·#21·#22를 닫는다.
