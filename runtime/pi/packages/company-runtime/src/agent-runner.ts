@@ -83,6 +83,8 @@ export interface FitnessWorkerObserver {
 		policyDenied: boolean;
 		/** The error was returned to the model within the correctable tool-error budget. */
 		recoverable: boolean;
+		/** runtime_request_check actually ran an advisory check (not a request-only or limit answer). */
+		advisoryCheck: boolean;
 	}): void;
 	providerError?(kind: "AUTH" | "TRANSPORT" | "TIMEOUT" | "PROVIDER"): void;
 }
@@ -705,6 +707,10 @@ export class PiAgentExecutor implements AgentExecutor {
 							staleReceipt,
 							policyDenied,
 							recoverable,
+							advisoryCheck:
+								event.toolName === "runtime_request_check" &&
+								!event.isError &&
+								event.result?.details?.advisory === true,
 						}),
 					);
 				}

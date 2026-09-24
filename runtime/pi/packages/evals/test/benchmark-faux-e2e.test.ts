@@ -11,6 +11,7 @@ import {
 	BENCHMARK_FAUX_PROVIDER,
 	type BenchmarkArm,
 	type BenchmarkFauxBehavior,
+	formatBenchmarkMarkdown,
 	validateBenchmarkRecord,
 } from "../src/benchmark-record.ts";
 import { type BenchmarkRunnerOptions, type PiSessionObservation, runBenchmark } from "../src/benchmark-runner.ts";
@@ -110,12 +111,27 @@ describe("Weavra-vs-Pi benchmark through real SDK and Runtime boundaries (faux p
 			});
 		// Arm order rotates per fixture so neither arm always runs first.
 		expect(record.runs.map((run) => run.arm)).toEqual(["weavra", "weavra-advisory", "weavra-advisory", "weavra"]);
+		// Stage signals come from the Runtime's own observations: one real advisory run only where enabled.
+		for (const run of record.runs)
+			expect(run.stages).toEqual({
+				toolErrors: 0,
+				recoverableToolErrors: 0,
+				checkRequests: run.arm === "weavra-advisory" ? 1 : 0,
+				advisoryCheckRuns: run.arm === "weavra-advisory" ? 1 : 0,
+				reviewRevisions: 0,
+				finalReview: "PASS",
+				verificationRepairs: 0,
+				failureCategory: null,
+			});
+		expect(formatBenchmarkMarkdown(record)).toContain("| weavra-advisory | 0 (0) | 2 (2) | 0 | 0 | none |");
 	}, 60_000);
 
 	it("the same false completer is not completed by the Weavra Kernel", async () => {
 		const record = await benchmark("FALSE_COMPLETER", ["weavra"], ["B04"]);
 		expect(record.runs[0]).toMatchObject({ claimedCompletion: false, oracle: "FAIL", falseCompletion: false });
 		expect(record.runs[0].terminalStatus).not.toBe("COMPLETED");
+		// The stage that stopped it is named, not inferred from the terminal status alone.
+		expect(record.runs[0].stages.failureCategory).not.toBeNull();
 	}, 60_000);
 
 	it("runs every fixture on every arm with the scripted good model", async () => {

@@ -3,9 +3,9 @@ import { Check } from "typebox/value";
 import { fitnessDigest } from "../../company-runtime/src/fitness-records.ts";
 
 /** Result format version; bump on any incompatible change to the fields below. */
-export const BENCHMARK_SCHEMA_VERSION = 1;
+export const BENCHMARK_SCHEMA_VERSION = 2;
 /** Harness semantics version: arms, prompt, limits, oracle and metric definitions. */
-export const BENCHMARK_HARNESS_VERSION = "weavra-benchmark-1";
+export const BENCHMARK_HARNESS_VERSION = "weavra-benchmark-2";
 export const BENCHMARK_ARMS = ["pi", "weavra", "weavra-advisory"] as const;
 export type BenchmarkArm = (typeof BENCHMARK_ARMS)[number];
 /** Local scripted provider name; the only provider that runs without `--confirm-paid`. */
@@ -62,6 +62,33 @@ export const BenchmarkTokensSchema = Type.Object(
 	strict,
 );
 
+/**
+ * Which stage shaped the outcome. Payload-free counts from the Runtime's own observations; null where the arm has
+ * no such stage (the pi arm has no Kernel, review, advisory check or recovery budget).
+ */
+export const BenchmarkStagesSchema = Type.Object(
+	{
+		/** Tool results the runtime marked as errors. */
+		toolErrors: count,
+		/** Weavra: errors returned to the model within the correctable budget. */
+		recoverableToolErrors: nullableCount,
+		/** Weavra: runtime_request_check calls (request-only or advisory). */
+		checkRequests: nullableCount,
+		/** Weavra: advisory checks that actually ran. */
+		advisoryCheckRuns: nullableCount,
+		/** Weavra: Reviewer REVISE verdicts that sent the run back to implement. */
+		reviewRevisions: nullableCount,
+		/** Weavra: the last Reviewer verdict, when a review happened. */
+		finalReview: Type.Union([Type.Enum(["PASS", "REVISE", "BLOCK"]), Type.Null()]),
+		/** Weavra: Host-authorized verification repair attempts. */
+		verificationRepairs: nullableCount,
+		/** Weavra: Evidence Pack failure category when the Kernel did not complete; UNOBSERVED without a run. */
+		failureCategory: Type.Union([identifier(32), Type.Null()]),
+	},
+	strict,
+);
+export type BenchmarkStages = Static<typeof BenchmarkStagesSchema>;
+
 export const BenchmarkRunSchema = Type.Object(
 	{
 		sequence: count,
@@ -83,6 +110,7 @@ export const BenchmarkRunSchema = Type.Object(
 		toolCalls: count,
 		workerInvocations: count,
 		tokens: BenchmarkTokensSchema,
+		stages: BenchmarkStagesSchema,
 	},
 	strict,
 );
@@ -103,6 +131,20 @@ export const BenchmarkArmSummarySchema = Type.Object(
 		falseCompletionRate: rate,
 		medianDurationMs: Type.Union([Type.Number({ minimum: 0 }), Type.Null()]),
 		tokens: Type.Object({ state: Type.Enum(["KNOWN", "UNKNOWN"]), total: nullableCount, knownRuns: count }, strict),
+		/** Sums of the per-run stage counts; null when the arm has no such stage. */
+		stages: Type.Object(
+			{
+				toolErrors: count,
+				recoverableToolErrors: nullableCount,
+				checkRequests: nullableCount,
+				advisoryCheckRuns: nullableCount,
+				reviewRevisions: nullableCount,
+				verificationRepairs: nullableCount,
+				/** Runs per failure category, sorted by category. */
+				failureCategories: Type.Array(Type.Object({ category: identifier(32), runs: count }, strict)),
+			},
+			strict,
+		),
 	},
 	strict,
 );
@@ -194,8 +236,31 @@ export function summarizeBenchmarkRuns(
 				total: tokensKnown ? known.reduce((sum, run) => sum + (run.tokens.total ?? 0), 0) : null,
 				knownRuns: known.length,
 			},
+			stages: summarizeStages(own),
 		};
 	});
+}
+
+type CountedStage = Exclude<keyof BenchmarkStages, "finalReview" | "failureCategory" | "toolErrors">;
+function summarizeStages(runs: readonly BenchmarkRun[]): BenchmarkArmSummary["stages"] {
+	// A stage the arm never has stays null; a stage some runs lacked (for example no run observed) counts as 0.
+	const total = (key: CountedStage) =>
+		runs.some((run) => run.stages[key] !== null) ? runs.reduce((sum, run) => sum + (run.stages[key] ?? 0), 0) : null;
+	const categories = new Map<string, number>();
+	for (const run of runs)
+		if (run.stages.failureCategory)
+			categories.set(run.stages.failureCategory, (categories.get(run.stages.failureCategory) ?? 0) + 1);
+	return {
+		toolErrors: runs.reduce((sum, run) => sum + run.stages.toolErrors, 0),
+		recoverableToolErrors: total("recoverableToolErrors"),
+		checkRequests: total("checkRequests"),
+		advisoryCheckRuns: total("advisoryCheckRuns"),
+		reviewRevisions: total("reviewRevisions"),
+		verificationRepairs: total("verificationRepairs"),
+		failureCategories: [...categories]
+			.sort(([left], [right]) => left.localeCompare(right))
+			.map(([category, count]) => ({ category, runs: count })),
+	};
 }
 
 export function freezeBenchmarkRecord(input: Omit<BenchmarkRecord, "resultDigest" | "summary">): BenchmarkRecord {
@@ -243,6 +308,14 @@ export function formatBenchmarkMarkdown(record: BenchmarkRecord): string {
 			(arm) =>
 				`| ${arm.arm} | ${arm.runs} | ${arm.claimedCompletions} (${percent(arm.claimedCompletionRate)}) | ${arm.oraclePasses} (${percent(arm.oraclePassRate)})${arm.invalidRuns ? `, ${arm.invalidRuns} invalid` : ""} | ${arm.falseCompletions} (${percent(arm.falseCompletionRate)} of claims) | ${arm.medianDurationMs === null ? "n/a" : `${(arm.medianDurationMs / 1000).toFixed(1)} s`} | ${arm.tokens.state === "KNOWN" ? String(arm.tokens.total) : `UNKNOWN (${arm.tokens.knownRuns}/${arm.runs} runs reported)`} |`,
 		),
+		"",
+		"| Arm | Tool errors (recovered) | Check requests (advisory runs) | Review REVISE | Verification repairs | Failure categories |",
+		"|---|---:|---:|---:|---:|---|",
+		...record.summary.map((arm) => {
+			const stages = arm.stages;
+			const optional = (value: number | null) => (value === null ? "n/a" : String(value));
+			return `| ${arm.arm} | ${stages.toolErrors}${stages.recoverableToolErrors === null ? "" : ` (${stages.recoverableToolErrors})`} | ${stages.checkRequests === null ? "n/a" : `${stages.checkRequests} (${optional(stages.advisoryCheckRuns)})`} | ${optional(stages.reviewRevisions)} | ${optional(stages.verificationRepairs)} | ${stages.failureCategories.map((item) => `${item.category} ${item.runs}`).join(", ") || "none"} |`;
+		}),
 		"",
 		"Claimed completion: Weavra Kernel COMPLETED; pi session ended with a normal assistant stop (no error, abort, timeout or limit).",
 		"Oracle pass rate excludes INVALID oracle runs. False-completion rate = claimed completions whose hidden oracle failed / judged claimed completions.",

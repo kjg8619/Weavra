@@ -277,6 +277,8 @@ export interface FitnessFixtureExecutionOptions {
 	advisory?: boolean;
 	/** Benchmark-only: product revision limit instead of the Fitness calibration value 0. */
 	maxRevisionCycles?: number;
+	/** Benchmark-only: payload-free worker tool outcomes, in order; never changes the Fitness result. */
+	observeToolResult?: NonNullable<FitnessWorkerObserver["toolResult"]>;
 	/**
 	 * Benchmark-only: Host observation of the final workspace after the workflow settled and before cleanup.
 	 * It never changes the Fitness result; a throwing observer makes the result a harness error.
@@ -362,6 +364,8 @@ export async function executeFitnessFixture(
 			if (event.staleReceipt || event.submissionRejected || event.recoverable) retryable.add(event.name);
 			if (event.policyDenied && ["runtime_edit", "runtime_write", "runtime_delete"].includes(event.name))
 				forbiddenAttempts++;
+			// Last, so a throwing benchmark hook can never skew the Fitness counters above.
+			options.observeToolResult?.(event);
 		},
 	};
 	const base = (): FitnessFixtureResult => ({
