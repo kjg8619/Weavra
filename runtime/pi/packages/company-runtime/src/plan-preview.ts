@@ -1,4 +1,5 @@
 import type { RiskOverride } from "./classification.ts";
+import { complexWaves } from "./complex-state.ts";
 import type { ComplexPlan } from "./complex-types.ts";
 import type { RuntimeConfig } from "./config.ts";
 import type { AcceptanceCriterion, Risk, Workflow } from "./contracts.ts";
@@ -51,7 +52,13 @@ function formatComplexPlan(plan: ComplexPlan): string[] {
 	const { limits, integration } = plan;
 	return [
 		`COMPLEX plan ${plan.planId} ${plan.complexPlanDigest} (parent ${plan.parentTaskId} ${plan.parentTaskContractDigest}):`,
-		"  Tasks run one at a time in this exact order, each only after every earlier task COMPLETED; no Planner/Lead, parallel work, reordering, retry or reassignment.",
+		limits.maxParallel === 1
+			? "  Tasks run one at a time in this exact order, each only after every earlier task COMPLETED; no Planner/Lead, parallel work, reordering, retry or reassignment."
+			: `  Up to ${limits.maxParallel} tasks implement at once in waves, each once its declared dependencies COMPLETED (plan order breaks ties); every task is then verified alone, in plan order, on a quiescent workspace. No Planner/Lead, reordering, retry or reassignment. Waves: ${complexWaves(
+					plan,
+				)
+					.map((wave, index) => `${index + 1}: ${wave.join(", ")}`)
+					.join(" | ")}`,
 		...plan.tasks.flatMap((task) => [
 			`  ${task.id} ${displayText(task.title)}`,
 			`    Goal: ${displayText(task.goal)}`,
@@ -62,7 +69,7 @@ function formatComplexPlan(plan: ComplexPlan): string[] {
 			`    Local revision cycles: at most ${task.maxRevisionCycles}`,
 		]),
 		`  Integration after every task COMPLETED: fresh checks ${integration.checkIds.join(", ")}, a new independent final review of ${integration.criterionIds.join(", ")}, then fresh final checks`,
-		`  Limits: ${limits.maxTasks} tasks; ${limits.maxWorkerInvocations} worker invocations; ${limits.maxReportedTokens} provider-reported tokens (not a billing cap); ${limits.maxTotalRevisionCycles} total revision cycles`,
+		`  Limits: ${limits.maxTasks} tasks; ${limits.maxWorkerInvocations} worker invocations; ${limits.maxReportedTokens} provider-reported tokens (not a billing cap); ${limits.maxTotalRevisionCycles} total revision cycles${limits.maxParallel > 1 ? `; at most ${limits.maxParallel} tasks implementing at once` : ""}`,
 		"  Owned files are exclusive responsibility, not permission: Policy, R2 review and R3 approval still apply, and unclaimed files are denied. The plan cannot change after confirmation.",
 	];
 }

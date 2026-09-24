@@ -5,7 +5,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { type Static, Type } from "typebox";
 import { readAnchoredSource } from "./anchored-files.ts";
-import { ACTIVE_TASK_STATUSES, complexRunError, settleComplexState } from "./complex-state.ts";
+import { complexRunError, settleComplexState } from "./complex-state.ts";
 import { type PolicyDecision, PolicyDecisionSchema, type Run, RunSchema, validateContract } from "./contracts.ts";
 import { createRuntimeEvent, type EventDeliveryFailure, type RuntimeEvent, type RuntimeEventSink } from "./events.ts";
 import { isExecutionMode } from "./execution-contract.ts";
@@ -972,8 +972,11 @@ export class FileStateStore implements StateStore, ActionAudit {
 				throw new Error("Action requires a running owner, a fresh ID and the same frozen configuration");
 			if (decision.decision === "ALLOW" && (decision.risk === "R2" || decision.risk === "R3")) {
 				const run = next.runs.find((run) => run.runId === decision.runId);
-				// COMPLEX: the attempt is the active task attempt (§10.1), not revisionCycle + 1.
-				const implementing = run?.complex?.tasks.find((row) => ACTIVE_TASK_STATUSES.has(row.status));
+				// COMPLEX: the attempt is an implementing task attempt (§10.1), not revisionCycle + 1; a V0.8A wave has
+				// one IMPLEMENTING row per concurrent Developer, all at the current step attempt.
+				const implementing = run?.complex?.tasks.some(
+					(row) => row.status === "IMPLEMENTING" && row.attempt === run.currentStep?.attempt,
+				);
 				if (
 					!run ||
 					run.risk !== decision.risk ||
@@ -981,9 +984,7 @@ export class FileStateStore implements StateStore, ActionAudit {
 					run.quickScope ||
 					run.phase !== "IMPLEMENT" ||
 					run.currentStep?.stepId !== "implement" ||
-					(run.workflow === "COMPLEX"
-						? implementing?.status !== "IMPLEMENTING" || run.currentStep.attempt !== implementing.attempt
-						: run.currentStep.attempt !== run.revisionCycle + 1) ||
+					(run.workflow === "COMPLEX" ? !implementing : run.currentStep.attempt !== run.revisionCycle + 1) ||
 					decision.role !== "Developer" ||
 					!run.activeAgents.includes("Developer") ||
 					run.roleSessionRefs.at(-1)?.role !== "Developer"
@@ -991,15 +992,16 @@ export class FileStateStore implements StateStore, ActionAudit {
 					throw new Error("R2 intent requires a persisted STANDARD/R2 Developer session and review obligation");
 			}
 			if (decision.decision === "ALLOW" && decision.role === "Developer" && decision.risk !== "R0") {
-				// COMPLEX mutation intent exists only inside the one IMPLEMENTING task attempt with its Developer session.
+				// COMPLEX mutation intent exists only inside an IMPLEMENTING task attempt with its Developer session.
 				const run = next.runs.find((run) => run.runId === decision.runId);
-				const implementing = run?.complex?.tasks.find((row) => ACTIVE_TASK_STATUSES.has(row.status));
+				const implementing = run?.complex?.tasks.some(
+					(row) => row.status === "IMPLEMENTING" && row.attempt === run.currentStep?.attempt,
+				);
 				if (
 					run?.workflow === "COMPLEX" &&
 					(!run.complex ||
-						implementing?.status !== "IMPLEMENTING" ||
+						!implementing ||
 						run.currentStep?.stepId !== "implement" ||
-						run.currentStep.attempt !== implementing.attempt ||
 						!run.activeAgents.includes("Developer") ||
 						run.roleSessionRefs.at(-1)?.role !== "Developer")
 				)

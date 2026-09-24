@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { capabilityJson } from "../src/capability-catalog.ts";
 import { complexPlanDigest } from "../src/complex-plan.ts";
 import { ComplexProjectionError, projectComplexExecution } from "../src/complex-state.ts";
-import type { ComplexExecution, ComplexPlan } from "../src/complex-types.ts";
+import type { ComplexExecution, ComplexPlan, ComplexPlanV1 } from "../src/complex-types.ts";
 import type { Run, TaskContract } from "../src/contracts.ts";
 import { taskContractDigest } from "../src/criterion-evidence.ts";
 import type { HostControlPreview } from "../src/host-control-protocol.ts";
@@ -22,13 +24,14 @@ import {
 } from "./complex-fixture.ts";
 
 // #16 stage C: the §10.2 Host Control projection is a pure function of one durable COMPLEX Run and its envelope,
-// and every rule of the merged #17 App consumer (restated in complex-conformance.ts) holds for it. The negative
-// tables prove that restatement rejects each inconsistency the App rejects.
+// and every rule of the App consumer (restated in complex-conformance.ts, V0.8A #21 contract v2 with Amendment A1)
+// holds for it. The negative tables prove that restatement rejects each inconsistency the App rejects.
 
+/** The historical V0.7B reference fixture (contract v1). */
 interface ContractFixture {
 	parent: TaskContract;
 	parentTaskContractDigest: string;
-	plan: ComplexPlan;
+	plan: ComplexPlanV1;
 	complexPlanDigest: string;
 	preview: {
 		goal: string;
@@ -41,6 +44,31 @@ interface ContractFixture {
 const fixture = JSON.parse(
 	readFileSync(new URL("./fixtures/complex-contract-v1.fixture.json", import.meta.url), "utf8"),
 ) as ContractFixture;
+/** The V0.8A reference fixture (contract v2): CT-001 and CT-002 form wave 1, CT-003 wave 2. */
+const fixtureV2 = JSON.parse(
+	readFileSync(new URL("./fixtures/complex-contract-v2.fixture.json", import.meta.url), "utf8"),
+) as { parent: TaskContract; parentTaskContractDigest: string; plan: ComplexPlan; complexPlanDigest: string };
+
+/** What this v2 Runtime compiles from the V0.7B reference decomposition (a test expectation, never an upgrade). */
+function compiledV2(plan: ComplexPlanV1): ComplexPlan {
+	const { complexPlanDigest: _historical, ...material } = plan;
+	const next = { ...material, schemaVersion: 2 as const, limits: { ...material.limits, maxParallel: 1 } };
+	return { ...next, complexPlanDigest: complexPlanDigest(next) };
+}
+
+/**
+ * A terminal historical V0.7B Run exactly as the V0.7B Kernel stored it: its frozen v1 plan with its own digest,
+ * `activeTaskId` instead of `activeTaskIds`, and every context bound to the v1 plan digest.
+ */
+function historicalV1Run(run: Run, plan: ComplexPlanV1, v2Digest: string): Run {
+	const legacy = JSON.parse(JSON.stringify(run).split(v2Digest).join(plan.complexPlanDigest)) as Run;
+	const state = legacy.complex;
+	if (!state) throw new Error("not a COMPLEX run");
+	delete state.activeTaskIds;
+	state.activeTaskId = null;
+	state.plan = structuredClone(plan);
+	return legacy;
+}
 
 const TWO_TASKS: ComplexTaskSpec[] = [
 	{ claims: [{ path: "src/app.ts", operation: "modify" }] },
@@ -97,9 +125,9 @@ function atRevision(observation: ComplexObservation, stateRevision: number): Com
 }
 
 describe("COMPLEX control projection (#16 stage C)", () => {
-	it("projects the reference fixture plan from creation to completion, byte-identical to its frozen material", async () => {
+	it("projects the v2 reference fixture plan from creation to completion, byte-identical to its frozen material", async () => {
 		const files = new FakeFiles({ "src/config.ts": "export const config = {};\n" });
-		const h = complexHarness({ plan: fixture.plan, parent: fixture.parent, files });
+		const h = complexHarness({ plan: fixtureV2.plan, parent: fixtureV2.parent, files });
 		const kernel = await h.create();
 		const created = kernel.snapshot;
 		const projection = projectComplexExecution(created, { ...envelope, stateRevision: created.revision });
@@ -121,16 +149,16 @@ describe("COMPLEX control projection (#16 stage C)", () => {
 			failureCode: null,
 		});
 		expect(projection).toEqual({
-			schemaVersion: 1,
+			schemaVersion: 2,
 			ownerId: "owner-1",
 			projectRevision: 1,
 			runId: "run-1",
 			stateRevision: created.revision,
-			parent: fixture.parent,
-			plan: fixture.plan,
+			parent: fixtureV2.parent,
+			plan: fixtureV2.plan,
 			phase: "TASK_SEQUENCE",
-			activeTaskId: null,
-			tasks: [pending("CT-001"), pending("CT-002")],
+			activeTaskIds: [],
+			tasks: [pending("CT-001"), pending("CT-002"), pending("CT-003")],
 			integration: {
 				check: "NOT_RUN",
 				review: "NOT_RUN",
@@ -146,23 +174,69 @@ describe("COMPLEX control projection (#16 stage C)", () => {
 			failureCode: null,
 		});
 		// The consumer recomputes both frozen digests directly from the projection.
-		expect(taskContractDigest(projection.parent)).toBe(fixture.parentTaskContractDigest);
-		expect(complexPlanDigest(projection.plan)).toBe(fixture.complexPlanDigest);
+		expect(taskContractDigest(projection.parent)).toBe(fixtureV2.parentTaskContractDigest);
+		expect(complexPlanDigest(projection.plan)).toBe(fixtureV2.complexPlanDigest);
 		const run = await driveComplex(kernel);
 		expect(run.status, run.lastError ?? "").toBe("COMPLETED");
 		// Every durable snapshot of the fixture Run, and every transition between them, satisfies the App consumer.
 		expect(h.saved.length).toBeGreaterThan(10);
 		expect(takeConsumerIssues()).toEqual([]);
+		// The fixture's waves, as reported: CT-001 and CT-002 implement together, CT-003 alone afterwards.
+		const reported = h.saved.map((value) => value.complex?.activeTaskIds ?? []);
+		expect(reported).toContainEqual(["CT-001", "CT-002"]);
+		expect(reported).toContainEqual(["CT-003"]);
+		expect(reported.every((ids) => !(ids.includes("CT-003") && ids.length > 1))).toBe(true);
 		expect(projectComplexExecution(run, { ...envelope, stateRevision: run.revision })).toMatchObject({
-			parent: { ...fixture.parent, status: "completed" },
-			plan: fixture.plan,
+			parent: { ...fixtureV2.parent, status: "completed" },
+			plan: fixtureV2.plan,
 			phase: "TERMINAL",
-			activeTaskId: null,
+			activeTaskIds: [],
 			integration: { check: "PASS", review: "PASS", test: "PASS", evidenceFreshness: "CURRENT", failureCode: null },
-			budget: { workerInvocations: 5, totalRevisionCycles: 0, status: "WITHIN_LIMITS" },
+			budget: { workerInvocations: 7, totalRevisionCycles: 0, status: "WITHIN_LIMITS" },
 			cleanup: "CONFIRMED",
 			failureCode: null,
 		});
+	});
+
+	it("Amendment A1: projects a terminal historical V0.7B Run as v2 with its frozen v1 plan, never re-digested", async () => {
+		const files = new FakeFiles({ "src/config.ts": "export const config = {};\n" });
+		const current = compiledV2(fixture.plan);
+		const h = complexHarness({ plan: current, parent: fixture.parent, files });
+		const run = await driveComplex(await h.create());
+		expect(run.status, run.lastError ?? "").toBe("COMPLETED");
+		expect(takeConsumerIssues()).toEqual([]);
+		const legacy = historicalV1Run(run, fixture.plan, current.complexPlanDigest);
+		const projection = projectComplexExecution(legacy, { ...envelope, stateRevision: legacy.revision });
+		expect(projection.schemaVersion).toBe(2);
+		expect(projection.plan).toEqual(fixture.plan);
+		expect(complexPlanDigest(projection.plan)).toBe(fixture.complexPlanDigest);
+		expect(projection.activeTaskIds).toEqual([]);
+		expect(projection.tasks.every((row) => row.status === "COMPLETED")).toBe(true);
+		const observed = observe(legacy);
+		expect(complexConsumerIssues(observed)).toEqual([]);
+		// A non-terminal historical Run has no projection (recovery settles it first), and the consumer rejects a v1
+		// plan on a non-terminal Run, with an active row or with a HANDED_OFF row.
+		const running = structuredClone(legacy);
+		running.status = "RUNNING";
+		expect(() => projectComplexExecution(running, { ...envelope, stateRevision: running.revision })).toThrow(
+			ComplexProjectionError,
+		);
+		const nonTerminal = structuredClone(observed);
+		nonTerminal.state.snapshot.status.run!.status = "RUNNING";
+		expect(complexConsumerIssues(nonTerminal).join("\n")).toMatch(/a v1 plan only on a terminal Run/);
+		const active = structuredClone(observed);
+		execution(active).activeTaskIds = ["CT-001"];
+		expect(complexConsumerIssues(active).join("\n")).toMatch(/historical v1 plan has no active rows/);
+		const handedOff = structuredClone(observed);
+		execution(handedOff).tasks[1].status = "HANDED_OFF";
+		expect(complexConsumerIssues(handedOff).join("\n")).toMatch(/no HANDED_OFF row/);
+		// A v1 plan digested in the v2 domain never verifies: each version recomputes only in its own domain.
+		const redigested = structuredClone(observed);
+		const { complexPlanDigest: _v1, ...material } = fixture.plan;
+		execution(redigested).plan.complexPlanDigest = `sha256:${createHash("sha256")
+			.update(capabilityJson(["weavra-complex-plan-v2", material]), "utf8")
+			.digest("hex")}`;
+		expect(complexConsumerIssues(redigested).join("\n")).toMatch(/does not recompute/);
 	});
 
 	it("is a pure function of the Run and envelope: same revision, same canonical data", async () => {
@@ -387,20 +461,29 @@ describe("App consumer restatement rejects inconsistent observations (#16 stage 
 			/phase TERMINAL iff/,
 		],
 		[
-			"two active rows",
+			"two active rows at maxParallel 1",
 			"mid",
 			(o) => {
 				execution(o).tasks[0].status = "TEST";
+				execution(o).activeTaskIds = ["CT-001", "CT-002"];
 			},
-			/at most one active row/,
+			/more active rows than maxParallel/,
 		],
 		[
 			"a wrong active task",
 			"mid",
 			(o) => {
-				execution(o).activeTaskId = "CT-001";
+				execution(o).activeTaskIds = ["CT-001"];
 			},
-			/activeTaskId/,
+			/activeTaskIds must list exactly/,
+		],
+		[
+			"an unsorted active task list",
+			"mid",
+			(o) => {
+				execution(o).activeTaskIds = ["CT-002", "CT-001"];
+			},
+			/strictly ascending/,
 		],
 		[
 			"an Approval wait while the Run runs",
@@ -566,7 +649,7 @@ describe("App consumer restatement rejects inconsistent observations (#16 stage 
 				(o) => {
 					const value = execution(o);
 					value.tasks[1] = { ...structuredClone(value.tasks[1]), status: "PENDING" };
-					value.activeTaskId = null;
+					value.activeTaskIds = [];
 				},
 				/re-entered PENDING/,
 			],
@@ -638,7 +721,7 @@ describe("COMPLEX preview restatement (#16 stage C)", () => {
 			verificationRepairMode: "disabled",
 			lspEnabled: false,
 		},
-		complexPlan: structuredClone(fixture.plan),
+		complexPlan: compiledV2(fixture.plan),
 	});
 	type Echo = { ownerId: string; expectedProjectRevision: number; complexDraft?: unknown };
 	const request: Echo = { ownerId: "owner-1", expectedProjectRevision: 4, complexDraft: {} };
@@ -717,6 +800,25 @@ describe("COMPLEX preview restatement (#16 stage C)", () => {
 			() => {},
 			/never downgraded/,
 			{ ownerId: "owner-1", expectedProjectRevision: 4 },
+		],
+		[
+			"a v1 plan from a v2 Runtime",
+			(value) => {
+				(value as unknown as { complexPlan: unknown }).complexPlan = structuredClone(fixture.plan);
+			},
+			/must be the advertised version/,
+			request,
+		],
+		[
+			"an R3 plan implementing more than one task at a time",
+			(value) => {
+				value.risk = "R3";
+				const plan = compiledV2(fixture.plan);
+				const material = { ...plan, limits: { ...plan.limits, maxParallel: 2 } };
+				value.complexPlan = { ...material, complexPlanDigest: complexPlanDigest(material) };
+			},
+			/R3 plan implements one task at a time/,
+			request,
 		],
 	])("rejects %s", (_name, mutate, expected, echo) => {
 		const value = preview();

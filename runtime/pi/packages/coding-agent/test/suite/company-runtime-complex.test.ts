@@ -339,9 +339,9 @@ describe("COMPLEX sequential Run through Host Control and real adapters (#16)", 
 			run: { status: "COMPLETED", workflow: "COMPLEX" },
 		});
 		const run = await storedRun();
-		// #16 stage C: contract v1 is advertised and the latest COMPLEX Run is projected, from exactly that durable
-		// Run, at the snapshot's own owner/project/state revisions.
-		expect(capabilities.complexContractVersion).toBe(1);
+		// V0.8A: contract v2 is advertised and the latest COMPLEX Run is projected, from exactly that durable Run,
+		// at the snapshot's own owner/project/state revisions.
+		expect(capabilities.complexContractVersion).toBe(2);
 		expect(state.complexExecution).toEqual(
 			projectComplexExecution(run, {
 				ownerId: state.ownerId,
@@ -353,7 +353,7 @@ describe("COMPLEX sequential Run through Host Control and real adapters (#16)", 
 			runId: state.snapshot.status.run?.runId,
 			stateRevision: state.stateRevision,
 			phase: "TERMINAL",
-			activeTaskId: null,
+			activeTaskIds: [],
 			cleanup: "CONFIRMED",
 			integration: { check: "PASS", review: "PASS", test: "PASS", evidenceFreshness: "CURRENT" },
 			budget: { workerInvocations: 5, totalRevisionCycles: 0, status: "WITHIN_LIMITS" },
@@ -465,7 +465,7 @@ describe("COMPLEX sequential Run through Host Control and real adapters (#16)", 
 		await start();
 		await ready;
 		const live = await client.state();
-		expect(live.complexExecution).toMatchObject({ phase: "TASK_SEQUENCE", activeTaskId: "CT-002" });
+		expect(live.complexExecution).toMatchObject({ phase: "TASK_SEQUENCE", activeTaskIds: ["CT-002"] });
 		const cancelled = await mutation({
 			type: "workflow.cancel",
 			runId: live.ownedRunId,
@@ -562,7 +562,7 @@ describe("COMPLEX R3 single deletion through Host Control (#16)", () => {
 		const waiting = observed.find((item) => item.state.pendingApproval)?.state;
 		expect(waiting?.snapshot.status.run?.status).toBe("WAITING_APPROVAL");
 		expect(waiting?.complexExecution).toMatchObject({
-			activeTaskId: "CT-001",
+			activeTaskIds: ["CT-001"],
 			stateRevision: waiting?.stateRevision,
 		});
 		expect(waiting?.complexExecution?.tasks[0].status).toBe("WAITING_APPROVAL");
@@ -601,6 +601,133 @@ describe("COMPLEX R3 single deletion through Host Control (#16)", () => {
 			observed.filter((item) => item.state.complexExecution).map((item) => item.state.stateRevision),
 		);
 		expect(revisions.size).toBeGreaterThanOrEqual(2);
+		expect(consumerIssues()).toEqual([]);
+	});
+});
+
+describe("V0.8A parallel COMPLEX waves through Host Control and real adapters (#20)", () => {
+	/** Two independent tasks: with max_parallel 2 they form one wave. */
+	const PARALLEL_DRAFT = {
+		tasks: [
+			{ ...DRAFT.tasks[0], dependsOnIndexes: [] },
+			{ ...DRAFT.tasks[1], dependsOnIndexes: [] },
+		],
+	};
+	const files: Record<string, { path: string; content: string }> = {
+		"CT-001": { path: "src/app.js", content: "fixed\n" },
+		"CT-002": { path: "src/extra.js", content: "extra\n" },
+	};
+	/**
+	 * One faux dispatcher for every stream call: concurrent Developer sessions pull responses in nondeterministic
+	 * order, so each response is chosen from the worker's own task context and conversation turn. Each Developer's
+	 * first turn waits until both Developers are live at once and the test releases them.
+	 */
+	function dispatcher(release: Promise<void>) {
+		const live = new Set<string>();
+		let bothLive!: () => void;
+		const both = new Promise<void>((resolve) => {
+			bothLive = resolve;
+		});
+		const respond = async (context: Context, options?: { signal?: AbortSignal }) => {
+			const input = workerInput(context);
+			if (input.role === "Reviewer") return review(context);
+			const task = input.complexContext?.taskId ?? "";
+			if (context.messages.some((message) => message.role === "assistant"))
+				return handoff([files[task].path])(context);
+			live.add(task);
+			if (live.size === 2) bothLive();
+			await Promise.race([
+				release,
+				new Promise<void>((resolve) => {
+					if (options?.signal?.aborted) resolve();
+					else options?.signal?.addEventListener("abort", () => resolve(), { once: true });
+				}),
+			]);
+			if (options?.signal?.aborted) return fauxAssistantMessage("Late output is not completion evidence");
+			return write(files[task].path, files[task].content);
+		};
+		return { respond, both };
+	}
+
+	it("P01 (real adapters): two Developers implement at once, then verification and integration complete", async () => {
+		await setup({ agents: { max_parallel: 2, max_revision_cycles: 1 } });
+		let release!: () => void;
+		const released = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const { respond, both } = dispatcher(released);
+		harness.setResponses(Array.from({ length: 7 }, () => respond));
+		const preview = await start(GOAL, PARALLEL_DRAFT);
+		expect(preview.complexPlan?.limits.maxParallel).toBe(2);
+		await both;
+		// Both Developer sessions are live at once, and the projection reports the wave's two IMPLEMENTING rows.
+		const live = await client.state();
+		expect(live.complexExecution?.activeTaskIds).toEqual(["CT-001", "CT-002"]);
+		expect(live.complexExecution?.tasks.map((row) => row.status)).toEqual(["IMPLEMENTING", "IMPLEMENTING"]);
+		release();
+		const state = await idleState();
+		const run = await storedRun();
+		expect(state.snapshot.status, run.lastError ?? "").toMatchObject({
+			writerPresent: false,
+			run: { status: "COMPLETED" },
+		});
+		expect(readFileSync(join(cwd, "src/app.js"), "utf8")).toBe("fixed\n");
+		expect(readFileSync(join(cwd, "src/extra.js"), "utf8")).toBe("extra\n");
+		expect(run.complex?.tasks.map((row) => [row.status, row.changedFiles])).toEqual([
+			["COMPLETED", ["src/app.js"]],
+			["COMPLETED", ["src/extra.js"]],
+		]);
+		// Two Developers, two task Reviewers and one final Reviewer on one global ledger.
+		expect(run.budget?.workerInvocations).toBe(5);
+		// Both Developers started before either handed off; every verification ran after the join, in plan order.
+		const implement = events.filter((event) => "step" in event && event.step?.stepId === "implement");
+		const started = implement.filter((event) => event.type === "AgentStarted").map((event) => event.sequence);
+		const completed = implement.filter((event) => event.type === "AgentCompleted").map((event) => event.sequence);
+		expect(started).toHaveLength(2);
+		expect(Math.max(...started)).toBeLessThan(Math.min(...completed));
+		const verifications = events
+			.filter((event) => event.type === "VerificationStarted")
+			.map(
+				(event) => `${event.complexContext?.taskId ?? "integration"}:${"step" in event ? event.step?.stepId : ""}`,
+			);
+		expect(verifications).toEqual([
+			"CT-001:self-check",
+			"CT-001:test",
+			"CT-002:self-check",
+			"CT-002:test",
+			"integration:self-check",
+			"integration:test",
+		]);
+		expect(new Set(events.map((event) => event.sequence)).size).toBe(events.length);
+		expect(state.complexExecution).toMatchObject({ phase: "TERMINAL", activeTaskIds: [], cleanup: "CONFIRMED" });
+		expect(consumerIssues()).toEqual([]);
+	});
+
+	it("P07 (real adapters): a cancel with two live Developers cancels both rows and releases the writer", async () => {
+		await setup({ agents: { max_parallel: 2, max_revision_cycles: 1 } });
+		const { respond, both } = dispatcher(new Promise<void>(() => {}));
+		harness.setResponses(Array.from({ length: 2 }, () => respond));
+		await start(GOAL, PARALLEL_DRAFT);
+		await both;
+		const live = await client.state();
+		expect(live.complexExecution?.activeTaskIds).toEqual(["CT-001", "CT-002"]);
+		const cancelled = await mutation({
+			type: "workflow.cancel",
+			runId: live.ownedRunId,
+			expectedStateRevision: live.stateRevision,
+		});
+		expect(cancelled.response).toMatchObject({ success: true });
+		const state = await idleState();
+		expect(state.snapshot.status).toMatchObject({ writerPresent: false, run: { status: "CANCELLED" } });
+		const run = await storedRun();
+		expect(run.complex).toMatchObject({ phase: "TERMINAL", cleanup: "CONFIRMED", failureCode: "CANCELLED" });
+		expect(run.complex?.tasks.map((row) => [row.status, row.failureCode])).toEqual([
+			["CANCELLED", "CANCELLED"],
+			["CANCELLED", "CANCELLED"],
+		]);
+		expect(existsSync(join(cwd, "src/extra.js"))).toBe(false);
+		expect(readFileSync(join(cwd, "src/app.js"), "utf8")).toBe("original\n");
+		expect(events.some((event) => event.type === "RunCompleted")).toBe(false);
 		expect(consumerIssues()).toEqual([]);
 	});
 });

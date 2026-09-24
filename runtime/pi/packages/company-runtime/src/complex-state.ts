@@ -13,24 +13,29 @@ import {
 	type ComplexRunState,
 	type ComplexTaskState,
 	type ComplexTaskStatus,
+	type FrozenComplexPlan,
 	type ReviewGate,
 } from "./complex-types.ts";
 import { isTaskContract, type Run, type TaskContract } from "./contracts.ts";
 import { taskContractDigest } from "./criterion-evidence.ts";
 
 /**
- * Pure helpers for the durable COMPLEX Run state (COMPLEX_SEQUENTIAL_WORKFLOW.md §7, §9, §10). The Kernel is the
- * only writer; StateStore uses `complexRunError` to reject any save that a consumer would find inconsistent.
+ * Pure helpers for the durable COMPLEX Run state (COMPLEX_SEQUENTIAL_WORKFLOW.md §7, §9, §10; PARALLEL_AGENTS.md
+ * §4, §6, §8). The Kernel is the only writer; StateStore uses `complexRunError` to reject any save that a consumer
+ * would find inconsistent.
  */
 export const ACTIVE_TASK_STATUSES: ReadonlySet<ComplexTaskStatus> = new Set([
 	"ELIGIBLE",
 	"IMPLEMENTING",
 	"WAITING_APPROVAL",
+	"HANDED_OFF",
 	"SELF_CHECK",
 	"REVIEW",
 	"TEST",
 	"STOPPING",
 ]);
+/** Verification stages of the one row in its turn (§4 rule 6). */
+export const VERIFYING_TASK_STATUSES: ReadonlySet<ComplexTaskStatus> = new Set(["SELF_CHECK", "REVIEW", "TEST"]);
 export const FINISHED_TASK_STATUSES: ReadonlySet<ComplexTaskStatus> = new Set([
 	"COMPLETED",
 	"BLOCKED",
@@ -65,6 +70,56 @@ export function isTerminalRun(status: Run["status"]): boolean {
 	return TERMINAL_RUN.has(status);
 }
 
+/** The frozen wave bound; a historical v1 plan is sequential (one task at a time). */
+export function planMaxParallel(plan: FrozenComplexPlan): number {
+	return plan.schemaVersion === 2 ? plan.limits.maxParallel : 1;
+}
+
+/** Active task IDs of a durable state of either version, in plan order. */
+export function activeTaskIdsOf(state: ComplexRunState): string[] {
+	if (state.activeTaskIds) return [...state.activeTaskIds];
+	return state.activeTaskId ? [state.activeTaskId] : [];
+}
+
+/**
+ * Scheduling readiness of one row (§4 rule 1, v2 consumer rule 2): every declared dependency COMPLETED; with
+ * `maxParallel = 1` (and on v1 plans) every earlier row COMPLETED, which is the V0.7B order.
+ */
+export function taskReady(plan: FrozenComplexPlan, rows: readonly ComplexTaskState[], index: number): boolean {
+	if (planMaxParallel(plan) === 1) return rows.slice(0, index).every((row) => row.status === "COMPLETED");
+	return (plan.tasks[index]?.dependsOn ?? []).every((dependency) =>
+		rows.some((row) => row.id === dependency && row.status === "COMPLETED"),
+	);
+}
+
+/**
+ * Wave formation (§4 rule 1): the first at most `maxParallel` PENDING rows in plan order whose scheduling
+ * dependencies are COMPLETED. A pure function of the frozen plan and persisted statuses, never of which worker
+ * finished first; a row whose dependencies are not COMPLETED never enters a wave, even if its files exist.
+ */
+export function complexWave(plan: FrozenComplexPlan, rows: readonly ComplexTaskState[]): number[] {
+	const wave: number[] = [];
+	for (const [index, row] of rows.entries()) {
+		if (wave.length >= planMaxParallel(plan)) break;
+		if (row.status === "PENDING" && taskReady(plan, rows, index)) wave.push(index);
+	}
+	return wave;
+}
+
+/**
+ * The wave partition of a plan: each wave forms after every earlier wave COMPLETED, so a successful Run implements
+ * exactly these waves. Reports use it to show wave membership; it is never a transition.
+ */
+export function complexWaves(plan: FrozenComplexPlan): string[][] {
+	const rows = plan.tasks.map((task) => pendingTaskState(task.id));
+	const waves: string[][] = [];
+	for (let wave = complexWave(plan, rows); wave.length; wave = complexWave(plan, rows)) {
+		waves.push(wave.map((index) => rows[index].id));
+		for (const index of wave) rows[index].status = "COMPLETED";
+	}
+	return waves;
+}
+
 /** PENDING: attempt 0, no invocation, zero (not unknown) tokens, no capture, no change, no evidence, no failure. */
 export function pendingTaskState(id: string): ComplexTaskState {
 	return {
@@ -90,7 +145,7 @@ export function initialComplexState(plan: ComplexPlan): ComplexRunState {
 	return {
 		plan: structuredClone(plan),
 		phase: "TASK_SEQUENCE",
-		activeTaskId: null,
+		activeTaskIds: [],
 		tasks: plan.tasks.map((task) => pendingTaskState(task.id)),
 		integration: {
 			check: "NOT_RUN",
@@ -107,7 +162,7 @@ export function initialComplexState(plan: ComplexPlan): ComplexRunState {
 	};
 }
 
-export function taskContext(plan: ComplexPlan, taskId: string, attempt: number): ComplexEvidenceContext {
+export function taskContext(plan: FrozenComplexPlan, taskId: string, attempt: number): ComplexEvidenceContext {
 	return {
 		parentTaskContractDigest: plan.parentTaskContractDigest,
 		complexPlanDigest: plan.complexPlanDigest,
@@ -117,7 +172,7 @@ export function taskContext(plan: ComplexPlan, taskId: string, attempt: number):
 	};
 }
 
-export function integrationContext(plan: ComplexPlan): ComplexEvidenceContext {
+export function integrationContext(plan: FrozenComplexPlan): ComplexEvidenceContext {
 	return {
 		parentTaskContractDigest: plan.parentTaskContractDigest,
 		complexPlanDigest: plan.complexPlanDigest,
@@ -159,7 +214,7 @@ export function markStaleEvidence(state: ComplexRunState, digest: string): void 
 /** §10.2 budget projection from the one global ledger (`Run.budget`) and the global work cycle. */
 export function complexBudget(
 	run: Pick<Run, "budget" | "revisionCycle">,
-	plan: ComplexPlan,
+	plan: FrozenComplexPlan,
 ): ComplexExecution["budget"] {
 	const tokens = run.budget?.reportedTokens ?? null;
 	return {
@@ -187,11 +242,13 @@ export class ComplexProjectionError extends Error {
 }
 
 /**
- * Opt-in Host Control projection (§10.2, §10.3): a pure function of one durable COMPLEX Run (frozen parent and plan,
- * task rows, integration, the one global budget ledger and work cycle) and the enclosing snapshot envelope. The
- * canonical Run stays the outcome authority; nothing is inferred, merged from another Run, shortened or repaired.
- * A Run without a Host-confirmed plan, an inconsistent Run or a DTO outside the closed shape is STATE_UNAVAILABLE;
- * a DTO over 32,768 UTF-8 bytes is RESPONSE_TOO_LARGE.
+ * Opt-in Host Control projection (§10.2, §10.3; v2 per PARALLEL_AGENTS.md §8): a pure function of one durable
+ * COMPLEX Run (frozen parent and plan, task rows, integration, the one global budget ledger and work cycle) and the
+ * enclosing snapshot envelope. The canonical Run stays the outcome authority; nothing is inferred, merged from
+ * another Run, shortened or repaired. A terminal historical V0.7B Run keeps its frozen v1 plan unchanged inside the
+ * v2 execution with no active rows (Amendment A1); a non-terminal one has no projection. A Run without a
+ * Host-confirmed plan, an inconsistent Run or a DTO outside the closed shape is STATE_UNAVAILABLE; a DTO over
+ * 32,768 UTF-8 bytes is RESPONSE_TOO_LARGE.
  */
 export function projectComplexExecution(
 	run: Run,
@@ -206,8 +263,13 @@ export function projectComplexExecution(
 		throw new ComplexProjectionError("STATE_UNAVAILABLE", "The snapshot stateRevision is not this Run revision");
 	const inconsistent = complexRunError(run);
 	if (inconsistent) throw new ComplexProjectionError("STATE_UNAVAILABLE", inconsistent);
+	if (state.plan.schemaVersion === 1 && !isTerminalRun(run.status))
+		throw new ComplexProjectionError(
+			"STATE_UNAVAILABLE",
+			"A historical V0.7B COMPLEX Run is projected only once terminal; recovery settles it first",
+		);
 	const execution: ComplexExecution = {
-		schemaVersion: 1,
+		schemaVersion: 2,
 		ownerId: envelope.ownerId,
 		projectRevision: envelope.projectRevision,
 		runId: run.runId,
@@ -229,7 +291,7 @@ export function projectComplexExecution(
 		},
 		plan: structuredClone(state.plan),
 		phase: state.phase,
-		activeTaskId: state.activeTaskId,
+		activeTaskIds: activeTaskIdsOf(state),
 		tasks: structuredClone(state.tasks),
 		integration: structuredClone(state.integration),
 		budget: complexBudget(run, state.plan),
@@ -253,27 +315,35 @@ export function projectComplexExecution(
 }
 
 export interface ComplexSettlement {
-	/** Terminal status of the current (active) task row. */
+	/** Run-level terminal status and closed failure code: the first failure in plan order, or the stop cause. */
 	taskStatus: "BLOCKED" | "FAILED" | "CANCELLED" | "INTERRUPTED";
 	failureCode: ComplexFailureCode;
-	/** User cancellation: never-started rows are CANCELLED instead of BLOCKED. */
+	/**
+	 * Rows (by task ID) whose own failure stopped the Run, each keeping its own status and code (§4 rule 8). When
+	 * present, every other started unfinished row is a stopped sibling: BLOCKED/RUN_STOPPED, or CANCELLED on a user
+	 * cancel. When absent, every started unfinished row takes `taskStatus`/`failureCode` (a Run-level stop).
+	 */
+	failures?: Readonly<Record<string, { status: "BLOCKED" | "FAILED"; failureCode: ComplexFailureCode }>>;
+	/** User cancellation: never-started rows and stopped siblings are CANCELLED instead of BLOCKED. */
 	cancelled: boolean;
 	/** Owner loss (recovery): every unfinished row is INTERRUPTED. */
 	ownerLost: boolean;
 	cleanup: "CONFIRMED" | "UNCONFIRMED";
 	partialChanges: boolean;
 	changesUnknown: boolean;
-	/** Honest current-task facts from the final safe capture, when one exists. */
-	activeRow?: Pick<ComplexTaskState, "changedFiles" | "changesUnknown">;
+	/** Honest facts of started rows (by task ID) from the final safe capture, when one exists. */
+	rows?: Readonly<Record<string, Pick<ComplexTaskState, "changedFiles" | "changesUnknown">>>;
 }
 
 const settleGate = <T extends CheckGate | ReviewGate>(gate: T): T | "UNAVAILABLE" =>
 	gate === "RUNNING" ? "UNAVAILABLE" : gate;
 
 /**
- * Terminal settlement (§7.1, §9): the active row takes the terminal status and closed failure code, earlier
- * COMPLETED rows stay untouched, never-started rows become BLOCKED (RUN_STOPPED or DEPENDENCY_NOT_COMPLETED),
- * CANCELLED on user cancel or INTERRUPTED on owner loss, and no gate is left RUNNING (never a fabricated verdict).
+ * Terminal settlement (§7.1, §9; V0.8A §4 rule 8, §6): COMPLETED rows stay untouched; every started unfinished row
+ * ends with its own failure, as a stopped sibling (BLOCKED/RUN_STOPPED, CANCELLED on cancel, HANDED_OFF rows keeping
+ * their attempt data) or INTERRUPTED on owner loss; never-started rows become BLOCKED (RUN_STOPPED when they were
+ * ready, else DEPENDENCY_NOT_COMPLETED), CANCELLED or INTERRUPTED; no gate is left RUNNING (never a fabricated
+ * verdict) and no row stays active.
  */
 export function settleComplexState(state: ComplexRunState, settlement: ComplexSettlement): ComplexRunState {
 	const next = structuredClone(state);
@@ -285,22 +355,35 @@ export function settleComplexState(state: ComplexRunState, settlement: ComplexSe
 		row.review = settleGate(row.review);
 		row.test = settleGate(row.test);
 		if (row.status === "PENDING") {
-			const earlier = next.tasks.slice(0, index).every((before) => before.status === "COMPLETED");
+			const ready = taskReady(state.plan, state.tasks, index);
 			row.status = settlement.ownerLost ? "INTERRUPTED" : settlement.cancelled ? "CANCELLED" : "BLOCKED";
 			row.failureCode = settlement.ownerLost
 				? "OWNER_LOST"
 				: settlement.cancelled
 					? "CANCELLED"
-					: earlier
+					: ready
 						? "RUN_STOPPED"
 						: "DEPENDENCY_NOT_COMPLETED";
 			continue;
 		}
-		row.status = settlement.ownerLost ? "INTERRUPTED" : settlement.taskStatus;
-		row.failureCode = settlement.ownerLost ? "OWNER_LOST" : settlement.failureCode;
-		if (settlement.activeRow) {
-			row.changedFiles = [...settlement.activeRow.changedFiles];
-			row.changesUnknown ||= settlement.activeRow.changesUnknown;
+		const own = settlement.failures?.[row.id];
+		if (settlement.ownerLost) {
+			row.status = "INTERRUPTED";
+			row.failureCode = "OWNER_LOST";
+		} else if (own) {
+			row.status = own.status;
+			row.failureCode = own.failureCode;
+		} else if (settlement.failures) {
+			row.status = settlement.cancelled ? "CANCELLED" : "BLOCKED";
+			row.failureCode = settlement.cancelled ? "CANCELLED" : "RUN_STOPPED";
+		} else {
+			row.status = settlement.taskStatus;
+			row.failureCode = settlement.failureCode;
+		}
+		const facts = settlement.rows?.[row.id];
+		if (facts) {
+			row.changedFiles = [...facts.changedFiles];
+			row.changesUnknown ||= facts.changesUnknown;
 		}
 		// attempt>0 always carries an entry capture, a failure code or an unknown-change flag.
 		if (row.attempt > 0 && row.entryWorkspaceDigest === null) row.changesUnknown = true;
@@ -311,7 +394,9 @@ export function settleComplexState(state: ComplexRunState, settlement: ComplexSe
 	if (integrationPhase && next.tasks.every((row) => row.status === "COMPLETED"))
 		next.integration.failureCode = settlement.ownerLost ? "OWNER_LOST" : settlement.failureCode;
 	next.phase = "TERMINAL";
-	next.activeTaskId = null;
+	// A historical V0.7B state keeps its own active-task field; v2 states list no active row once terminal.
+	if (next.activeTaskIds) next.activeTaskIds = [];
+	else next.activeTaskId = null;
 	next.cleanup = settlement.cleanup;
 	next.partialChanges = settlement.partialChanges || settlement.changesUnknown;
 	next.changesUnknown = settlement.changesUnknown;
@@ -325,9 +410,11 @@ const sum = (values: readonly number[]) => values.reduce((total, value) => total
 
 function rowError(
 	row: ComplexTaskState,
-	task: ComplexPlan["tasks"][number] | undefined,
-	earlier: readonly ComplexTaskState[],
+	plan: FrozenComplexPlan,
+	rows: readonly ComplexTaskState[],
+	index: number,
 ): string | undefined {
+	const task = plan.tasks[index];
 	if (!task || row.id !== task.id) return "rows must match the plan tasks in order";
 	if (row.status === "PENDING")
 		return JSON.stringify(row) === JSON.stringify(pendingTaskState(row.id))
@@ -350,11 +437,19 @@ function rowError(
 	)
 		return `${row.id} changed files must be unique sorted claims of the task`;
 	if (!ordered(row.selfCheck, row.review, row.test)) return `${row.id} gates ran out of order`;
+	// v2 rule 2: declared dependencies COMPLETED; maxParallel 1 (and v1): every earlier row COMPLETED.
+	if ((ACTIVE_TASK_STATUSES.has(row.status) || row.status === "COMPLETED") && !taskReady(plan, rows, index))
+		return `${row.id} is active or completed before ${planMaxParallel(plan) === 1 ? "an earlier task" : "a dependency"} completed`;
+	// v2 rule 5: implemented with an entry capture, every gate still waiting for its verification turn.
 	if (
-		(ACTIVE_TASK_STATUSES.has(row.status) || row.status === "COMPLETED") &&
-		earlier.some((item) => item.status !== "COMPLETED")
+		row.status === "HANDED_OFF" &&
+		(row.attempt < 1 ||
+			row.entryWorkspaceDigest === null ||
+			row.selfCheck !== "NOT_RUN" ||
+			row.review !== "NOT_RUN" ||
+			row.test !== "NOT_RUN")
 	)
-		return `${row.id} is active or completed before an earlier task completed`;
+		return `${row.id} HANDED_OFF without an attempt, an entry capture and NOT_RUN gates`;
 	if (
 		row.status === "COMPLETED" &&
 		(row.attempt < 1 ||
@@ -369,7 +464,41 @@ function rowError(
 	return undefined;
 }
 
-function contextError(run: Run, plan: ComplexPlan | undefined): string | undefined {
+/**
+ * v2 consumer rules 1, 3 and 4 with the atomic-save amendment (PARALLEL_AGENTS.md §8): `activeTaskIds` lists exactly
+ * the active rows in plan order within `maxParallel`; first-attempt implementation (IMPLEMENTING attempt 1 or
+ * WAITING_APPROVAL) coexists only with HANDED_OFF rows; exactly one verification-state row (a stage, or a revising
+ * IMPLEMENTING attempt ≥ 2) coexists only with HANDED_OFF rows; otherwise the active rows are all ELIGIBLE (a formed
+ * wave) or all HANDED_OFF/STOPPING (a joined wave, or a stop before its terminal save).
+ */
+function activeRowsError(state: ComplexRunState, maxParallel: number): string | undefined {
+	const active = state.tasks.filter((row) => ACTIVE_TASK_STATUSES.has(row.status));
+	if (capabilityJson(state.activeTaskIds ?? null) !== capabilityJson(active.map((row) => row.id)))
+		return "activeTaskIds must list exactly the active rows in plan order";
+	if (active.length > maxParallel) return "More active rows than the frozen maxParallel";
+	const verifying = active.filter(
+		(row) => VERIFYING_TASK_STATUSES.has(row.status) || (row.status === "IMPLEMENTING" && row.attempt >= 2),
+	);
+	const implementing = active.filter(
+		(row) => row.status === "WAITING_APPROVAL" || (row.status === "IMPLEMENTING" && row.attempt < 2),
+	);
+	const beside = (working: readonly ComplexTaskState[]) =>
+		active.every((row) => working.includes(row) || row.status === "HANDED_OFF");
+	if (implementing.length && (verifying.length || !beside(implementing)))
+		return "Implementing rows coexist only with HANDED_OFF rows, never with verification";
+	if (verifying.length && (verifying.length > 1 || !beside(verifying)))
+		return "Exactly one row verifies at a time, beside HANDED_OFF rows only";
+	if (
+		!implementing.length &&
+		!verifying.length &&
+		!active.every((row) => row.status === "ELIGIBLE") &&
+		!active.every((row) => row.status === "HANDED_OFF" || row.status === "STOPPING")
+	)
+		return "Idle active rows must all be ELIGIBLE, or all HANDED_OFF or STOPPING";
+	return undefined;
+}
+
+function contextError(run: Run, plan: FrozenComplexPlan | undefined): string | undefined {
 	const contexts: Array<ComplexEvidenceContext | undefined> = [
 		...run.verification.map((check) => check.complexContext),
 		...(run.handoff ? [run.handoff.complexContext] : []),
@@ -418,9 +547,10 @@ function contextError(run: Run, plan: ComplexPlan | undefined): string | undefin
 }
 
 /**
- * Durable COMPLEX invariants for one save (§10.1, §10.2 and the #17 consumer rules): plan/parent binding, exact rows,
- * one active task, phase/status agreement, gate order, one global budget, cleanup honesty, completion evidence and,
- * against the previous save, immutability and monotonic counters. Returns the first violation.
+ * Durable COMPLEX invariants for one save (§10.1, §10.2, the V0.8A §8 v2 consumer rules and Amendment A1): plan/parent
+ * binding, exact rows, wave coexistence of active rows, phase/status agreement, gate order, one global budget, cleanup
+ * honesty, completion evidence and, against the previous save, immutability and monotonic counters. A historical
+ * V0.7B state (v1 plan) keeps the V0.7B single-active-task rules. Returns the first violation.
  */
 export function complexRunError(run: Run, previous?: Run): string | undefined {
 	const state = run.complex;
@@ -446,12 +576,25 @@ export function complexRunError(run: Run, previous?: Run): string | undefined {
 	if ((parent.status === "completed") !== (run.status === "COMPLETED"))
 		return "Only final completion marks the parent";
 	if (state.tasks.length !== plan.tasks.length) return "Exactly one state row per plan task";
+	const legacy = plan.schemaVersion === 1;
+	if (
+		legacy ? state.activeTaskIds !== undefined || state.activeTaskId === undefined : state.activeTaskId !== undefined
+	)
+		return "The active-task field must match the frozen plan version";
+	if (legacy && state.tasks.some((row) => row.status === "HANDED_OFF"))
+		return "A historical V0.7B Run carries no HANDED_OFF row";
 	for (const [index, row] of state.tasks.entries()) {
-		const error = rowError(row, plan.tasks[index], state.tasks.slice(0, index));
+		const error = rowError(row, plan, state.tasks, index);
 		if (error) return error;
 	}
-	const active = state.tasks.filter((row) => ACTIVE_TASK_STATUSES.has(row.status));
-	if (active.length > 1 || state.activeTaskId !== (active[0]?.id ?? null)) return "At most one active task";
+	if (legacy) {
+		const active = state.tasks.filter((row) => ACTIVE_TASK_STATUSES.has(row.status));
+		if (active.length > 1 || state.activeTaskId !== (active[0]?.id ?? null)) return "At most one active task";
+	} else {
+		const error = activeRowsError(state, planMaxParallel(plan));
+		if (error) return error;
+	}
+	if (run.risk === "R3" && planMaxParallel(plan) !== 1) return "An R3 COMPLEX plan implements one task at a time";
 	if (state.tasks.some((row) => row.status === "WAITING_APPROVAL") && run.status !== "WAITING_APPROVAL")
 		return "A task waits for Approval only while the Run does";
 	if ((state.phase === "TERMINAL") !== isTerminalRun(run.status))

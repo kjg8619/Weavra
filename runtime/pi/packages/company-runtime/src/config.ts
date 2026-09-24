@@ -43,7 +43,9 @@ export const RuntimeConfigSchema = Type.Object(
 		agents: Type.Optional(
 			Type.Object(
 				{
-					max_parallel: Type.Optional(Type.Literal(1)),
+					// V0.8A: COMPLEX implementation waves of at most this many tasks (frozen into the plan); QUICK and
+					// STANDARD ignore it.
+					max_parallel: Type.Optional(Type.Integer({ minimum: 1, maximum: 4 })),
 					max_revision_cycles: Type.Optional(Type.Integer({ minimum: 0, maximum: 3 })),
 					worker_timeout_ms: Type.Optional(Type.Integer({ minimum: 10_000, maximum: 600_000 })),
 					// Task Context Pack (V0.5A): Host-selected advisory context. Opt-in and bounded only.
@@ -292,7 +294,7 @@ export function parseRuntimeConfig(source: string) {
 		models: value.models,
 		runtime: { workflow: value.runtime?.workflow ?? "adaptive" },
 		agents: {
-			max_parallel: 1 as const,
+			max_parallel: value.agents?.max_parallel ?? 1,
 			max_revision_cycles: value.agents?.max_revision_cycles ?? 1,
 			worker_timeout_ms: value.agents?.worker_timeout_ms ?? 180_000,
 			context_pack: { mode: value.agents?.context_pack?.mode ?? ("disabled" as const) },

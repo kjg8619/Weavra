@@ -12,28 +12,36 @@ import {
 	type ComplexPlanMaterial,
 	ComplexPlanSchema,
 	complexTaskId,
+	type FrozenComplexPlan,
 	type OwnershipClaim,
 } from "./complex-types.ts";
 import type { TaskContract } from "./contracts.ts";
 import { assertCriterionIdentity, taskContractDigest } from "./criterion-evidence.ts";
 
 /**
- * Frozen COMPLEX plan identity and binding (COMPLEX_SEQUENTIAL_WORKFLOW.md §4.2, §5.1): canonical digest, lexical
- * exact-file rule and the structural invariants shared by the Host compiler and the Kernel's admission, per-task
- * and completion guards. Pure and free of configuration, Policy and I/O so the Kernel import graph stays host-free.
+ * Frozen COMPLEX plan identity and binding (COMPLEX_SEQUENTIAL_WORKFLOW.md §4.2, §5.1; PARALLEL_AGENTS.md §3):
+ * canonical digest, lexical exact-file rule and the structural invariants shared by the Host compiler and the
+ * Kernel's admission, per-task and completion guards. Pure and free of configuration, Policy and I/O so the
+ * Kernel import graph stays host-free.
  */
-export const COMPLEX_PLAN_DIGEST_DOMAIN = "weavra-complex-plan-v1";
+export const COMPLEX_PLAN_DIGEST_DOMAIN = "weavra-complex-plan-v2";
+/** Historical V0.7B domain (Amendment A1): a v1 plan recomputes only in its own domain and is never re-digested. */
+export const COMPLEX_PLAN_V1_DIGEST_DOMAIN = "weavra-complex-plan-v1";
 
 function sameList(left: readonly string[], right: readonly string[]): boolean {
 	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-/** sha256 over canonical JSON `["weavra-complex-plan-v1", plan without complexPlanDigest]` (§4.2). Not a signature. */
-export function complexPlanDigest(plan: ComplexPlanMaterial): string {
+/**
+ * sha256 over canonical JSON `[domain, plan without complexPlanDigest]` (§4.2), in the plan's own version domain:
+ * `weavra-complex-plan-v2` for v2 plans, `weavra-complex-plan-v1` for historical v1 plans. Not a signature.
+ */
+export function complexPlanDigest(plan: ComplexPlanMaterial | FrozenComplexPlan): string {
 	const material: Record<string, unknown> = { ...plan };
 	delete material.complexPlanDigest;
+	const domain = plan.schemaVersion === 1 ? COMPLEX_PLAN_V1_DIGEST_DOMAIN : COMPLEX_PLAN_DIGEST_DOMAIN;
 	return `sha256:${createHash("sha256")
-		.update(capabilityJson([COMPLEX_PLAN_DIGEST_DOMAIN, material]), "utf8")
+		.update(capabilityJson([domain, material]), "utf8")
 		.digest("hex")}`;
 }
 
@@ -161,9 +169,12 @@ export function complexStructureError(
 	const deletions = claims.filter(({ claim }) => claim.operation === "delete");
 	if (
 		deletions.length &&
-		(claims.length !== 1 || deletions[0].taskId !== complexTaskId(1) || plan.limits.maxTotalRevisionCycles !== 0)
+		(claims.length !== 1 ||
+			deletions[0].taskId !== complexTaskId(1) ||
+			plan.limits.maxTotalRevisionCycles !== 0 ||
+			plan.limits.maxParallel !== 1)
 	)
-		return "A delete claim must be the plan's only claim, held by CT-001, with no revision cycles (single R3 deletion)";
+		return "A delete claim must be the plan's only claim, held by CT-001, with no revision cycles and maxParallel 1 (single R3 deletion)";
 	return undefined;
 }
 
@@ -205,8 +216,9 @@ export function assertComplexPlanBinding(
 		)
 	)
 		throw new ComplexPlanBindingError("PARENT_MISMATCH", "The parent is not a valid COMPLEX Task Contract");
+	// Only a v2 plan executes; a historical v1 plan is read-only history (Amendment A1).
 	if (!Check(ComplexPlanSchema, plan))
-		throw new ComplexPlanBindingError("PLAN_MISMATCH", "The plan does not match the closed COMPLEX plan schema");
+		throw new ComplexPlanBindingError("PLAN_MISMATCH", "The plan does not match the closed COMPLEX v2 plan schema");
 	if (plan.parentTaskId !== parent.id || plan.parentTaskContractDigest !== taskContractDigest(parent))
 		throw new ComplexPlanBindingError("PARENT_MISMATCH", "The plan is bound to a different parent Task Contract");
 	if (complexPlanDigest(plan) !== plan.complexPlanDigest)

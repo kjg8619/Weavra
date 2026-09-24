@@ -18,6 +18,7 @@ import {
 } from "./execution-contract.ts";
 import { CompanyKernel } from "./kernel.ts";
 import { LspManager } from "./lsp/manager.ts";
+import { serializedLspPort } from "./lsp/serial.ts";
 import type { LspServerStatus } from "./lsp/types.ts";
 import { formatRunView, type ObservationState } from "./observations.ts";
 import type { PolicyContext } from "./policy.ts";
@@ -257,6 +258,8 @@ export class StandardWorkflow {
 			const lspConfig = this.options.config.code_intelligence?.lsp;
 			if (lspConfig?.enabled) this.lsp = await LspManager.create(workspace.cwd, lspConfig, agents.policy);
 			const lsp = this.lsp;
+			// V0.8A: concurrent wave Developers share the one manager through a FIFO query port.
+			const workerLsp = lsp && complexPlan && complexPlan.limits.maxParallel > 1 ? serializedLspPort(lsp) : lsp;
 			// Disabled mode keeps the existing path untouched (no extra inspector, no context work).
 			const contextWorkspace = workspace;
 			const reviewerContext = this.options.config.review.context;
@@ -375,7 +378,7 @@ export class StandardWorkflow {
 									execute: (request) =>
 										agents.executor.execute({
 											...request,
-											...(this.lsp ? { lsp: this.lsp } : {}),
+											...(workerLsp ? { lsp: workerLsp } : {}),
 											...(advisoryChecks && request.role === "Developer" ? { advisoryChecks } : {}),
 										}),
 									get safeToRelease() {
@@ -389,7 +392,7 @@ export class StandardWorkflow {
 					approval: this.options.approval,
 					...(complexPlan
 						? {
-								// Stop/join before any COMPLEX terminal write: close code intelligence, then report each
+								// Stop/join before any COMPLEX terminal write (the Kernel already joined every wave worker): close code intelligence, then report each
 								// resource as confirmed stopped. A missing flag is unknown, never confirmed.
 								resources: {
 									settle: async () => {

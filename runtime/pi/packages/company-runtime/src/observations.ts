@@ -1,3 +1,4 @@
+import { activeTaskIdsOf, complexWaves, planMaxParallel } from "./complex-state.ts";
 import type { RuntimeConfig } from "./config.ts";
 import {
 	type CheckResult,
@@ -85,11 +86,12 @@ export function reviewRecords(run: Run): readonly ReviewRecord[] {
 
 const INTEGRATION_PHASES = new Set(["INTEGRATION_CHECK", "FINAL_REVIEW", "FINAL_TEST", "COMPLETING"]);
 
-/** Where the current COMPLEX step runs: the active task, the integration gate, or neither. */
+/** Where the current COMPLEX step runs: the active task(s) of the wave, the integration gate, or neither. */
 function complexScope(run: Run): string | undefined {
 	const state = run.complex;
 	if (!state) return undefined;
-	if (state.activeTaskId) return `task ${state.activeTaskId}`;
+	const active = activeTaskIdsOf(state);
+	if (active.length) return `${active.length > 1 ? "tasks" : "task"} ${active.join(", ")}`;
 	return INTEGRATION_PHASES.has(state.phase) ? "integration" : state.phase.toLowerCase().replace("_", " ");
 }
 
@@ -103,21 +105,24 @@ export function formatComplexRows(run: Run, detail: "status" | "history"): strin
 	if (!state || !parent) return [];
 	const plan = state.plan;
 	const failure = (code: string | null) => code ?? "none";
+	const waves = complexWaves(plan);
+	const wave = (id: string) => waves.findIndex((members) => members.includes(id)) + 1;
 	const lines = [
-		`COMPLEX parent ${displayText(parent.id)} [${parent.status}] | Run ${run.status} | phase ${state.phase} | active ${state.activeTaskId ?? "none"}`,
+		`COMPLEX parent ${displayText(parent.id)} [${parent.status}] | Run ${run.status} | phase ${state.phase} | active ${activeTaskIdsOf(state).join(", ") || "none"}`,
 	];
 	if (detail === "status")
 		lines.push(
-			`Plan ${displayText(plan.planId)} ${displayText(plan.complexPlanDigest)}; parent ${displayText(plan.parentTaskContractDigest)}`,
-			"Tasks in plan order (a COMPLETED task is a verified contribution, not Run completion):",
+			`Plan ${displayText(plan.planId)} ${displayText(plan.complexPlanDigest)}${plan.schemaVersion === 1 ? " (V0.7B v1)" : ""}; parent ${displayText(plan.parentTaskContractDigest)}`,
+			`Waves (at most ${planMaxParallel(plan)} implementing at once; verification one task at a time in plan order): ${waves.map((members, index) => `${index + 1}: ${members.join(", ")}`).join(" | ")}`,
+			"Tasks in plan order (HANDED_OFF waits for its verification turn; a COMPLETED task is a verified contribution, not Run completion):",
 		);
 	for (const [index, row] of state.tasks.entries()) {
 		const task = plan.tasks[index];
 		const title = displayText(task?.title ?? "untitled", 80);
 		lines.push(
 			detail === "history"
-				? `  ${row.id} ${row.status} | attempt ${row.attempt} | failure ${failure(row.failureCode)} | ${title}`
-				: `  ${row.id} ${row.status} | attempt ${row.attempt}, revisions ${row.revisionCycle}/${task?.maxRevisionCycles ?? "?"} | self-check ${row.selfCheck}, review ${row.review}, test ${row.test} | evidence ${row.evidenceFreshness} | changed ${row.changedFiles.length}${row.changesUnknown ? "+unknown" : ""}/${task?.ownership.length ?? 0} claimed | failure ${failure(row.failureCode)} | ${title}${task?.dependsOn.length ? ` | after ${task.dependsOn.join(", ")}` : ""}`,
+				? `  ${row.id} ${row.status} | wave ${wave(row.id)} | attempt ${row.attempt} | failure ${failure(row.failureCode)} | ${title}`
+				: `  ${row.id} ${row.status} | wave ${wave(row.id)} | attempt ${row.attempt}, revisions ${row.revisionCycle}/${task?.maxRevisionCycles ?? "?"} | self-check ${row.selfCheck}, review ${row.review}, test ${row.test} | evidence ${row.evidenceFreshness} | changed ${row.changedFiles.length}${row.changesUnknown ? "+unknown" : ""}/${task?.ownership.length ?? 0} claimed | failure ${failure(row.failureCode)} | ${title}${task?.dependsOn.length ? ` | after ${task.dependsOn.join(", ")}` : ""}`,
 		);
 	}
 	const integration = state.integration;

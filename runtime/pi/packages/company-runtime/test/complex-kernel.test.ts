@@ -108,7 +108,7 @@ describe("COMPLEX positive controls", () => {
 		expect(run.status, run.lastError ?? "").toBe("COMPLETED");
 		expect(run.complex).toMatchObject({
 			phase: "TERMINAL",
-			activeTaskId: null,
+			activeTaskIds: [],
 			cleanup: "CONFIRMED",
 			partialChanges: false,
 			changesUnknown: false,
@@ -491,7 +491,7 @@ describe("COMPLEX integration, completion and guards (C08, C09, C11, C30, C36, C
 		expect(() =>
 			assertCanCompleteComplex({
 				run,
-				plan: run.complex!.plan,
+				plan: h.request().complexPlan!,
 				checks: h.checks,
 				liveDigest: h.files.digest,
 				liveChangedFiles: [],

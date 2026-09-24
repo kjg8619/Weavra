@@ -7,11 +7,13 @@ const MAX_ACCEPTANCE_CRITERIA = 16;
 const MAX_ACCEPTANCE_STATEMENT_LENGTH = 500;
 
 /**
- * V0.7B COMPLEX contract v1 (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md §4, §7.1, §9, §10.2).
- * Closed wire/data shapes and their bounds only. A plan is Host-compiled proposal data bound to one frozen
- * parent Task Contract; it never grants Policy, Approval, verification or completion authority.
+ * COMPLEX contract v2 (V0.8A, docs/architecture/PARALLEL_AGENTS.md §3, §8) over the V0.7B contract
+ * (docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md §4, §7.1, §9, §10.2): implementation waves of at most
+ * `limits.maxParallel` tasks, the HANDED_OFF status and `activeTaskIds`. Closed wire/data shapes and their bounds
+ * only. A plan is Host-compiled proposal data bound to one frozen parent Task Contract; it never grants Policy,
+ * Approval, verification or completion authority. This Runtime emits exactly contract version 2.
  */
-export const COMPLEX_CONTRACT_VERSION = 1;
+export const COMPLEX_CONTRACT_VERSION = 2;
 export const COMPLEX_MIN_TASKS = 2;
 export const COMPLEX_MAX_TASKS = 8;
 export const COMPLEX_TITLE_MAX_LENGTH = 80;
@@ -31,6 +33,8 @@ export const COMPLEX_MAX_WORKER_INVOCATIONS = 24;
 export const COMPLEX_MAX_REPORTED_TOKENS = 200000;
 export const COMPLEX_MAX_LOCAL_REVISION_CYCLES = 2;
 export const COMPLEX_MAX_TOTAL_REVISION_CYCLES = 3;
+/** V0.8A: at most this many tasks implement at once in one wave (the frozen `limits.maxParallel`). */
+export const COMPLEX_MAX_PARALLEL = 4;
 /** attempt = local revisionCycle + 1 after activation. */
 export const COMPLEX_MAX_TASK_ATTEMPTS = COMPLEX_MAX_LOCAL_REVISION_CYCLES + 1;
 /** One Developer and one Reviewer per task attempt. */
@@ -48,6 +52,8 @@ export const COMPLEX_TASK_STATUSES = [
 	"ELIGIBLE",
 	"IMPLEMENTING",
 	"WAITING_APPROVAL",
+	/** V0.8A: implemented with a valid handoff, waiting for its verification turn. */
+	"HANDED_OFF",
 	"SELF_CHECK",
 	"REVIEW",
 	"TEST",
@@ -174,13 +180,15 @@ export const ComplexTaskSchema = Type.Object(
 );
 export type ComplexTask = Static<typeof ComplexTaskSchema>;
 
-const complexPlanFields = {
-	schemaVersion: Type.Literal(1),
+const complexPlanIdentity = {
 	/** Runtime-issued canonical lowercase UUID. */
 	planId: Type.String({ pattern: COMPLEX_PLAN_ID_PATTERN }),
 	parentTaskId: identifier,
 	parentTaskContractDigest: digest,
-	/** Array order is execution order, not a scheduling hint. */
+	/**
+	 * Array order is the deterministic tie-break. Declared dependencies (earlier rows only) decide which tasks may
+	 * implement together; with `maxParallel = 1` every earlier row must be COMPLETED first (the V0.7B order).
+	 */
 	tasks: Type.Array(ComplexTaskSchema, { minItems: COMPLEX_MIN_TASKS, maxItems: COMPLEX_MAX_TASKS }),
 	integration: Type.Object(
 		{
@@ -191,12 +199,21 @@ const complexPlanFields = {
 		},
 		strict,
 	),
+};
+const complexPlanLimits = {
+	maxTasks: Type.Literal(COMPLEX_MAX_TASKS),
+	maxWorkerInvocations: Type.Integer({ minimum: 1, maximum: COMPLEX_MAX_WORKER_INVOCATIONS }),
+	maxReportedTokens: Type.Integer({ minimum: 1, maximum: COMPLEX_MAX_REPORTED_TOKENS }),
+	maxTotalRevisionCycles: Type.Integer({ minimum: 0, maximum: COMPLEX_MAX_TOTAL_REVISION_CYCLES }),
+};
+const complexPlanFields = {
+	schemaVersion: Type.Literal(2),
+	...complexPlanIdentity,
 	limits: Type.Object(
 		{
-			maxTasks: Type.Literal(COMPLEX_MAX_TASKS),
-			maxWorkerInvocations: Type.Integer({ minimum: 1, maximum: COMPLEX_MAX_WORKER_INVOCATIONS }),
-			maxReportedTokens: Type.Integer({ minimum: 1, maximum: COMPLEX_MAX_REPORTED_TOKENS }),
-			maxTotalRevisionCycles: Type.Integer({ minimum: 0, maximum: COMPLEX_MAX_TOTAL_REVISION_CYCLES }),
+			...complexPlanLimits,
+			/** Frozen `min(agents.max_parallel, 4)`; R3 plans freeze 1. */
+			maxParallel: Type.Integer({ minimum: 1, maximum: COMPLEX_MAX_PARALLEL }),
 		},
 		strict,
 	),
@@ -204,9 +221,25 @@ const complexPlanFields = {
 /** Digest material: every plan field except `complexPlanDigest`. */
 export const ComplexPlanMaterialSchema = Type.Object(complexPlanFields, strict);
 export type ComplexPlanMaterial = Static<typeof ComplexPlanMaterialSchema>;
-/** Immutable Host-compiled plan. Its digest is not a signature and authorizes nothing. */
+/** Immutable Host-compiled plan (v2). Its digest is not a signature and authorizes nothing. */
 export const ComplexPlanSchema = Type.Object({ ...complexPlanFields, complexPlanDigest: digest }, strict);
 export type ComplexPlan = Static<typeof ComplexPlanSchema>;
+/**
+ * Historical V0.7B plan (v1): read-only durable history of a Run created before V0.8A (Amendment A1). Kept byte
+ * for byte with its own `weavra-complex-plan-v1` digest; never compiled, executed, rewritten or re-digested.
+ */
+export const ComplexPlanV1Schema = Type.Object(
+	{
+		schemaVersion: Type.Literal(1),
+		...complexPlanIdentity,
+		limits: Type.Object(complexPlanLimits, strict),
+		complexPlanDigest: digest,
+	},
+	strict,
+);
+export type ComplexPlanV1 = Static<typeof ComplexPlanV1Schema>;
+/** A frozen plan of either version as stored or projected; only v2 plans are compiled and executed. */
+export type FrozenComplexPlan = ComplexPlan | ComplexPlanV1;
 
 export const ComplexTaskStatusSchema = Type.Enum(COMPLEX_TASK_STATUSES);
 export type ComplexTaskStatus = Static<typeof ComplexTaskStatusSchema>;
@@ -309,9 +342,13 @@ export type ComplexBinding = Static<typeof ComplexBindingSchema>;
  */
 export const ComplexRunStateSchema = Type.Object(
 	{
-		plan: ComplexPlanSchema,
+		/** The frozen plan exactly as confirmed: v2, or v1 on a historical V0.7B Run (never rewritten). */
+		plan: Type.Union([ComplexPlanSchema, ComplexPlanV1Schema]),
 		phase: ComplexPhaseSchema,
-		activeTaskId: Type.Union([taskId, Type.Null()]),
+		/** v2: every active row, in plan order, at most `maxParallel`. Absent only on a historical V0.7B Run. */
+		activeTaskIds: Type.Optional(Type.Array(taskId, { maxItems: COMPLEX_MAX_PARALLEL, uniqueItems: true })),
+		/** The historical V0.7B (v1 plan) field; a v2 Run never writes it. */
+		activeTaskId: Type.Optional(Type.Union([taskId, Type.Null()])),
 		/** Exactly one row per plan task, in plan order. */
 		tasks: Type.Array(ComplexTaskStateSchema, { minItems: COMPLEX_MIN_TASKS, maxItems: COMPLEX_MAX_TASKS }),
 		integration: ComplexIntegrationSchema,
@@ -365,20 +402,22 @@ export const ComplexParentSchema = Type.Object(
 export type ComplexParent = Static<typeof ComplexParentSchema>;
 
 /**
- * Opt-in Host Control execution projection (§10.2), present iff the latest canonical Run is COMPLEX. The outer
- * canonical Run snapshot stays the final status authority; this DTO adds no outcome enum that could disagree.
+ * Opt-in Host Control execution projection (§10.2; v2 per PARALLEL_AGENTS.md §8), present iff the latest canonical
+ * Run is COMPLEX. The outer canonical Run snapshot stays the final status authority; this DTO adds no outcome enum
+ * that could disagree. A v1 plan appears only on a terminal historical V0.7B Run (Amendment A1).
  */
 export const ComplexExecutionSchema = Type.Object(
 	{
-		schemaVersion: Type.Literal(1),
+		schemaVersion: Type.Literal(2),
 		ownerId: identifier,
 		projectRevision: safeCounter,
 		runId: identifier,
 		stateRevision: safeCounter,
 		parent: ComplexParentSchema,
-		plan: ComplexPlanSchema,
+		plan: Type.Union([ComplexPlanSchema, ComplexPlanV1Schema]),
 		phase: ComplexPhaseSchema,
-		activeTaskId: Type.Union([taskId, Type.Null()]),
+		/** Every active row in plan order (≤ maxParallel); empty during integration and at TERMINAL. */
+		activeTaskIds: Type.Array(taskId, { maxItems: COMPLEX_MAX_PARALLEL, uniqueItems: true }),
 		tasks: Type.Array(ComplexTaskStateSchema, { minItems: COMPLEX_MIN_TASKS, maxItems: COMPLEX_MAX_TASKS }),
 		integration: ComplexIntegrationSchema,
 		budget: Type.Object(

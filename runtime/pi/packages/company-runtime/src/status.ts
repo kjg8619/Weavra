@@ -1,3 +1,4 @@
+import { activeTaskIdsOf } from "./complex-state.ts";
 import type { Run } from "./contracts.ts";
 
 /** Display only. `live` means this Host still owns the awaited workflow, never a stored status/lock guess. */
@@ -7,9 +8,15 @@ export function formatWeavraStatus(run: Run | undefined, live: boolean, error?: 
 	if (error && error !== run.lastError) return "Weavra · ATTENTION · /state";
 	if (!["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(run.status)) return `Weavra · ${run.status}`;
 	if (!live) return "Weavra · UNCONFIRMED · /state";
-	// COMPLEX: where the current step runs (the active task or the integration stage); never one task as the Run.
+	// COMPLEX: where the current step runs (the wave's active tasks or the integration stage); never one task as
+	// the Run.
+	const active = run.complex ? activeTaskIdsOf(run.complex) : [];
 	const scope = run.complex
-		? (run.complex.activeTaskId ?? (run.complex.phase === "TASK_SEQUENCE" ? undefined : run.complex.phase))
+		? active.length
+			? active.join("+")
+			: run.complex.phase === "TASK_SEQUENCE"
+				? undefined
+				: run.complex.phase
 		: undefined;
 	return [
 		"Weavra",

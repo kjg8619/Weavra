@@ -222,7 +222,9 @@ describe("Host workflow preparation for COMPLEX (#16 stage A)", () => {
 			maxWorkerInvocations: 24,
 			maxReportedTokens: 200000,
 			maxTotalRevisionCycles: 2,
+			maxParallel: 1,
 		});
+		expect(complex.schemaVersion).toBe(2);
 		expect(plan.preview).toMatchObject({ workflow: "COMPLEX", complexPlan: complex });
 		const text = formatPlanPreview(plan.preview);
 		for (const line of [

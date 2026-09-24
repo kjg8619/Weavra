@@ -16,6 +16,7 @@ import { LspClient } from "../src/lsp/client.ts";
 import { lspPosition } from "../src/lsp/files.ts";
 import { inspectLspServers, LspManager } from "../src/lsp/manager.ts";
 import { encodeMessage, LspFramer, MAX_BUFFER_BYTES } from "../src/lsp/protocol.ts";
+import { serializedLspPort } from "../src/lsp/serial.ts";
 import type { LspConfig } from "../src/lsp/types.ts";
 import type { PolicyContext } from "../src/policy.ts";
 
@@ -309,6 +310,30 @@ describe("run-scoped real stdio LSP", () => {
 		await rejected;
 		expect(lsp.safeToRelease).toBe(true);
 		expect(events().filter((event) => event.event === "start")).toHaveLength(1);
+	});
+	it("V0.8A: a serialized port queues concurrent wave queries on the one manager instead of failing", async () => {
+		const lsp = await manager();
+		const shared = serializedLspPort(lsp);
+		const [diagnostics, symbols, references] = await Promise.all([
+			shared.diagnostics(request),
+			shared.symbols(request),
+			shared.references(request),
+		]);
+		expect(diagnostics.status).toBe("AVAILABLE");
+		expect(symbols.symbols.map((item) => item.name)).toEqual(["inner", "漢字"]);
+		expect(references.locations).toHaveLength(1);
+		// One server answered them one at a time, in request order.
+		expect(events().filter((event) => event.event === "start")).toHaveLength(1);
+		expect(
+			events()
+				.map((event) => event.event)
+				.filter((name) => String(name).startsWith("textDocument/")),
+		).toEqual(
+			expect.arrayContaining(["textDocument/diagnostic", "textDocument/documentSymbol", "textDocument/references"]),
+		);
+		expect(shared.safeToRelease).toBe(lsp.safeToRelease);
+		await shared.close();
+		await expect(shared.symbols(request)).rejects.toThrow("closed");
 	});
 	it("close cancels an active request and refuses parallel query growth", async () => {
 		const lsp = await manager("request-timeout");

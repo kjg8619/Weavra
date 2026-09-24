@@ -753,8 +753,8 @@ export class HostControlBridge {
 					previewTtlMs: HOST_CONTROL_PREVIEW_TTL_MS,
 					runtimeVersion: runtimePackage.version,
 					readiness: this.options.readiness ?? "READY",
-					// §10.3: this Runtime implements COMPLEX contract v1 and always says so. Advertisement is not
-					// readiness, authority or permission to execute.
+					// §10.3 / V0.8A §8: this Runtime implements exactly COMPLEX contract v2 (implementation waves) and
+					// always says so. Advertisement is not readiness, authority or permission to execute.
 					complexContractVersion: COMPLEX_CONTRACT_VERSION,
 					recipes: listTaskRecipes().map(({ id, version, title }) => ({
 						id,

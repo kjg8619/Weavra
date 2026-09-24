@@ -1,12 +1,14 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { classifyRequest } from "../src/classification.ts";
+import { complexPlanDigest } from "../src/complex-plan.ts";
 import type { PolicyDecision, Run } from "../src/contracts.ts";
 import type { RuntimeEvent } from "../src/events.ts";
 import { CompanyKernel } from "../src/kernel.ts";
 import { FileStateStore, type FileStateStoreOptions, StateStoreError } from "../src/state-store.ts";
+import { complexConsumerIssues, observeDurableRun } from "./complex-conformance.ts";
 import {
 	type ComplexTaskSpec,
 	complexHarness,
@@ -121,7 +123,13 @@ describe("durable COMPLEX runs", () => {
 		[
 			"active task identity",
 			(run: Run) => {
-				run.complex!.activeTaskId = null;
+				run.complex!.activeTaskIds = [];
+			},
+		],
+		[
+			"a V0.7B active-task field on a v2 Run",
+			(run: Run) => {
+				run.complex!.activeTaskId = "CT-002";
 			},
 		],
 		[
@@ -149,7 +157,7 @@ describe("durable COMPLEX runs", () => {
 			(run: Run) => {
 				run.status = "COMPLETED";
 				run.complex!.phase = "TERMINAL";
-				run.complex!.activeTaskId = null;
+				run.complex!.activeTaskIds = [];
 				run.complex!.tasks[1].status = "COMPLETED";
 				run.tasks[0].status = "completed";
 			},
@@ -272,7 +280,7 @@ describe("COMPLEX recovery after owner loss (B7)", () => {
 		expect(run.status).toBe("INTERRUPTED");
 		expect(run.complex).toMatchObject({
 			phase: "TERMINAL",
-			activeTaskId: null,
+			activeTaskIds: [],
 			cleanup: "UNCONFIRMED",
 			failureCode: "OWNER_LOST",
 			partialChanges: true,
@@ -294,6 +302,45 @@ describe("COMPLEX recovery after owner loss (B7)", () => {
 		const again: RuntimeEvent[] = [];
 		await openStore({ events: { emit: (event) => void again.push(event) } });
 		expect(again).toEqual([]);
+	});
+
+	it("Amendment A1: opens a V0.7B COMPLEX Run, settles it with its own fields and projects its frozen v1 plan", async () => {
+		const { store, kernel } = await durable();
+		await driveComplex(kernel, (run) => run.complex?.tasks[1].status === "ELIGIBLE");
+		await store.close();
+		// The same Run in the exact V0.7B durable shape: a v1 plan with its own digest and `activeTaskId`.
+		const path = join(root, ".ai", "state.json");
+		const state = JSON.parse(await readFile(path, "utf8"));
+		const { complexPlanDigest: v2Digest, ...material } = state.runs[0].complex.plan;
+		const { maxParallel: _bound, ...limits } = material.limits;
+		const historical = { ...material, schemaVersion: 1, limits };
+		const v1Digest = complexPlanDigest(historical);
+		const legacy = JSON.parse(JSON.stringify(state.runs[0]).split(v2Digest).join(v1Digest));
+		legacy.complex.plan = { ...historical, complexPlanDigest: v1Digest };
+		delete legacy.complex.activeTaskIds;
+		legacy.complex.activeTaskId = "CT-002";
+		state.runs[0] = legacy;
+		await writeFile(path, `${JSON.stringify(state, null, 2)}\n`);
+		// A v2 writer loads it, recovers it as owner-lost with its own V0.7B field and never rewrites the plan.
+		const recovered = await openStore();
+		const settled = recovered.snapshot.runs[0];
+		expect(settled.status).toBe("INTERRUPTED");
+		expect(settled.complex?.plan).toEqual(legacy.complex.plan);
+		expect(settled.complex).toMatchObject({ phase: "TERMINAL", activeTaskId: null, failureCode: "OWNER_LOST" });
+		expect(settled.complex?.activeTaskIds).toBeUndefined();
+		expect(settled.complex?.tasks.map((row) => [row.status, row.failureCode])).toEqual([
+			["COMPLETED", null],
+			["INTERRUPTED", "OWNER_LOST"],
+		]);
+		// The terminal historical Run projects as a v2 execution carrying the frozen v1 plan unchanged.
+		const { observation, issues } = observeDurableRun(settled, { ownerId: "owner-1", projectRevision: 1 });
+		expect(issues).toEqual([]);
+		expect(observation.state.complexExecution).toMatchObject({
+			schemaVersion: 2,
+			activeTaskIds: [],
+			plan: { schemaVersion: 1, complexPlanDigest: v1Digest },
+		});
+		expect(complexConsumerIssues(observation)).toEqual([]);
 	});
 
 	it("settles a gate that was RUNNING when the owner was lost as UNAVAILABLE", async () => {

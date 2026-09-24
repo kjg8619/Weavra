@@ -309,6 +309,8 @@ export async function createHostWorkflow(options: CreateHostWorkflowOptions): Pr
 				quickScope,
 				r2RunId,
 				r3Scope,
+				// V0.8A: a COMPLEX wave runs up to its frozen maxParallel Developers at once; otherwise one worker.
+				maxConcurrentWorkers: complexPlan?.limits.maxParallel ?? 1,
 			});
 			return { executor, policy: executor.policyContext };
 		},

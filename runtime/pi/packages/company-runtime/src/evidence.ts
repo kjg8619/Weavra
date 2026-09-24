@@ -1,5 +1,5 @@
 import type { BrowserVerificationEvidence } from "./browser-types.ts";
-import { complexBudget } from "./complex-state.ts";
+import { activeTaskIdsOf, complexBudget, complexWaves, planMaxParallel } from "./complex-state.ts";
 import type {
 	CheckGate,
 	CleanupStatus,
@@ -58,14 +58,26 @@ export interface EvidenceComplexSummary {
 	plan: {
 		id: string;
 		digest: string;
-		limits: { maxWorkerInvocations: number; maxReportedTokens: number; maxTotalRevisionCycles: number };
+		/** 2 for V0.8A plans; 1 only on a historical V0.7B Run (sequential, maxParallel 1). */
+		schemaVersion: 1 | 2;
+		limits: {
+			maxWorkerInvocations: number;
+			maxReportedTokens: number;
+			maxTotalRevisionCycles: number;
+			maxParallel: number;
+		};
 	};
 	phase: ComplexPhase;
-	activeTaskId: string | null;
+	/** Every active row in plan order (V0.8A); empty during integration and at TERMINAL. */
+	activeTaskIds: string[];
+	/** The plan's implementation waves in order: tasks listed together may implement concurrently. */
+	waves: string[][];
 	tasks: Array<{
 		id: string;
 		title: string;
 		status: ComplexTaskStatus;
+		/** 1-based implementation wave of this task. */
+		wave: number;
 		dependsOn: string[];
 		claims: Array<{ path: string; operation: OwnershipOperation }>;
 		attempt: number;
@@ -262,25 +274,30 @@ function complexSummary(run: Run): EvidenceComplexSummary | undefined {
 		records.find((item) => item.complexContext.taskId === taskId && item.complexContext.attempt === attempt);
 	const integration = record(null, 1);
 	const budget = complexBudget(run, plan);
+	const waves = complexWaves(plan);
 	return {
 		parent: { id: parent.id, digest: plan.parentTaskContractDigest, status: parent.status },
 		plan: {
 			id: plan.planId,
 			digest: plan.complexPlanDigest,
+			schemaVersion: plan.schemaVersion,
 			limits: {
 				maxWorkerInvocations: plan.limits.maxWorkerInvocations,
 				maxReportedTokens: plan.limits.maxReportedTokens,
 				maxTotalRevisionCycles: plan.limits.maxTotalRevisionCycles,
+				maxParallel: planMaxParallel(plan),
 			},
 		},
 		phase: state.phase,
-		activeTaskId: state.activeTaskId,
+		activeTaskIds: activeTaskIdsOf(state),
+		waves,
 		tasks: state.tasks.map((row, index) => {
 			const task = plan.tasks[index];
 			return {
 				id: row.id,
 				title: task?.title ?? "",
 				status: row.status,
+				wave: waves.findIndex((wave) => wave.includes(row.id)) + 1,
 				dependsOn: [...(task?.dependsOn ?? [])],
 				claims: (task?.ownership ?? []).map((claim) => ({ path: claim.path, operation: claim.operation })),
 				attempt: row.attempt,
@@ -580,12 +597,13 @@ function formatComplexSummary(complex: EvidenceComplexSummary): string[] {
 	const change = (paths: readonly string[], digest: string | null, changesUnknown = false) =>
 		`${files(paths)}${changesUnknown ? " + UNKNOWN" : ""} (${digest ?? "digest UNKNOWN"})`;
 	const lines = [
-		`COMPLEX parent ${displayText(complex.parent.id)} ${complex.parent.digest} [${complex.parent.status}]; plan ${complex.plan.id} ${complex.plan.digest}; phase ${complex.phase}; active ${complex.activeTaskId ?? "none"}`,
+		`COMPLEX parent ${displayText(complex.parent.id)} ${complex.parent.digest} [${complex.parent.status}]; plan ${complex.plan.id} ${complex.plan.digest}${complex.plan.schemaVersion === 1 ? " (V0.7B v1)" : ""}; phase ${complex.phase}; active ${complex.activeTaskIds.join(", ") || "none"}`,
+		`  Waves (max ${complex.plan.limits.maxParallel} implementing at once; verification one task at a time in plan order): ${complex.waves.map((wave, index) => `${index + 1}: ${wave.join(", ")}`).join(" | ")}`,
 		"  A task COMPLETED is a verified contribution at its own workspace, not Run completion; the Run status is the outcome.",
 	];
 	for (const task of complex.tasks)
 		lines.push(
-			`  ${task.id} ${task.status} | ${displayText(task.title, 80)} | after ${task.dependsOn.join(", ") || "none"} | claims ${task.claims.map((claim) => `${claim.operation} ${displayText(claim.path)}`).join(", ") || "none (read-only)"}`,
+			`  ${task.id} ${task.status} | wave ${task.wave} | ${displayText(task.title, 80)} | after ${task.dependsOn.join(", ") || "none"} | claims ${task.claims.map((claim) => `${claim.operation} ${displayText(claim.path)}`).join(", ") || "none (read-only)"}`,
 			`    attempt ${task.attempt}, revisions ${task.revisionCycle}/${task.maxRevisionCycles}, invocations ${task.workerInvocations}, reported tokens ${unknown(task.reportedTokens)} | changed ${change(task.changedFiles, task.changeDigest, task.changesUnknown)} | self-check ${task.selfCheck}, review ${task.review}, test ${task.test} | evidence ${task.evidenceFreshness} | failure ${task.failureCode ?? "none"}`,
 		);
 	const integration = complex.integration;
