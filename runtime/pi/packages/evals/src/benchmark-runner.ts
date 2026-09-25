@@ -426,7 +426,8 @@ export interface BenchmarkRunnerOptions {
 	onPiSession?: (observation: PiSessionObservation) => void;
 }
 
-function harnessIdentity(): { revision: string; dirty: boolean | null } {
+/** Git commit of the harness checkout and whether it has uncommitted changes; UNKNOWN/null when Git is unavailable. */
+export function harnessIdentity(): { revision: string; dirty: boolean | null } {
 	try {
 		const revision = fitnessGit(CHECKOUT, ["rev-parse", "HEAD"]);
 		return {
