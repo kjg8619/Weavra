@@ -1042,3 +1042,54 @@
   - cancel·read는 STALE_PROJECT를 내지 않는다.
   - 호출 상한은 3회로 고정하고, token 상한만 예산의 최솟값을 따른다.
 - 커밋 상태: `249cbc1d`, `e2d7b8cc`, `3a2c65f1`, `a64a4b6c`, devlop 병합, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — V0.8B #54 Planner 통합 검증(실제 경계·실제 모델·실제 UI)
+
+- 목적: #53(PR #62)·#52(PR #63)을 합친 실제 경계에서 Planner 계약(PLANNER_DRAFT.md §11)을 검증한다. 실제 모델 smoke와 실제 App UI 확인을 포함한다.
+- 브랜치/worktree: `test/v0.8b-planner-integration`, `Weavra-worktrees/runtime-review-followups-2`(재사용, runtime·App 의존성 모두 있음). 메인 세션이 작성했다.
+- 추가·변경 파일:
+  - `scripts/planner-integration.mjs`(신규): Planner corpus.
+    - 실제 Runtime 실행 파일, 운영 App `ControlTransport`와 엄격한 디코더를 쓴다.
+    - 모든 snapshot에 App의 `ComplexProjection`·`PlannerProjection` 검사를 적용한다.
+    - Planner와 worker는 대본 모델이 맡는다.
+  - `scripts/run-complex-integration.mjs`: 기본으로 planner corpus까지 세 개를 실행한다. `WEAVRA_APP_ROOT`를 하위 프로세스에 넘기도록 고쳤다(전에는 버렸다).
+  - `scripts/planner-live-smoke.mjs`(신규): 유료 opt-in이며 CI에 넣지 않는다.
+  - `.github/workflows/ci.yml`: 단계 이름을 세 corpus에 맞췄다.
+- corpus(13개 시나리오, 대본 모델, 유료 호출 0):
+  - L01: READY → read → 초안 그대로 prepare(첫 시도에 성공) → confirm → COMPLETED.
+    - 계획 중 revision은 그대로이고 writer도 없다. confirm 뒤 planner 상태가 비워진다.
+    - Planning Context 확인(L13): 이름만 있고, 허용 경로 안이며, `.ai`·`.git`이 없고, 검사에 명령이 없고, 196,608 bytes 이하다.
+    - 시작 전 snapshot에는 `planner` 키가 없다(L14).
+  - L02: 위조 필드 → delete claim → 호출 2회 만에 DRAFT_INVALID.
+  - L03: 범위 밖 claim → 2,048 bytes 이하의 수정 1회 → READY.
+  - L04: 텍스트만 두 번 → 호출 2회 만에 NO_DRAFT.
+  - L05: 응답 없음 → worker_timeout_ms(10초)에 TIMEOUT. 그동안 snapshot은 계속 응답한다.
+  - L06: RUNNING 중 취소 → CANCELLED. 늦게 온 제출은 무시한다.
+  - L07: 텍스트 → 무효 → 무효 → 정확히 호출 3회에서 DRAFT_INVALID. 4번째 호출은 없다.
+  - L08: 오래된 revision, STANDARD 목표, R3 COMPLEX 목표는 Planner 호출 0회로 거부한다.
+  - L08b: 사람이 시작한 Run이 진행 중이면 같은 Host는 PLANNER_BUSY, 다른 Host는 WRITER_PRESENT/ACTIVE_RUN으로 거부한다.
+  - L09: 계획 중 confirm → PLANNER_BUSY. Run은 시작되지 않는다.
+  - L10: RUNNING 중 설정 변경 → STALE.
+  - L11: READY 뒤 변경 → `current: false`. prepare가 다시 검증해 거부한다.
+  - L12: RUNNING 중 소유 연결 종료 → 새 Host에는 planner 상태가 없고, 저장된 변화도 없다.
+  - 결과: `PLANNER INTEGRATION PASS: 13 scenarios; falseCompletion=0`. 완료되는 Run은 양성 대조 둘(L01, L08b의 사람 Run)뿐이다.
+  - 같은 브랜치에서 COMPLEX 14·PARALLEL 9도 통과했다.
+  - 변이 확인: Runtime에서 계획 중 confirm 거부를 지우면 corpus가 실패한다. RUNNING 상태가 사라진 것을 App의 PlannerProjection이 거부한다.
+- 실제 모델 smoke(commandcode `deepseek/deepseek-v4.1-flash`, `max_parallel 2`, 각 1회):
+
+  | 조건 | Planner | Run | 시간 | Run 보고 토큰 |
+  |---|---|---|---|---|
+  | AC에 파일 경로 없음 | READY, 8초, 호출 1회, 3,032 토큰, 작업 4개 | BLOCKED/CHECK_FAILED | 41초 | 90,130 |
+  | AC에 파일 경로 명시(`--explicit-paths`) | READY, 4초, 호출 1회, 2,005 토큰, 독립 작업 2개 | COMPLETED, 작업·통합 PASS×3 | 82초 | 117,024 |
+
+  - 첫 실행에서 Planner는 파일 이름을 `src/parser.js`·`src/formatter.js`로 추측했다. 등록된 검사가 불러오는 파일은 `src/parse.mjs`·`src/format.mjs`다.
+    - Planning Context에는 허용 경로(src)의 파일 이름만 들어가고, 검사 명령·테스트 내용은 설계상 들어가지 않는다.
+    - 검사가 실패하자 Kernel이 차단했다. 거짓 완료는 0이었다.
+    - 사람이 검토 단계에서 고쳐야 하는 사례다. 이번 smoke는 초안을 그대로 받아들인 경우를 흉내 냈다.
+  - AC에 경로를 적으면 Planner가 정확한 독립 계획을 냈고, 병렬 웨이브로 완료됐다.
+  - 후속 개선 후보: 등록된 검사가 실행하는 파일 경로를 Planning Context에 넣기, 또는 제한된 읽기 도구. 설계 수정과 사용자 결정이 필요하다.
+- 실제 App UI(dev 서버, 격리 상태 `/tmp/wx-ui/t3`·`WEAVRA_HOME=/tmp/wx-ui/weavra`, 헤드리스 Chromium, 대본 모델):
+  - 흐름: "Draft with Planner" → RUNNING("1 of 3 model calls", route, 취소 버튼) → "Planner proposal — unreviewed" 카드(작업 2개) → Load into editor → 검토 배너와 작업 행 → Prepare → Confirm → COMPLETED.
+  - confirm 뒤 Planner 카드는 사라졌다.
+  - 종료할 때는 기록한 dev 서버 PID와, 작업 디렉터리를 확인한 포트 소유자만 종료했다. 남은 bridge 프로세스는 없었다.
+- 커밋 상태: `7bc8f8d7`(corpus), `2bf0e75b`(smoke), 병합 커밋, 이 기록. devlop 대상 PR.

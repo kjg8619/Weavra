@@ -106,7 +106,7 @@ jobs:
         run: node scripts/run-cross-boundary.mjs
       - name: Verify combined Broker authority and activation boundaries
         run: node scripts/run-capability-boundary.mjs
-      - name: Verify COMPLEX Runtime to App lifecycle corpus (falseCompletion = 0)
+      - name: Verify COMPLEX, parallel and Planner Runtime to App corpora (falseCompletion = 0)
         run: node scripts/run-complex-integration.mjs
       - name: Require unchanged tracked source
         run: git diff --exit-code HEAD --

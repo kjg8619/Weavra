@@ -6,10 +6,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Isolated HOME/TMPDIR/git config for the COMPLEX Runtime→App corpora; the scripted model listens on loopback only.
-// Runs the sequential (V0.7B) and parallel (V0.8A) corpora by default; `complex` or `parallel` selects one.
+// Runs the sequential (V0.7B), parallel (V0.8A) and Planner (V0.8B) corpora by default; `complex`, `parallel` or
+// `planner` selects one. WEAVRA_APP_ROOT, when set, points the harness at another checkout's App (split worktrees).
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const corpora = process.argv[2] ? [process.argv[2]] : ["complex", "parallel"];
-for (const corpus of corpora) if (corpus !== "complex" && corpus !== "parallel") throw new Error(`Unknown corpus: ${corpus}`);
+const corpora = process.argv[2] ? [process.argv[2]] : ["complex", "parallel", "planner"];
+for (const corpus of corpora) if (!["complex", "parallel", "planner"].includes(corpus)) throw new Error(`Unknown corpus: ${corpus}`);
 // Darwin Unix sockets have a small path limit; canonical /private/tmp also avoids alias mismatches.
 const temporary = realpathSync(mkdtempSync(join(process.platform === "darwin" ? "/tmp" : tmpdir(), "wc-")));
 const home = join(temporary, "home");
@@ -27,6 +28,7 @@ try {
         TMPDIR: temp,
         WEAVRA_HOME: join(home, ".weavra"),
         T3_WEAVRA_EXECUTABLE: join(root, "runtime/pi/packages/company-runtime/bin/weavra"),
+        ...(process.env.WEAVRA_APP_ROOT ? { WEAVRA_APP_ROOT: process.env.WEAVRA_APP_ROOT } : {}),
         LANG: "C",
         LC_ALL: "C",
         GIT_CONFIG_NOSYSTEM: "1",
