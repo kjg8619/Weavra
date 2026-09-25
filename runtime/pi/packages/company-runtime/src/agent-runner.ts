@@ -140,8 +140,11 @@ function inside(root: string, path: string): boolean {
 	return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
-/** A new empty extension runtime per invocation; DefaultResourceLoader is never constructed or reloaded. */
-function workerResources(systemPrompt: string): ResourceLoader {
+/**
+ * A new empty extension runtime per invocation; DefaultResourceLoader is never constructed or reloaded. Also the
+ * V0.8B Planner session's loader: no skills, prompts, themes, extensions or AGENTS discovery.
+ */
+export function workerResources(systemPrompt: string): ResourceLoader {
 	const extensions = { extensions: [], errors: [], runtime: createExtensionRuntime() };
 	return {
 		getExtensions: () => extensions,
