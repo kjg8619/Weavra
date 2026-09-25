@@ -54,7 +54,7 @@ The source is the durable Run: frozen parent `tasks[0]`, frozen plan, and task r
 
    | Source row | Derived task |
    | --- | --- |
-   | COMPLETED | **Verification task:** title `Verify: <title>` (cut to 80 characters on a code-point boundary); goal `Re-verify without changes: <goal>` (cut to 300); `ownership: []`; same `criterionIndexes` and `checkIds` |
+   | COMPLETED | **Verification task:** title `Verify: <title>` (cut to 80 characters on a code-point boundary); goal `Re-verify without changes: <goal>` (cut to 300). A prefix is added only if the text does not already start with it, so re-running a re-run does not repeat it. `ownership: []`; same `criterionIndexes` and `checkIds` |
    | Any other status | Same title, goal, `criterionIndexes` and `checkIds`. Claims are adjusted as in step 3. |
 
 3. **Claims of unfinished tasks.** Each claim is re-evaluated against the current file.
