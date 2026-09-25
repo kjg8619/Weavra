@@ -64,7 +64,7 @@ The Host builds the context deterministically, before the first model call, from
 
 | Part | Source | Bound |
 | --- | --- | --- |
-| Goal and acceptance statements, labelled `AC-001`… in the compiler's order | The `planner.start` request | Goal ≤2,048 characters; ≤16 statements of ≤500 characters |
+| Goal and acceptance statements, labelled `AC-001`… in the compiler's order; without statements, the goal is the only AC (`AC-001`), as in prepare | The `planner.start` request | Goal ≤2,048 characters; ≤16 statements of ≤500 characters |
 | Execution mode (EDIT or READ_ONLY) and Risk | The same classification as prepare | — |
 | Plan rules | Fixed Host text | The §4 limits of COMPLEX_SEQUENTIAL_WORKFLOW and V0.8A `maxParallel`: 2–8 tasks, earlier-row dependencies, full AC coverage, exclusive exact-file claims, `create` needs a missing file in an existing directory, `modify` needs an existing UTF-8 text file, READ_ONLY has zero claims, required checks only |
 | Registered checks | `.ai/config.yaml` | `id`, `kind`, `required` only; never `executable` or `args` |
@@ -86,7 +86,7 @@ The Planner is a new worker role, `Planner`, routed through a new optional inten
 ### 5.2 Session shape
 
 - A fresh SDK session with no skills, no extensions and no AGENTS discovery. Compaction and retry are off, as for workers.
-- **Exactly one tool: `submit_plan_draft`.** Its parameters are the closed `ComplexDraft` schema, `{ tasks: [...] }`. A call to any other tool name is treated like an answer without a submission.
+- **Exactly one tool: `submit_plan_draft`.** Its parameters are the closed `ComplexDraft` schema, `{ tasks: [...] }`. A call to any other tool name is treated like an answer without a submission. An answer with more than one `submit_plan_draft` call is one failed submission.
 - The Planner is not the Run-bound `PiAgentExecutor`. There is no runId, no `ActionAudit` and no measurement step, because no Run exists and the Planner has no audited tools.
 - **Timeout:** the existing `agents.worker_timeout_ms` (default 180,000 ms) covers the whole planning request.
 
@@ -125,7 +125,7 @@ The Planner is a new worker role, `Planner`, routed through a new optional inten
 ## 6. Binding and staleness
 
 When `planner.start` is accepted, the Host records three values:
-- `requestDigest`: `sha256` of the canonical JSON of `["weavra-planner-request-v1", goal, acceptanceStatements]`;
+- `requestDigest`: `sha256:` followed by the lowercase hex SHA-256 of the UTF-8 bytes of `JSON.stringify(["weavra-planner-request-v1", goal, acceptanceStatements])`. The goal and statements are exactly as sent, and `acceptanceStatements` is `[]` when omitted. The App computes the same value;
 - the project revision;
 - the configuration fingerprint that `workflow.prepare` compares.
 
@@ -163,9 +163,9 @@ The snapshot gains `planner?: PlannerStatus`. The key is **present only after a 
 ```text
 PlannerStatus = {
   schemaVersion: 1,
-  planId, status: "RUNNING" | "READY" | "FAILED" | "CANCELLED",
-  requestDigest, projectRevision, current: boolean,
-  startedAt, finishedAt: number | null,
+  planId: UUID, status: "RUNNING" | "READY" | "FAILED" | "CANCELLED",
+  requestDigest: "sha256:<64 hex>", projectRevision, current: boolean,
+  startedAt: epoch ms, finishedAt: epoch ms | null,
   route: { alias: "plan" | null, profile, provider, model } | null,
   usage: { invocations, reportedTokens: number | null },
   taskCount: number | null,            // READY only
@@ -201,6 +201,7 @@ The landing order is **consumer-first**: #53 (App) merges before #52 (Runtime).
   - While RUNNING, it shows elapsed time, the route and usage, plus **Cancel**.
 - **READY.** A card labelled **"Planner proposal — unreviewed"** shows the task count, the route and the usage, with **Load into editor** and **Discard**.
   - **Load into editor** calls `planner.read` and replaces the editor rows. It asks first if rows are non-empty and differ.
+  - **Discard** only hides the card in the App. The Host keeps the READY state until a new `planner.start` replaces it or a confirm clears it.
   - While the editor holds the loaded, unchanged draft, a banner stays visible: "Review every task, claim and check before Prepare."
   - Labels show a non-current draft, or a `requestDigest` that differs from the editor's goal and criteria.
 - **FAILED.** Shows the failure code with fixed explanatory text. There is no retry loop; the user starts again.
