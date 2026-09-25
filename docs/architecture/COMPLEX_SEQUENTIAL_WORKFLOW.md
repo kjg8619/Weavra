@@ -60,6 +60,8 @@ The [company-runtime README](../../runtime/pi/packages/company-runtime/README.md
 
 A future Planner could inspect bounded project context and propose decomposition, order, AC mapping, ownership, dependencies and integration risks as structured data. It could not rewrite the parent, grant tools, register checks, change Policy/Risk/mode, approve R3, assert trusted PASS/COMPLETE, invoke Git mutation, or override Kernel. **V0.7B does not instantiate that future role.** A deterministic compiler is sufficient when the decomposition is explicit; heuristic free-text decomposition would invent ownership/verification obligations. The cost is an explicit pre-confirmation planning form, not an autonomous planning loop.
 
+> **Amendment (V0.8B, [#51](https://github.com/kjg8619/Weavra/issues/51)):** [PLANNER_DRAFT.md](PLANNER_DRAFT.md) instantiates this future role as a tool-less, candidate-only proposer. It fills the explicit planning form; it does not replace it. The deterministic compiler, human prepare/confirm and every limit in this paragraph still apply.
+
 ### 3.2 Prepare and confirmation
 
 1. Existing `workflow.prepare` accepts optional `complexDraft` (§4). It still requires canonical owner/project/request identity, goal and optional acceptance statements. Unknown fields are rejected.
