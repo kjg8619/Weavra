@@ -98,6 +98,7 @@ let sequence=1;
 const receipts=new Map();
 const empty={status:{source:'durable-canonical-state',ownerObserved:false,state:'missing',writerPresent:false,run:null},graph:null,graphAvailable:false,evidence:null,configuration:{source:'project-config-not-frozen-run-config',status:'missing'}};
 let state={ownerId,nextRequestId:ownerId+':1',projectRevision:0,stateRevision:null,ownedRunId:null,busy:false,cancelling:false,startFailure:null,preview:null,browserPreview:null,factPreview:null,projectFacts:{status:'available',entries:[]},pendingApproval:null,snapshot:empty};
+if(mode==='orphan'){state.stateRevision=4;state.snapshot={...empty,status:{source:'durable-canonical-state',ownerObserved:false,state:'available',writerPresent:true,run:{runId:'orphan-run',status:'RUNNING',phase:'IMPLEMENT',workflow:'STANDARD',risk:'R1',executionMode:'EDIT',codeRevision:0,currentStep:{stepId:'implement',attempt:1},activeAgentCount:1,taskContractDigest:digest,createdAt:1,updatedAt:1}}};}
 if(existsSync('canonical.json')){const old=JSON.parse(readFileSync('canonical.json','utf8'));state={...old,ownerId,nextRequestId:ownerId+':1',ownedRunId:null,busy:false,cancelling:false,preview:null,browserPreview:null,factPreview:null,pendingApproval:null};}
 const complex=mode==='complex'?1:mode==='complex-v2'?2:0;
 const capabilities={authority:'Runtime/Kernel',control:'workflow-control-v1',ownerId,commands:['control.hello','control.snapshot','workflow.prepare','workflow.confirm','workflow.cancel','approval.resolve','browser.inspect','browser.prepare','browser.confirm','facts.prepare','facts.confirm'],maxRequestBytes:32768,maxResponseBytes:65536,resultLimit:64,previewTtlMs:300000,runtimeVersion:'0.85.1',readiness:mode==='not-setup'&&launch===1?'NOT_SETUP':'READY',...(complex?{complexContractVersion:complex}:{}),recipes:[]};
@@ -122,7 +123,11 @@ for await(const line of createInterface({input:process.stdin})){
   else if(request.expectedProjectRevision!==state.projectRevision)response=reply(request,null,'STALE_PROJECT');
   else{
    state.nextRequestId=ownerId+':'+(++sequence);
-   if(request.type==='browser.inspect'){
+   if(mode==='orphan'&&request.type==='workflow.prepare'&&state.snapshot.status.run?.status==='RUNNING'){
+    // Runtime recovery of a provably dead owner: INTERRUPTED, writer released, no preview.
+    state.snapshot.status.run.status='INTERRUPTED';state.snapshot.status.run.phase='IMPLEMENT';state.snapshot.status.writerPresent=false;state.projectRevision++;state.stateRevision++;
+    response=reply(request,null,'STALE_PROJECT');
+   }else if(request.type==='browser.inspect'){
     response=reply(request,{kind:'browser-state',state:{projectId:digest,candidates:[candidate],omittedCandidates:0,checks:existsSync('browser-check.json')?[{check:JSON.parse(readFileSync('browser-check.json','utf8')),required:true}]:[],omittedChecks:0,evidence:[],omittedEvidence:0}});
    }else if(request.type==='browser.prepare'){
     const {candidateId,expectedCandidateDigest,...definition}=request.registration;
@@ -2121,5 +2126,44 @@ it.effect(
       const rejected = yield* next(fixture.queue, (value) => value.status === "ERROR");
       expect(rejected).toMatchObject({ stale: true, errorCode: "INVALID_PAYLOAD" });
       expect(rejected.state?.complexExecution).toEqual(historical);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect(
+  "prepare lets Runtime recover an orphaned Run, then reads fresh state and never retries",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup("orphan");
+      const orphan = fixture.initial.state!;
+      expect(orphan).toMatchObject({
+        ownedRunId: null,
+        busy: false,
+        snapshot: {
+          status: { writerPresent: true, run: { runId: "orphan-run", status: "RUNNING" } },
+        },
+      });
+      const request = { ...fields(orphan), type: "workflow.prepare" as const, goal: "Fix fixture" };
+      const response = yield* fixture.controller.command({ projectId, request });
+      expect(response).toMatchObject({ success: false, error: { code: "STALE_PROJECT" } });
+      // The existing post-command read publishes the Runtime's recovery.
+      const recovered = yield* next(
+        fixture.queue,
+        (value) => !value.stale && value.state?.snapshot.status.run?.status === "INTERRUPTED",
+      );
+      expect(recovered.state).toMatchObject({
+        projectRevision: 1,
+        stateRevision: 5,
+        snapshot: { status: { writerPresent: false } },
+      });
+      expect(recovered.state?.preview).toBeNull();
+      expect(
+        (yield* fixture.fs.readFileString(`${fixture.root}/requests`)).split("\n").filter(Boolean),
+      ).toEqual(["workflow.prepare"]);
+      // Only an explicit new prepare, with the fresh identity, proceeds normally.
+      const prepared = yield* fixture.controller.command({
+        projectId,
+        request: { ...fields(recovered.state!), type: "workflow.prepare", goal: "Fix fixture" },
+      });
+      expect(prepared).toMatchObject({ success: true, data: { kind: "prepared" } });
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );

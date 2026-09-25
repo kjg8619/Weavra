@@ -245,12 +245,17 @@ export function WeavraControls({
   const run = state?.snapshot.status.run;
   const submitting = commandState.status === "submitting";
   const canEditDraft = fresh && !state?.busy && !submitting;
+  const runActive = ["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(run?.status ?? "");
   const canPrepare =
     fresh &&
     !state?.busy &&
     state?.snapshot.status.writerPresent === false &&
-    !["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(run?.status ?? "") &&
+    !runActive &&
     !submitting;
+  // Another Runtime owner, such as a killed Host, holds this project's active Run. Prepare lets the
+  // Runtime decide: it marks the Run INTERRUPTED only when that owner provably stopped.
+  const foreignActiveRun = fresh && !state?.busy && runActive && state?.ownedRunId !== run?.runId;
+  const canPrepareWorkflow = canPrepare || (foreignActiveRun && !submitting);
   const canCancel =
     fresh &&
     state?.busy &&
@@ -333,15 +338,17 @@ export function WeavraControls({
         const hint =
           request.type !== "workflow.prepare"
             ? ""
-            : request.complexDraft
-              ? code === "INVALID_REQUEST"
-                ? " A task plan is accepted only when Runtime classifies the goal as COMPLEX; discard it for QUICK or STANDARD goals."
-                : code === "INVALID_CRITERIA"
-                  ? " Runtime rejected the task plan's dependencies, criteria coverage, file claims or checks."
-                  : ""
-              : code === "UNSUPPORTED_WORKFLOW" && complexSupported
-                ? " If Runtime classified this goal as COMPLEX, add a structured task plan of 2–8 tasks and prepare again."
-                : "";
+            : code === "STALE_PROJECT"
+              ? " The project changed before a plan was prepared, for example because a stopped owner's Run was just marked INTERRUPTED. Nothing was prepared or retried; prepare again once the refreshed state appears."
+              : request.complexDraft
+                ? code === "INVALID_REQUEST"
+                  ? " A task plan is accepted only when Runtime classifies the goal as COMPLEX; discard it for QUICK or STANDARD goals."
+                  : code === "INVALID_CRITERIA"
+                    ? " Runtime rejected the task plan's dependencies, criteria coverage, file claims or checks."
+                    : ""
+                : code === "UNSUPPORTED_WORKFLOW" && complexSupported
+                  ? " If Runtime classified this goal as COMPLEX, add a structured task plan of 2–8 tasks and prepare again."
+                  : "";
         setCommandState({
           status: "rejected",
           message: `Runtime rejected the command: ${code}.${hint} Review fresh state before trying again.`,
@@ -456,7 +463,7 @@ export function WeavraControls({
       .filter(Boolean);
   const prepare = () => {
     const fields = common();
-    if (!fields || !canPrepare || !goal.trim()) return;
+    if (!fields || !canPrepareWorkflow || !goal.trim()) return;
     const complex = complexRows.length > 0;
     const complexStatements = lines(complexCriteria);
     const problem = !complex
@@ -723,6 +730,17 @@ export function WeavraControls({
               remains the only outcome.
             </p>
           )
+        )}
+        {foreignActiveRun && (
+          <p
+            aria-label="Another owner holds this project"
+            className="text-xs text-muted-foreground"
+          >
+            Another Runtime owner holds this project's active Run. If that owner has stopped,
+            preparing a workflow marks its Run INTERRUPTED; nothing resumes and partial workspace
+            changes remain. If the owner is still running or cannot be proven stopped, the Runtime
+            refuses.
+          </p>
         )}
         <form
           className="space-y-3"
@@ -1031,7 +1049,7 @@ export function WeavraControls({
               </div>
             </section>
           )}
-          <Button size="sm" type="submit" disabled={!canPrepare || !goal.trim()}>
+          <Button size="sm" type="submit" disabled={!canPrepareWorkflow || !goal.trim()}>
             {preview ? "Refresh Plan Preview" : "Prepare workflow"}
           </Button>
         </form>

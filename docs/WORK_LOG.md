@@ -815,3 +815,21 @@
   - 메인 세션 실제 확인(유료 1회, commandcode `deepseek/deepseek-v4.1-flash`, `intents: {simple: fast, standard: coding, review: reasoning}`): STANDARD run이 운영 App `ControlTransport` 경유로 COMPLETED. 기록된 측정은 Developer `standard → coding`, Reviewer `review → reasoning`이고, 요청과 실제 provider/model이 모두 `commandcode/deepseek-v4.1-flash`로 일치했다.
 - 보류: App 표시와 선택(wire 변경 필요), Host Control 경유 deep 선택, 같은 provider 내 fallback.
 - 커밋 상태: `79c8ec28`, devlop 병합, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — 고아 Run 복구: App 준비 버튼 조건 (1/2)
+
+- 배경: #22 P14에서 발견한 공백이다. 소유 Host가 강제 종료되면 App은 고아 Run을 활성 run(`writerPresent: true`, `ownedRunId: null`)으로 보여 주고 준비 버튼을 비활성화한다. App만으로는 프로젝트를 다시 쓸 수 없다. 사용자 결정은 "App prepare 시 복구"다.
+- 설계(메인 세션):
+  - 소유자가 죽었는지는 Runtime만 증명할 수 있다(같은 호스트, 죽은 PID, 복구 guard). 그래서 App은 이 연결이 소유하지 않은 활성 run이 있을 때도 prepare를 보낼 수 있게 한다.
+  - Runtime(2/2, 별도 PR)은 증명된 경우에만 복구하고 `STALE_PROJECT`를 반환한다. 소유자가 살아 있으면 지금처럼 `WRITER_PRESENT`다.
+  - App의 엄격한 revision 일치 검사는 바꾸지 않는다. 복구 뒤 다시 읽고, 사용자가 다시 준비한다.
+- 변경(`app/t3code`, 브랜치 `fix/app-orphan-prepare`, 커밋 `0a638f6f`, 하위 에이전트 구현):
+  - `WeavraControls.tsx`: 워크플로 전용 준비 조건을 추가했다. 다른 소유자의 활성 run이면 writer가 있어도 준비를 허용한다. 이 연결의 run, busy·stale·disconnected, 활성 run 없는 writer에서는 여전히 비활성이다. facts·browser·confirm·cancel·approval 조건은 그대로다.
+  - 안내 문구: 다른 Runtime 소유자가 활성 run을 가지고 있다. 그 소유자가 멈췄다면 준비할 때 해당 run이 INTERRUPTED로 표시되고 아무것도 재개하지 않는다. 아니면 Runtime이 거부한다.
+  - `STALE_PROJECT` 뒤에는 기존 새로 읽기를 하고 "다시 준비하라"는 안내를 보여 준다. 자동 재시도는 없다.
+  - `docs/operations/development.md`: 준비 단계 설명을 보강했다.
+- 현재 검증(하위 에이전트):
+  - `node scripts/validate.mjs t3` → `ALL GATES PASS`.
+  - 새 테스트: web 4개, 가짜 Runtime 고아 모드 server 1개. 새 조건을 제거하면 실패하는지 변이 확인을 했다.
+- 현재 Runtime과의 호환: 이 PR만 있으면 고아 run 준비 시 `WRITER_PRESENT`가 표시될 뿐이다. Runtime PR이 들어오면 복구까지 이어진다.
+- 커밋 상태: devlop 대상 PR.

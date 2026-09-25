@@ -1417,3 +1417,133 @@ describe("COMPLEX contract v2 (parallel waves) projection", () => {
     );
   });
 });
+
+/** An active Run whose owner is not this connection, e.g. left behind by a killed Host. */
+function orphaned(patch: Partial<WeavraControlState> = {}) {
+  running();
+  update({ busy: false, ownedRunId: null, ...patch });
+}
+function refused(code: "STALE_PROJECT" | "WRITER_PRESENT"): WeavraControlResponse {
+  return {
+    protocolVersion: 1,
+    type: "control_response",
+    id: "owner:2",
+    command: "workflow.prepare",
+    ownerId: "owner",
+    runId: "run-1",
+    stateRevision: 7,
+    projectRevision: 9,
+    eventId: null,
+    timestamp: 1,
+    success: false,
+    error: { code },
+  };
+}
+const orphanNote = (tree: ReactElement<Record<string, unknown>>) =>
+  visitElements(tree, (node) => node.props["aria-label"] === "Another owner holds this project");
+
+describe("Prepare while another owner holds the active Run", () => {
+  it("offers only workflow prepare, and explains that Runtime decides whether the owner stopped", () => {
+    orphaned();
+    change("Workflow goal", preview.goal);
+    const tree = render();
+    expect(control(tree, "Prepare workflow").props.disabled).toBe(false);
+    expect(words(orphanNote(tree))).toContain(
+      "If that owner has stopped, preparing a workflow marks its Run INTERRUPTED; nothing resumes",
+    );
+    expect(words(orphanNote(tree))).toContain("the Runtime refuses");
+    // Cancel, approval, facts and browser gates stay as they were.
+    expect(visitElements(tree, (node) => text(node) === "Cancel workflow")).toBeNull();
+    expect(
+      visitElements(tree, (node) => node.props["aria-label"] === "Pending R3 approval"),
+    ).toBeNull();
+    expect(control(tree, "Prepare fact").props.disabled).toBe(true);
+    expect(control(tree, "Refresh browser evidence").props.disabled).not.toBe(true);
+    // A connection that owned an earlier Run does not own this one either.
+    update({ ownedRunId: "earlier-run" });
+    expect(control(render(), "Prepare workflow").props.disabled).toBe(false);
+  });
+  it("keeps prepare disabled for this connection's own Run and for busy, stale or disconnected views", () => {
+    change("Workflow goal", preview.goal);
+    for (const patch of [{ ownedRunId: "run-1" }, { busy: true, ownedRunId: "earlier-run" }]) {
+      orphaned(patch);
+      expect(control(render(), "Prepare workflow").props.disabled).toBe(true);
+      expect(orphanNote(render())).toBeNull();
+    }
+    orphaned();
+    data.observation = { ...data.observation!, stale: true };
+    expect(control(render(), "Prepare workflow").props.disabled).toBe(true);
+    data.observation = { ...data.observation!, stale: false };
+    data.phase = "disconnected";
+    expect(control(render(), "Prepare workflow").props.disabled).toBe(true);
+    data.phase = "connected";
+    // A writer retained without an active Run is still not preparable.
+    const current = data.observation!.state!;
+    update({
+      snapshot: {
+        ...current.snapshot,
+        status: {
+          ...current.snapshot.status,
+          run: { ...current.snapshot.status.run!, status: "INTERRUPTED" },
+        },
+      },
+    });
+    expect(control(render(), "Prepare workflow").props.disabled).toBe(true);
+    expect(data.invoke).not.toHaveBeenCalled();
+  });
+  it("sends one plain prepare and, after STALE_PROJECT, waits for fresh state and an explicit retry", async () => {
+    orphaned();
+    change("Workflow goal", preview.goal);
+    data.invoke.mockResolvedValue(AsyncResult.success(refused("STALE_PROJECT")));
+    await submitPrepare();
+    expect(data.invoke.mock.calls[0]?.[0].input.request).toEqual({
+      protocolVersion: 1,
+      id: "owner:2",
+      ownerId: "owner",
+      expectedProjectRevision: 9,
+      type: "workflow.prepare",
+      goal: preview.goal,
+    });
+    const shown = words(render());
+    expect(shown).toContain("Runtime rejected the command: STALE_PROJECT.");
+    expect(shown).toContain(
+      "Nothing was prepared or retried; prepare again once the refreshed state appears.",
+    );
+    await flush();
+    expect(data.invoke).toHaveBeenCalledOnce();
+    // The fresh read shows the Runtime's recovery: INTERRUPTED and the writer released.
+    const current = data.observation!.state!;
+    update({
+      projectRevision: 10,
+      stateRevision: 8,
+      nextRequestId: "owner:3",
+      snapshot: {
+        ...current.snapshot,
+        status: {
+          ...current.snapshot.status,
+          writerPresent: false,
+          run: { ...current.snapshot.status.run!, status: "INTERRUPTED" },
+        },
+      },
+    });
+    expect(orphanNote(render())).toBeNull();
+    data.invoke.mockResolvedValue(AsyncResult.success(response({ kind: "prepared", preview })));
+    await submitPrepare();
+    expect(data.invoke).toHaveBeenCalledTimes(2);
+    expect(data.invoke.mock.calls[1]?.[0].input.request).toMatchObject({
+      id: "owner:3",
+      expectedProjectRevision: 10,
+      type: "workflow.prepare",
+    });
+  });
+  it("reports a live or unprovable owner's refusal without retrying", async () => {
+    orphaned();
+    change("Workflow goal", preview.goal);
+    data.invoke.mockResolvedValue(AsyncResult.success(refused("WRITER_PRESENT")));
+    await submitPrepare();
+    await flush();
+    expect(words(render())).toContain("Runtime rejected the command: WRITER_PRESENT.");
+    expect(data.invoke).toHaveBeenCalledOnce();
+    expect(text(render())).toContain("RUNNING");
+  });
+});
