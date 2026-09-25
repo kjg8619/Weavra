@@ -599,7 +599,7 @@ readiness는 project config validation이나 Provider readiness가 아니라 **�
 |---|---|
 | `control.hello` | control owner/epoch와 요청 identity 계약 확인 |
 | `control.snapshot` | 현재 canonical state와 control 상태 조회; 접수 ACK를 실행 결과로 추정하지 않음 |
-| `workflow.prepare` | goal·선택적 recipe data·AC prose로 Runtime preview 준비; Provider 호출 없음 |
+| `workflow.prepare` | goal·선택적 recipe data·AC prose로 Runtime preview 준비; Provider 호출 없음. 같은 호스트에서 죽었음이 증명된 소유자의 Run만 먼저 INTERRUPTED로 정리한다([S2](#저장소와-소유권)) |
 | `workflow.confirm` | 현재 preview의 명시적 사용자 확인을 전달하고 기존 Workflow 실행 시작 |
 | `workflow.cancel` | 이미 존재하는 owned Run에 취소 요청; terminal/cleanup 확인은 별도 |
 | `approval.resolve` | 현재 exact pending R3 request의 approve/reject 응답; grant/소비는 Runtime 소유 |
@@ -610,7 +610,7 @@ readiness는 project config validation이나 Provider readiness가 아니라 **�
 - **입력은 data뿐이다.** classification·execution mode·scope·checks·frozen Task Contract·revision, approval grant/consumption·Policy·PASS·COMPLETE는 Runtime/Kernel이 소유한다. T3가 임의 계약 필드나 도구/셸 명령을 실행 인수로 지정하지 않는다. confirmation 뒤 계약을 UI에서 변경하지 않는다.
 - owner UUID + **Runtime-issued 단조 증가 request ID** + 최대 **64개 payload-bound receipt**를 사용한다. 다른 payload로 같은 ID를 재사용하거나 같은 epoch에서 이미 evicted된 ID를 replay해 새 실행을 만들 수 없다. 이 bounded receipt는 durable replay log나 재시작 recovery가 아니다.
 - **ACK != canonical outcome.** confirm/cancel/approval 응답을 `COMPLETED`/`CANCELLED`/`CONSUMED`로 바꾸지 않는다. fresh canonical Run·revision·approval 기록과 cleanup 상태를 따로 확인한다. read-only의 `ownerObserved: false`와 writer presence는 계속 liveness 증명이 아니며 control owner identity와 혼동하지 않는다.
-- 브라우저 disconnect·Project panel 이탈은 **server-owned 실행을 종료하지 않는다.** reconnect는 fresh canonical state를 읽고 mutation을 자동 재전송하지 않는다. 이전 UI snapshot·receipt로 approval/실행을 복원하지 않는다. backend/Runtime 종료 뒤 resume/recovery를 제공한다는 뜻도 아니다.
+- 브라우저 disconnect·Project panel 이탈은 **server-owned 실행을 종료하지 않는다.** reconnect는 fresh canonical state를 읽고 mutation을 자동 재전송하지 않는다. 이전 UI snapshot·receipt로 approval/실행을 복원하지 않는다. backend/Runtime 종료 뒤 resume을 제공한다는 뜻도 아니다. 죽은 소유자가 남긴 Run은 다음 `workflow.prepare`가 INTERRUPTED로 정리할 뿐 재개하지 않는다.
 - cancel은 **기존 owned Run**이 있어야 한다. canonical Run 생성 전 model/Git/LSP preflight에는 wire cancellation ID가 없으므로 존재하지 않는 runId로 cancel을 보낼 수 없다. 취소 ACK 뒤 worker/check 정리·terminal state와 writer 해제를 확인한다. 비협조 I/O의 즉시 종료나 rollback을 보장하지 않으며 부분 변경은 보존한다.
 - R3는 기존 S5C의 **허용된 Git 추적 텍스트 파일 한 개 삭제**뿐이다. 일반 preview 확인은 삭제 승인이 아니며 현재 exact action·revision·digest·expiry에 대한 인간 응답만 전달한다. grant·검사·1회 소비·독립 review/checks·완료는 기존 Runtime 경로를 따른다. stale/다른 요청이나 재연결만으로 승인하지 않는다.
 - 임의 write/edit/tool/shell, 범용 R3, COMPLEX, resume/recovery/rollback/fallback, 새 network Host, 자동 setup·Policy 완화·UI의 완료 판정은 범위 밖이다. COMPLEX는 이후 V0.7B가 같은 command 집합에 선택적 필드만 더해 지원한다([V0.7B](#v07b-complex-순차-workflow)). C07 closure 후 C06은 별도 [Fitness CLI](../../docs/WEAVRA_PROVIDER_FITNESS_PLAN_2026-09-20.md#9-c06-bounded-구현-계약)로 구현한다. `fitness list/show/compare`는 read-only이고 실제 평가는 paid opt-in·exact corpus·F01/F02 calibration·명시적 예산을 요구한다. C07 execution/control RPC에서 평가를 실행하지 않는다.
@@ -848,6 +848,7 @@ AgentExecutor에는 역할·profile·task·handoff·증거를, Verifier에는 ch
 ### 저장소와 소유권
 
 - `FileStateStore.open(projectPath, options?)`: `realpath`로 프로젝트를 정규화하고 `.ai/writer.lock`을 배타 생성한다. 별칭 경로와 다른 프로세스도 같은 lock을 사용한다. lock에는 PID와 hostname을 기록한다. 기존 lock은 **같은 hostname·같은 프로젝트이고 기록된 PID가 이 호스트에 존재하지 않을 때만**(`kill(pid, 0)`이 ESRCH) 복구한다. `writer.lock.recovery`를 O_EXCL로 만들어 복구자끼리 배제하고, 같은 inode인지 다시 확인한 뒤 지우고 새 lock을 배타 생성한다. 살아 있거나 확인할 수 없는 PID, 다른 호스트, hostname 없는 이전 형식 lock, 남은 recovery guard는 이전처럼 건드리지 않는다. 복구 결과는 `recoveredStaleLock`과 workflow diagnostic으로 보인다. 설계: [STATE_STORE.md](../../../../docs/architecture/STATE_STORE.md).
+- `FileStateStore.recoverDeadOwner(projectPath, options?)`: Host Control `workflow.prepare` 전용이다. `.ai`를 만들거나 빈 lock을 잡지 않는다. 위 조건과 recovery guard로 소유자가 죽었음이 증명된 lock만 지우고 다음 writer로 열어, 아래의 기존 복구를 그대로 적용한다. COMPLEX는 끝나지 않은 행이 INTERRUPTED/OWNER_LOST가 되고 COMPLETED 행은 유지된다. 그 뒤 lock을 놓고 복구 전·후 project revision을 돌려준다. 증명할 수 없으면 아무것도 쓰지 않고 `undefined`다. Host는 client가 본 revision에서 시작한 복구일 때만 prepare를 이어가고, preview를 복구된 revision에 묶는다. `control.snapshot`은 복구하지 않으며 `workflow.confirm`의 guarded start는 계속 `recoverInterrupted: false`다.
 - `load/save`: 기존 StateStore Port 구현. Run revision은 정확히 1씩 증가해야 하며 terminal run은 덮어쓰지 않는다. 이전 run ID를 보존하고 활성 run은 프로젝트당 하나만 허용한다.
 - `state.json`: `{schemaVersion, revision, runs, actions}`가 원본이다. 프로젝트 revision은 action 저장에서도 증가하며, Kernel의 Run revision·code revisionCycle과 별개다.
 - 보관: writer가 열 때 활성 run과 최근 terminal run 20개(`INLINE_TERMINAL_RUNS`)만 inline으로 남긴다. 더 오래된 terminal run은 그 action과 함께 불변 파일 `.ai/runs/<runId>.json`으로 먼저 원자 저장하고, `state.json`에는 선택 필드 `archivedRuns`(id·상태·workflow·risk·phase·300자 goal·시각·action 수·sha256)만 남긴다. 그 사이 crash가 나면 다음 open이 같은 바이트를 재사용한다. `/state <runId>`, `/workflow history`, Host bridge 조회, `/state export`는 digest를 확인한 보관 파일을 읽으며 누락·변경은 무결성 오류다. `tasks.json`은 inline run만 투영한다. Git workspace 검사는 `.ai/runs/<id>.json`과 recovery guard를 Runtime 소유 파일로 취급하며 Git에 추적하면 안 된다.

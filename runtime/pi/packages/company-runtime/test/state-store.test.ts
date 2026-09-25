@@ -5,6 +5,7 @@ import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { PolicyDecision, Run } from "../src/contracts.ts";
+import type { RuntimeEvent } from "../src/events.ts";
 import { readHostObservation } from "../src/host-bridge-projections.ts";
 import { CompanyKernel } from "../src/kernel.ts";
 import { formatHistory } from "../src/observations.ts";
@@ -451,6 +452,53 @@ describe("stale writer lock recovery", () => {
 		await expect(openStore()).rejects.toMatchObject({ stage: "open/lock" });
 		expect(await readFile(join(root, ".ai/writer.lock.recovery"), "utf8")).toBe("other recoverer");
 		expect(await json("writer.lock")).toMatchObject({ token: "dead" });
+	});
+
+	it("Host prepare recovery settles a dead same-host owner's Run, reports both revisions and releases the lock", async () => {
+		const store = await openStore();
+		await (await kernel(store)).start();
+		await store.close();
+		const fromRevision = (await json("state.json")).revision;
+		const pid = deadPid();
+		await writeLock({
+			schemaVersion: 1,
+			projectPath: await realpath(root),
+			token: "dead",
+			pid,
+			hostname: hostname(),
+		});
+		const events: RuntimeEvent[] = [];
+		expect(
+			await FileStateStore.recoverDeadOwner(root, { events: { emit: (event) => void events.push(event) } }),
+		).toEqual({ pid, fromRevision, revision: fromRevision + 1 });
+		expect((await json("state.json")).runs[0]).toMatchObject({ runId: "run-1", status: "INTERRUPTED" });
+		expect(events.map((event) => [event.type, event.runId])).toEqual([["RunInterrupted", "run-1"]]);
+		expect((await readdir(join(root, ".ai"))).sort()).toEqual(["state.json", "tasks.json"]);
+	});
+
+	it("Host prepare recovery never creates .ai, takes a free lock or passes another recoverer's guard", async () => {
+		await expect(FileStateStore.recoverDeadOwner(root)).rejects.toBeInstanceOf(StateStoreError);
+		expect(await readdir(root)).toEqual([]);
+		// An active Run without any lock has no owner to prove dead: nothing is taken or settled.
+		const store = await openStore();
+		await (await kernel(store)).start();
+		await store.close();
+		const state = await readFile(join(root, ".ai/state.json"), "utf8");
+		await expect(FileStateStore.recoverDeadOwner(root)).resolves.toBeUndefined();
+		expect(await readFile(join(root, ".ai/state.json"), "utf8")).toBe(state);
+		expect((await readdir(join(root, ".ai"))).sort()).toEqual(["state.json", "tasks.json"]);
+		await writeLock({
+			schemaVersion: 1,
+			projectPath: await realpath(root),
+			token: "dead",
+			pid: deadPid(),
+			hostname: hostname(),
+		});
+		await writeFile(join(root, ".ai/writer.lock.recovery"), "other recoverer");
+		await expect(FileStateStore.recoverDeadOwner(root)).resolves.toBeUndefined();
+		expect(await readFile(join(root, ".ai/state.json"), "utf8")).toBe(state);
+		expect(await json("writer.lock")).toMatchObject({ token: "dead" });
+		expect(await readFile(join(root, ".ai/writer.lock.recovery"), "utf8")).toBe("other recoverer");
 	});
 });
 
