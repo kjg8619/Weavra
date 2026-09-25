@@ -6,11 +6,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Isolated HOME/TMPDIR/git config for the COMPLEX Runtime→App corpora; the scripted model listens on loopback only.
-// Runs the sequential (V0.7B), parallel (V0.8A) and Planner (V0.8B) corpora by default; `complex`, `parallel` or
-// `planner` selects one. WEAVRA_APP_ROOT, when set, points the harness at another checkout's App (split worktrees).
+// Runs the sequential (V0.7B), parallel (V0.8A), Planner (V0.8B) and re-run (V0.8C) corpora by default; `complex`,
+// `parallel`, `planner` or `rerun` selects one. WEAVRA_APP_ROOT, when set, points the harness at another checkout's App (split worktrees).
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const corpora = process.argv[2] ? [process.argv[2]] : ["complex", "parallel", "planner"];
-for (const corpus of corpora) if (!["complex", "parallel", "planner"].includes(corpus)) throw new Error(`Unknown corpus: ${corpus}`);
+const corpora = process.argv[2] ? [process.argv[2]] : ["complex", "parallel", "planner", "rerun"];
+for (const corpus of corpora) if (!["complex", "parallel", "planner", "rerun"].includes(corpus)) throw new Error(`Unknown corpus: ${corpus}`);
 // Darwin Unix sockets have a small path limit; canonical /private/tmp also avoids alias mismatches.
 const temporary = realpathSync(mkdtempSync(join(process.platform === "darwin" ? "/tmp" : tmpdir(), "wc-")));
 const home = join(temporary, "home");
