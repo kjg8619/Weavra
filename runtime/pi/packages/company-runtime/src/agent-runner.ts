@@ -45,6 +45,7 @@ import {
 } from "./execution-contract.ts";
 import { LSP_READ_TOOLS } from "./lsp/types.ts";
 import { type WorkerDenialCode, WorkerExecutionError, WorkerMeasurementAccumulator } from "./measurement.ts";
+import { type ModelRole, type ModelRoute, resolveModelRoute } from "./model-routing.ts";
 import { type ActionAudit, isPolicyPath, type PolicyContext } from "./policy.ts";
 import { FilePolicyPathInspector } from "./policy-paths.ts";
 import type { AgentExecutionRequest, AgentExecutionResult, AgentExecutor } from "./ports.ts";
@@ -112,8 +113,13 @@ export interface PiAgentExecutorOptions {
 	 * worker fails. Policy denials, audit failures and every R3-run tool error stay fatal.
 	 */
 	maxToolErrors?: number;
-	/** Present only for a QUICK run. Reuses coding profile and requires no Reviewer auth/session. */
+	/** Present only for a QUICK run. Its Executor uses the `simple` alias (default: coding); no Reviewer auth/session. */
 	quickScope?: QuickScope;
+	/**
+	 * Explicit per-run user choice (TUI `/workflow run --deep`): this run's Developers use `models.intents.deep`.
+	 * Never set automatically; refused for QUICK (no Developer) and when the alias is not configured.
+	 */
+	deep?: boolean;
 	/** Enables R2 file actions only for this preselected STANDARD run. Not an approval or review PASS. */
 	r2RunId?: string;
 	r3Scope?: R3Scope;
@@ -236,6 +242,7 @@ function validateRequest(request: AgentExecutionRequest): void {
 		!request.onSessionCreated
 	)
 		throw new Error("Invalid worker identity or missing session persistence callback");
+	// `profile` is the Kernel's fixed role class (coding/reasoning); model intent aliases are applied by the adapter.
 	if (request.role === "Developer") {
 		if (request.profile !== "coding" || request.step.stepId !== "implement")
 			throw new Error("Invalid Developer profile/step");
@@ -375,6 +382,8 @@ export class PiAgentExecutor implements AgentExecutor {
 			if (options.quickScope || options.r2RunId || !isPolicyPath(options.r3Scope.targetPath))
 				throw new Error("Invalid R3 binding");
 		}
+		if (options.deep && options.quickScope)
+			throw new Error("Model intent deep routes Developers; a QUICK run has none");
 		const config = structuredClone(options.config);
 		validateContract(RuntimeConfigSchema, config);
 		const timeoutMs = options.timeoutMs ?? config.agents.worker_timeout_ms;
@@ -446,9 +455,10 @@ export class PiAgentExecutor implements AgentExecutor {
 			policy,
 		);
 		const signal = AbortSignal.timeout(executor.timeoutMs);
-		// STANDARD still validates both profiles. QUICK has only a coding-profile Executor.
-		await executor.resolveModel("coding", signal);
-		if (!options.quickScope) await executor.resolveModel("reasoning", signal);
+		// Every routed model of this workflow is resolved before any Run or worker exists; no fallback. Without
+		// models.intents this is coding then reasoning (STANDARD) or coding alone (QUICK), as before aliases existed.
+		const roles: ModelRole[] = options.quickScope ? ["Executor"] : ["Developer", "Reviewer"];
+		for (const role of roles) await executor.resolveModel(executor.route(role), signal);
 		return executor;
 	}
 
@@ -456,20 +466,29 @@ export class PiAgentExecutor implements AgentExecutor {
 		return structuredClone(this.policy);
 	}
 
-	private async resolveModel(profile: "coding" | "reasoning", signal: AbortSignal): Promise<WorkerModel> {
+	/**
+	 * The frozen configuration's model route for a role (#5). Kernel requests keep naming the role's default profile
+	 * class; aliases and the explicit per-run `deep` choice are applied only here, never by the model.
+	 */
+	private route(role: ModelRole): ModelRoute {
+		return resolveModelRoute(this.options.config, role, this.options.deep === true);
+	}
+
+	private async resolveModel(route: ModelRoute, signal: AbortSignal): Promise<WorkerModel> {
 		signal.throwIfAborted();
 		const runtime = this.options.modelRuntime;
-		const mapping = this.options.config.models.profiles[profile];
-		if (!mapping || runtime.getError() || !runtime.getProvider(mapping.provider))
-			throw new Error("Worker profile/provider unavailable");
-		const model = runtime.getModel(mapping.provider, mapping.model);
-		if (!model) throw new Error("Worker model unavailable; fallback disabled");
+		// Closed alias/profile names only: configured provider and model strings stay out of error text.
+		const routeLabel = `${route.role} ${route.intent} -> ${route.profile}`;
+		if (runtime.getError() || !runtime.getProvider(route.provider))
+			throw new Error(`Worker profile/provider unavailable for ${routeLabel}; fallback disabled`);
+		const model = runtime.getModel(route.provider, route.model);
+		if (!model) throw new Error(`Worker model unavailable for ${routeLabel}; fallback disabled`);
 		try {
-			if (!(await runtime.checkAuth(mapping.provider, { signal })) || !(await runtime.getAuth(model, { signal })))
+			if (!(await runtime.checkAuth(route.provider, { signal })) || !(await runtime.getAuth(model, { signal })))
 				throw new Error("Unconfigured auth");
 		} catch {
 			this.observe((observer) => observer.providerError?.("AUTH"));
-			throw new Error("Worker authentication unavailable");
+			throw new Error(`Worker authentication unavailable for ${routeLabel}; fallback disabled`);
 		}
 		signal.throwIfAborted();
 		return model;
@@ -478,17 +497,18 @@ export class PiAgentExecutor implements AgentExecutor {
 	/** Observation-only span; a failing exporter never changes the worker result. */
 	async execute(input: AgentExecutionRequest): Promise<AgentExecutionResult> {
 		const telemetry = this.options.telemetry ?? NOOP_TELEMETRY_CONTEXT;
-		// Requested identity comes from the trusted frozen config profile, never from the parent Pi UI model.
-		const mapping = this.options.config.models.profiles[input.profile];
+		// Requested identity is the frozen config's route for this role, never the parent Pi UI model.
+		const route = this.route(input.role);
 		return withSpan(
 			telemetry,
 			"weavra.worker",
 			{
 				role: input.role,
-				profile: input.profile,
+				profile: route.profile,
+				...(route.source === "config" ? { modelIntent: route.intent } : {}),
 				revision: input.revision,
-				provider: mapping.provider,
-				model: mapping.model,
+				provider: route.provider,
+				model: route.model,
 			},
 			() => this.performExecution(input),
 			(result) => ({
@@ -610,7 +630,8 @@ export class PiAgentExecutor implements AgentExecutor {
 		}, this.timeoutMs);
 		try {
 			await this.options.audit.assertWritable();
-			const model = await this.resolveModel(request.profile, signal);
+			const route = this.route(request.role);
+			const model = await this.resolveModel(route, signal);
 			const assertActive = () => {
 				if (!active) throw new Error("Worker disposed");
 				signal.throwIfAborted();
@@ -864,11 +885,12 @@ export class PiAgentExecutor implements AgentExecutor {
 			measurement = new WorkerMeasurementAccumulator(
 				{
 					role: request.role,
-					profile: request.profile,
+					profile: route.profile,
+					...(route.source === "config" ? { modelIntent: route.intent } : {}),
 					revision: request.revision,
 					step: request.step,
-					requestedProvider: this.options.config.models.profiles[request.profile].provider,
-					requestedModel: this.options.config.models.profiles[request.profile].model,
+					requestedProvider: route.provider,
+					requestedModel: route.model,
 				},
 				undefined,
 				// Bounded summary of the pack this invocation actually received; never rebuilt here.

@@ -9,6 +9,13 @@ import {
 	type ReviewRecord,
 	type Run,
 } from "./contracts.ts";
+import {
+	type ModelIntent,
+	type ModelRole,
+	modelRouteSource,
+	recordedModelRoute,
+	resolveModelRoute,
+} from "./model-routing.ts";
 import { SANDBOX_DISABLED_WARNING } from "./sandbox-advice.ts";
 
 export interface ObservationAction {
@@ -252,10 +259,18 @@ export function formatConfiguration(config: RuntimeConfig): string {
 		`Verification repair: ${config.verification.repair.mode}; maximum one separate STANDARD/EDIT/R1 SELF_CHECK repair; cumulative budget retained`,
 		`Worker timeout: ${config.agents.worker_timeout_ms}ms per role invocation (default 180000, range 10000..600000); cancel signals immediately, awaits cleanup`,
 		`Verifier sandbox: ${config.verification.sandbox.mode === "required" ? "required (network and $HOME/$TMPDIR reads denied)" : `disabled. ${SANDBOX_DISABLED_WARNING}`}`,
-		...Object.entries(config.models.profiles).map(
-			([profile, model]) =>
-				`${profile}: ${displayText(model.provider)}/${displayText(model.model)}${["fast", "creative"].includes(profile) ? " (not auto-selected)" : ""}`,
-		),
+		...Object.entries(config.models.profiles).map(([profile, model]) => {
+			const aliases = Object.entries(config.models.intents ?? {})
+				.filter(([, name]) => name === profile)
+				.map(([intent]) => intent);
+			return `${profile}: ${displayText(model.provider)}/${displayText(model.model)}${aliases.length ? ` (models.intents: ${aliases.join(", ")})` : ["fast", "creative"].includes(profile) ? " (not auto-selected)" : ""}`;
+		}),
+		"Model intents (fixed per role; no automatic selection or fallback):",
+		...(["Executor", "Developer", "Reviewer"] as const).map((role) => {
+			const route = resolveModelRoute(config, role);
+			return `  ${role}: ${route.intent} -> ${route.profile} (${modelRouteSource(route)})`;
+		}),
+		`  deep: ${config.models.intents?.deep ? `${config.models.intents.deep}; only for STANDARD Developers of an explicit /workflow run --deep <goal>` : "not configured; /workflow run --deep is refused"}`,
 		`Allowed paths: ${config.files.allowed_paths.map((path) => displayText(path)).join(", ") || "none"}`,
 		...config.verification.checks.map((check) =>
 			check.kind === "browser"
@@ -265,6 +280,47 @@ export function formatConfiguration(config: RuntimeConfig): string {
 		"Required checks, project trust and clean Git remain mandatory. No resume, fallback or approval bypass.",
 	].join("\n");
 	return displayText(output, 32000, true);
+}
+
+const MODEL_ROUTES_PER_ROLE = 4;
+
+/** Model identity of one recorded worker invocation: a WorkerMeasurement or its Evidence Pack projection. */
+export interface RecordedModelInvocation {
+	role: string;
+	profile: string;
+	modelIntent?: ModelIntent;
+	requestedProvider: string;
+	requestedModel: string;
+	actualProvider: string;
+	actualModel: string;
+}
+
+/**
+ * Per-role model routing from recorded invocations (#5; display only, bounded): alias -> profile, the requested
+ * provider/model from the frozen configuration and the actual one the provider reported. It never queries a provider
+ * or the current config; a role without a recorded invocation says so instead of guessing.
+ */
+export function formatModelRoutes(workflow: string, invocations: readonly RecordedModelInvocation[]): string[] {
+	const lines = [
+		"Models (recorded per role; alias -> profile -> requested provider/model; actual as reported; no fallback):",
+	];
+	const roles: ModelRole[] = workflow === "QUICK" ? ["Executor"] : ["Developer", "Reviewer"];
+	for (const role of roles) {
+		const routes = new Map<string, number>();
+		for (const invocation of invocations) {
+			if (invocation.role !== role) continue;
+			const alias = recordedModelRoute(invocation);
+			const profile = displayText(invocation.profile, 40);
+			const route = `${alias ? `${alias.intent} -> ${profile} (${modelRouteSource(alias)})` : profile} -> requested ${displayText(invocation.requestedProvider, 200)}/${displayText(invocation.requestedModel, 200)}; actual ${displayText(invocation.actualProvider, 200)}/${displayText(invocation.actualModel, 200)}`;
+			routes.set(route, (routes.get(route) ?? 0) + 1);
+		}
+		if (!routes.size) lines.push(`  ${role}: no invocation recorded`);
+		for (const [route, count] of [...routes].slice(0, MODEL_ROUTES_PER_ROLE))
+			lines.push(`  ${role}: ${route} | ${count} invocation(s)`);
+		if (routes.size > MODEL_ROUTES_PER_ROLE)
+			lines.push(`  ${role}: ${routes.size - MODEL_ROUTES_PER_ROLE} more route(s); /state evidence`);
+	}
+	return lines;
 }
 
 /** Only renders snapshots. Never reads files, resolves auth, executes checks or changes state. */
@@ -411,8 +467,13 @@ export function formatRunView(
 		for (const role of roles) {
 			const sessions = run.roleSessionRefs.filter((ref) => ref.role === role);
 			const last = sessions.at(-1);
+			// The profile of the role's latest recorded invocation (#5 aliases may route away from coding/reasoning).
+			const measured = run.workerMeasurements?.filter((measurement) => measurement.role === role).at(-1);
+			const profile = measured
+				? `${measured.modelIntent ? `${measured.modelIntent} -> ` : ""}${displayText(measured.profile, 40)}`
+				: "profile not recorded";
 			lines.push(
-				`${role} (${role === "Reviewer" || role === "Lead" ? "reasoning" : "coding"}): ${run.activeAgents.includes(role as Run["activeAgents"][number]) ? (local ? "active" : "recorded active; liveness unconfirmed") : active ? (last ? "idle" : "waiting") : "inactive"}; ${sessions.length} session(s)`,
+				`${role} (${profile}): ${run.activeAgents.includes(role as Run["activeAgents"][number]) ? (local ? "active" : "recorded active; liveness unconfirmed") : active ? (last ? "idle" : "waiting") : "inactive"}; ${sessions.length} session(s)`,
 				...(last ? [`  ${displayText(last.sessionId)} → ${displayText(last.sessionFile)}`] : []),
 			);
 		}
@@ -452,6 +513,7 @@ export function formatRunView(
 				? "Verification repair: not used by COMPLEX (a failed task or integration check blocks the Run)"
 				: `Verification repair: ${run.verificationRepair?.mode ?? "UNKNOWN (legacy)"}; used ${run.verificationRepair?.attempts.length ?? 0}/1 (separate from Reviewer revisions)`,
 			`Next steps: ${run.next.join(", ") || "none"}`,
+			...formatModelRoutes(run.workflow, run.workerMeasurements ?? []),
 			...(complex ? formatComplexRows(run, "status") : []),
 		);
 		if (command === "state") {
