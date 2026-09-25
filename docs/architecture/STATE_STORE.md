@@ -60,6 +60,8 @@ In every other case nothing is written and prepare fails as before: owner alive 
 
 `control.snapshot` stays read-only and keeps showing the orphan until a prepare recovers it. The `workflow.confirm` guarded start keeps `recoverInterrupted: false` as its freshness fence; after a prepare-time recovery no active Run is left for it to refuse. Nothing is resumed, replayed, rolled back or deleted. Partial changes stay in the checkout, and the next Run still requires a clean workspace.
 
+For a COMPLEX Run, `workflow.derive` ([COMPLEX_RERUN.md](COMPLEX_RERUN.md)) can turn the recovered Run into a candidate draft for that next Run and list the leftover changes that block the clean start. It is not a resume. It reads `state.json` with `readSnapshot` only: it takes no lock, recovers nothing, writes nothing and moves no revision, and it is allowed while a writer lock is present.
+
 App note: the Project Settings panel enables prepare only when `writerPresent` is `false` and no Run is active. Until that gating allows a prepare over a writer lock, an App-only user cannot trigger this recovery. That App change is tracked separately.
 
 ## 2. Terminal-run archive
@@ -92,4 +94,4 @@ Effect: each mutation rewrites at most the active run, 20 terminal runs, the ind
 
 ## Non-goals
 
-No schema version bump (the index is optional and older states stay valid), no archive pruning or compression, no resume of interrupted runs, no change to lock semantics for live owners, and no cross-host coordination.
+No schema version bump (the index is optional and older states stay valid), no archive pruning or compression, no resume of interrupted runs (the V0.8C re-run in [COMPLEX_RERUN.md](COMPLEX_RERUN.md) starts a new Run and is not a resume), no change to lock semantics for live owners, and no cross-host coordination.

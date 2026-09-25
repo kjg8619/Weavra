@@ -4,7 +4,7 @@ Adaptive Agent Workflow Runtime — **Weavra v0.1 RC1 기반 development build**
 
 사용자 설치·Quick Start·기능 범위는 [Weavra README](../../README.md)를 참고한다. 이 문서는 S0~S6 및 RC 수정의 구현 참조다. 내부 `company-runtime`/`CompanyKernel` 명칭과 Pi workspace package 버전 `0.85.1`은 유지하며 Weavra 제품 버전과 구분한다.
 
-Host 독립 Kernel, StateStore·Policy, 독립 Pi SDK 역할에 실제 Git evidence·등록 check·명령/lifecycle을 연결했다. **STANDARD/R0~R2와 QUICK/R0~R1**을 지원한다. R2는 제한된 파일 변경과 독립 리뷰를 결합한 경로다. R3는 명시적 인간 승인을 받은 단일 tracked 텍스트 파일 삭제만 지원한다. COMPLEX는 Host Control로 준비·확인한 구조화 계획의 2~8개 task를 한 Run에서 실행하는 경로로만 지원한다([V0.7B](#v07b-complex-순차-workflow)). 독립 task의 구현은 최대 4개까지 wave로 동시에 실행할 수 있고 검증은 항상 한 번에 하나다([V0.8A](#v08a-complex-병렬-구현-wave)). 선택적 Planner는 그 계획의 초안을 사람이 검토할 후보 데이터로만 제안한다([V0.8B](#v08b-planner-초안)). 범용 R3 실행, 자동 resume/rollback/commit은 지원하지 않는다. [GPT RC-01~08 validation](../../docs/GPT_RC_VALIDATION_2026-09-16.md)의 한정된 실제 검증을 통과했으며 정식 V0.1 release 선언은 아니다. DeepSeek는 NOT VERIFIED다.
+Host 독립 Kernel, StateStore·Policy, 독립 Pi SDK 역할에 실제 Git evidence·등록 check·명령/lifecycle을 연결했다. **STANDARD/R0~R2와 QUICK/R0~R1**을 지원한다. R2는 제한된 파일 변경과 독립 리뷰를 결합한 경로다. R3는 명시적 인간 승인을 받은 단일 tracked 텍스트 파일 삭제만 지원한다. COMPLEX는 Host Control로 준비·확인한 구조화 계획의 2~8개 task를 한 Run에서 실행하는 경로로만 지원한다([V0.7B](#v07b-complex-순차-workflow)). 독립 task의 구현은 최대 4개까지 wave로 동시에 실행할 수 있고 검증은 항상 한 번에 하나다([V0.8A](#v08a-complex-병렬-구현-wave)). 선택적 Planner는 그 계획의 초안을 사람이 검토할 후보 데이터로만 제안한다([V0.8B](#v08b-planner-초안)). 끝나지 않은 COMPLEX Run은 재개하지 않으며, 그 Run에서 사람이 검토할 새 Run 초안을 읽기 전용으로 만들 수 있다([V0.8C](#v08c-미완료-complex-작업의-명시적-재실행)). 범용 R3 실행, 자동 resume/rollback/commit은 지원하지 않는다. [GPT RC-01~08 validation](../../docs/GPT_RC_VALIDATION_2026-09-16.md)의 한정된 실제 검증을 통과했으며 정식 V0.1 release 선언은 아니다. DeepSeek는 NOT VERIFIED다.
 
 ## 로딩
 
@@ -666,7 +666,7 @@ readiness는 project config validation이나 Provider readiness가 아니라 **�
 | `browser.prepare` | candidate digest와 Host가 검토한 expectation을 Runtime 등록 preview로 고정; 모델 호출 없음 |
 | `browser.confirm` | exact preview의 명시적 확인 후 기존 project config에 browser check 등록; 실행/PASS 아님 |
 
-V0.8B Host는 후보 초안만 다루는 `planner.start`·`planner.cancel`·`planner.read`도 받는다([V0.8B](#v08b-planner-초안)). 이전 App이 광고 `commands` tuple을 엄격하게 decode하므로 이 세 command는 tuple에 넣지 않고 `plannerContractVersion: 1`로만 알린다. 어느 것도 prepare·confirm·실행을 대신하지 않는다.
+V0.8B Host는 후보 초안만 다루는 `planner.start`·`planner.cancel`·`planner.read`도 받는다([V0.8B](#v08b-planner-초안)). 이전 App이 광고 `commands` tuple을 엄격하게 decode하므로 이 세 command는 tuple에 넣지 않고 `plannerContractVersion: 1`로만 알린다. 어느 것도 prepare·confirm·실행을 대신하지 않는다. V0.8C Host는 읽기 전용 `workflow.derive`도 같은 방식으로 받고 `rerunContractVersion: 1`로만 알린다([V0.8C](#v08c-미완료-complex-작업의-명시적-재실행)). resume·prepare·confirm·실행을 대신하지 않는다.
 
 - **입력은 data뿐이다.** classification·execution mode·scope·checks·frozen Task Contract·revision, approval grant/consumption·Policy·PASS·COMPLETE는 Runtime/Kernel이 소유한다. T3가 임의 계약 필드나 도구/셸 명령을 실행 인수로 지정하지 않는다. confirmation 뒤 계약을 UI에서 변경하지 않는다.
 - owner UUID + **Runtime-issued 단조 증가 request ID** + 최대 **64개 payload-bound receipt**를 사용한다. 다른 payload로 같은 ID를 재사용하거나 같은 epoch에서 이미 evicted된 ID를 replay해 새 실행을 만들 수 없다. 이 bounded receipt는 durable replay log나 재시작 recovery가 아니다.
@@ -795,6 +795,21 @@ weavra browser observe \
 - **binding.** 접수할 때 `requestDigest`(`sha256:` + `JSON.stringify(["weavra-planner-request-v1", goal, acceptanceStatements])` UTF-8의 소문자 hex SHA-256, statements가 없으면 `[]`), project revision, prepare가 비교하는 config fingerprint를 기록한다. RUNNING 중 revision이나 config가 바뀌면 다음 모델 호출 전이나 READY 전에 `STALE`이다. READY 뒤에는 snapshot과 `planner.read`마다 `current`를 계산한다. `workflow.prepare`는 불러온 초안을 항상 다시 compile한다.
 - **다른 control과의 관계.** RUNNING 중 `workflow.prepare`는 허용되고 `workflow.confirm`은 `PLANNER_BUSY`다(암묵적 취소 없음). 새 `planner.start`는 READY·FAILED·CANCELLED 상태를 대체한다. 계획을 시작한 연결이 닫히거나 Host가 종료되면 RUNNING을 취소한다. writer lock·`.ai` 쓰기·Run·project revision 변경은 없다.
 - **검증 범위.** faux provider의 단위·Host Control 테스트(`test/planner.test.ts`, `test/host-planner.test.ts`)만 근거다. App(#53)과 결합한 경계 corpus(#54)와 실모델 smoke는 NOT VERIFIED다.
+
+## V0.8C 미완료 COMPLEX 작업의 명시적 재실행
+
+설계 계약: [COMPLEX_RERUN.md](../../../../docs/architecture/COMPLEX_RERUN.md). BLOCKED·CANCELLED·FAILED·INTERRUPTED로 끝난 최신 COMPLEX Run에서 사람이 검토할 **후보 재실행 초안**을 결정적으로 만들고, 새 Run의 clean start를 막는 **남은 변경**을 알려 준다. resume이 아니다. 모델 호출·writer lock·`.ai` 쓰기·Run·revision 변경이 없고 어떤 증거도 재사용하지 않으며, 원래 Run은 이력으로 남는다. 사람이 남은 변경을 자기 도구로 commit하거나 버린 뒤(Runtime은 둘 다 하지 않는다) 초안을 편집기에 불러와 기존 `workflow.prepare` → preview → `workflow.confirm`을 거친다(`src/complex-rerun.ts`, `src/host-control.ts`).
+
+| command | 계약 |
+|---|---|
+| `workflow.derive` | mutation envelope와 `{ runId }`. 계약 표 순서대로 검사하고 프로젝트 파일을 읽기 전에 거부한다: 최신 durable Run(`runs.at(-1)`)이 아니면 `RUN_NOT_FOUND`; Host가 확인한 plan이 있는 COMPLEX가 아니거나, BLOCKED·CANCELLED·FAILED·INTERRUPTED가 아니거나(COMPLETED와 아직 진행 중인 Run 포함), 모든 행이 COMPLETED이거나, R3이면 새 코드 `RERUN_NOT_APPLICABLE`; active Run이 있거나 이 Host가 실행 중이면 `ACTIVE_RUN`; `expectedProjectRevision`이 현재가 아니면 `STALE_PROJECT`. writer lock이 있어도 허용하고 죽은 소유자 복구도 하지 않는다. 그 뒤 설정을 읽지 못하면 `CONTROL_UNAVAILABLE`, 파일을 읽는 동안 revision이 바뀌면 `STALE_PROJECT`다. 성공하면 `derived-draft`를 돌려준다 |
+
+- **초안.** 원래 parent의 goal과 AC 순서의 statement(`AC-001`이 1번)를 싣는다. task 수·순서·`dependsOnIndexes`, 1-based 기준 index와 check ID는 그대로다. COMPLETED 행은 읽기 전용 검증 task가 된다: 제목 `Verify: <title>`(80자), goal `Re-verify without changes: <goal>`(300자; 둘 다 UTF-16 길이 안에서 code point 경계로 자름), `ownership: []`, 같은 기준과 check. 새 Run에서 self-check·review·test를 새로 하며 이전 PASS는 옮기지 않는다. 나머지 행은 title·goal·기준·check를 유지하고 claim만 현재 파일로 다시 판단한다. `create` 대상이 이제 정확한 철자의 일반 파일로 있으면 `modify`가 되고, 그 밖의 claim은 그대로다(없는 파일의 `modify`는 note에 남고 dry-run이 거부를 보여 준다).
+- **dry-run.** 초안을 Planner와 같은 prepare 파이프라인(`prepareHostWorkflowDraft` → `finalizeComplexHostWorkflowPlan` → `compileComplexPlan`, claim fact·현재 Policy·응답 크기 포함)에 통과시켜 `prepareCheck: { ok, code }`로 알린다. `code`는 그 파이프라인이 답할 기존 코드(`INVALID_REQUEST`·`INVALID_GOAL`·`UNSUPPORTED_WORKFLOW`·`INVALID_CRITERIA`·`RESPONSE_TOO_LARGE`)뿐이다. 아무것도 저장하지 않는다.
+- **남은 변경.** 시작 검사(`GitWorkspace.assertClean`)와 같은 `git status --porcelain=v1 -z --untracked-files=all`, 같은 Runtime 소유·생성 관측 경로 filter(공유 helper `cleanStartBlockers`)를 workspace를 열지 않고 실행한다. rename은 새 경로와 이전 경로를 모두 싣는다. 정렬된 이름만 최대 200개·16,384 UTF-8 bytes까지 싣고 넘으면 `truncated: true`다. Git이 답하지 못하거나 프로젝트가 Git root가 아니면 `clean: null`(모름, clean이 아님)과 빈 목록이다. 내용·diff·mode는 없다.
+- **notes.** 최대 16개, 각 200 bytes 이하의 고정 문장이다(`create became modify (file exists)`, `modify target is missing`, `completed files missing: …; a verification task cannot recreate them`). 긴 문장은 `…`로, 넘치는 목록은 마지막 `N more notes omitted`로 표시하며 파일 내용은 싣지 않는다.
+- **관측.** `control.hello`는 `rerunContractVersion: 1`을 광고한다(권한·준비 완료 표시가 아님). 광고 `commands` tuple과 snapshot은 V0.8B와 같고 초안은 응답에만 있다. 응답 한 줄(개행 포함)은 49,152 bytes 이하이며 넘으면 `RESPONSE_TOO_LARGE`다. 남은 변경 목록 외에는 자르지 않는다. 같은 원본·파일·설정이면 두 번 만든 응답 data가 byte 단위로 같다.
+- **검증 범위.** 단위·Host Control 테스트(`test/complex-rerun.test.ts`, `test/host-rerun.test.ts`)만 근거다. App(#57)과 결합한 경계 corpus(#58)와 실모델 smoke는 NOT VERIFIED다.
 
 ## #5 모델 의도 프로필
 

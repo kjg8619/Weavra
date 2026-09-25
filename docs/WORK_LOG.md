@@ -1141,3 +1141,33 @@
   - 변이 확인: capability 게이트를 없애면 서버 3개·UI 1개, 불러온 뒤 자동 prepare를 넣으면 5개, lock 허용 조건을 모든 writer 상태로 넓히면 2개가 실패했다. runId 일치, delete 금지, 교체 확인, R3 제외 등 추가 변이도 모두 잡혔다.
 - 메인 세션: App의 해석(prepareCheck 코드 5종, leftovers 규칙, 문자열을 그대로 돌려줄 것, 이미 종료된 Run의 lock 해제는 revision이 바뀌지 않을 수 있다는 점)을 Runtime 에이전트에게 전달했다.
 - 커밋 상태: `11f7a446`, `3376500f`, `7541c0e0`, `ab30f4d8`, `aecc9f30`, `886162c0`, devlop 병합, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — V0.8C #56 Runtime `workflow.derive`
+
+- 목적: COMPLEX_RERUN.md §3–§6·§8의 Runtime 쪽 구현이다. App #57(PR #67)이 먼저 머지된 뒤 올린다.
+- 브랜치/worktree: `feat/v0.8c-rerun-runtime`, `Weavra-worktrees/v0.7b-complex-runtime`(재사용). 하위 에이전트가 구현했고, 메인 세션이 검토와 수정 1건을 했다.
+- 변경(`runtime/pi/packages/company-runtime`):
+  - `host-control.ts` `derive()`:
+    - §3 조건을 표 순서대로 검사한다. 파일을 읽기 전에 `RUN_NOT_FOUND`, `RERUN_NOT_APPLICABLE`, `ACTIVE_RUN`, `STALE_PROJECT` 순으로 거부한다.
+    - 그다음 설정을 읽고, claim 사실을 확인하고, 순수 도출과 dry-run(Planner와 공유하도록 `prepareDryRun`을 추출)을 한 뒤 leftovers를 모은다.
+    - 파일을 읽은 뒤 revision을 다시 확인하고, 응답 49,152 bytes 상한을 적용한다.
+    - lock·복구·`.ai` 쓰기는 없다. lock이 있어도 도출은 허용한다.
+  - `complex-rerun.ts`(신규): 원본 적격성(R3는 원본 Run의 risk로 판정), 코드 포인트 단위 자르기, 메모 제한, `deriveRerunDraft`(COMPLETED는 claim 없는 검증 작업, 파일이 있으면 create→modify), leftovers 제한.
+  - `workspace.ts`:
+    - `cleanStartBlockers`를 `assertClean`과 공유한다. rename·copy는 두 이름을 모두 잡는다.
+    - 읽기 전용 `readCleanStartBlockers`를 추가했다. Git이 실패하거나 프로젝트가 자체 Git 루트가 아니면 null을 돌려준다.
+  - 프로토콜:
+    - `rerunContractVersion: 1`을 추가했다. `commands` 목록은 바꾸지 않았다.
+    - `derived-draft`와 `RERUN_NOT_APPLICABLE`을 추가했다.
+    - `prepareCheck` 코드는 prepare 파이프라인 코드 5종만 쓰고, 나머지는 INVALID_REQUEST로 보낸다. 설정이 없으면 도출 자체를 `CONTROL_UNAVAILABLE`로 거부한다.
+  - 문서: OVERVIEW, COMPLEX_SEQUENTIAL_WORKFLOW §8(메모), PARALLEL_AGENTS §12, STATE_STORE, README의 "재개 없음" 문장이 COMPLEX_RERUN.md를 가리키게 했다.
+  - 메인 세션 수정(`82691ed2`): UI 확인에서 재실행한 Run을 다시 도출하자 제목이 `Verify: Verify: …`로 겹쳤다. 접두사는 이미 있으면 붙이지 않게 했고, 테스트와 계약 §4를 함께 고쳤다.
+- 현재 검증:
+  - 하위 에이전트:
+    - 테스트 44개(`complex-rerun.test.ts` 24, `host-rerun.test.ts` 20)가 §3 거부와 판정 순서, §4 표의 모든 행, prepareCheck, leftovers(Runtime 소유 경로 제외, rename, 잘림, unknown), 읽기 전용, 결정성, 응답 상한, 새 Run 정체성을 확인한다.
+    - 변이 확인 10/10에서 테스트가 실패했다.
+    - `npm run check` exit 0. `./test.sh` exit 0(company-runtime 2,248 PASS).
+    - #57 App과 함께 COMPLEX 14·PARALLEL 9·PLANNER 13 corpus를 통과했다.
+    - Host 테스트의 derive·hello 응답 73줄이 #57 App의 엄격한 디코더를 모두 통과했다.
+  - 메인 세션: 수정 뒤 re-run 테스트 44개와 `npm run check`를 통과했다. 통합 브랜치의 #58 corpus(`RERUN INTEGRATION PASS: 5`), 실제 모델 smoke, 실제 UI 확인은 #58 기록에 적는다.
+- 커밋 상태: `37a7c738`, `1722e8f2`, `82691ed2`, devlop 병합, 이 기록. devlop 대상 PR.

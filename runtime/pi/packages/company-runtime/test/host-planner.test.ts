@@ -99,7 +99,12 @@ describe("§7.1 capability and §7.3 snapshot shape", () => {
 		]);
 		expect(client.hello.data.capabilities.commands).toEqual(HOST_CONTROL_COMMANDS);
 		expect(HOST_PLANNER_COMMANDS).toEqual(["planner.start", "planner.cancel", "planner.read"]);
-		expect(HOST_CONTROL_ERROR_CODES.slice(-3)).toEqual(["PLANNER_BUSY", "PLANNER_NOT_FOUND", "PLANNER_NOT_READY"]);
+		// V0.8C appends RERUN_NOT_APPLICABLE after them.
+		expect(HOST_CONTROL_ERROR_CODES.slice(-4, -1)).toEqual([
+			"PLANNER_BUSY",
+			"PLANNER_NOT_FOUND",
+			"PLANNER_NOT_READY",
+		]);
 		// Accepted when requested; a planId is a canonical lowercase UUID.
 		const unknown = "00000000-0000-4000-8000-000000000000";
 		expect(failure(await client.mutation({ type: "planner.read", planId: unknown }))).toBe("PLANNER_NOT_FOUND");
