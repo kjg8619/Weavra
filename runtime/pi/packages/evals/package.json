@@ -8,6 +8,7 @@
 		"clean": "shx rm -rf .eval",
 		"eval": "node scripts/run-evals.mjs",
 		"benchmark": "node scripts/run-benchmark.mjs",
+		"reviewer-eval": "node scripts/run-reviewer-eval.mjs",
 		"test": "vitest run --config vitest.test.config.ts"
 	},
 	"devDependencies": {
