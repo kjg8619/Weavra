@@ -35,7 +35,8 @@ Production app modules do not import Runtime implementation source. The root cro
 An agent can run shell commands in one place: the interactive `weavra` conversation's built-in `bash` tool (and `powershell` if a user enables it). Workflow workers have no shell tool, and Policy denies `bash`, `sh`, `shell` and `exec` tool ids. Registered checks are trusted Host configuration, run as argv without a shell.
 
 - The command guard (`runtime/pi/packages/company-runtime/src/command-guard.ts`) classifies the conversation's shell commands locally as `read_only`, `reversible`, `destructive` or `unknown`. It runs inside the existing `tool_call` hook.
-- `destructive` and `unknown` commands need an explicit per-call confirmation from the user. Without a UI they are refused. Dismissal, timeout or any error also refuses.
+- `destructive` commands need an explicit confirmation from the user on every call. For an `unknown` command the user may instead allow that exact command for the rest of the session; the allowance lives in memory only and is cleared at every session start.
+- Without a UI, `destructive` and `unknown` commands are refused. Dismissal, timeout or any error also refuses and grants no allowance.
 - A classification grants nothing. It does not change Policy, workflow, Kernel or RegisteredVerifier decisions, and it makes no Jev, model or network call.
 - It does not claim to protect the worker or registered-check paths, commands the user types with `!`, or other tools.
 

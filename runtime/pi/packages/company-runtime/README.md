@@ -138,18 +138,20 @@ workflow가 workspace를 소유하는 동안에는 기존처럼 부모 도구 �
 분류는 허가가 아니며 가드는 어떤 권한도 부여하지 않는다.
 
 - `read_only`/`reversible`: 가드 도입 전처럼 실행한다.
-- `destructive`/`unknown`: TUI/RPC에서 선택 대화상자(`Deny` 기본, `Run once`)로 확인한 경우에만 이번 호출을 1회 실행한다. 다음 호출은 다시 확인한다. 대화상자에는 분류·이유·명령이 나온다(제어 문자는 escape, 긴 명령은 앞뒤만 표시).
-- UI가 없는 print/json 모드: 실행하지 않고 이유와 opt-out 방법을 tool 오류로 반환한다.
-- 대화상자 닫기·시간 초과·abort·UI 오류·기록 실패: 실행하지 않는다.
+- `destructive`: TUI/RPC 선택 대화상자(`Deny` 기본, `Run once`)에서 확인한 경우에만 이번 호출을 1회 실행한다. 호출마다 다시 묻고 세션 허용은 제공하지 않는다.
+- `unknown`: 같은 대화상자에 `Allow for this session`이 추가된다(`Deny` 기본 유지). 이를 고르면 **정확히 같은 명령**이 현재 세션이 끝날 때까지 묻지 않고 실행된다. 같은 명령인지는 앞뒤 공백(space·tab·newline)만 제거한 명령 텍스트의 sha256과 도구(`bash`/`powershell`)로 판단한다. 따옴표·안쪽 공백·인자가 하나라도 다르면 다시 묻는다. 허용 목록은 extension 메모리에만 있고 저장하지 않는다. 새 세션·resume·fork·reload의 `session_start`마다 비운다. 명령이 destructive로 분류되면 세션 허용과 무관하게 매번 묻는다.
+- 대화상자에는 분류·이유·명령이 나온다(제어 문자는 escape, 긴 명령은 앞뒤만 표시).
+- UI가 없는 print/json 모드: **변경 없음.** destructive/unknown 명령은 `WEAVRA_COMMAND_GUARD=off`가 아니면 거절하며 이유와 opt-out 방법을 tool 오류로 반환한다. 세션 허용은 대화상자에서만 생기고, 이미 있어도 print/json 모드에서는 적용하지 않는다.
+- 대화상자 닫기·시간 초과·abort·UI 오류·기록 실패: 실행하지 않으며 세션 허용도 생기지 않는다.
 
 ### 기록
 
-각 결정은 실행 전에 세션 JSONL(`~/.weavra/agent/sessions/…`)에 custom entry `weavra.command-guard`로 남는다. LLM 컨텍스트에는 들어가지 않는다. 필드는 `tool`, `toolCallId`, `category`, 고정 문구 `reasons`, 분류기 어휘 안의 `programs`(그 밖은 `(other)`), `commandSha256`, `commandBytes`, `confirmation`, `decision`, `remoteCalls: 0`이다. 명령 원문과 인자·경로는 기록하지 않는다(원문은 세션의 tool call 메시지에 이미 있다). 기록할 수 없으면 명령을 실행하지 않는다. 실행 전에 durable intent를 남기는 Policy와 같은 원칙이다.
+각 결정은 실행 전에 세션 JSONL(`~/.weavra/agent/sessions/…`)에 custom entry `weavra.command-guard`로 남는다. LLM 컨텍스트에는 들어가지 않는다. 필드는 `tool`, `toolCallId`, `category`, 고정 문구 `reasons`, 분류기 어휘 안의 `programs`(그 밖은 `(other)`), 앞뒤 공백을 제거한 명령의 `commandSha256`·`commandBytes`, `confirmation`(`not_required`, `confirmed`, `allowed_session`, `allowed_session_cached`, `declined`, `unavailable`, `failed`), `decision`, `remoteCalls: 0`이다. `allowed_session`은 사용자가 세션 허용을 고른 호출, `allowed_session_cached`는 그 허용으로 대화상자 없이 실행된 이후의 같은 명령이다. 명령 원문과 인자·경로는 기록하지 않는다(원문은 세션의 tool call 메시지에 이미 있다). 기록할 수 없으면 명령을 실행하지 않는다. 실행 전에 durable intent를 남기는 Policy와 같은 원칙이다.
 
 ### 설정과 동작 변경
 
 - 기본값은 켜짐이다. `WEAVRA_COMMAND_GUARD=off`만 가드를 끈다(명시적 opt-out). `confirm`/`on`/미설정은 켜짐이며, 그 밖의 값은 무시하고 켜진 상태를 유지한다. 프로젝트 `.ai/config.yaml`로는 끌 수 없다. TUI 시작 배너에 가드 상태가 1줄 표시된다.
-- **기존 CLI 동작 변경**: 이전에는 부모 대화의 모든 bash 명령이 확인 없이 실행되었다. 이제 TUI/RPC에서는 destructive/unknown 명령마다 확인을 묻는다. print/json 모드(`weavra -p` 등)에서는 `npm test` 같은 unknown 명령도 거절한다. 비대화형 자동화에서 이전 동작이 필요하면 `WEAVRA_COMMAND_GUARD=off`를 명시한다.
+- **기존 CLI 동작 변경**: 이전에는 부모 대화의 모든 bash 명령이 확인 없이 실행되었다. 이제 TUI/RPC에서는 destructive 명령마다 확인을 묻는다. `npm test` 같은 unknown 명령은 처음 한 번 묻고, 사용자가 `Allow for this session`을 고르면 같은 세션의 같은 명령은 다시 묻지 않는다. print/json 모드(`weavra -p` 등)에서는 unknown 명령도 거절하며 세션 허용이 없다. 비대화형 자동화에서 이전 동작이 필요하면 `WEAVRA_COMMAND_GUARD=off`를 명시한다.
 
 ### 한계
 
@@ -159,7 +161,7 @@ workflow가 workspace를 소유하는 동안에는 기존처럼 부모 도구 �
 - bash/POSIX 밖의 문법(zsh 전용 문법, fish)은 모델링하지 않으며 인식하지 못하면 `unknown`이다. PowerShell은 분류하지 않는다. Windows 지원을 주장하지 않는다. 검증 환경은 macOS(darwin), Node 24, faux provider 테스트다.
 - Jev 등 원격 보조 검사는 없다. 도입한다면 별도 범위에서 전송 정책·timeout·예산·오류 처리를 따로 설계한다.
 
-테스트: `test/command-risk.test.ts`(분류 표·`sed -i`·따옴표·복합 명령·fuzz), `test/command-guard.test.ts`(가로채기·확인·UI 없음 거절·실패 시 거절·기록·opt-out·worker와 Policy 불변), `packages/coding-agent/test/suite/company-runtime-command-guard.test.ts`(실제 AgentSession tool loop, faux model, 셸을 실행하지 않는 bash 대역).
+테스트: `test/command-risk.test.ts`(분류 표·`sed -i`·따옴표·복합 명령·fuzz), `test/command-guard.test.ts`(가로채기·확인·세션 허용·UI 없음 거절·실패 시 거절·기록·opt-out·worker와 Policy 불변), `packages/coding-agent/test/suite/company-runtime-command-guard.test.ts`(실제 AgentSession tool loop, faux model, 셸을 실행하지 않는 bash 대역).
 
 ## Weavra Status Projection
 

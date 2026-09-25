@@ -65,6 +65,8 @@ export function registerCompanyRuntime(
 	const commandGuard = options.commandGuard
 		? { mode: options.commandGuard, ignoredValue: false }
 		: commandGuardSetting(process.env[COMMAND_GUARD_ENVIRONMENT]);
+	// `unknown` commands the user allowed for this session: memory only, cleared at every session start.
+	const sessionAllowances = new Set<string>();
 	let pending: Promise<void> | undefined;
 	let exporting: Promise<void> | undefined;
 	let workflow: StandardWorkflow | undefined;
@@ -601,6 +603,7 @@ export function registerCompanyRuntime(
 		});
 	}
 	pi.on("session_start", (_event, ctx) => {
+		sessionAllowances.clear();
 		closeGraphViewer();
 		clearStatus();
 		if (ctx.mode === "tui" && ctx.hasUI) {
@@ -627,9 +630,12 @@ export function registerCompanyRuntime(
 			return { block: true, reason: "Weavra workflow owns workspace; use /workflow cancel", terminate: true };
 		// #5 command guard: the parent conversation's shell tools only. Workers have no shell and are not affected.
 		if (commandGuard.mode === "off" || !isGuardedShellTool(event.toolName)) return undefined;
-		return guardShellToolCall(event, ctx, (entry) => {
-			if (!pi.appendEntry) throw new Error("Command guard decisions cannot be recorded");
-			pi.appendEntry(COMMAND_GUARD_ENTRY_TYPE, entry);
+		return guardShellToolCall(event, ctx, {
+			record: (entry) => {
+				if (!pi.appendEntry) throw new Error("Command guard decisions cannot be recorded");
+				pi.appendEntry(COMMAND_GUARD_ENTRY_TYPE, entry);
+			},
+			sessionAllowances,
 		});
 	});
 	pi.on("user_bash", () =>

@@ -102,4 +102,32 @@ describe("Weavra command guard in the parent conversation (#5)", () => {
 			["confirmed", "allow"],
 		]);
 	});
+
+	it("in the TUI, an unknown command allowed for the session reruns without a prompt until the next session start", async () => {
+		const executed: string[] = [];
+		const harness = await conversation(executed);
+		const select = vi.fn<ExtensionUIContext["select"]>();
+		const ui = { select, notify: vi.fn(), setStatus: vi.fn() } as unknown as ExtensionUIContext;
+		await harness.session.bindExtensions({ mode: "tui", uiContext: ui });
+		select.mockResolvedValueOnce("Allow for this session");
+		for (const prompt of ["test", "test again"]) {
+			script(harness, "npm test");
+			await harness.session.prompt(prompt);
+		}
+		expect(executed).toEqual(["npm test", "npm test"]);
+		expect(select).toHaveBeenCalledOnce();
+		expect(select.mock.calls[0][1]).toEqual(["Deny", "Run once", "Allow for this session"]);
+		// Binding a session emits session_start, which forgets every session allowance.
+		await harness.session.bindExtensions({ mode: "tui", uiContext: ui });
+		select.mockResolvedValueOnce("Deny");
+		script(harness, "npm test");
+		await harness.session.prompt("test once more");
+		expect(executed).toEqual(["npm test", "npm test"]);
+		expect(select).toHaveBeenCalledTimes(2);
+		expect(guardEntries(harness).map((entry) => [entry.confirmation, entry.decision])).toEqual([
+			["allowed_session", "allow"],
+			["allowed_session_cached", "allow"],
+			["declined", "deny"],
+		]);
+	});
 });

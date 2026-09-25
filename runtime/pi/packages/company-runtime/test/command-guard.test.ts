@@ -15,6 +15,7 @@ import {
 	type CommandGuardEntry,
 	commandGuardSetting,
 	guardShellToolCall,
+	normalizeCommand,
 } from "../src/command-guard.ts";
 import { classifyCommand } from "../src/command-risk.ts";
 import { parseRuntimeConfig } from "../src/config.ts";
@@ -369,10 +370,157 @@ describe("command guard on the interactive bash tool (#5)", () => {
 		const result = await guardShellToolCall(
 			{ toolName: "bash", toolCallId: "call-2", input: {} },
 			context({ hasUI: false }),
-			(entry) => entries.push(entry),
+			{ record: (entry) => entries.push(entry), sessionAllowances: new Set() },
 		);
 		expect(result).toMatchObject({ block: true });
 		expect(entries[0]).toMatchObject({ category: "unknown", reasons: ["the tool input has no command text"] });
+	});
+});
+
+describe("session allowance for unclassified commands (#5)", () => {
+	const allowSession = "Allow for this session";
+	const confirmations = (guard: ReturnType<typeof host>) =>
+		guard.entries.map((entry) => [entry.data.category, entry.data.confirmation, entry.data.decision]);
+
+	it("is offered for unknown commands only, never for destructive ones", async () => {
+		const guard = host();
+		select.mockResolvedValue("Deny");
+		await guard.toolCall("bash", { command: "npm test" });
+		await guard.toolCall("bash", { command: "rm -rf dist" });
+		expect(select.mock.calls.map((call) => call[1])).toEqual([
+			["Deny", "Run once", allowSession],
+			["Deny", "Run once"],
+		]);
+		expect(select.mock.calls[0][0]).toContain("runs this exact command without asking until the session ends");
+		expect(select.mock.calls[1][0]).toContain("Destructive commands are asked every time.");
+	});
+
+	it("applies only to the identical command and records allowed_session, then allowed_session_cached", async () => {
+		const guard = host();
+		select.mockResolvedValueOnce(allowSession);
+		expect(await guard.toolCall("bash", { command: "npm test" })).toBeUndefined();
+		// Identical text, with or without surrounding blanks: no prompt.
+		expect(await guard.toolCall("bash", { command: "npm test" })).toBeUndefined();
+		expect(await guard.toolCall("bash", { command: "  npm test\n" })).toBeUndefined();
+		expect(select).toHaveBeenCalledOnce();
+		// Any other command asks again, including a change inside the text.
+		select.mockResolvedValue("Deny");
+		for (const command of ["npm  test", "npm test -- --watch", "npm run build", "'npm' test"])
+			expect(await guard.toolCall("bash", { command })).toMatchObject({ block: true });
+		expect(select).toHaveBeenCalledTimes(5);
+		expect(confirmations(guard)).toEqual([
+			["unknown", "allowed_session", "allow"],
+			["unknown", "allowed_session_cached", "allow"],
+			["unknown", "allowed_session_cached", "allow"],
+			...Array.from({ length: 4 }, () => ["unknown", "declined", "deny"]),
+		]);
+		expect(new Set(guard.entries.slice(0, 3).map((entry) => entry.data.commandSha256))).toEqual(
+			new Set([digest("npm test")]),
+		);
+		// The same text under the other shell tool is a different command.
+		select.mockResolvedValueOnce("Deny");
+		expect(await guard.toolCall("powershell", { command: "npm test" })).toMatchObject({ block: true });
+		expect(select).toHaveBeenCalledTimes(6);
+	});
+
+	it("never covers a destructive command, even one that contains the allowed command", async () => {
+		const guard = host();
+		select.mockResolvedValueOnce(allowSession);
+		await guard.toolCall("bash", { command: "npm test" });
+		select.mockResolvedValue("Deny");
+		expect(await guard.toolCall("bash", { command: "npm test && rm -rf dist" })).toMatchObject({ block: true });
+		// A UI answering with an option that was not offered grants nothing.
+		select.mockResolvedValueOnce(allowSession);
+		expect(await guard.toolCall("bash", { command: "rm -rf dist" })).toMatchObject({ block: true });
+		select.mockResolvedValueOnce("Deny");
+		expect(await guard.toolCall("bash", { command: "rm -rf dist" })).toMatchObject({ block: true });
+		expect(select).toHaveBeenCalledTimes(4);
+		expect(select.mock.calls.slice(1).map((call) => call[1])).toEqual([
+			["Deny", "Run once"],
+			["Deny", "Run once"],
+			["Deny", "Run once"],
+		]);
+		expect(confirmations(guard).slice(1)).toEqual([
+			["destructive", "declined", "deny"],
+			["destructive", "declined", "deny"],
+			["destructive", "declined", "deny"],
+		]);
+	});
+
+	it("does not survive a new session", async () => {
+		const guard = host();
+		select.mockResolvedValueOnce(allowSession);
+		await guard.toolCall("bash", { command: "npm test" });
+		expect(await guard.toolCall("bash", { command: "npm test" })).toBeUndefined();
+		expect(select).toHaveBeenCalledOnce();
+		// New, resumed or forked session: the extension receives session_start and forgets every allowance.
+		guard.handlers.get("session_start")!({ type: "session_start", reason: "new" }, context({ mode: "print" }));
+		select.mockResolvedValueOnce("Deny");
+		expect(await guard.toolCall("bash", { command: "npm test" })).toMatchObject({ block: true });
+		expect(select).toHaveBeenCalledTimes(2);
+		// A reload registers the extension again, with an empty in-memory set.
+		select.mockResolvedValueOnce("Deny");
+		expect(await host().toolCall("bash", { command: "npm test" })).toMatchObject({ block: true });
+		expect(select).toHaveBeenCalledTimes(3);
+	});
+
+	it("is never granted by dismissal, timeout, abort, a UI failure or a failed record", async () => {
+		let failRecord = false;
+		const entries: CommandGuardEntry[] = [];
+		const guard = host({
+			appendEntry: (_type, data) => {
+				if (failRecord) throw new Error("session file unavailable");
+				entries.push(data as CommandGuardEntry);
+			},
+		});
+		select.mockResolvedValueOnce(undefined); // dismissed or timed out
+		expect(await guard.toolCall("bash", { command: "npm test" })).toMatchObject({ block: true });
+		const aborted = new AbortController();
+		aborted.abort();
+		select.mockResolvedValueOnce(allowSession); // a late answer after the turn was aborted
+		expect(await guard.toolCall("bash", { command: "npm test" }, context({ signal: aborted.signal }))).toMatchObject({
+			block: true,
+		});
+		select.mockRejectedValueOnce(new Error("UI failed"));
+		expect(await guard.toolCall("bash", { command: "npm test" })).toMatchObject({ block: true });
+		failRecord = true;
+		select.mockResolvedValueOnce(allowSession);
+		expect(await guard.toolCall("bash", { command: "npm test" })).toMatchObject({
+			block: true,
+			reason: expect.stringContaining("could not complete its check"),
+		});
+		failRecord = false;
+		// None of the above left an allowance behind: the next call asks again.
+		select.mockResolvedValueOnce("Deny");
+		expect(await guard.toolCall("bash", { command: "npm test" })).toMatchObject({ block: true });
+		expect(select).toHaveBeenCalledTimes(5);
+		expect(entries.map((entry) => entry.confirmation)).toEqual(["declined", "declined", "failed", "declined"]);
+	});
+
+	it("leaves print/json mode unchanged: unknown commands are refused even after a session allowance", async () => {
+		const guard = host();
+		select.mockResolvedValueOnce(allowSession);
+		await guard.toolCall("bash", { command: "npm test" });
+		for (const mode of ["print", "json"])
+			expect(await guard.toolCall("bash", { command: "npm test" }, context({ mode, hasUI: false }))).toMatchObject({
+				block: true,
+				reason: expect.stringContaining(`not available in ${mode} mode`),
+			});
+		expect(select).toHaveBeenCalledOnce();
+		expect(confirmations(guard).slice(1)).toEqual([
+			["unknown", "unavailable", "deny"],
+			["unknown", "unavailable", "deny"],
+		]);
+	});
+
+	it("normalizes only surrounding blanks", () => {
+		expect(normalizeCommand(" \t\nnpm test \n\t ")).toBe("npm test");
+		expect(normalizeCommand("npm  test")).toBe("npm  test");
+		// A backslash escapes the first trailing blank, so the text stays exact.
+		expect(normalizeCommand("npm test\\ ")).toBe("npm test\\ ");
+		// Carriage returns and non-breaking spaces are not blanks to bash.
+		expect(normalizeCommand("npm test\r")).toBe("npm test\r");
+		expect(normalizeCommand("npm test\u00a0")).toBe("npm test\u00a0");
 	});
 });
 
