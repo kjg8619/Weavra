@@ -17,6 +17,7 @@ import {
   type WeavraControlObservation,
   type WeavraControlPreview,
   WeavraControlState,
+  type WeavraPlannerStatus,
   WeavraTaskContract,
 } from "@t3tools/contracts";
 import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
@@ -39,6 +40,7 @@ import {
   previewTaskContractDigest,
   taskContractDigest,
 } from "./ComplexProjection.ts";
+import { plannerDraftConsistent, plannerStateConsistent } from "./PlannerProjection.ts";
 import { make } from "./RuntimeController.ts";
 // Shared cross-side references: the Runtime lane keeps its own copies of the same fixtures.
 import reference from "./testFixtures/complexContractV1.json" with { type: "json" };
@@ -86,6 +88,7 @@ const registration = {
 const source = `
 import { createInterface } from 'node:readline';
 import { readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 if(process.argv.slice(2).join('|')!=='bridge|--stdio|--project-trusted|--control')process.exit(41);
 const mode=process.env.MODE;
 const launch=existsSync('launch-count')?Number(readFileSync('launch-count','utf8'))+1:1;
@@ -99,9 +102,13 @@ const receipts=new Map();
 const empty={status:{source:'durable-canonical-state',ownerObserved:false,state:'missing',writerPresent:false,run:null},graph:null,graphAvailable:false,evidence:null,configuration:{source:'project-config-not-frozen-run-config',status:'missing'}};
 let state={ownerId,nextRequestId:ownerId+':1',projectRevision:0,stateRevision:null,ownedRunId:null,busy:false,cancelling:false,startFailure:null,preview:null,browserPreview:null,factPreview:null,projectFacts:{status:'available',entries:[]},pendingApproval:null,snapshot:empty};
 if(mode==='orphan'){state.stateRevision=4;state.snapshot={...empty,status:{source:'durable-canonical-state',ownerObserved:false,state:'available',writerPresent:true,run:{runId:'orphan-run',status:'RUNNING',phase:'IMPLEMENT',workflow:'STANDARD',risk:'R1',executionMode:'EDIT',codeRevision:0,currentStep:{stepId:'implement',attempt:1},activeAgentCount:1,taskContractDigest:digest,createdAt:1,updatedAt:1}}};}
-if(existsSync('canonical.json')){const old=JSON.parse(readFileSync('canonical.json','utf8'));state={...old,ownerId,nextRequestId:ownerId+':1',ownedRunId:null,busy:false,cancelling:false,preview:null,browserPreview:null,factPreview:null,pendingApproval:null};}
+if(existsSync('canonical.json')){const old=JSON.parse(readFileSync('canonical.json','utf8'));state={...old,ownerId,nextRequestId:ownerId+':1',ownedRunId:null,busy:false,cancelling:false,preview:null,browserPreview:null,factPreview:null,pendingApproval:null};delete state.planner;}
 const complex=mode==='complex'?1:mode==='complex-v2'?2:0;
-const capabilities={authority:'Runtime/Kernel',control:'workflow-control-v1',ownerId,commands:['control.hello','control.snapshot','workflow.prepare','workflow.confirm','workflow.cancel','approval.resolve','browser.inspect','browser.prepare','browser.confirm','facts.prepare','facts.confirm'],maxRequestBytes:32768,maxResponseBytes:65536,resultLimit:64,previewTtlMs:300000,runtimeVersion:'0.85.1',readiness:mode==='not-setup'&&launch===1?'NOT_SETUP':'READY',...(complex?{complexContractVersion:complex}:{}),recipes:[]};
+// V0.8B Planner peer: planning state lives in this process only, keyed by a fresh planId per start.
+const planner=String(mode).startsWith('planner');
+let plans=0;
+const planIdOf=(n)=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+const capabilities={authority:'Runtime/Kernel',control:'workflow-control-v1',ownerId,commands:['control.hello','control.snapshot','workflow.prepare','workflow.confirm','workflow.cancel','approval.resolve','browser.inspect','browser.prepare','browser.confirm','facts.prepare','facts.confirm'],maxRequestBytes:32768,maxResponseBytes:65536,resultLimit:64,previewTtlMs:300000,runtimeVersion:'0.85.1',readiness:mode==='not-setup'&&launch===1?'NOT_SETUP':'READY',...(complex?{complexContractVersion:complex}:{}),...(planner?{plannerContractVersion:1}:{}),recipes:[]};
 const reply=(request,data,error)=>({protocolVersion:1,type:'control_response',id:request.id,command:request.type,ownerId,runId:state.snapshot.status.run?.runId??null,stateRevision:state.stateRevision,projectRevision:state.projectRevision,eventId:null,timestamp:1000,success:!error,...(error?{error:{code:error}}:{data})});
 const save=()=>writeFileSync('canonical.json',JSON.stringify(state));
 for await(const line of createInterface({input:process.stdin})){
@@ -113,6 +120,8 @@ for await(const line of createInterface({input:process.stdin})){
    const inventory=existsSync('broker.json')?JSON.parse(readFileSync('broker.json','utf8')):{schemaVersion:1,coverage:'RUNTIME_ACTION_TOOLS',ownerId,projectRevision:state.projectRevision,brokerEpoch:'12345678-1234-1234-1234-123456789abc',generation:1,status:'CURRENT',reason:'OBSERVED',observedAt:1,entries:[],total:0,omitted:0};
    if(inventory===null)delete state.capabilityInventory;else state.capabilityInventory=inventory;
   }
+  if(planner&&existsSync('disconnect')&&launch===1)process.exit(0);
+  if(existsSync('planner-ready')&&state.planner?.status==='RUNNING')state.planner={...state.planner,status:'READY',finishedAt:1500,route:{alias:null,profile:'reasoning',provider:'loopback',model:'scripted'},usage:{invocations:1,reportedTokens:900},taskCount:2};
   if(existsSync('state-patch.json'))Object.assign(state,JSON.parse(readFileSync('state-patch.json','utf8')));
   if(existsSync('settle')&&state.busy){state.snapshot.status.run.status=state.cancelling?'CANCELLED':existsSync('decision')&&readFileSync('decision','utf8')==='reject'?'BLOCKED':'COMPLETED';state.snapshot.status.run.phase='COMPLETE';state.snapshot.status.writerPresent=false;state.busy=false;state.cancelling=false;state.pendingApproval=null;state.projectRevision++;state.stateRevision++;save();}
   response=reply(request,{kind:'snapshot',state});
@@ -136,6 +145,16 @@ for await(const line of createInterface({input:process.stdin})){
    }else if(request.type==='browser.confirm'){
     const check=state.browserPreview.check;writeFileSync('browser-check.json',JSON.stringify(check));state.browserPreview=null;
     response=reply(request,{kind:'browser-registered',check});
+   }else if(request.type==='planner.start'){
+    state.planner={schemaVersion:1,planId:planIdOf(++plans),status:'RUNNING',requestDigest:'sha256:'+createHash('sha256').update(JSON.stringify(['weavra-planner-request-v1',request.goal,request.acceptanceStatements??[]]),'utf8').digest('hex'),projectRevision:state.projectRevision,current:true,startedAt:1000,finishedAt:null,route:null,usage:{invocations:0,reportedTokens:0},taskCount:null,failureCode:null};
+    response=reply(request,{kind:'accepted',requestId:request.id,command:request.type,runId:mode==='planner-run'?'run-9':null});
+   }else if(request.type==='planner.cancel'){
+    if(state.planner?.planId!==request.planId||state.planner.status!=='RUNNING')response=reply(request,null,'PLANNER_NOT_FOUND');
+    else{state.planner={...state.planner,status:'CANCELLED',finishedAt:1200};response=reply(request,{kind:'accepted',requestId:request.id,command:request.type,runId:null});}
+   }else if(request.type==='planner.read'){
+    if(state.planner?.planId!==request.planId)response=reply(request,null,'PLANNER_NOT_FOUND');
+    else if(state.planner.status!=='READY')response=reply(request,null,'PLANNER_NOT_READY');
+    else response=reply(request,{kind:'planner-draft',planId:mode==='planner-other'?planIdOf(99):request.planId,requestDigest:state.planner.requestDigest,projectRevision:state.planner.projectRevision,current:state.planner.current,draft:JSON.parse(readFileSync('planner-draft.json','utf8'))});
    }else if(request.type==='workflow.prepare'&&request.complexDraft){
     if(!complex)response=reply(request,null,'INVALID_REQUEST');
     else{state.preview={...JSON.parse(readFileSync('complex-preview.json','utf8')),ownerId,projectRevision:state.projectRevision};response=reply(request,{kind:'prepared',preview:state.preview});}
@@ -143,7 +162,7 @@ for await(const line of createInterface({input:process.stdin})){
     state.preview={previewId:'preview',previewDigest:digest,ownerId,projectRevision:state.projectRevision,expiresAt:9999999999999,goal:request.goal,workflow:'STANDARD',executionMode:'EDIT',risk:mode==='approval'?'R3':'R1',allowedPaths:['src'],checks:[],acceptanceCriteria:[{id:'AC-1',statement:request.goal,checkIds:[],reviewRequired:true}],taskContractDigest:digest,recipe:null,configuration:{mutationMode:'compatible',verifierTrustMode:'compatible',verifierSandboxMode:'disabled',contextPackMode:'disabled',verificationRepairMode:'disabled',lspEnabled:false}};
     response=reply(request,{kind:'prepared',preview:state.preview});
    }else if(request.type==='workflow.confirm'){
-    state.preview=null;state.projectRevision++;state.stateRevision=1;state.ownedRunId='run-1';state.busy=true;
+    state.preview=null;delete state.planner;state.projectRevision++;state.stateRevision=1;state.ownedRunId='run-1';state.busy=true;
     state.snapshot.status={source:'durable-canonical-state',ownerObserved:false,state:'available',writerPresent:true,run:{runId:'run-1',status:mode==='approval'?'WAITING_APPROVAL':'RUNNING',phase:'IMPLEMENT',workflow:'STANDARD',risk:mode==='approval'?'R3':'R1',executionMode:'EDIT',codeRevision:0,currentStep:{stepId:'implement',attempt:0},activeAgentCount:1,taskContractDigest:digest,createdAt:1,updatedAt:1}};
     if(mode==='approval')state.pendingApproval={approvalId:'approval-1',runId:'run-1',stateRevision:1,projectRevision:state.projectRevision,risk:'R3',operation:'delete-file',role:'Developer',step:{stepId:'implement',attempt:0},path:'src/old.js',bytes:4,preconditionDigest:'b'.repeat(64),expiresAt:9999999999999,explanation:'Delete one tracked file'};
     save();writeFileSync('confirm-received','yes');
@@ -2167,3 +2186,364 @@ it.effect(
       expect(prepared).toMatchObject({ success: true, data: { kind: "prepared" } });
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
+
+// V0.8B Planner (docs/architecture/PLANNER_DRAFT.md §7, §8): the server forwards planner commands
+// only to an advertising Runtime and publishes planner state only after its consistency checks.
+const plannerGoal = "Split the config parser into parse and validate modules";
+const plannerStatements = [
+  "parseConfig keeps its current behavior",
+  "validateConfig rejects duplicate keys",
+];
+// sha256 of the UTF-8 JSON ["weavra-planner-request-v1", goal, statements] (§6).
+const plannerRequestDigest =
+  "sha256:29350ea702ea51a4b633fb065b20653d2070a6e744e76f0ac605424e4179f9f6";
+const plannerDraft: WeavraComplexDraft = {
+  tasks: [
+    {
+      title: "Extract parser",
+      goal: "Move parsing into src/parse.ts",
+      dependsOnIndexes: [],
+      criterionIndexes: [1],
+      ownership: [{ path: "src/parse.ts", operation: "create" }],
+      checkIds: ["test"],
+    },
+    {
+      title: "Add validation",
+      goal: "Reject duplicate keys in src/validate.ts",
+      dependsOnIndexes: [1],
+      criterionIndexes: [2],
+      ownership: [{ path: "src/config.ts", operation: "modify" }],
+      checkIds: ["test"],
+    },
+  ],
+};
+const planIdOf = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+function plannerRequests(state: WeavraControlState): ReadonlyArray<WeavraControlMutation> {
+  return [
+    {
+      ...fields(state),
+      type: "planner.start",
+      goal: plannerGoal,
+      acceptanceStatements: plannerStatements,
+    },
+    { ...fields(state), type: "planner.cancel", planId: planIdOf(1) },
+    { ...fields(state), type: "planner.read", planId: planIdOf(1) },
+  ];
+}
+const requestLog = (fixture: Effect.Success<ReturnType<typeof setup>>) =>
+  fixture.fs
+    .readFileString(`${fixture.root}/requests`)
+    .pipe(Effect.map((text) => text.split("\n").filter(Boolean)));
+/** Starts planning and lets the peer finish it READY with the draft of `planner-draft.json`. */
+const readyPlanner = Effect.fn("test.control.readyPlanner")(function* (
+  fixture: Effect.Success<ReturnType<typeof setup>>,
+  draft: unknown = plannerDraft,
+) {
+  const started = yield* fixture.controller.command({
+    projectId,
+    request: plannerRequests(fixture.initial.state!)[0]!,
+  });
+  expect(started).toMatchObject({ success: true, data: { kind: "accepted", runId: null } });
+  yield* connected(fixture.queue);
+  yield* fixture.fs.writeFileString(`${fixture.root}/planner-draft.json`, encodeJson(draft));
+  yield* fixture.fs.writeFileString(`${fixture.root}/planner-ready`, "ready");
+  yield* TestClock.adjust("2 seconds");
+  return (yield* next(
+    fixture.queue,
+    (value) => !value.stale && value.state?.planner?.status === "READY",
+  )).state!;
+});
+
+for (const mode of ["normal", "complex-v2"] as const) {
+  it.effect(`never sends a planner command to a Runtime without the Planner (${mode})`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup(mode);
+      expect(fixture.initial.capabilities).not.toHaveProperty("plannerContractVersion");
+      expect(fixture.initial.state).not.toHaveProperty("planner");
+      for (const request of plannerRequests(fixture.initial.state!)) {
+        expect(
+          yield* fixture.controller.command({ projectId, request }).pipe(Effect.result),
+        ).toMatchObject({ _tag: "Failure", failure: { code: "INCOMPATIBLE_CAPABILITIES" } });
+      }
+      expect(yield* fixture.fs.exists(`${fixture.root}/requests`)).toBe(false);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+it.effect(
+  "forwards planner start, cancel and read to an advertising Runtime without any Run or writer",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup("planner");
+      expect(fixture.initial.capabilities?.plannerContractVersion).toBe(1);
+      expect(fixture.initial.state).not.toHaveProperty("planner");
+      const [start] = plannerRequests(fixture.initial.state!);
+      expect(yield* fixture.controller.command({ projectId, request: start! })).toMatchObject({
+        success: true,
+        data: { kind: "accepted", command: "planner.start", runId: null },
+      });
+      const running = (yield* connected(fixture.queue)).state!;
+      expect(running.planner).toMatchObject({
+        planId: planIdOf(1),
+        status: "RUNNING",
+        requestDigest: plannerRequestDigest,
+        projectRevision: 0,
+        current: true,
+      });
+      // Planning holds no writer, starts no Run and changes no project revision.
+      expect(running).toMatchObject({
+        busy: false,
+        ownedRunId: null,
+        projectRevision: 0,
+        snapshot: { status: { writerPresent: false, run: null } },
+      });
+      expect(
+        yield* fixture.controller.command({
+          projectId,
+          request: { ...fields(running), type: "planner.cancel", planId: planIdOf(1) },
+        }),
+      ).toMatchObject({
+        success: true,
+        data: { kind: "accepted", command: "planner.cancel", runId: null },
+      });
+      const cancelled = (yield* connected(fixture.queue)).state!;
+      expect(cancelled.planner).toMatchObject({ planId: planIdOf(1), status: "CANCELLED" });
+      // A cancel of a request that is no longer RUNNING is the Runtime's refusal, not an error.
+      expect(
+        yield* fixture.controller.command({
+          projectId,
+          request: { ...fields(cancelled), type: "planner.cancel", planId: planIdOf(1) },
+        }),
+      ).toMatchObject({ success: false, error: { code: "PLANNER_NOT_FOUND" } });
+      // A new start replaces the terminal request; its draft is read only once READY.
+      const ready = yield* readyPlanner({ ...fixture, initial: yield* connected(fixture.queue) });
+      expect(ready.planner).toMatchObject({ planId: planIdOf(2), status: "READY", taskCount: 2 });
+      const read = yield* fixture.controller.command({
+        projectId,
+        request: { ...fields(ready), type: "planner.read", planId: planIdOf(2) },
+      });
+      expect(read).toMatchObject({
+        success: true,
+        data: {
+          kind: "planner-draft",
+          planId: planIdOf(2),
+          requestDigest: plannerRequestDigest,
+          current: true,
+          draft: plannerDraft,
+        },
+      });
+      expect(yield* requestLog(fixture)).toEqual([
+        "planner.start",
+        "planner.cancel",
+        "planner.cancel",
+        "planner.start",
+        "planner.read",
+      ]);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+for (const [label, mode, draft] of [
+  ["a draft of another planning request", "planner-other", plannerDraft],
+  [
+    "a draft with a deletion claim",
+    "planner",
+    {
+      tasks: [
+        plannerDraft.tasks[0],
+        {
+          ...plannerDraft.tasks[1],
+          ownership: [{ path: "src/config.ts", operation: "delete" }],
+        },
+      ],
+    },
+  ],
+] as const) {
+  it.effect(`rejects ${label} instead of offering it to the editor`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup(mode);
+      const ready = yield* readyPlanner(fixture, draft);
+      const result = yield* fixture.controller
+        .command({
+          projectId,
+          request: { ...fields(ready), type: "planner.read", planId: ready.planner!.planId },
+        })
+        .pipe(Effect.result);
+      expect(result).toMatchObject({ _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } });
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+it.effect("rejects a planner acknowledgement that names a Run", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("planner-run");
+    const result = yield* fixture.controller
+      .command({ projectId, request: plannerRequests(fixture.initial.state!)[0]! })
+      .pipe(Effect.result);
+    expect(result).toMatchObject({ _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } });
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+const plannerRunning: WeavraPlannerStatus = {
+  schemaVersion: 1,
+  planId: planIdOf(1),
+  status: "RUNNING",
+  requestDigest: plannerRequestDigest,
+  projectRevision: 0,
+  current: true,
+  startedAt: 1000,
+  finishedAt: null,
+  route: null,
+  usage: { invocations: 0, reportedTokens: 0 },
+  taskCount: null,
+  failureCode: null,
+};
+for (const [label, mode] of [
+  ["a Runtime that never advertised the Planner", "normal"],
+  ["an advertising Runtime before any planner.start", "planner"],
+] as const) {
+  it.effect(`treats planner state from ${label} as unavailable`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup(mode);
+      yield* fixture.fs.writeFileString(
+        `${fixture.root}/state-patch.json`,
+        encodeJson({ planner: plannerRunning }),
+      );
+      yield* TestClock.adjust("2 seconds");
+      const failed = yield* next(fixture.queue, (value) => value.status === "ERROR");
+      expect(failed).toMatchObject({ stale: true, errorCode: "INVALID_PAYLOAD" });
+      expect(failed.state).not.toHaveProperty("planner");
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+it.effect("a reconnected Host starts without planner state and needs its own planner.start", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("planner");
+    yield* fixture.controller.command({
+      projectId,
+      request: plannerRequests(fixture.initial.state!)[0]!,
+    });
+    expect((yield* connected(fixture.queue)).state?.planner?.status).toBe("RUNNING");
+    yield* fixture.fs.writeFileString(`${fixture.root}/disconnect`, "yes");
+    yield* TestClock.adjust("2 seconds");
+    yield* next(fixture.queue, (value) => value.status === "DISCONNECTED");
+    yield* TestClock.adjust("5 seconds");
+    const replacement = (yield* connected(fixture.queue)).state!;
+    expect(replacement.ownerId).toBe("owner-2");
+    expect(replacement).not.toHaveProperty("planner");
+    // The retired Host's planner.start does not let the new Host report planning.
+    yield* fixture.fs.writeFileString(
+      `${fixture.root}/state-patch.json`,
+      encodeJson({ planner: plannerRunning }),
+    );
+    yield* TestClock.adjust("2 seconds");
+    expect(yield* next(fixture.queue, (value) => value.status === "ERROR")).toMatchObject({
+      errorCode: "INVALID_PAYLOAD",
+    });
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+describe("Planner snapshot consistency (V0.8B §3, §7.3)", () => {
+  const advertised: WeavraControlCapabilities = {
+    ...baselineCapabilities,
+    plannerContractVersion: 1,
+  };
+  const at = (planner: WeavraPlannerStatus | undefined, ownerId = "owner"): WeavraControlState => {
+    const { planner: _planner, ...state } = {
+      ...complexState(undefined, "COMPLETED", "STANDARD"),
+      ownerId,
+    };
+    return planner === undefined ? state : { ...state, planner };
+  };
+  const ready: WeavraPlannerStatus = {
+    ...plannerRunning,
+    status: "READY",
+    finishedAt: 1500,
+    usage: { invocations: 1, reportedTokens: 900 },
+    taskCount: 2,
+  };
+  const failed: WeavraPlannerStatus = {
+    ...plannerRunning,
+    status: "FAILED",
+    finishedAt: 1500,
+    failureCode: "DRAFT_INVALID",
+  };
+  const consistentAfter = (before: WeavraPlannerStatus | undefined, after: WeavraPlannerStatus) =>
+    plannerStateConsistent(at(after), advertised, at(before), true);
+
+  it("accepts planner state only from an advertising Host that this server started planning on", () => {
+    expect(plannerStateConsistent(at(plannerRunning), advertised, null, true)).toBe(true);
+    expect(plannerStateConsistent(at(plannerRunning), baselineCapabilities, null, true)).toBe(
+      false,
+    );
+    expect(plannerStateConsistent(at(plannerRunning), advertised, null, false)).toBe(false);
+    expect(plannerStateConsistent(at(undefined), baselineCapabilities, null, false)).toBe(true);
+  });
+  it("follows one request to a terminal status and never back", () => {
+    expect(consistentAfter(plannerRunning, ready)).toBe(true);
+    expect(consistentAfter(plannerRunning, failed)).toBe(true);
+    // A READY draft may stop being current when the project moves on; that is not a regression.
+    expect(consistentAfter(ready, { ...ready, current: false })).toBe(true);
+    for (const [label, before, after] of [
+      ["READY back to RUNNING", ready, plannerRunning],
+      ["READY to FAILED", ready, { ...failed, usage: ready.usage }],
+      ["FAILED to CANCELLED", failed, { ...failed, status: "CANCELLED", failureCode: null }],
+      ["changed task count", ready, { ...ready, taskCount: 3 }],
+      ["changed finish time", ready, { ...ready, finishedAt: 1600 }],
+      [
+        "changed request binding",
+        plannerRunning,
+        { ...plannerRunning, requestDigest: `sha256:${"b".repeat(64)}` },
+      ],
+      ["changed start time", plannerRunning, { ...plannerRunning, startedAt: 999 }],
+      ["changed recorded revision", ready, { ...ready, projectRevision: 1, current: false }],
+      [
+        "fewer invocations",
+        { ...plannerRunning, usage: { invocations: 2, reportedTokens: 10 } },
+        { ...plannerRunning, usage: { invocations: 1, reportedTokens: 10 } },
+      ],
+      [
+        "fewer tokens",
+        { ...plannerRunning, usage: { invocations: 1, reportedTokens: 10 } },
+        { ...plannerRunning, usage: { invocations: 1, reportedTokens: 9 } },
+      ],
+      [
+        "unknown usage becoming known",
+        { ...plannerRunning, usage: { invocations: 1, reportedTokens: null } },
+        { ...plannerRunning, usage: { invocations: 1, reportedTokens: 10 } },
+      ],
+    ] as const) {
+      expect([label, consistentAfter(before, after)]).toEqual([label, false]);
+    }
+    expect(
+      consistentAfter(
+        { ...plannerRunning, usage: { invocations: 1, reportedTokens: 10 } },
+        { ...plannerRunning, usage: { invocations: 2, reportedTokens: null } },
+      ),
+    ).toBe(true);
+  });
+  it("lets a new request replace a terminal one and a confirm clear it, but never loses RUNNING", () => {
+    expect(consistentAfter(ready, { ...plannerRunning, planId: planIdOf(2) })).toBe(true);
+    expect(consistentAfter(failed, { ...ready, planId: planIdOf(2) })).toBe(true);
+    // Only a successful confirm clears planner state, and confirm is refused while RUNNING.
+    expect(plannerStateConsistent(at(undefined), advertised, at(ready), true)).toBe(true);
+    expect(plannerStateConsistent(at(undefined), advertised, at(plannerRunning), true)).toBe(false);
+    // A reconnect is a new Host with a new owner and no planner state.
+    expect(
+      plannerStateConsistent(at(undefined, "owner-2"), advertised, at(plannerRunning), false),
+    ).toBe(true);
+  });
+  it("accepts only create and modify claims in a Planner draft (§2)", () => {
+    expect(plannerDraftConsistent(plannerDraft)).toBe(true);
+    const deleting = {
+      tasks: [
+        plannerDraft.tasks[0]!,
+        {
+          ...plannerDraft.tasks[1]!,
+          ownership: [{ path: "src/a.ts", operation: "delete" as const }],
+        },
+      ],
+    };
+    expect(plannerDraftConsistent(deleting)).toBe(false);
+  });
+});

@@ -234,8 +234,10 @@ server-owned Runtime connection, not merely a read-only observer. T3 launches th
 root. The read-only argv, protocol v1, and snapshot-only capabilities remain unchanged.
 No additional network Host or listener is introduced.
 
-The closed control command set is `control.hello`, `control.snapshot`, `workflow.prepare`,
-`workflow.confirm`, `workflow.cancel`, and `approval.resolve`. Its strict UTF-8 JSONL limits
+The control command set is closed: `control.hello`, `control.snapshot`, `workflow.prepare`,
+`workflow.confirm`, `workflow.cancel`, `approval.resolve`, the browser and fact review commands
+and, only when the Runtime advertises the Planner, `planner.start`, `planner.cancel` and
+`planner.read`. Its strict UTF-8 JSONL limits
 are **32,768 request bytes** and **65,536 response bytes**, including the newline. T3 supplies
 goal text, reviewed recipe input data, and acceptance-criterion prose, not executable
 instructions or authority-bearing overrides. Runtime/Kernel owns classification, allowed
@@ -355,6 +357,27 @@ revision, or whose contract version differs from the advertised one as unavailab
 current. The one exception: after a Runtime upgrade, a finished Run recorded under contract 1
 keeps its frozen contract 1 plan inside a contract 2 projection.
 
+#### Planner drafts
+
+A Runtime that advertises `plannerContractVersion: 1` beside a COMPLEX contract adds **Planner**
+under the task plan; T3 never sends `planner.*` to any other Runtime and treats planner state
+from one as unavailable. Enter the goal and 1–16 parent acceptance criteria, then select **Draft
+with Planner** (fresh control state, no active Run, no writer, no planning already running). The
+Runtime plans only goals it classifies as COMPLEX, never R3, with at most 3 model calls in the
+background; meanwhile the view shows elapsed time, the model route and usage, and **Cancel
+planning**. Planning takes no writer, starts no Run and changes no project revision.
+
+A READY result is a **Planner proposal — unreviewed** card with its task count, route and usage.
+**Load into editor** reads the draft and replaces only the task rows, asking first if the editor
+holds different rows. **Discard** only hides the card in this App (**Show proposal** brings it
+back). Labels mark a proposal that is not current (the project or configuration changed after
+planning) or that was planned for another goal or criteria than the editor holds (T3 recomputes
+the request digest). While the editor holds the unedited proposal it says "Review every task,
+claim and check before Prepare." Nothing is prepared, confirmed or stored automatically: prepare
+and confirm the rows like any task plan, and the Runtime validates them again. A failed request
+shows its code with a fixed explanation and is never retried automatically. Confirming a preview
+while planning runs returns `PLANNER_BUSY`; cancel planning first.
+
 #### Unavailable state and limits
 
 **CONTROL UNAVAILABLE** disables actions when the environment is unsupported, disconnected,
@@ -365,10 +388,10 @@ protocol errors before reopening the view; restart T3 when changing its server e
 Do not remove a writer lock or infer owner liveness from it to bypass unavailable controls.
 
 This slice supports the existing QUICK/STANDARD Workflow paths and, when advertised, the
-COMPLEX projection above; not arbitrary write/edit/tool/shell dispatch, generic R3,
-resume/recovery, rollback, or fallback. T3 remains a Host requesting Runtime actions and showing
-bounded canonical summaries; it never becomes the Task Contract, Policy, approval-consumption,
-task-scheduling or completion authority.
+COMPLEX projection and Planner drafts above; not arbitrary write/edit/tool/shell dispatch,
+generic R3, resume/recovery, rollback, or fallback. T3 remains a Host requesting Runtime
+actions and showing bounded canonical summaries; it never becomes the Task Contract, Policy,
+approval-consumption, planning, task-scheduling or completion authority.
 
 ## Checks
 

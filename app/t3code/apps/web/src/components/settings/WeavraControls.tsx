@@ -2,6 +2,15 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   createEnvironmentWeavraControlCommand,
   createEnvironmentWeavraControlStateAtoms,
+  plannerCancelRequest,
+  plannerDraftUnchanged,
+  plannerElapsedMs,
+  plannerLoadedDraft,
+  plannerReadRequest,
+  plannerRequestDigest,
+  plannerStartRequest,
+  plannerStatusOf,
+  type PlannerLoadedDraft,
 } from "@t3tools/client-runtime/state/weavraControl";
 import {
   type EnvironmentId,
@@ -11,9 +20,12 @@ import {
   type WeavraBrowserState,
   type WeavraComplexDraft,
   type WeavraComplexOwnershipClaim,
+  type WeavraControlErrorCode,
   WeavraControlMutation,
   type WeavraControlPreview,
   type WeavraFactPreview,
+  type WeavraPlannerFailureCode,
+  type WeavraPlannerStatus,
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -93,6 +105,83 @@ const toComplexDraft = (rows: ReadonlyArray<ComplexDraftRow>): WeavraComplexDraf
     checkIds: row.checkIds.split(/\s+/).filter(Boolean),
   })),
 });
+/** A Planner draft becomes ordinary editor rows exactly as proposed, check IDs space-separated. */
+const toComplexRows = (draft: WeavraComplexDraft): ComplexDraftRow[] =>
+  draft.tasks.map((task) => ({
+    title: task.title,
+    goal: task.goal,
+    dependsOnIndexes: [...task.dependsOnIndexes],
+    criterionIndexes: [...task.criterionIndexes],
+    ownership: task.ownership.map(({ path, operation }) => ({ path, operation })),
+    checkIds: task.checkIds.join(" "),
+  }));
+const lines = (text: string) =>
+  text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+/** Fixed explanations of the closed Planner failure codes (PLANNER_DRAFT.md §5.5). */
+const plannerFailureText: Record<WeavraPlannerFailureCode, string> = {
+  MODEL_UNAVAILABLE:
+    "No usable planning model, profile or credential is configured. There is no fallback model.",
+  CONTEXT_TOO_LARGE: "The planning context would exceed 196,608 bytes. No model was called.",
+  TIMEOUT: "Planning did not finish within the worker timeout.",
+  PROVIDER_ERROR: "The model provider failed or its response ended abnormally.",
+  BUDGET_EXHAUSTED:
+    "The planning budget of 3 model calls or its token cap ran out before a valid draft.",
+  BUDGET_UNKNOWN:
+    "The provider reported no usage, so the token cap stopped further planning calls.",
+  NO_DRAFT: "The model answered without submitting a draft, even after one reminder.",
+  DRAFT_INVALID: "The corrected draft still failed the plan checks.",
+  STALE: "The project or its configuration changed while planning, so the draft was discarded.",
+};
+const plannerRoute = (route: WeavraPlannerStatus["route"]) =>
+  route === null
+    ? "route not reported"
+    : `${route.alias === "plan" ? "models.intents.plan" : "role default"} → ${route.profile} → ${route.provider}/${route.model}`;
+const plannerUsage = ({ invocations, reportedTokens }: WeavraPlannerStatus["usage"]) =>
+  `${invocations} of 3 model calls · ${reportedTokens ?? "unknown"} reported tokens`;
+const plannerSeconds = (elapsedMs: number | null) =>
+  elapsedMs === null ? "unknown" : `${Math.floor(elapsedMs / 1000)} s`;
+/** Fixed guidance after a Runtime refusal; the refusal code itself is always shown. */
+function rejectionHint(
+  request: WeavraControlMutation,
+  code: WeavraControlErrorCode,
+  complexSupported: boolean,
+) {
+  switch (request.type) {
+    case "workflow.prepare":
+      return code === "STALE_PROJECT"
+        ? " The project changed before a plan was prepared, for example because a stopped owner's Run was just marked INTERRUPTED. Nothing was prepared or retried; prepare again once the refreshed state appears."
+        : request.complexDraft
+          ? code === "INVALID_REQUEST"
+            ? " A task plan is accepted only when Runtime classifies the goal as COMPLEX; discard it for QUICK or STANDARD goals."
+            : code === "INVALID_CRITERIA"
+              ? " Runtime rejected the task plan's dependencies, criteria coverage, file claims or checks."
+              : ""
+          : code === "UNSUPPORTED_WORKFLOW" && complexSupported
+            ? " If Runtime classified this goal as COMPLEX, add a structured task plan of 2–8 tasks and prepare again."
+            : "";
+    case "workflow.confirm":
+      return code === "PLANNER_BUSY"
+        ? " Planning is still running on this Runtime. Cancel planning first; nothing was started."
+        : "";
+    case "planner.start":
+      return code === "UNSUPPORTED_WORKFLOW"
+        ? " The Planner drafts only goals that Runtime classifies as COMPLEX, never R3."
+        : code === "PLANNER_BUSY"
+          ? " Planning or a Run is already in progress on this Runtime."
+          : "";
+    case "planner.cancel":
+      return code === "PLANNER_NOT_FOUND" ? " That planning request is no longer running." : "";
+    case "planner.read":
+      return code === "PLANNER_NOT_FOUND" || code === "PLANNER_NOT_READY"
+        ? " That proposal is no longer available; nothing was loaded."
+        : "";
+    default:
+      return "";
+  }
+}
 
 export function WeavraControls({
   environmentId,
@@ -115,6 +204,9 @@ export function WeavraControls({
   const [criteria, setCriteria] = useState("");
   const [complexCriteria, setComplexCriteria] = useState("");
   const [complexRows, setComplexRows] = useState<ComplexDraftRow[]>([]);
+  // Planner proposals stay page-session memory: the loaded one and one dismissed locally.
+  const [loadedDraft, setLoadedDraft] = useState<PlannerLoadedDraft | null>(null);
+  const [dismissedPlanId, setDismissedPlanId] = useState<string | null>(null);
   const [preview, setPreview] = useState<WeavraControlPreview | null>(null);
   const [preparedDraft, setPreparedDraft] = useState<string | null>(null);
   const [commandState, setCommandState] = useState<CommandState>(idle);
@@ -221,6 +313,7 @@ export function WeavraControls({
     browserDraftIdentity,
     factPreviewCurrent,
     factDraftIdentity,
+    complexRows,
   });
   useLayoutEffect(() => {
     latest.current = {
@@ -231,6 +324,7 @@ export function WeavraControls({
       browserDraftIdentity,
       factPreviewCurrent,
       factDraftIdentity,
+      complexRows,
     };
   }, [
     fresh,
@@ -240,6 +334,7 @@ export function WeavraControls({
     browserDraftIdentity,
     factPreviewCurrent,
     factDraftIdentity,
+    complexRows,
     latest,
   ]);
   const run = state?.snapshot.status.run;
@@ -256,6 +351,27 @@ export function WeavraControls({
   // Runtime decide: it marks the Run INTERRUPTED only when that owner provably stopped.
   const foreignActiveRun = fresh && !state?.busy && runActive && state?.ownedRunId !== run?.runId;
   const canPrepareWorkflow = canPrepare || (foreignActiveRun && !submitting);
+  // V0.8B Planner: it exists only when the Runtime advertises it beside the COMPLEX editor it fills.
+  const plannerExposed =
+    complexSupported && observation?.capabilities?.plannerContractVersion === 1;
+  const planner = plannerExposed ? plannerStatusOf(observation) : null;
+  const plannerStatements = lines(complexCriteria);
+  const canStartPlanner =
+    plannerExposed &&
+    canPrepare &&
+    goal.trim() !== "" &&
+    plannerStatements.length > 0 &&
+    planner?.status !== "RUNNING";
+  const canCancelPlanner = plannerExposed && fresh && planner?.status === "RUNNING" && !submitting;
+  const canLoadPlanner = plannerExposed && canEditDraft && planner?.status === "READY";
+  const plannerProposal =
+    planner?.status === "READY" && planner.planId !== dismissedPlanId ? planner : null;
+  // The Host's request binding, recomputed for what the editor holds now (§6).
+  const editorDigest =
+    plannerProposal || loadedDraft ? plannerRequestDigest(goal.trim(), plannerStatements) : null;
+  const loadedUnchanged = plannerDraftUnchanged(loadedDraft, toComplexDraft(complexRows));
+  const loadedCurrent =
+    planner && planner.planId === loadedDraft?.planId ? planner.current : loadedDraft?.current;
   const canCancel =
     fresh &&
     state?.busy &&
@@ -335,27 +451,46 @@ export function WeavraControls({
       const response = result.value;
       if (!response.success) {
         const code = response.error.code;
-        const hint =
-          request.type !== "workflow.prepare"
-            ? ""
-            : code === "STALE_PROJECT"
-              ? " The project changed before a plan was prepared, for example because a stopped owner's Run was just marked INTERRUPTED. Nothing was prepared or retried; prepare again once the refreshed state appears."
-              : request.complexDraft
-                ? code === "INVALID_REQUEST"
-                  ? " A task plan is accepted only when Runtime classifies the goal as COMPLEX; discard it for QUICK or STANDARD goals."
-                  : code === "INVALID_CRITERIA"
-                    ? " Runtime rejected the task plan's dependencies, criteria coverage, file claims or checks."
-                    : ""
-                : code === "UNSUPPORTED_WORKFLOW" && complexSupported
-                  ? " If Runtime classified this goal as COMPLEX, add a structured task plan of 2–8 tasks and prepare again."
-                  : "";
         setCommandState({
           status: "rejected",
-          message: `Runtime rejected the command: ${code}.${hint} Review fresh state before trying again.`,
+          message: `Runtime rejected the command: ${code}.${rejectionHint(request, code, complexSupported)} Review fresh state before trying again.`,
         });
         return;
       }
-      if (response.data.kind === "prepared") {
+      if (response.data.kind === "planner-draft") {
+        // Candidate data for the editor only: nothing is prepared, confirmed or stored.
+        const loaded =
+          request.type === "planner.read" ? plannerLoadedDraft(response, request.planId) : null;
+        if (!loaded) {
+          setCommandState({
+            status: "rejected",
+            message: "Runtime returned a draft of another planning request. Nothing was loaded.",
+          });
+          return;
+        }
+        const rows = latest.current.complexRows;
+        if (rows.length > 0 && !plannerDraftUnchanged(loaded, toComplexDraft(rows))) {
+          setCommandState({ status: "submitting", message: "Waiting for explicit confirmation." });
+          const replace = await requestConfirmDialog(
+            `Replace the ${rows.length} task rows in the editor with the Planner proposal of ${loaded.draft.tasks.length} tasks?\nThe current rows are not kept. The proposal is unreviewed: review every task, claim and check before Prepare.`,
+          );
+          if (!mounted.current) return;
+          if (!replace) {
+            setCommandState({
+              status: "idle",
+              message: "Kept the editor's task rows. Nothing was loaded.",
+            });
+            return;
+          }
+        }
+        editComplexRows(() => toComplexRows(loaded.draft));
+        setLoadedDraft(loaded);
+        setCommandState({
+          status: "accepted",
+          message:
+            "Planner proposal loaded into the editor. Review every task, claim and check, then Prepare. Nothing was prepared or started.",
+        });
+      } else if (response.data.kind === "prepared") {
         setFactPreview(null);
         setPreparedFactDraft(null);
         setPreview(response.data.preview);
@@ -436,7 +571,11 @@ export function WeavraControls({
               ? "Cancellation accepted. Wait for canonical terminal state and writer release. Partial changes remain."
               : request.type === "approval.resolve"
                 ? "Decision accepted for the pending request. Runtime still owns approval validation, consumption and completion."
-                : "Start accepted. Waiting for canonical Run state; this acknowledgement does not establish success.",
+                : request.type === "planner.start"
+                  ? "Planning started. Runtime drafts a candidate task plan in the background; nothing runs, and nothing enters the editor until you load it."
+                  : request.type === "planner.cancel"
+                    ? "Planning cancellation accepted. Wait for Runtime to report CANCELLED."
+                    : "Start accepted. Waiting for canonical Run state; this acknowledgement does not establish success.",
         });
       }
     } catch {
@@ -456,11 +595,6 @@ export function WeavraControls({
     setCriteria("");
     setCommandState(idle);
   };
-  const lines = (text: string) =>
-    text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
   const prepare = () => {
     const fields = common();
     if (!fields || !canPrepareWorkflow || !goal.trim()) return;
@@ -561,6 +695,29 @@ export function WeavraControls({
         ? `Approve ONE deletion of ${approval.path}?\nRun: ${approval.runId}\nApproval: ${approval.approvalId}\nFingerprint: ${approval.preconditionDigest}\nNo automatic rollback. This does not approve any other action or establish completion.`
         : undefined,
     );
+  };
+  const startPlanner = () => {
+    const fields = common();
+    if (!fields || !canStartPlanner) return;
+    try {
+      void submit(plannerStartRequest(fields, goal.trim(), plannerStatements));
+    } catch {
+      setCommandState({
+        status: "rejected",
+        message:
+          "Invalid goal or acceptance criteria for the Planner. Use a goal of up to 2,048 characters and 1–16 criteria of up to 500 characters each.",
+      });
+    }
+  };
+  const cancelPlanner = () => {
+    const fields = common();
+    if (fields && canCancelPlanner && planner)
+      void submit(plannerCancelRequest(fields, planner.planId));
+  };
+  const loadPlannerProposal = () => {
+    const fields = common();
+    if (fields && canLoadPlanner && planner)
+      void submit(plannerReadRequest(fields, planner.planId));
   };
   const inspectBrowser = () => {
     const fields = common();
@@ -823,7 +980,7 @@ export function WeavraControls({
                 Runtime assigns task IDs and validates dependencies, criteria coverage, exact file
                 claims and registered checks. The plan cannot be edited after confirmation.
               </p>
-              {complexRows.length > 0 && (
+              {(complexRows.length > 0 || plannerExposed) && (
                 <label className="block space-y-1 text-sm">
                   <span>Parent acceptance criteria · one per line (1–16)</span>
                   <Textarea
@@ -837,6 +994,25 @@ export function WeavraControls({
                     }}
                   />
                 </label>
+              )}
+              {loadedDraft && loadedUnchanged && (
+                <div
+                  role="note"
+                  aria-label="Loaded Planner proposal"
+                  className="space-y-1 rounded-md border border-warning/50 p-3 text-xs"
+                >
+                  <p className="font-medium">Review every task, claim and check before Prepare.</p>
+                  <p className="text-muted-foreground">
+                    These rows are the unedited Planner proposal. Prepare re-validates them, and
+                    nothing runs until you confirm the Runtime preview.
+                  </p>
+                  {loadedCurrent === false && (
+                    <p>Not current: the project or its configuration changed after planning.</p>
+                  )}
+                  {editorDigest !== loadedDraft.requestDigest && (
+                    <p>Planned for a different goal or criteria than the editor now holds.</p>
+                  )}
+                </div>
               )}
               {complexRows.map((row, index) => {
                 const task = index + 1;
@@ -1047,6 +1223,114 @@ export function WeavraControls({
                   </>
                 )}
               </div>
+              {plannerExposed && (
+                <section aria-label="Planner" className="space-y-3 border-t border-border pt-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h5 className="text-sm font-medium">Planner · proposed task rows</h5>
+                    <Badge variant="outline">CANDIDATE ONLY</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Runtime asks the configured planning model, with at most 3 calls, to propose
+                    task rows for this goal and these criteria from a bounded context of file names,
+                    project instructions and reviewed facts. A proposal is never loaded, prepared or
+                    started automatically.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!canStartPlanner}
+                    onClick={startPlanner}
+                  >
+                    Draft with Planner
+                  </Button>
+                  {planner?.status === "RUNNING" && (
+                    <div
+                      aria-label="Planner running"
+                      className="space-y-2 rounded-md border border-border p-3 text-xs"
+                    >
+                      <p>
+                        Planning · elapsed{" "}
+                        {plannerSeconds(plannerElapsedMs(planner, observation?.observedAt ?? null))}{" "}
+                        · {plannerRoute(planner.route)} · {plannerUsage(planner.usage)}
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!canCancelPlanner}
+                        onClick={cancelPlanner}
+                      >
+                        Cancel planning
+                      </Button>
+                    </div>
+                  )}
+                  {plannerProposal && (
+                    <section
+                      aria-label="Planner proposal"
+                      className="space-y-2 rounded-md border border-warning/50 p-3 text-xs"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h5 className="text-sm font-medium">Planner proposal — unreviewed</h5>
+                        <div className="flex flex-wrap gap-2">
+                          {!plannerProposal.current && <Badge variant="warning">NOT CURRENT</Badge>}
+                          {editorDigest !== plannerProposal.requestDigest && (
+                            <Badge variant="warning">OTHER GOAL OR CRITERIA</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <p>
+                        {plannerProposal.taskCount} tasks · {plannerRoute(plannerProposal.route)} ·{" "}
+                        {plannerUsage(plannerProposal.usage)}
+                      </p>
+                      {!plannerProposal.current && (
+                        <p>
+                          The project or its configuration changed after planning. Use it only as a
+                          starting point; Prepare re-validates everything.
+                        </p>
+                      )}
+                      {editorDigest !== plannerProposal.requestDigest && (
+                        <p>
+                          This proposal is for a different goal or criteria than the editor holds.
+                        </p>
+                      )}
+                      <p className="text-muted-foreground">
+                        Loading replaces only the editor's task rows. Nothing is prepared, confirmed
+                        or run until you do it yourself. Drafting again replaces this proposal.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" disabled={!canLoadPlanner} onClick={loadPlannerProposal}>
+                          Load into editor
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setDismissedPlanId(plannerProposal.planId)}
+                        >
+                          Discard
+                        </Button>
+                      </div>
+                    </section>
+                  )}
+                  {planner?.status === "READY" && planner.planId === dismissedPlanId && (
+                    <p className="text-xs text-muted-foreground">
+                      Proposal discarded in this App; Runtime keeps it until planning starts again
+                      or a Run is confirmed.{" "}
+                      <Button size="sm" variant="outline" onClick={() => setDismissedPlanId(null)}>
+                        Show proposal
+                      </Button>
+                    </p>
+                  )}
+                  {planner?.status === "FAILED" && planner.failureCode && (
+                    <p aria-label="Planner failed" className="text-xs">
+                      Planner failed: <strong>{planner.failureCode}</strong> —{" "}
+                      {plannerFailureText[planner.failureCode]} Nothing was drafted; draft again
+                      when ready.
+                    </p>
+                  )}
+                  {planner?.status === "CANCELLED" && (
+                    <p className="text-xs">Planning cancelled. Nothing was drafted.</p>
+                  )}
+                </section>
+              )}
             </section>
           )}
           <Button size="sm" type="submit" disabled={!canPrepareWorkflow || !goal.trim()}>

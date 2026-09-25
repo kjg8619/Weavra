@@ -1,3 +1,4 @@
+import type * as ControlState from "@t3tools/client-runtime/state/weavraControl";
 import type * as React from "react";
 import type { ReactElement } from "react";
 import {
@@ -6,6 +7,7 @@ import {
   type WeavraBrowserCandidateSummary,
   type WeavraBrowserPreview,
   type WeavraBrowserState,
+  type WeavraComplexDraft,
   type WeavraComplexExecutionV1,
   type WeavraComplexExecutionV2,
   type WeavraComplexPlanV1,
@@ -15,7 +17,10 @@ import {
   type WeavraControlResponse,
   type WeavraControlState,
   type WeavraFactPreview,
+  type WeavraPlannerFailureCode,
+  type WeavraPlannerStatus,
 } from "@t3tools/contracts";
+import { plannerRequestDigest } from "@t3tools/client-runtime/state/weavraControl";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { reactHookHarness as hooks } from "../../test/reactHookHarness";
@@ -44,7 +49,9 @@ vi.mock("react/compiler-runtime", () => ({ c: hooks.useMemoCache }));
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: () => AsyncResult.success({ support: data.support, observation: data.observation }),
 }));
-vi.mock("@t3tools/client-runtime/state/weavraControl", () => ({
+// The pure Planner helpers stay real; only the connection-bound atoms are replaced.
+vi.mock("@t3tools/client-runtime/state/weavraControl", async (importOriginal) => ({
+  ...(await importOriginal<typeof ControlState>()),
   createEnvironmentWeavraControlStateAtoms: () => ({ stateAtom: () => "observation" }),
   createEnvironmentWeavraControlCommand: () => "command",
 }));
@@ -1545,5 +1552,484 @@ describe("Prepare while another owner holds the active Run", () => {
     expect(words(render())).toContain("Runtime rejected the command: WRITER_PRESENT.");
     expect(data.invoke).toHaveBeenCalledOnce();
     expect(text(render())).toContain("RUNNING");
+  });
+});
+
+// V0.8B Planner (docs/architecture/PLANNER_DRAFT.md §9): candidate rows for the editor only.
+const plannerGoal = "Split the config parser into parse and validate modules";
+const plannerStatements = [
+  "parseConfig keeps its current behavior",
+  "validateConfig rejects duplicate keys",
+];
+// sha256 of the UTF-8 JSON ["weavra-planner-request-v1", goal, statements] (§6).
+const plannerDigest = "sha256:29350ea702ea51a4b633fb065b20653d2070a6e744e76f0ac605424e4179f9f6";
+const planId = "5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e";
+const plannerRunning: WeavraPlannerStatus = {
+  schemaVersion: 1,
+  planId,
+  status: "RUNNING",
+  requestDigest: plannerDigest,
+  projectRevision: 0,
+  current: true,
+  startedAt: 1_000,
+  finishedAt: null,
+  route: {
+    alias: "plan",
+    profile: "reasoning",
+    provider: "commandcode",
+    model: "deepseek/deepseek-v4.1-flash",
+  },
+  usage: { invocations: 1, reportedTokens: 1200 },
+  taskCount: null,
+  failureCode: null,
+};
+const plannerReady: WeavraPlannerStatus = {
+  ...plannerRunning,
+  status: "READY",
+  finishedAt: 9_000,
+  usage: { invocations: 2, reportedTokens: 3400 },
+  taskCount: 2,
+};
+const plannerDraft: WeavraComplexDraft = {
+  tasks: [
+    {
+      title: "Split parse module",
+      goal: "Move parsing into src/parse.ts",
+      dependsOnIndexes: [],
+      criterionIndexes: [1],
+      ownership: [{ path: "src/parse.ts", operation: "create" }],
+      checkIds: ["test"],
+    },
+    {
+      title: "Validate keys",
+      goal: "Reject duplicate keys in src/config.ts",
+      dependsOnIndexes: [1],
+      criterionIndexes: [2],
+      ownership: [{ path: "src/config.ts", operation: "modify" }],
+      checkIds: ["test", "lint"],
+    },
+  ],
+};
+function advertisePlanner() {
+  advertiseComplex(2);
+  data.observation = {
+    ...data.observation!,
+    capabilities: { ...data.observation!.capabilities!, plannerContractVersion: 1 },
+  };
+}
+function enterPlannerRequest() {
+  change("Workflow goal", plannerGoal);
+  change("COMPLEX acceptance criteria", plannerStatements.join("\n"));
+}
+function plannerReply(
+  data: Extract<WeavraControlResponse, { success: true }>["data"],
+  command: string,
+) {
+  return AsyncResult.success({ ...response(data), command });
+}
+function readReply(patch: Partial<{ planId: string; current: boolean }> = {}) {
+  return plannerReply(
+    {
+      kind: "planner-draft",
+      planId,
+      requestDigest: plannerDigest,
+      projectRevision: 0,
+      current: true,
+      draft: plannerDraft,
+      ...patch,
+    },
+    "planner.read",
+  );
+}
+const sentTypes = () =>
+  data.invoke.mock.calls.map(
+    (call) => (call[0] as { input: { request: { type: string } } }).input.request.type,
+  );
+const labelled = (tree: ReactElement<Record<string, unknown>>, label: string) =>
+  visitElements(tree, (node) => node.props["aria-label"] === label);
+
+describe("V0.8B Planner draft", () => {
+  it("renders nothing about the Planner and sends no planner command without the capability", async () => {
+    const plannerSurface = (tree: ReactElement<Record<string, unknown>>) =>
+      visitElements(
+        tree,
+        (node) =>
+          /planner/i.test(String(node.props["aria-label"] ?? "")) ||
+          (node.type === "button" && /planner|load into editor/i.test(text(node))),
+      );
+    // Even a snapshot that carries planner state shows nothing on a connection without it.
+    update({ planner: plannerReady });
+    for (const runtime of ["baseline", "COMPLEX v2 without Planner"]) {
+      if (runtime !== "baseline") advertiseComplex(2);
+      expect([runtime, plannerSurface(render())]).toEqual([runtime, null]);
+      expect(words(render())).not.toMatch(/planner/i);
+    }
+    // The COMPLEX editor keeps its previous shape: criteria appear only with task rows.
+    expect(labelled(render(), "COMPLEX acceptance criteria")).toBeNull();
+    await prepare();
+    expect(sentTypes()).toEqual(["workflow.prepare"]);
+  });
+  it("offers Draft with Planner only for a current idle connection with a goal and criteria", async () => {
+    advertisePlanner();
+    const draftDisabled = () => control(render(), "Draft with Planner").props.disabled;
+    expect(draftDisabled()).toBe(true);
+    change("Workflow goal", plannerGoal);
+    expect(draftDisabled()).toBe(true);
+    change("COMPLEX acceptance criteria", "  \n ");
+    expect(draftDisabled()).toBe(true);
+    change("COMPLEX acceptance criteria", plannerStatements.join("\n"));
+    expect(draftDisabled()).toBe(false);
+    const base = data.observation!;
+    const writer = (writerPresent: boolean, run: WeavraControlState["snapshot"]["status"]["run"]) =>
+      update({
+        snapshot: {
+          ...base.state!.snapshot,
+          status: { ...base.state!.snapshot.status, writerPresent, run },
+        },
+      });
+    const foreignRun = {
+      runId: "foreign-run",
+      status: "RUNNING" as const,
+      phase: "IMPLEMENT" as const,
+      workflow: "STANDARD" as const,
+      risk: "R1" as const,
+      executionMode: "EDIT" as const,
+      codeRevision: 0,
+      currentStep: null,
+      activeAgentCount: 1,
+      taskContractDigest: digest,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    for (const [label, apply] of [
+      [
+        "stale observation",
+        () => {
+          data.observation = { ...base, stale: true };
+        },
+      ],
+      [
+        "disconnected environment",
+        () => {
+          data.phase = "disconnected";
+        },
+      ],
+      [
+        "control not supported",
+        () => {
+          data.support = "unsupported";
+        },
+      ],
+      ["writer present", () => writer(true, null)],
+      ["active Run", () => writer(false, foreignRun)],
+      ["busy owner", () => update({ busy: true })],
+      ["planning already running", () => update({ planner: plannerRunning })],
+    ] as const) {
+      data.observation = base;
+      data.phase = "connected";
+      data.support = "supported";
+      apply();
+      expect([label, draftDisabled()]).toEqual([label, true]);
+    }
+    data.observation = base;
+    data.phase = "connected";
+    data.support = "supported";
+    data.invoke.mockResolvedValue(
+      plannerReply(
+        { kind: "accepted", requestId: "owner:1", command: "planner.start", runId: null },
+        "planner.start",
+      ),
+    );
+    await click("Draft with Planner");
+    const sent = data.invoke.mock.calls[0]?.[0].input.request;
+    expect(sent).toEqual({
+      protocolVersion: 1,
+      id: "owner:1",
+      ownerId: "owner",
+      expectedProjectRevision: 0,
+      type: "planner.start",
+      goal: plannerGoal,
+      acceptanceStatements: plannerStatements,
+    });
+    // What was sent is exactly what the Host binds as the request digest.
+    expect(plannerRequestDigest(sent.goal, sent.acceptanceStatements)).toBe(plannerDigest);
+    expect(data.confirm).not.toHaveBeenCalled();
+    expect(words(render())).toContain("Planning started.");
+    expect(words(render())).toContain("nothing enters the editor until you load it");
+  });
+  it("shows elapsed time, route and usage while RUNNING, and cancels only that request", async () => {
+    advertisePlanner();
+    enterPlannerRequest();
+    update({ planner: plannerRunning });
+    data.observation = { ...data.observation!, observedAt: plannerRunning.startedAt + 12_400 };
+    const shown = words(control(render(), "Planner running"));
+    expect(shown).toContain("Planning · elapsed 12 s");
+    expect(shown).toContain(
+      "models.intents.plan → reasoning → commandcode/deepseek/deepseek-v4.1-flash",
+    );
+    expect(shown).toContain("1 of 3 model calls · 1200 reported tokens");
+    expect(control(render(), "Draft with Planner").props.disabled).toBe(true);
+    expect(labelled(render(), "Planner proposal")).toBeNull();
+    data.invoke.mockResolvedValue(
+      plannerReply(
+        { kind: "accepted", requestId: "owner:1", command: "planner.cancel", runId: null },
+        "planner.cancel",
+      ),
+    );
+    await click("Cancel planning");
+    expect(data.confirm).not.toHaveBeenCalled();
+    expect(data.invoke.mock.calls[0]?.[0].input.request).toEqual({
+      protocolVersion: 1,
+      id: "owner:1",
+      ownerId: "owner",
+      expectedProjectRevision: 0,
+      type: "planner.cancel",
+      planId,
+    });
+    // The acknowledgement is not the outcome: RUNNING stays until the snapshot says otherwise.
+    expect(words(render())).toContain("Planning cancellation accepted");
+    expect(labelled(render(), "Planner running")).not.toBeNull();
+    update({ planner: { ...plannerRunning, status: "CANCELLED", finishedAt: 5_000 } });
+    expect(words(control(render(), "Planner"))).toContain(
+      "Planning cancelled. Nothing was drafted.",
+    );
+    expect(labelled(render(), "Planner running")).toBeNull();
+    expect(control(render(), "Draft with Planner").props.disabled).toBe(false);
+    // Unknown time, usage and route are shown as such, never as zero.
+    update({
+      planner: { ...plannerRunning, route: null, usage: { invocations: 0, reportedTokens: null } },
+    });
+    data.observation = { ...data.observation!, observedAt: null };
+    expect(words(control(render(), "Planner running"))).toContain(
+      "Planning · elapsed unknown · route not reported · 0 of 3 model calls · unknown reported tokens",
+    );
+  });
+  it("loads the unreviewed proposal into the editor exactly as proposed and prepares nothing", async () => {
+    advertisePlanner();
+    enterPlannerRequest();
+    update({ planner: plannerReady });
+    const card = words(control(render(), "Planner proposal"));
+    expect(card).toContain("Planner proposal — unreviewed");
+    expect(card).toContain(
+      "2 tasks · models.intents.plan → reasoning → commandcode/deepseek/deepseek-v4.1-flash · 2 of 3 model calls · 3400 reported tokens",
+    );
+    expect(card).not.toContain("NOT CURRENT");
+    expect(card).not.toContain("OTHER GOAL OR CRITERIA");
+    data.invoke.mockResolvedValue(readReply());
+    await click("Load into editor");
+    expect(data.invoke.mock.calls[0]?.[0].input.request).toEqual({
+      protocolVersion: 1,
+      id: "owner:1",
+      ownerId: "owner",
+      expectedProjectRevision: 0,
+      type: "planner.read",
+      planId,
+    });
+    // The editor was empty, so nothing is asked, and nothing but the rows changes.
+    expect(data.confirm).not.toHaveBeenCalled();
+    const tree = render();
+    expect(control(tree, "Task 1 title").props.value).toBe("Split parse module");
+    expect(control(tree, "Task 1 goal").props.value).toBe("Move parsing into src/parse.ts");
+    expect(control(tree, "Task 1 claim 1 operation").props.value).toBe("create");
+    expect(control(tree, "Task 1 claim 1 path").props.value).toBe("src/parse.ts");
+    expect(control(tree, "Task 1 check IDs").props.value).toBe("test");
+    expect(control(tree, "Task 2 check IDs").props.value).toBe("test lint");
+    expect(control(tree, "Task 2 depends on task 1").props.checked).toBe(true);
+    expect(control(tree, "Task 2 maps criterion 1").props.checked).toBe(false);
+    expect(control(tree, "Task 2 maps criterion 2").props.checked).toBe(true);
+    expect(control(tree, "Workflow goal").props.value).toBe(plannerGoal);
+    expect(words(control(tree, "Loaded Planner proposal"))).toContain(
+      "Review every task, claim and check before Prepare.",
+    );
+    expect(words(tree)).toContain("Planner proposal loaded into the editor.");
+    // No automatic prepare or confirm: only the read was sent.
+    await flush();
+    expect(sentTypes()).toEqual(["planner.read"]);
+    expect(labelled(render(), "Runtime Plan Preview")).toBeNull();
+    // An explicit Prepare sends exactly the loaded draft, with no hidden edits.
+    data.invoke.mockResolvedValue(
+      AsyncResult.success(response({ kind: "prepared", preview: complexPreview })),
+    );
+    await submitPrepare();
+    expect(data.invoke.mock.calls[1]?.[0].input.request).toMatchObject({
+      type: "workflow.prepare",
+      goal: plannerGoal,
+      acceptanceStatements: plannerStatements,
+      complexDraft: plannerDraft,
+    });
+    expect(data.invoke.mock.calls[1]?.[0].input.request.complexDraft).toEqual(plannerDraft);
+    // The banner stays only while the editor holds the unchanged proposal.
+    change("Task 1 title", "Split the parse module");
+    expect(labelled(render(), "Loaded Planner proposal")).toBeNull();
+    change("Task 1 title", "Split parse module");
+    expect(labelled(render(), "Loaded Planner proposal")).not.toBeNull();
+    toggle("Task 2 maps criterion 1");
+    expect(labelled(render(), "Loaded Planner proposal")).toBeNull();
+  });
+  it("labels a non-current proposal and one planned for another goal or criteria", async () => {
+    advertisePlanner();
+    enterPlannerRequest();
+    update({ planner: { ...plannerReady, current: false } });
+    const card = () => words(control(render(), "Planner proposal"));
+    expect(card()).toContain("NOT CURRENT");
+    expect(card()).toContain("changed after planning");
+    expect(card()).not.toContain("OTHER GOAL OR CRITERIA");
+    for (const [label, apply, differs] of [
+      [
+        "reordered criteria",
+        () => change("COMPLEX acceptance criteria", plannerStatements.toReversed().join("\n")),
+        true,
+      ],
+      [
+        "original criteria",
+        () => change("COMPLEX acceptance criteria", plannerStatements.join("\n")),
+        false,
+      ],
+      [
+        "surrounding whitespace the request trims",
+        () => change("Workflow goal", `  ${plannerGoal}\n`),
+        false,
+      ],
+      ["another goal", () => change("Workflow goal", `${plannerGoal}!`), true],
+    ] as const) {
+      apply();
+      expect([label, card().includes("OTHER GOAL OR CRITERIA")]).toEqual([label, differs]);
+      expect([label, card().includes("different goal or criteria")]).toEqual([label, differs]);
+    }
+    change("Workflow goal", plannerGoal);
+    data.invoke.mockResolvedValue(readReply({ current: false }));
+    await click("Load into editor");
+    const banner = () => words(control(render(), "Loaded Planner proposal"));
+    expect(banner()).toContain("Not current");
+    expect(banner()).not.toContain("different goal or criteria");
+    change("COMPLEX acceptance criteria", plannerStatements[0]!);
+    expect(banner()).toContain("Planned for a different goal or criteria");
+    // The snapshot's live value wins while the Host still reports that request.
+    update({ planner: { ...plannerReady, current: true } });
+    expect(banner()).not.toContain("Not current");
+  });
+  it("asks before replacing different rows and keeps them when declined", async () => {
+    await draftTwoTasks(2);
+    advertisePlanner();
+    update({ planner: plannerReady });
+    data.invoke.mockResolvedValue(readReply());
+    data.confirm.mockResolvedValueOnce(false);
+    await click("Load into editor");
+    expect(data.confirm).toHaveBeenCalledOnce();
+    expect(data.confirm.mock.calls[0]?.[0]).toContain(
+      "Replace the 2 task rows in the editor with the Planner proposal of 2 tasks?",
+    );
+    expect(control(render(), "Task 1 title").props.value).toBe("Extract parser");
+    expect(words(render())).toContain("Kept the editor's task rows. Nothing was loaded.");
+    expect(labelled(render(), "Loaded Planner proposal")).toBeNull();
+    await click("Load into editor");
+    expect(data.confirm).toHaveBeenCalledTimes(2);
+    expect(control(render(), "Task 1 title").props.value).toBe("Split parse module");
+    // The unchanged proposal loads again without asking.
+    await click("Load into editor");
+    expect(data.confirm).toHaveBeenCalledTimes(2);
+    expect(sentTypes()).toEqual(["planner.read", "planner.read", "planner.read"]);
+  });
+  it("never loads a draft of another planning request", async () => {
+    advertisePlanner();
+    enterPlannerRequest();
+    update({ planner: plannerReady });
+    data.invoke.mockResolvedValue(readReply({ planId: "0b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e" }));
+    await click("Load into editor");
+    expect(words(render())).toContain("Runtime returned a draft of another planning request.");
+    expect(labelled(render(), "Task 1")).toBeNull();
+    expect(labelled(render(), "Loaded Planner proposal")).toBeNull();
+  });
+  it("discards a proposal only in this App and shows a new request's proposal again", async () => {
+    advertisePlanner();
+    enterPlannerRequest();
+    update({ planner: plannerReady });
+    await click("Discard");
+    expect(labelled(render(), "Planner proposal")).toBeNull();
+    expect(words(control(render(), "Planner"))).toContain("Proposal discarded in this App");
+    // The way back is local too.
+    await click("Show proposal");
+    expect(labelled(render(), "Planner proposal")).not.toBeNull();
+    await click("Discard");
+    expect(data.invoke).not.toHaveBeenCalled();
+    expect(data.confirm).not.toHaveBeenCalled();
+    update({ planner: { ...plannerReady, planId: "0b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e" } });
+    expect(labelled(render(), "Planner proposal")).not.toBeNull();
+  });
+  it("explains each failure code with fixed text and never retries on its own", async () => {
+    advertisePlanner();
+    enterPlannerRequest();
+    const codes: ReadonlyArray<WeavraPlannerFailureCode> = [
+      "MODEL_UNAVAILABLE",
+      "CONTEXT_TOO_LARGE",
+      "TIMEOUT",
+      "PROVIDER_ERROR",
+      "BUDGET_EXHAUSTED",
+      "BUDGET_UNKNOWN",
+      "NO_DRAFT",
+      "DRAFT_INVALID",
+      "STALE",
+    ];
+    const explanations = new Set<string>();
+    for (const failureCode of codes) {
+      update({ planner: { ...plannerRunning, status: "FAILED", finishedAt: 2_000, failureCode } });
+      const shown = words(control(render(), "Planner failed"));
+      expect(shown).toMatch(
+        new RegExp(
+          `^Planner failed: ${failureCode} — .+ Nothing was drafted; draft again when ready\\.$`,
+        ),
+      );
+      explanations.add(shown.replace(failureCode, ""));
+      expect(labelled(render(), "Planner proposal")).toBeNull();
+      expect(control(render(), "Draft with Planner").props.disabled).toBe(false);
+    }
+    expect(explanations.size).toBe(codes.length);
+    expect(words(control(render(), "Planner failed"))).toContain("the draft was discarded");
+    await flush();
+    expect(data.invoke).not.toHaveBeenCalled();
+  });
+  it("shows Runtime refusals of planning with fixed guidance and no retry", async () => {
+    advertisePlanner();
+    enterPlannerRequest();
+    const refusal: WeavraControlResponse = {
+      protocolVersion: 1,
+      type: "control_response",
+      id: "owner:1",
+      command: "planner.start",
+      ownerId: "owner",
+      runId: null,
+      stateRevision: null,
+      projectRevision: 0,
+      eventId: null,
+      timestamp: 1,
+      success: false,
+      error: { code: "UNSUPPORTED_WORKFLOW" },
+    };
+    data.invoke.mockResolvedValue(AsyncResult.success(refusal));
+    await click("Draft with Planner");
+    await flush();
+    expect(words(render())).toContain(
+      "Runtime rejected the command: UNSUPPORTED_WORKFLOW. The Planner drafts only goals that Runtime classifies as COMPLEX, never R3.",
+    );
+    expect(sentTypes()).toEqual(["planner.start"]);
+    // A confirm refused while planning runs is not turned into an implicit cancel (§8).
+    update({ planner: plannerRunning });
+    data.invoke.mockResolvedValue(AsyncResult.success(response({ kind: "prepared", preview })));
+    await prepare();
+    data.invoke.mockResolvedValue(
+      AsyncResult.success({
+        ...refusal,
+        id: "owner:2",
+        command: "workflow.confirm",
+        error: { code: "PLANNER_BUSY" },
+      }),
+    );
+    await click("Confirm and start");
+    await flush();
+    expect(words(render())).toContain(
+      "Runtime rejected the command: PLANNER_BUSY. Planning is still running on this Runtime. Cancel planning first; nothing was started.",
+    );
+    expect(sentTypes()).toEqual(["planner.start", "workflow.prepare", "workflow.confirm"]);
+    expect(labelled(render(), "Planner running")).not.toBeNull();
   });
 });

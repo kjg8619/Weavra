@@ -978,3 +978,33 @@
 - 현재 검증: 설계가 인용한 코드 사실(줄 번호, 한도, 직렬 큐, 10초 timeout, 65,536 bytes 응답 상한, `ComplexPlanRequiredError` 계기)을 `20ff4632`에서 직접 확인했다. PR #60 CI(세 job)를 통과해 머지했다(`99c36abf`).
 - 구현 착수: #52 Runtime(`Weavra-worktrees/v0.7b-complex-runtime`, `feat/v0.8b-planner-runtime`)과 #53 App(`Weavra-worktrees/v0.7b-complex-app`, `feat/v0.8b-planner-app`)을 하위 에이전트 두 개가 병렬로 구현 중이다. 머지는 계약대로 App → Runtime 순서다.
 - 커밋 상태: `6e75ede4`(PR #60), 계약 정밀화 `82cc3559`, 이 기록. 후속 문서 PR(devlop 대상).
+
+## 2026-09-25 KST — V0.8B #53 App Planner 소비자
+
+- 목적: PLANNER_DRAFT.md §7·§9의 App 쪽 구현이다. 소비자 우선 규칙에 따라 Runtime(#52)보다 먼저 머지한다.
+- 브랜치/worktree: `feat/v0.8b-planner-app`, `Weavra-worktrees/v0.7b-complex-app`(재사용). 하위 에이전트가 구현했고 메인 세션이 검토했다. Runtime #52는 별도 worktree에서 동시에 진행 중이다.
+- 변경(`app/t3code`만):
+  - **계약**(`packages/contracts/src/weavraControl.ts`):
+    - `plannerContractVersion: 1` capability를 추가했다. 기존 App이 hello의 `commands` 목록을 엄격하게 해석하므로 이 목록은 바꾸지 않는다.
+    - `planner.start`·`planner.cancel`·`planner.read` 요청, 엄격한 `planner-draft` 종류(응답 줄 ≤16,384 bytes), 새 오류 코드 3개, snapshot의 `planner` 상태를 추가했다.
+    - `planner` 상태는 status별로 필드 조합을 강제하고, 알 수 없는 필드는 거부한다.
+  - **서버**(`RuntimeController.ts`, 신규 `PlannerProjection.ts`):
+    - Runtime이 capability를 알리지 않으면 planner 명령을 보내지 않고 로컬에서 거부한다.
+    - `planner-draft`는 `planner.read`에 대해서만, 요청한 planId와 일치하고 delete claim이 없을 때만 받는다.
+    - planner 상태는 이 서버가 `planner.start`를 보낸 Host에서만 받는다. 같은 planId 안에서는 digest·revision·시작 시각이 바뀌지 않아야 하고, 종료 상태는 고정되며, 사용량은 줄지 않아야 한다.
+  - **클라이언트 상태**(`packages/client-runtime`):
+    - 요청 digest를 계산한다. 평문 LAN HTTP에는 Web Crypto가 없어서, shared에 있던 `@noble/hashes`를 쓰는 순수 JS `sha256`을 추가했다. lockfile 변경은 없다.
+    - 불러온 초안 표식과 경과 시간을 관리한다.
+  - **UI**(`WeavraControls.tsx`): COMPLEX 편집기 아래에 "Draft with Planner"를 추가했다.
+    - RUNNING일 때는 경과 시간·route·사용량과 취소 버튼을 보여 준다.
+    - READY일 때는 "Planner proposal — unreviewed" 카드를 보여 준다. 편집기로 불러오기는 교체 전에 확인을 받고 rows만 바꾼다.
+    - 검토 배너, 현재 아님 라벨, digest 불일치 라벨을 둔다.
+    - Discard는 App 안에서만 처리한다. FAILED일 때는 고정 문구를 보여 준다.
+    - 자동 prepare·confirm은 없다.
+  - **문서**: `docs/operations/development.md`에 Planner 초안 절을 추가했다.
+- 현재 검증(하위 에이전트):
+  - `node scripts/validate.mjs t3` → `VALIDATE t3: ALL GATES PASS`. 첫 실행은 Electron 바이너리 다운로드 timeout(환경 문제)으로 실패했고, 다시 실행해 통과했다.
+  - 테스트: contracts 41, server(RuntimeController 68, ControlTransport 53), client 40, UI 44, shared sha256 1.
+  - 변이 확인: 서버 capability 게이트를 제거하면 2개, UI 게이트를 제거하면 1개, 불러온 뒤 자동 prepare를 넣으면 2개가 실패했다.
+- 메인 세션 확인: digest 고정값 두 개(`sha256:29350ea7…`, statements 생략 시 `sha256:7e83f534…`)를 `shasum`으로 다시 계산해 일치를 확인했다. Runtime 에이전트에게도 같은 값과 App의 해석(commands 목록 불변, 토큰은 0에서 시작, status별 필드 규칙)을 전달했다.
+- 커밋 상태: `cf21baf2`, `e564ac3a`, `2a75de0d`, `70a32c97`, `7fda16f9`, devlop 병합, 이 기록. devlop 대상 PR.

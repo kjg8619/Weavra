@@ -636,6 +636,72 @@ const terminalRunStatuses: ReadonlySet<string> = new Set([
   "COMPLETED",
 ]);
 
+// V0.8B Planner wire contract (docs/architecture/PLANNER_DRAFT.md §5.5, §7), duplicated from the
+// Runtime wire shapes and never imported across build roots. A Planner draft is candidate data:
+// READY is advice, and nothing it proposes runs until the human loads it into the editor, prepares
+// and confirms a Runtime preview.
+export const WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES = 16_384;
+export const WeavraPlannerFailureCode = Schema.Literals([
+  "MODEL_UNAVAILABLE",
+  "CONTEXT_TOO_LARGE",
+  "TIMEOUT",
+  "PROVIDER_ERROR",
+  "BUDGET_EXHAUSTED",
+  "BUDGET_UNKNOWN",
+  "NO_DRAFT",
+  "DRAFT_INVALID",
+  "STALE",
+]);
+export type WeavraPlannerFailureCode = typeof WeavraPlannerFailureCode.Type;
+const plannerRouteName = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(WEAVRA_CONTROL_MAX_RESPONSE_BYTES),
+  Schema.isPattern(/\S/),
+);
+/** Snapshot status of this Host's planning request; the draft itself only travels in `planner.read`. */
+export const WeavraPlannerStatus = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  planId: canonicalUuid,
+  status: Schema.Literals(["RUNNING", "READY", "FAILED", "CANCELLED"]),
+  requestDigest: digest,
+  projectRevision: counter,
+  current: Schema.Boolean,
+  startedAt: counter,
+  finishedAt: Schema.NullOr(counter),
+  route: Schema.NullOr(
+    Schema.Struct({
+      alias: Schema.NullOr(Schema.Literal("plan")),
+      profile: plannerRouteName,
+      provider: plannerRouteName,
+      model: plannerRouteName,
+    }),
+  ),
+  usage: Schema.Struct({
+    invocations: counter.check(Schema.isLessThanOrEqualTo(3)),
+    reportedTokens: Schema.NullOr(counter),
+  }),
+  taskCount: Schema.NullOr(counter.check(Schema.isBetween({ minimum: 2, maximum: 8 }))),
+  failureCode: Schema.NullOr(WeavraPlannerFailureCode),
+}).check(
+  Schema.makeFilter(
+    (planner) =>
+      // Each status carries exactly its own fields: a task count only when READY, a failure code
+      // only when FAILED, and no finish time only while RUNNING.
+      (planner.status === "READY") === (planner.taskCount !== null) &&
+      (planner.status === "FAILED") === (planner.failureCode !== null) &&
+      (planner.status === "RUNNING") === (planner.finishedAt === null) &&
+      // A READY draft was submitted by at least one model invocation.
+      (planner.status !== "READY" || planner.usage.invocations >= 1),
+    { expected: "a planner status with exactly the fields of its status" },
+  ),
+);
+export type WeavraPlannerStatus = typeof WeavraPlannerStatus.Type;
+
+/** Parent acceptance statements, bounded alike for `workflow.prepare` and `planner.start`. */
+const acceptanceStatements = Schema.Array(
+  Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500), Schema.isPattern(/\S/)),
+).check(Schema.isMinLength(1), Schema.isMaxLength(16));
+
 export const WeavraControlMutation = Schema.Union([
   Schema.Struct({
     ...mutation,
@@ -672,11 +738,7 @@ export const WeavraControlMutation = Schema.Union([
         Schema.String.check(Schema.isMaxLength(2048)),
       ).check(Schema.isMaxProperties(16)),
     ),
-    acceptanceStatements: Schema.optionalKey(
-      Schema.Array(
-        Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500), Schema.isPattern(/\S/)),
-      ).check(Schema.isMinLength(1), Schema.isMaxLength(16)),
-    ),
+    acceptanceStatements: Schema.optionalKey(acceptanceStatements),
     complexDraft: Schema.optionalKey(WeavraComplexDraft),
   }).check(
     // Reviewed recipes remain STANDARD-only; a recipe never travels with a COMPLEX draft.
@@ -706,6 +768,16 @@ export const WeavraControlMutation = Schema.Union([
     approvalId: identifier,
     decision: Schema.Literals(["approve", "reject"]),
   }),
+  // V0.8B: the goal and criteria only. Runtime classifies, plans and bounds everything else, and
+  // `planner.start` returns at once while planning runs in the background.
+  Schema.Struct({
+    ...mutation,
+    type: Schema.Literal("planner.start"),
+    goal,
+    acceptanceStatements: Schema.optionalKey(acceptanceStatements),
+  }),
+  Schema.Struct({ ...mutation, type: Schema.Literal("planner.cancel"), planId: canonicalUuid }),
+  Schema.Struct({ ...mutation, type: Schema.Literal("planner.read"), planId: canonicalUuid }),
 ]);
 export type WeavraControlMutation = typeof WeavraControlMutation.Type;
 
@@ -759,6 +831,9 @@ export const WeavraControlErrorCode = Schema.Literals([
   "FACT_SOURCE_CHANGED",
   "INVALID_FACT",
   "FACT_LIMIT",
+  "PLANNER_BUSY",
+  "PLANNER_NOT_FOUND",
+  "PLANNER_NOT_READY",
 ]);
 export type WeavraControlErrorCode = typeof WeavraControlErrorCode.Type;
 
@@ -967,6 +1042,8 @@ export const WeavraControlState = Schema.Struct({
   pendingApproval: Schema.NullOr(WeavraControlApproval),
   capabilityInventory: Schema.optional(WeavraCapabilityInventory),
   complexExecution: Schema.optionalKey(WeavraComplexExecution),
+  // Present only after a `planner.start` on this Host; absent (never null) otherwise.
+  planner: Schema.optionalKey(WeavraPlannerStatus),
   snapshot: WeavraSnapshotSummary,
 }).check(
   Schema.makeFilter(
@@ -974,6 +1051,13 @@ export const WeavraControlState = Schema.Struct({
       (state.capabilityInventory === undefined ||
         (state.capabilityInventory.ownerId === state.ownerId &&
           state.capabilityInventory.projectRevision === state.projectRevision)) &&
+      // The planner keeps the project revision it started at. A current READY draft still has
+      // it (§6); `current` of the other statuses is not defined, so it binds nothing here.
+      (state.planner === undefined ||
+        (state.planner.projectRevision <= state.projectRevision &&
+          (state.planner.status !== "READY" ||
+            !state.planner.current ||
+            state.planner.projectRevision === state.projectRevision))) &&
       // The projection belongs to exactly the enclosing latest COMPLEX Run and observation.
       (state.complexExecution === undefined ||
         (state.complexExecution.ownerId === state.ownerId &&
@@ -1014,6 +1098,9 @@ export const WeavraControlCapabilities = Schema.Struct({
   // Absent means COMPLEX is NOT_EXPOSED; never inferred from readiness or version text. A Runtime
   // advertises exactly one version: 1 (sequential, V0.7B) or 2 (implementation waves, V0.8A).
   complexContractVersion: Schema.optionalKey(Schema.Literals([1, 2])),
+  // V0.8B: absent means the Planner does not exist on this connection. As with COMPLEX, the
+  // advertisement is not readiness or permission. The `commands` tuple above stays unchanged.
+  plannerContractVersion: Schema.optionalKey(Schema.Literal(1)),
   recipes: Schema.Array(
     Schema.Struct({
       id: identifier,
@@ -1040,8 +1127,26 @@ const controlData = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("accepted"),
     requestId: identifier,
-    command: Schema.Literals(["workflow.confirm", "workflow.cancel", "approval.resolve"]),
+    command: Schema.Literals([
+      "workflow.confirm",
+      "workflow.cancel",
+      "approval.resolve",
+      "planner.start",
+      "planner.cancel",
+    ]),
     runId: Schema.NullOr(identifier),
+  }).check(
+    // Planning never creates or names a Run.
+    Schema.makeFilter((data) => !data.command.startsWith("planner.") || data.runId === null),
+  ),
+  // A READY Planner proposal for the editor: candidate data, never a plan, preview or approval.
+  Schema.Struct({
+    kind: Schema.Literal("planner-draft"),
+    planId: canonicalUuid,
+    requestDigest: digest,
+    projectRevision: counter,
+    current: Schema.Boolean,
+    draft: WeavraComplexDraft,
   }),
 ]);
 const responseEnvelope = {
@@ -1057,7 +1162,15 @@ const responseEnvelope = {
   ownerId: identifier,
 };
 export const WeavraControlResponse = Schema.Union([
-  Schema.Struct({ ...responseEnvelope, success: Schema.Literal(true), data: controlData }),
+  Schema.Struct({ ...responseEnvelope, success: Schema.Literal(true), data: controlData }).check(
+    // A Planner draft travels on its own, well below the general response budget: the whole
+    // response line, newline included, is at most 16,384 bytes.
+    Schema.makeFilter(
+      (response) =>
+        response.data.kind !== "planner-draft" ||
+        jsonBytes(response) + 1 <= WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES,
+    ),
+  ),
   Schema.Struct({
     ...responseEnvelope,
     success: Schema.Literal(false),
