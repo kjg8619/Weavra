@@ -49,13 +49,18 @@ Every path uses the rules and guard above. They differ in whether they may settl
 - COMPLEX unfinished rows become `INTERRUPTED`/`OWNER_LOST`; `COMPLETED` rows are kept,
 - `RunInterrupted` is emitted and old terminal runs are archived.
 
-It releases the lock and returns the revision before and after. The prepare continues only if the recovery started from exactly the revision the client saw. Its preview is then bound to the recovered revision (`expectedProjectRevision + 1` when a Run was interrupted), and `workflow.confirm` must send that revision.
+It then releases the lock and returns the dead PID.
+
+A preview is always bound to the request's own `expectedProjectRevision`, which keeps the App's strict revision echo check intact. So the prepare checks that revision again after the recovery:
+
+- **A Run was settled.** Settling it committed a new project revision, so the request is stale. The prepare answers `STALE_PROJECT` and prepares nothing. The client re-reads: the snapshot now shows the Run `INTERRUPTED` and no writer. The next prepare runs normally at the recovered revision.
+- **Nothing was settled.** The dead owner left no active Run and nothing needed archiving, so the revision did not change. The same prepare continues and returns a preview.
 
 In every other case nothing is written and prepare fails as before: owner alive or `EPERM`, another host, a lock without `hostname`, an unreadable lock, a leftover guard, a stale revision (`STALE_PROJECT`), or an active Run with no lock at all (`ACTIVE_RUN`). Such a lockless Run has no owner left to prove dead; only a normal writer `open` settles it.
 
 `control.snapshot` stays read-only and keeps showing the orphan until a prepare recovers it. The `workflow.confirm` guarded start keeps `recoverInterrupted: false` as its freshness fence; after a prepare-time recovery no active Run is left for it to refuse. Nothing is resumed, replayed, rolled back or deleted. Partial changes stay in the checkout, and the next Run still requires a clean workspace.
 
-Known App gap: the Project Settings panel enables prepare only when `writerPresent` is `false` and no Run is active, and the App server accepts a prepared preview only at the request's `expectedProjectRevision`. An App-only user can use this recovery only after an App change.
+App note: the Project Settings panel enables prepare only when `writerPresent` is `false` and no Run is active. Until that gating allows a prepare over a writer lock, an App-only user cannot trigger this recovery. That App change is tracked separately.
 
 ## 2. Terminal-run archive
 

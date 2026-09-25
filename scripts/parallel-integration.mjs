@@ -259,7 +259,7 @@ await scenario("P09", "a two-row wave with one invocation left is BLOCKED before
   const scripted = workers({ hold: { "CT-001": async (e) => { await hold["CT-001"](e); await parked.released; }, "CT-002": async (e) => { await hold["CT-002"](e); await parked.released; } } });
   /** The Run ID of every model request, in arrival order. */
   const runIds = [];
-  await scenario("P14", "owner killed mid-wave: the orphan stays visible read-only; prepare recovers it INTERRUPTED/OWNER_LOST (no resume) and a new Run completes", true, {
+  await scenario("P14", "owner killed mid-wave: the orphan stays visible read-only; a prepare recovers it INTERRUPTED/OWNER_LOST (STALE_PROJECT, no resume); the next prepare's new Run completes", true, {
     model: (entry) => {
       runIds.push(entry.request?.runId);
       return scripted(entry);
@@ -309,18 +309,24 @@ await scenario("P09", "a two-row wave with one invocation left is BLOCKED before
           // control.snapshot stays read-only: reading again changes nothing.
           const reread = yield* next.snapshot();
           assert.deepEqual([reread.projectRevision, reread.stateRevision, reread.snapshot.status.writerPresent], [seen.projectRevision, seen.stateRevision, true]);
-          // workflow.prepare recovers the provably dead same-host owner, then prepares on the recovered revision.
+          // workflow.prepare recovers the provably dead same-host owner. That moves the revision the client sent, so it
+          // answers STALE_PROJECT and prepares nothing.
           const recovering = yield* next.mutate({ type: "workflow.prepare", goal: GOAL, acceptanceStatements: STATEMENTS, complexDraft: DRAFT });
-          assert.equal(recovering.success, true, JSON.stringify(recovering));
-          const preview = recovering.data.preview;
-          assert.equal(preview.projectRevision, seen.projectRevision + 1);
+          assert.equal(recovering.success, false, JSON.stringify(recovering));
+          assert.equal(recovering.error.code, "STALE_PROJECT");
           const recovered = yield* next.snapshot();
+          assert.equal(recovered.projectRevision, seen.projectRevision + 1);
           assert.equal(recovered.snapshot.status.run.runId, orphanId);
           assert.equal(recovered.snapshot.status.run.status, "INTERRUPTED");
           assert.equal(recovered.snapshot.status.writerPresent, false);
+          assert.equal(recovered.preview, null);
           assert.deepEqual(recovered.complexExecution.tasks.map((row) => [row.status, row.failureCode]), Array(3).fill(["INTERRUPTED", "OWNER_LOST"]));
           assert.equal(recovered.complexExecution.cleanup, "UNCONFIRMED");
-          assert.equal(recovered.preview?.previewId, preview.previewId);
+          // The next prepare runs normally at the recovered revision, and its preview echoes the revision it was sent.
+          const prepared = yield* next.mutate({ type: "workflow.prepare", goal: GOAL, acceptanceStatements: STATEMENTS, complexDraft: DRAFT });
+          assert.equal(prepared.success, true, JSON.stringify(prepared));
+          const preview = prepared.data.preview;
+          assert.equal(preview.projectRevision, recovered.projectRevision);
           const accepted = yield* next.mutate({ type: "workflow.confirm", previewId: preview.previewId, previewDigest: preview.previewDigest });
           assert.equal(accepted.success, true, JSON.stringify(accepted));
           const final = yield* settle("P14 new Host", next);
@@ -333,7 +339,7 @@ await scenario("P09", "a two-row wave with one invocation left is BLOCKED before
           const orphan = durable.runs.find((run) => run.runId === orphanId);
           assert.equal(orphan.status, "INTERRUPTED");
           assert.deepEqual(orphan.complex.tasks.map((row) => [row.status, row.failureCode]), Array(3).fill(["INTERRUPTED", "OWNER_LOST"]));
-          console.log(`   P14 orphan after kill: run RUNNING, rows ${statuses(seen).join("/")}, writerPresent true; prepare recovered it → ${recovered.snapshot.status.run.status} (${statuses(recovered).join("/")}); new Run ${final.snapshot.status.run.status}`);
+          console.log(`   P14 orphan after kill: run RUNNING, rows ${statuses(seen).join("/")}, writerPresent true; prepare → ${recovering.error.code} with the Run ${recovered.snapshot.status.run.status} (${statuses(recovered).join("/")}), writer free; next prepare's new Run ${final.snapshot.status.run.status}`);
           return final;
         }),
       );

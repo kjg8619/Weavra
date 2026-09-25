@@ -220,20 +220,18 @@ export class HostControlBridge {
 		if (snapshot.state?.runs.some(isActive)) throw new ControlError("ACTIVE_RUN");
 	}
 	/**
-	 * `workflow.prepare` only; snapshots and confirm never recover. When the project is exactly the revision the client
-	 * saw and its writer lock belongs to a same-host owner whose PID provably no longer exists, the existing StateStore
-	 * recovery settles that owner's Run (INTERRUPTED, COMPLEX rows OWNER_LOST; nothing resumed, rolled back or deleted)
-	 * and the prepare continues at the recovered revision. Otherwise `expected` is returned unchanged, so the idle
-	 * checks refuse exactly as before.
+	 * `workflow.prepare` only; snapshots and confirm never recover. When this Host is idle, the project is exactly the
+	 * revision the client saw and a writer lock exists, the StateStore settles the lock owner's Run only if that owner is
+	 * provably dead on this host (INTERRUPTED, COMPLEX rows OWNER_LOST; nothing resumed, rolled back or deleted). That
+	 * commits a new project revision, so the idle check that follows answers STALE_PROJECT and the request prepares
+	 * nothing; the client re-reads and prepares at the recovered revision. Any other lock and every failure leave the
+	 * project unchanged for the idle checks to refuse exactly as before.
 	 */
-	private async recoverDeadOwner(expected: number): Promise<number> {
-		if (this.execution) return expected;
+	private async recoverDeadOwner(expected: number): Promise<void> {
+		if (this.execution) return;
 		const snapshot = await this.canonical();
-		if ((snapshot.state?.revision ?? 0) !== expected || !snapshot.writerPresent) return expected;
-		const recovery = await FileStateStore.recoverDeadOwner(this.root.path, { events: this.options.events }).catch(
-			() => undefined,
-		);
-		return recovery?.fromRevision === expected ? recovery.revision : expected;
+		if ((snapshot.state?.revision ?? 0) !== expected || !snapshot.writerPresent) return;
+		await FileStateStore.recoverDeadOwner(this.root.path, { events: this.options.events }).catch(() => {});
 	}
 	private async currentRun(request: Extract<HostControlMutation, { runId: string }>): Promise<Run> {
 		const snapshot = await this.canonical();
@@ -605,8 +603,9 @@ export class HostControlBridge {
 					complexDraftBytes(complexDraft) > COMPLEX_DRAFT_MAX_BYTES)
 			)
 				throw new ControlError("INVALID_REQUEST");
-			const projectRevision = await this.recoverDeadOwner(request.expectedProjectRevision);
-			await this.idleRevision(projectRevision);
+			await this.recoverDeadOwner(request.expectedProjectRevision);
+			// A preview is only ever bound to the client's own expected revision; a recovery that moved it is STALE_PROJECT.
+			await this.idleRevision(request.expectedProjectRevision);
 			const config = await this.configuration();
 			let draft = prepareHostWorkflowDraft({
 				goal: request.goal,
@@ -624,7 +623,7 @@ export class HostControlBridge {
 			const fields = {
 				previewId: randomUUID(),
 				ownerId: this.ownerId,
-				projectRevision,
+				projectRevision: request.expectedProjectRevision,
 				expiresAt: this.now() + HOST_CONTROL_PREVIEW_TTL_MS,
 				goal: plan.goal,
 				workflow: plan.workflow,
@@ -658,7 +657,7 @@ export class HostControlBridge {
 			const response = this.success(request, { kind: "prepared", preview });
 			if (Buffer.byteLength(JSON.stringify(response)) + 1 > HOST_CONTROL_MAX_RESPONSE_BYTES)
 				throw new ControlError("RESPONSE_TOO_LARGE");
-			await this.idleRevision(projectRevision);
+			await this.idleRevision(request.expectedProjectRevision);
 			this.prepared = { plan, preview, configurationDigest: fingerprint(config), consumed: false };
 			this.browserPrepared = undefined;
 			this.factPrepared = undefined;

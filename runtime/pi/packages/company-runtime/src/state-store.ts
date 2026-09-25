@@ -151,15 +151,6 @@ export interface FileStateStoreOptions {
 		step: "write" | "sync" | "rename",
 	) => void;
 }
-/** A Run owner lost with its process, recovered by `FileStateStore.recoverDeadOwner`. */
-export interface DeadOwnerRecovery {
-	/** PID recorded in the removed lock; it provably no longer exists on this host. */
-	pid: number;
-	/** Project revision found under the recovered lock, before recovery. */
-	fromRevision: number;
-	/** Project revision after recovery; one more when a Run was interrupted or terminal runs were archived. */
-	revision: number;
-}
 export class StateStoreError extends Error {
 	readonly stage: string;
 	readonly stateCommitted: boolean;
@@ -285,28 +276,26 @@ export class FileStateStore implements StateStore, ActionAudit {
 	/**
 	 * Host Control `workflow.prepare` after a killed owner: acts only through a writer lock whose same-host owner PID
 	 * provably no longer exists (the `open` rules and recovery guard). It then settles that owner's active Run exactly as
-	 * `open` does (INTERRUPTED; COMPLEX unfinished rows INTERRUPTED/OWNER_LOST; nothing resumed) and releases the lock.
-	 * Resolves undefined and leaves the project unchanged when the lock is absent or its owner is alive, on another host
-	 * or unprovable. It never creates `.ai` or takes a free lock.
+	 * `open` does (INTERRUPTED; COMPLEX unfinished rows INTERRUPTED/OWNER_LOST; nothing resumed), releases the lock and
+	 * resolves the dead PID. Resolves undefined and leaves the project unchanged when the lock is absent or its owner is
+	 * alive, on another host or unprovable. It never creates `.ai` or takes a free lock.
 	 */
 	static async recoverDeadOwner(
 		projectPath: string,
 		options: Pick<FileStateStoreOptions, "now" | "events"> = {},
-	): Promise<DeadOwnerRecovery | undefined> {
+	): Promise<{ pid: number } | undefined> {
 		const canonical = await realpath(projectPath);
 		if (!(await lstat(canonical)).isDirectory()) throw new StateStoreError("workspace");
 		const store = new FileStateStore(canonical, { now: options.now, events: options.events });
-		const fromRevision = await store.acquire(true);
-		if (fromRevision === undefined) return undefined;
-		const recovery = { pid: store.recoveredStaleLock!.pid, fromRevision, revision: store.state.revision };
+		if (!(await store.acquire(true))) return undefined;
 		await store.close();
-		return recovery;
+		return store.recoveredStaleLock;
 	}
 	/**
-	 * Takes the writer lock, then loads the canonical state with the configured recovery; resolves the revision it
-	 * loaded. `deadOwnerOnly` proceeds only through a lock that `recoverStaleLock` proved dead, else resolves undefined.
+	 * Takes the writer lock, then loads the canonical state with the configured recovery. `deadOwnerOnly` proceeds only
+	 * through a lock that `recoverStaleLock` proved dead and otherwise resolves false without any write.
 	 */
-	private async acquire(deadOwnerOnly: boolean): Promise<number | undefined> {
+	private async acquire(deadOwnerOnly: boolean): Promise<boolean> {
 		try {
 			if (!deadOwnerOnly)
 				await mkdir(this.directory, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => {
@@ -320,7 +309,7 @@ export class FileStateStore implements StateStore, ActionAudit {
 			if (deadOwnerOnly) {
 				if (!(await this.recoverStaleLock())) {
 					this.closed = true;
-					return undefined;
+					return false;
 				}
 				lock = await createLock();
 			} else
@@ -346,7 +335,8 @@ export class FileStateStore implements StateStore, ActionAudit {
 			} finally {
 				await lock.close();
 			}
-			return await this.initialize();
+			await this.initialize();
+			return true;
 		} catch (error) {
 			const failure = error instanceof StateStoreError ? error : new StateStoreError("open/lock");
 			this.closed = true;
@@ -663,16 +653,14 @@ export class FileStateStore implements StateStore, ActionAudit {
 			throw new StateStoreError("tasks.json", true);
 		}
 	}
-	/** Loads, recovers and commits the canonical state; resolves the revision it loaded (0 without state). */
-	private async initialize(): Promise<number> {
+	private async initialize(): Promise<void> {
 		const raw = await this.readJson("state.json");
 		if (raw !== undefined) this.state = structuredClone(assertState(raw));
 		else {
 			// Orphan projection is evidence of missing source, never a replacement source of truth.
 			if ((await this.readJson("tasks.json")) !== undefined) throw new StateStoreError("missing state.json");
-			return 0;
+			return;
 		}
-		const loaded = this.state.revision;
 		const next = structuredClone(this.state);
 		if (
 			this.options.recoverInterrupted === false &&
@@ -714,7 +702,7 @@ export class FileStateStore implements StateStore, ActionAudit {
 		if (this.options.recoverInterrupted !== false) await this.archiveTerminalRuns(next);
 		if (JSON.stringify(next) !== JSON.stringify(this.state)) await this.commit(next);
 		else {
-			if (this.options.recoverInterrupted === false) return loaded;
+			if (this.options.recoverInterrupted === false) return;
 			let tasks: unknown;
 			try {
 				tasks = await this.readJson("tasks.json");
@@ -731,7 +719,6 @@ export class FileStateStore implements StateStore, ActionAudit {
 				this.eventFailures.push({ sequence: event.sequence, type: event.type });
 			}
 		}
-		return loaded;
 	}
 	/**
 	 * Moves terminal runs beyond the newest INLINE_TERMINAL_RUNS (with their actions) to immutable archive files, then

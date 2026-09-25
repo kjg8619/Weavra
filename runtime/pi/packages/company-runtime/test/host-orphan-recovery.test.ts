@@ -277,7 +277,7 @@ async function connect() {
 }
 
 describe("Host prepare recovery of a provably dead same-host owner", () => {
-	it("keeps the orphan visible to snapshots, recovers it only on prepare, then a confirm starts a new Run", async () => {
+	it("keeps the orphan visible to snapshots; a prepare recovers it with STALE_PROJECT; the next prepare and confirm start a new Run", async () => {
 		const orphan = await standardOrphan();
 		const before = await FileStateStore.readSnapshot(cwd);
 		const revision = before.state!.revision;
@@ -294,9 +294,11 @@ describe("Host prepare recovery of a provably dead same-host owner", () => {
 		}
 		expect(await aiFiles()).toEqual(files);
 		expect(client.events).toEqual([]);
-		// workflow.prepare recovers first, then prepares on the recovered revision.
-		const preview = await client.prepare({ goal: "Fix bug in src/app.ts" });
-		expect(preview).toMatchObject({ workflow: "STANDARD", projectRevision: revision + 1 });
+		// Settling the dead owner's Run moves the revision the client sent: STALE_PROJECT, and nothing is prepared.
+		expect(await client.mutation({ type: "workflow.prepare", goal: "Fix bug in src/app.ts" })).toMatchObject({
+			success: false,
+			error: { code: "STALE_PROJECT" },
+		});
 		const recovered = (await durableRuns()).find((run) => run.runId === orphan.runId)!;
 		expect(recovered).toMatchObject({
 			status: "INTERRUPTED",
@@ -313,9 +315,15 @@ describe("Host prepare recovery of a provably dead same-host owner", () => {
 			expect.objectContaining({ type: "RunInterrupted", runId: orphan.runId, stateRevision: recovered.revision }),
 		]);
 		const idle = await client.state();
-		expect(idle).toMatchObject({ projectRevision: revision + 1, preview });
-		expect(idle.snapshot.status).toMatchObject({ writerPresent: false, run: { status: "INTERRUPTED" } });
-		// The guarded confirm start (no recovery of its own) now opens a writer and creates a new Run.
+		expect(idle).toMatchObject({ projectRevision: revision + 1, preview: null });
+		expect(idle.snapshot.status).toMatchObject({
+			writerPresent: false,
+			run: { runId: orphan.runId, status: "INTERRUPTED" },
+		});
+		// The next prepare runs normally at the recovered revision; the guarded confirm start then creates a new Run.
+		const preview = await client.prepare({ goal: "Fix bug in src/app.ts" });
+		expect(preview).toMatchObject({ workflow: "STANDARD", projectRevision: revision + 1 });
+		expect(client.events).toHaveLength(1);
 		scriptedWorkers();
 		const settled = await client.confirm(preview);
 		expect(client.createModels).toHaveBeenCalledOnce();
@@ -339,9 +347,12 @@ describe("Host prepare recovery of a provably dead same-host owner", () => {
 		expect(active.state.snapshot.status).toMatchObject({ writerPresent: true, run: { status: "RUNNING" } });
 		expect(active.state.complexExecution).toMatchObject({ phase: "TASK_SEQUENCE", activeTaskIds: ["CT-002"] });
 		expect(complexConsumerIssues(active)).toEqual([]);
-		const preview = await client.prepare({ goal: complexGoal, complexDraft });
-		expect(preview).toMatchObject({ workflow: "COMPLEX", projectRevision: active.state.projectRevision + 1 });
+		expect(await client.mutation({ type: "workflow.prepare", goal: complexGoal, complexDraft })).toMatchObject({
+			success: false,
+			error: { code: "STALE_PROJECT" },
+		});
 		const recovered = await client.observe();
+		expect(recovered.state).toMatchObject({ projectRevision: active.state.projectRevision + 1, preview: null });
 		expect(recovered.state.snapshot.status).toMatchObject({
 			writerPresent: false,
 			run: { runId: orphan.runId, status: "INTERRUPTED" },
@@ -372,6 +383,8 @@ describe("Host prepare recovery of a provably dead same-host owner", () => {
 		]);
 		const history = (await durableRuns())[0];
 		expect(history.complex?.tasks[0]).toEqual(orphan.complex?.tasks[0]);
+		const preview = await client.prepare({ goal: complexGoal, complexDraft });
+		expect(preview).toMatchObject({ workflow: "COMPLEX", projectRevision: recovered.state.projectRevision });
 		scriptedWorkers();
 		expect(await client.confirm(preview)).toMatchObject({ startFailure: null, preview: null });
 		// A new COMPLEX Run started under a new writer; its scripted worker failure settles it with confirmed cleanup.
@@ -440,24 +453,60 @@ describe("Host prepare recovery of a provably dead same-host owner", () => {
 		});
 	});
 
-	it("never recovers for a stale expected revision, then recovers for the revision the client saw", async () => {
+	it("never recovers for a stale expected revision; recovers only at the revision the client saw", async () => {
 		await standardOrphan();
 		const files = await aiFiles();
 		const client = await connect();
 		const seen = await client.state();
-		for (const expectedProjectRevision of [seen.projectRevision - 1, seen.projectRevision + 1])
-			expect(
-				await client.send({
-					id: (await client.state()).nextRequestId,
-					ownerId: seen.ownerId,
-					expectedProjectRevision,
-					type: "workflow.prepare",
-					goal: "Fix bug in src/app.ts",
-				}),
-			).toMatchObject({ success: false, error: { code: "STALE_PROJECT" } });
+		const prepareAt = async (expectedProjectRevision: number) =>
+			client.send({
+				id: (await client.state()).nextRequestId,
+				ownerId: seen.ownerId,
+				expectedProjectRevision,
+				type: "workflow.prepare",
+				goal: "Fix bug in src/app.ts",
+			});
+		for (const stale of [seen.projectRevision - 1, seen.projectRevision + 1])
+			expect(await prepareAt(stale)).toMatchObject({ success: false, error: { code: "STALE_PROJECT" } });
 		expect(await aiFiles()).toEqual(files);
+		expect(client.events).toEqual([]);
+		// The same answer at the seen revision, but now the recovery is done and the next prepare succeeds.
+		expect(await prepareAt(seen.projectRevision)).toMatchObject({ success: false, error: { code: "STALE_PROJECT" } });
+		expect(client.events.map((event) => event.type)).toEqual(["RunInterrupted"]);
 		expect(await client.prepare({ goal: "Fix bug in src/app.ts" })).toMatchObject({
 			projectRevision: seen.projectRevision + 1,
 		});
+	});
+
+	it("releases a dead owner's lock over an idle project in the same prepare: no revision change, no STALE_PROJECT", async () => {
+		const store = await FileStateStore.open(cwd);
+		const kernel = await CompanyKernel.create(
+			{
+				executionMode: "EDIT",
+				runId: "finished",
+				task: testContract("Fix bug", { taskId: "task-finished" }),
+				classification: classifyRequest("Fix bug").classification,
+			},
+			{
+				store,
+				agents: { execute: async () => Promise.reject(new Error("unused")) },
+				verifier: { verify: async () => Promise.reject(new Error("unused")) },
+			},
+		);
+		await kernel.start();
+		await kernel.stop("CANCELLED", "Owner finished");
+		// Killed after its terminal save but before releasing the lock: nothing is left to settle.
+		await store.close();
+		await deadOwnerLock();
+		const state = await readFile(join(cwd, ".ai/state.json"), "utf8");
+		const client = await connect();
+		const seen = await client.state();
+		expect(seen.snapshot.status).toMatchObject({ writerPresent: true, run: { status: "CANCELLED" } });
+		expect(await client.prepare({ goal: "Fix bug in src/app.ts" })).toMatchObject({
+			projectRevision: seen.projectRevision,
+		});
+		expect(await readFile(join(cwd, ".ai/state.json"), "utf8")).toBe(state);
+		expect((await readdir(join(cwd, ".ai"))).sort()).toEqual(["config.yaml", "state.json", "tasks.json"]);
+		expect(client.events).toEqual([]);
 	});
 });

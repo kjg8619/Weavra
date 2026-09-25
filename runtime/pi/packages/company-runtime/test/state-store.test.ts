@@ -454,11 +454,11 @@ describe("stale writer lock recovery", () => {
 		expect(await json("writer.lock")).toMatchObject({ token: "dead" });
 	});
 
-	it("Host prepare recovery settles a dead same-host owner's Run, reports both revisions and releases the lock", async () => {
+	it("Host prepare recovery settles a dead same-host owner's Run at the next revision, reports its PID and releases the lock", async () => {
 		const store = await openStore();
 		await (await kernel(store)).start();
 		await store.close();
-		const fromRevision = (await json("state.json")).revision;
+		const revision = (await json("state.json")).revision;
 		const pid = deadPid();
 		await writeLock({
 			schemaVersion: 1,
@@ -470,8 +470,11 @@ describe("stale writer lock recovery", () => {
 		const events: RuntimeEvent[] = [];
 		expect(
 			await FileStateStore.recoverDeadOwner(root, { events: { emit: (event) => void events.push(event) } }),
-		).toEqual({ pid, fromRevision, revision: fromRevision + 1 });
-		expect((await json("state.json")).runs[0]).toMatchObject({ runId: "run-1", status: "INTERRUPTED" });
+		).toEqual({ pid });
+		expect(await json("state.json")).toMatchObject({
+			revision: revision + 1,
+			runs: [{ runId: "run-1", status: "INTERRUPTED" }],
+		});
 		expect(events.map((event) => [event.type, event.runId])).toEqual([["RunInterrupted", "run-1"]]);
 		expect((await readdir(join(root, ".ai"))).sort()).toEqual(["state.json", "tasks.json"]);
 	});
