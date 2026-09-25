@@ -19,7 +19,8 @@
   - 실제 브라우저 capture 재사용 거부(C37) 실측.
   - 반복 횟수를 늘린 속도·비용 측정.
   - 고아 복구의 남은 한계: lock 없는 활성 Run, PID만 보는 사망 증명.
-  - App CI의 GitManager 테스트 임시 저장소 삭제 ENOTEMPTY flaky. PR #48에서 실패 job 재실행으로 통과했다.
+  - App device script가 stop 모드에서도 결과를 쓰지 않는 `xcrun simctl help`(30초 timeout)를 실행한다. simulator 서비스가 차가운 Mac에서는 stop마다 최대 30초가 걸릴 수 있다.
+  - P14에서 소유 Host를 강제 종료한 뒤 새 Host의 snapshot이 `STATE_UNAVAILABLE`로 실패하는 CI 전용 문제(PR #50에서 2회). 원인은 아직 모르고, 두 corpus 관찰자에 진단을 추가했다.
 - 원본 Pi/T3Code 저장소는 수정하지 않는다. 아래 기록은 날짜별 append-only이며, 현재 실행 결과와 이전 저장소의 역사적 결과를 구분한다.
 
 ## 2026-09-21 KST — 독립 저장소 및 원본 스냅샷 import 완료
@@ -900,3 +901,56 @@
   - 세 job이 모두 통과한 뒤 devlop에 머지했다(`aae9b508`).
 - 남은 한계: lock 없는 활성 Run은 여전히 `ACTIVE_RUN`이다. 소유자 사망 증명은 PID만 본다. 운영 브리지에는 이벤트 수신자가 없어 App은 저장 상태로 복구를 본다. fact·browser prepare는 복구하지 않는다.
 - 커밋 상태: `fa51f14b`, `4f839d1c`, `f43e5a03`, `0bf89a37`, devlop 병합 `eb4dd181`. PR #48로 머지했다. 이 기록은 머지 뒤 문서 PR로 따로 올렸다.
+
+## 2026-09-25 KST — CI 간헐 실패 5건 정리
+
+- 배경: 9월 24–25일 CI 기록에서 변경과 무관한 테스트가 간헐적으로 실패한 실행이 6회 있었다. devlop 푸시 실행 5회와 PR #48 첫 실행 1회다. 재실행마다 약 20분이 들어 PR → CI → 머지 흐름이 느려졌다. 실패 로그를 모두 확인해 원인별로 고쳤다.
+- 브랜치/worktree:
+  - `fix/ci-flaky-timing`(`Weavra-worktrees/runtime-review-followups-2`, 메인 세션).
+  - `fix/app-flaky-tests`(`Weavra-worktrees/v0.7b-complex-app`, 하위 에이전트).
+  - 두 브랜치를 병합해 PR 하나로 올렸다.
+- 수정(모두 테스트·검증 도구 변경이며 제품 코드는 바꾸지 않았다):
+  1. cross-boundary 병렬 corpus `P01-speed`(devlop run 36077942080, 7,600 ms 대 8,126 ms):
+     - 원인: 따로 실행한 두 run의 전체 시간을 비교했다. 병렬로 줄어드는 시간은 구현 단계뿐이라 약 0.8초이고, CI 러너의 시간 편차보다 작다.
+     - 수정: 대본 모델 서버가 요청별 시작·종료 시각을 기록하고, 검사는 같은 run 안에서 한다.
+       - 순차 run에서는 서로 다른 작업의 Developer 호출이 겹치지 않는다.
+       - 웨이브에서는 두 Developer 호출이 겹친다.
+       - 웨이브 구현 구간의 wall clock은 Developer 호출 시간의 합보다 짧다. 로컬 측정은 웨이브 856 ms 대 1,604 ms, 순차 2,849 ms 대 1,604 ms다.
+     - 전체 run 비율은 출력만 한다. 설계 P01의 "직렬 합보다 짧은 wall clock"을 병렬화되는 구현 단계에 적용한 것이다. 엄격한 동시 실행 증명은 기존 P01 barrier가 계속 맡는다.
+  2. runtime/pi coding-agent `handles timeout, rejects late result…`(devlop run 36079662291):
+     - 원인: 250 ms worker timeout이 모델 호출에 들어가기 전에 발생했다. 로컬에서 진입까지 유휴 약 10 ms, 16개 동시 실행에서 최대 120 ms가 걸렸다.
+     - 로컬에서는 250 ms로도 재현되지 않았다(16개 동시 실행 48회 중 실패 0). 그래서 진입 시간을 직접 재서 여유를 정했다.
+     - 수정: 두 timeout 테스트의 값을 1.5초 상수로 바꿨다. 파일 실행 시간은 약 2.5초 늘었다.
+  3. app/t3code GitManager ENOTEMPTY 3건(PR #48 첫 실행):
+     - 원인: `git commit`이 띄우는 분리된 `git maintenance run --auto --detach`가 명령이 끝난 뒤에도 돈다. git 2.54부터는 `objects/17`에 loose object가 2개만 있어도 repack한다. CI의 "Initial commit" 해시(17d985e8)와 README 트리(17c4bc79)가 겹친 세 테스트에서만, 임시 저장소를 지우는 동안 repack이 `.git/objects/pack`과 `.git/info`에 썼다(trace2로 확인).
+     - 수정: 서버 테스트 git 설정에 `maintenance.auto=false`를 추가했다.
+     - 재현: CI 시각을 고정하고 지연을 주입했을 때 수정 전 17/32 실패, 수정 후 0/32 실패였다.
+  4. app/t3code OrchestrationEventStore `releases consumed pages during all replay`(devlop run 36048065119):
+     - 원인: 저장소는 페이지를 놓지만 V8이 잠깐 참조를 쥔다. 동시 TurboFan 컴파일 작업이 페이지를 캡처한 closure를 잡거나, 첫 `queryObjects` 호출의 ExperimentalWarning 스택이 표식을 잡는다.
+     - 수정: 살아 있는 표식이 1개를 넘으면 live clock으로 50 ms씩, 최대 약 2초 동안 다시 센다. replay가 콜백 안에서 멈춘 채 기다리므로, 페이지를 실제로 쥐고 있으면 계속 실패한다.
+     - 재현: 컴파일 지연 조건에서 수정 전 15/64 실패, 수정 후 0/64 실패였다. 페이지를 누적하던 예전 구현을 되살리면 두 테스트 모두 실패한다.
+     - `app/t3code/AGENTS.md`는 테스트가 서버 비동기 흐름을 sleep이나 polling으로 기다리지 말고 receipt·drain을 기다리라고 한다. V8 내부 참조에는 기다릴 신호가 없어 예외로 두고, 이유를 테스트 주석에 적었다. 대안인 서버 테스트 전체의 `--no-concurrent-recompilation`은 영향이 더 커서 택하지 않았다.
+  5. app/t3code sshDeviceScript `reuses its own healthy helpers…` 120초 timeout 2건(devlop run 36007881495, 36013907988):
+     - 원인: 스크립트가 실행될 때마다 `xcrun simctl help`(30초 timeout)로 iOS를 확인한다. 그런데 테스트는 adb·npm만 stub하고 xcrun은 stub하지 않았다. Xcode가 있는 macOS 러너에서는 CoreSimulatorService를 기다리느라 통과해도 36–37초가 걸렸고, 두 번은 120초 timeout에 걸렸다.
+     - 수정: 테스트 bin에 `exit 1`만 하는 xcrun stub을 두었다.
+     - 재현: 40초 걸리는 xcrun이 PATH에 있어도 3.4초에 통과한다. 스크립트가 건강한 hub를 재시작하게 바꾸면 여전히 실패한다.
+- 새로 관측한 실패(원인 미확인):
+  - PR #50의 CI 두 번 모두 P14가 `STATE_UNAVAILABLE`로 실패했다. 소유 Host를 강제 종료한 뒤 새 Host의 snapshot에서 났다.
+  - 두 번째 실패는 첫 snapshot을 따로 진단한 뒤에 났다. 그래서 첫 읽기가 아니라 그 뒤의 읽기(재확인, 복구, 새 Run 진행)에서 난 것이다.
+  - 로컬에서는 재현되지 않았다.
+    - 강제 종료 직후 첫 snapshot: 35회(그중 20회는 CPU 부하).
+    - 복구와 새 Run 완료까지의 전체 흐름: 12회.
+    - 매 run에서 저장된 revision 79–85개를 Runtime 투영에 넣어 봤는데, 거부된 것이 없었다.
+  - 코드상 snapshot이 `STATE_UNAVAILABLE`을 내는 경로는 다섯 가지다: 상태 읽기 실패, 읽는 동안 revision 변경(3회), 실행 변경, stateRevision 없음, COMPLEX 투영 불일치.
+  - 진단을 넣었다. 두 corpus의 snapshot 관찰자가 실패한 snapshot을 받으면 다음을 출력하고, 시나리오는 그대로 실패한다.
+    - 몇 번째 읽기에서 실패했는지와 즉시 다시 읽은 결과.
+    - Runtime 자체의 `readSnapshot`·COMPLEX 투영을 같은 durable state로 다시 돌린 결과: 실패 메시지, 파일 형식·링크·크기, JSON 여부.
+    - `.ai` 목록.
+- 현재 검증:
+  - 메인 세션:
+    - 두 corpus 로컬 통과(COMPLEX 14, PARALLEL 9, falseCompletion 0).
+    - coding-agent 해당 파일 101 PASS.
+    - runtime `npm run check` exit 0.
+  - 하위 에이전트: `node scripts/validate.mjs t3` → `ALL GATES PASS`(server 테스트 5,161 PASS).
+  - PR CI: 세 job이 모두 통과해야 머지한다.
+- 커밋 상태: `2d0dbe58`, `51adbe26`(메인 세션), `5d0c56d3`, `2a01aab3`, `cb844e49`(하위 에이전트), 병합 커밋, 이 기록. devlop 대상 PR.
