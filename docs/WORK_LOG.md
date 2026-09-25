@@ -3,24 +3,29 @@
 ## 현재 진행 요약
 
 - 갱신: 2026-09-25, Asia/Seoul (UTC+09:00). 저장소 통합 baseline과 Product Independence Phase 1은 완료된 역사적 결과로 보존한다.
-- 로드맵 #23의 단계 이슈가 모두 닫혔다.
-  - Phase A: V0.6D Project Facts(#6–#10).
-  - Phase B: V0.7A Capability Broker(#11–#14).
-  - Phase C: V0.7B COMPLEX 순차 워크플로(#15–#18).
-  - Phase D: V0.8A 병렬 에이전트(#19–#22).
-  - C·D는 설계를 고정한 뒤 소비자 우선으로 머지했고, 통합 검증(#18, #22)을 통과한 뒤 구현 이슈를 닫았다.
-- CI cross-boundary job은 실제 Runtime ↔ 운영 App 경계 corpus를 매번 실행한다. COMPLEX 14개와 병렬 9개 시나리오이며 falseCompletion은 0이다.
-- 별도 backlog #5도 닫았다.
-  - 후보 3 모델 의도 프로필(PR #45)과 후보 1 로컬 커맨드 리스크 가드(PR #47)를 구현했다.
-  - 후보 2 Jev 웹 문구 검토는 전송 정책·키 보관·비용을 정하기 전까지 보류한다.
-- #22에서 발견한 고아 Run 공백은 App(PR #46)과 Runtime(PR #48)으로 닫았다.
+- 로드맵 #23(Phase A–D: V0.6D Project Facts, V0.7A Capability Broker, V0.7B COMPLEX 순차, V0.8A 병렬 에이전트)과 별도 backlog #5를 모두 닫았다.
+- 로드맵 #59도 모두 닫았다.
+  - Phase E — V0.8B Planner 초안 제안(#51–#54):
+    - 도구 없는 Planner 세션이 COMPLEX 계획 초안을 후보 데이터로만 제안한다.
+    - 초안은 prepare 파이프라인으로 미리 검증한다.
+    - 사람이 편집기에 불러와 prepare → confirm을 해야 실행된다.
+  - Phase F — V0.8C 명시적 재실행(#55–#58):
+    - 결정적·읽기 전용 `workflow.derive`가 종료된 COMPLEX Run에서 재실행 초안을 만든다.
+    - 완료된 작업은 검증 작업이 되어 새로 검증된다.
+    - 남은 변경은 사용자가 처리한다.
+    - 재개·재시도·증거 재사용은 없다.
+- CI cross-boundary job은 실제 Runtime ↔ 운영 App 경계 corpus 네 개를 매번 실행한다. COMPLEX 14, PARALLEL 9, PLANNER 13, RERUN 5개 시나리오이며 모두 falseCompletion 0이다.
+- 실제 모델(commandcode deepseek-v4.1-flash)과 실제 App UI로 COMPLEX·병렬·Planner·재실행 흐름을 각각 COMPLETED까지 확인했다.
 - 알려진 후속 과제(미착수):
+  - #65: Planning Context에 검사 대상 파일 정보가 없어, AC에 경로가 없으면 Planner가 모듈 이름을 추측한다.
   - App의 모델 의도 표시·선택. wire 변경이 필요하다.
+  - RESEARCH 읽기 전용 워크플로.
+  - Planner로 미완료 작업을 재계획하기(V0.8B와 V0.8C의 결합).
+  - #5 후보 2 Jev 웹 문구 검토. 전송 정책·키 보관·비용을 먼저 정해야 한다.
   - 실제 브라우저 capture 재사용 거부(C37) 실측.
-  - 반복 횟수를 늘린 속도·비용 측정.
   - 고아 복구의 남은 한계: lock 없는 활성 Run, PID만 보는 사망 증명.
-  - App device script가 stop 모드에서도 결과를 쓰지 않는 `xcrun simctl help`(30초 timeout)를 실행한다. simulator 서비스가 차가운 Mac에서는 stop마다 최대 30초가 걸릴 수 있다.
-  - P14에서 소유 Host를 강제 종료한 뒤 새 Host의 snapshot이 `STATE_UNAVAILABLE`로 실패하는 CI 전용 문제(PR #50에서 2회). 원인은 아직 모르고, 두 corpus 관찰자에 진단을 추가했다.
+  - P14에서 소유 Host를 강제 종료한 뒤 새 Host snapshot이 `STATE_UNAVAILABLE`로 실패한 CI 전용 문제(PR #50에서 2회). 이후 재발하지 않았고, corpus 관찰자에 진단을 추가해 두었다.
+  - App device script가 stop 모드에서도 `xcrun simctl help`를 실행한다.
 - 원본 Pi/T3Code 저장소는 수정하지 않는다. 아래 기록은 날짜별 append-only이며, 현재 실행 결과와 이전 저장소의 역사적 결과를 구분한다.
 
 ## 2026-09-21 KST — 독립 저장소 및 원본 스냅샷 import 완료
