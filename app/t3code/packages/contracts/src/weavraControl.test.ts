@@ -28,6 +28,9 @@ import {
   WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES,
   WeavraPlannerStatus,
   type WeavraRegisteredBrowserCheck,
+  WEAVRA_RERUN_MAX_DERIVED_RESPONSE_BYTES,
+  WeavraDerivedDraft,
+  WeavraRerunLeftovers,
 } from "./weavraControl.ts";
 
 const decodeRpc = Schema.decodeUnknownSync(WeavraControlInput);
@@ -1547,6 +1550,269 @@ describe("V0.8B Planner wire shapes", () => {
       runId: null,
     };
     const large = sized(accepted, WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES + 1);
+    expect(decodeResponse(large)).toEqual(large);
+  });
+});
+
+// V0.8C re-run (docs/architecture/COMPLEX_RERUN.md §4–§6): a candidate draft, decoded strictly.
+const decodeDerived = Schema.decodeUnknownSync(WeavraDerivedDraft, strict);
+const decodeLeftovers = Schema.decodeUnknownSync(WeavraRerunLeftovers, strict);
+const deriveRequest = { ...plannerEnvelope, type: "workflow.derive", runId: "run" } as const;
+const verificationTask = {
+  title: "Verify: Extract parser",
+  goal: "Re-verify without changes: Move parsing into src/parse.ts and keep parseConfig behavior",
+  dependsOnIndexes: [],
+  criterionIndexes: [1],
+  ownership: [],
+  checkIds: ["test"],
+} as const;
+const unfinishedTask = {
+  ...draftTask,
+  title: "Add validation",
+  dependsOnIndexes: [1],
+  criterionIndexes: [2],
+  ownership: [{ path: "src/validate.ts", operation: "modify" }],
+} as const;
+const derived = {
+  kind: "derived-draft",
+  runId: "run",
+  sourcePlanDigest: complexPlan.complexPlanDigest,
+  sourceStatus: "BLOCKED",
+  goal: complexPreview.goal,
+  acceptanceStatements: ["One", "Two"],
+  draft: { tasks: [verificationTask, unfinishedTask] },
+  prepareCheck: { ok: true, code: null },
+  leftovers: { clean: false, paths: ["src/parse.ts", "src/validate.ts"], truncated: false },
+  notes: ["CT-002 claim src/validate.ts: create became modify (file exists)"],
+} as const satisfies WeavraDerivedDraft;
+const withTasks = (...tasks: ReadonlyArray<unknown>) => ({ ...derived, draft: { tasks } });
+
+describe("V0.8C re-run wire shapes", () => {
+  it("advertises re-run derivation only as exact version 1, beside the unchanged command tuple", () => {
+    const advertised = {
+      ...complexCapabilities,
+      complexContractVersion: 2,
+      plannerContractVersion: 1,
+      rerunContractVersion: 1,
+    };
+    expect(decodeCapabilities(advertised).rerunContractVersion).toBe(1);
+    expect(decodeCapabilities(complexCapabilities)).not.toHaveProperty("rerunContractVersion");
+    for (const version of [2, 0, null, "1", true, 1.5]) {
+      expect(() => decodeCapabilities({ ...advertised, rerunContractVersion: version })).toThrow();
+    }
+    // Advertisement is the version key; the command tuple is not extended.
+    expect(() =>
+      decodeCapabilities({ ...advertised, commands: [...advertised.commands, "workflow.derive"] }),
+    ).toThrow();
+  });
+  it("accepts workflow.derive with only a runId in the mutation envelope", () => {
+    expect(decodeRpc({ projectId: "project", request: deriveRequest }).request).toEqual(
+      deriveRequest,
+    );
+    expect(decodeWire(deriveRequest)).toEqual(deriveRequest);
+    const { runId: _runId, ...withoutRun } = deriveRequest;
+    const { ownerId: _owner, ...withoutOwner } = deriveRequest;
+    const { expectedProjectRevision: _revision, ...withoutRevision } = deriveRequest;
+    for (const missing of [withoutRun, withoutOwner, withoutRevision]) {
+      expect(() => decodeWire(missing)).toThrow();
+    }
+  });
+  it("rejects forged derivation input and resume-shaped commands at the RPC decoder", () => {
+    const decodeRequest = (request: unknown) => decodeRpc({ projectId: "project", request });
+    for (const forged of [
+      { goal: complexPreview.goal },
+      { acceptanceStatements: ["One"] },
+      { complexDraft: draft },
+      { draft },
+      { sourceStatus: "BLOCKED" },
+      { sourcePlanDigest: browserDigest },
+      { taskIds: ["CT-001"] },
+      { resume: true },
+      { reuseEvidence: true },
+      { expectedStateRevision: 7 },
+      { leftovers: { clean: true, paths: [], truncated: false } },
+      { commit: true },
+      { discard: ["src/a.ts"] },
+      { recipeId: "bug-fix" },
+    ]) {
+      expect(() => decodeRequest({ ...deriveRequest, ...forged })).toThrow();
+    }
+    for (const runId of ["", "has space", "x".repeat(129), 7, null]) {
+      expect(() => decodeRequest({ ...deriveRequest, runId })).toThrow();
+    }
+    for (const type of [
+      "workflow.resume",
+      "workflow.retry",
+      "workflow.rerun",
+      "workflow.replay",
+      "workflow.rollback",
+      "task.retry",
+    ]) {
+      expect(() => decodeRequest({ ...deriveRequest, type })).toThrow();
+    }
+  });
+  it("decodes a derived draft with exactly the §6 fields and nothing forged", () => {
+    expect(decodeDerived(derived)).toEqual(derived);
+    expect(decodeResponse(plannerResponse(derived, "workflow.derive"))).toMatchObject({
+      data: derived,
+    });
+    for (const field of Object.keys(derived)) {
+      const { [field]: _omitted, ...missing } = derived as Record<string, unknown>;
+      expect(() => decodeDerived(missing)).toThrow();
+    }
+    for (const sourceStatus of ["BLOCKED", "CANCELLED", "FAILED", "INTERRUPTED"]) {
+      expect(decodeDerived({ ...derived, sourceStatus }).sourceStatus).toBe(sourceStatus);
+    }
+    for (const code of [
+      "INVALID_REQUEST",
+      "INVALID_GOAL",
+      "UNSUPPORTED_WORKFLOW",
+      "INVALID_CRITERIA",
+      "RESPONSE_TOO_LARGE",
+    ]) {
+      const prepareCheck = { ok: false, code };
+      expect(decodeDerived({ ...derived, prepareCheck }).prepareCheck).toEqual(prepareCheck);
+    }
+    for (const invalid of [
+      // No plan, preview, evidence, Run state or approval travels with a candidate draft.
+      { ...derived, complexPlan },
+      { ...derived, plan: complexPlan },
+      { ...derived, previewId: "preview" },
+      { ...derived, previewDigest: browserDigest },
+      { ...derived, parentTaskId: complexPlan.parentTaskId },
+      { ...derived, evidence: [] },
+      { ...derived, completedTaskIds: ["CT-001"] },
+      { ...derived, projectRevision: 9 },
+      { ...derived, risk: "R1" },
+      { ...derived, resume: true },
+      { ...derived, approved: true },
+      withTasks({ ...verificationTask, id: "CT-001" }, unfinishedTask),
+      withTasks({ ...verificationTask, status: "COMPLETED" }, unfinishedTask),
+      withTasks({ ...verificationTask, selfCheck: "PASS" }, unfinishedTask),
+      withTasks({ ...verificationTask, evidence: "PASS" }, unfinishedTask),
+      withTasks(verificationTask),
+      { ...derived, draft: { ...derived.draft, limits: { maxParallel: 4 } } },
+      // Source identity.
+      { ...derived, runId: "" },
+      { ...derived, runId: "has space" },
+      { ...derived, sourcePlanDigest: "7".repeat(64) },
+      { ...derived, sourcePlanDigest: `sha256:${"A".repeat(64)}` },
+      { ...derived, sourcePlanDigest: null },
+      { ...derived, sourceStatus: "COMPLETED" },
+      { ...derived, sourceStatus: "RUNNING" },
+      { ...derived, sourceStatus: "WAITING_APPROVAL" },
+      { ...derived, sourceStatus: "blocked" },
+      // The parent goal and statements keep the prepare bounds.
+      { ...derived, goal: "" },
+      { ...derived, goal: "   " },
+      { ...derived, goal: "x".repeat(2049) },
+      { ...derived, acceptanceStatements: [] },
+      { ...derived, acceptanceStatements: [" "] },
+      { ...derived, acceptanceStatements: ["x".repeat(501)] },
+      { ...derived, acceptanceStatements: Array(17).fill("criterion") },
+      // Criterion indexes name the statements carried with the draft.
+      { ...derived, acceptanceStatements: ["One"] },
+      // A code exactly when the dry-run failed, and only an existing prepare pipeline code.
+      { ...derived, prepareCheck: { ok: true, code: "INVALID_CRITERIA" } },
+      { ...derived, prepareCheck: { ok: false, code: null } },
+      { ...derived, prepareCheck: { ok: false, code: "RERUN_NOT_APPLICABLE" } },
+      { ...derived, prepareCheck: { ok: false, code: "ACTIVE_RUN" } },
+      { ...derived, prepareCheck: { ok: false, code: "WRITER_PRESENT" } },
+      { ...derived, prepareCheck: { ok: false, code: "PREPARE_FAILED" } },
+      { ...derived, prepareCheck: { ok: "true", code: null } },
+      { ...derived, prepareCheck: { ok: true, code: null, preview: complexPreview } },
+      { ...derived, prepareCheck: { ok: false, code: "INVALID_CRITERIA", message: "detail" } },
+      // Leftovers are names only.
+      { ...derived, leftovers: { ...derived.leftovers, diff: "@@ -1 +1 @@" } },
+      { ...derived, leftovers: { ...derived.leftovers, contents: ["secret"] } },
+      { ...derived, leftovers: { ...derived.leftovers, modes: ["100644"] } },
+    ]) {
+      expect(() => decodeDerived(invalid)).toThrow();
+    }
+  });
+  it("bounds leftovers to 200 sorted names of 16,384 bytes and never lists them for a clean or unknown checkout", () => {
+    const dirty = (paths: ReadonlyArray<string>, truncated = false) => ({
+      clean: false,
+      paths,
+      truncated,
+    });
+    // Names exactly as Git reports them, including characters an exact file claim rejects.
+    const names = ["a b/c.ts", "src/[id].tsx", "src/a*.ts", "sub/", "한글/파일.ts"];
+    expect(decodeLeftovers(dirty(names))).toEqual(dirty(names));
+    const many = Array.from({ length: 200 }, (_, index) => `f${String(index).padStart(3, "0")}`);
+    expect(decodeLeftovers(dirty(many, true)).paths).toHaveLength(200);
+    expect(() => decodeLeftovers(dirty([...many, "f200"], true))).toThrow();
+    // The name bound counts UTF-8 bytes, not JavaScript string length.
+    const exact = Array.from(
+      { length: 64 },
+      (_, index) => `${String(index).padStart(2, "0")}${"한".repeat(84)}ab`,
+    );
+    const bytes = (paths: ReadonlyArray<string>) =>
+      paths.reduce((total, path) => total + new TextEncoder().encode(path).byteLength, 0);
+    expect(bytes(exact)).toBe(16_384);
+    expect(exact.join("").length).toBeLessThan(16_384);
+    expect(decodeLeftovers(dirty(exact, true)).paths).toHaveLength(64);
+    expect(() => decodeLeftovers(dirty([...exact.slice(0, 63), `${exact[63]}c`], true))).toThrow();
+    expect(decodeLeftovers({ clean: true, paths: [], truncated: false }).clean).toBe(true);
+    expect(decodeLeftovers({ clean: null, paths: [], truncated: false }).clean).toBeNull();
+    for (const invalid of [
+      dirty(["src/b.ts", "src/a.ts"]),
+      dirty(["src/a.ts", "src/a.ts"]),
+      dirty([""]),
+      dirty(["src/a\u0000b.ts"]),
+      // A dirty checkout names at least one leftover.
+      dirty([]),
+      dirty([], true),
+      // A clean or unknown checkout lists and truncates nothing.
+      { clean: true, paths: ["src/a.ts"], truncated: false },
+      { clean: true, paths: [], truncated: true },
+      { clean: null, paths: ["src/a.ts"], truncated: false },
+      { clean: null, paths: [], truncated: true },
+      { clean: "unknown", paths: [], truncated: false },
+      { paths: [], truncated: false },
+      { clean: true, paths: [] },
+      { clean: false, paths: [{ path: "src/a.ts", status: " M" }], truncated: false },
+    ]) {
+      expect(() => decodeLeftovers(invalid)).toThrow();
+    }
+  });
+  it("keeps at most 16 notes of at most 200 UTF-8 bytes each", () => {
+    const notes = (value: ReadonlyArray<unknown>) => ({ ...derived, notes: value });
+    expect(decodeDerived(notes([])).notes).toEqual([]);
+    expect(decodeDerived(notes(Array(16).fill("CT-001 note"))).notes).toHaveLength(16);
+    const longest = `${"한".repeat(66)}ab`;
+    expect(new TextEncoder().encode(longest).byteLength).toBe(200);
+    expect(decodeDerived(notes([longest])).notes).toEqual([longest]);
+    for (const invalid of [Array(17).fill("CT-001 note"), [`${longest}c`], [""], ["   "], [1]]) {
+      expect(() => decodeDerived(notes(invalid))).toThrow();
+    }
+  });
+  it("decodes RERUN_NOT_APPLICABLE and bounds a derived-draft response line by 49,152 bytes, newline included", () => {
+    const { data: _data, ...envelope } = plannerResponse(null, "workflow.derive");
+    const refused = { ...envelope, success: false, error: { code: "RERUN_NOT_APPLICABLE" } };
+    expect(decodeResponse(refused)).toEqual(refused);
+    const utf8 = new TextEncoder();
+    // Pads an envelope field so that the whole line, with its newline, has exactly `bytes` bytes.
+    const sized = (data: unknown, bytes: number) => {
+      const base = plannerResponse(data, "");
+      const padding = bytes - 1 - utf8.encode(JSON.stringify(base)).byteLength;
+      return { ...base, command: "x".repeat(padding) };
+    };
+    const line = (response: unknown) => utf8.encode(`${JSON.stringify(response)}\n`).byteLength;
+    const atLimit = sized(derived, WEAVRA_RERUN_MAX_DERIVED_RESPONSE_BYTES);
+    expect(line(atLimit)).toBe(WEAVRA_RERUN_MAX_DERIVED_RESPONSE_BYTES);
+    expect(decodeResponse(atLimit)).toEqual(atLimit);
+    expect(() =>
+      decodeResponse(sized(derived, WEAVRA_RERUN_MAX_DERIVED_RESPONSE_BYTES + 1)),
+    ).toThrow();
+    // The bound belongs to the derived-draft kind; other responses keep the general budget.
+    const accepted = {
+      kind: "accepted",
+      requestId: "owner:4",
+      command: "workflow.confirm",
+      runId: null,
+    };
+    const large = sized(accepted, WEAVRA_RERUN_MAX_DERIVED_RESPONSE_BYTES + 1);
     expect(decodeResponse(large)).toEqual(large);
   });
 });

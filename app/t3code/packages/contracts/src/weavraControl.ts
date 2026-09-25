@@ -778,6 +778,9 @@ export const WeavraControlMutation = Schema.Union([
   }),
   Schema.Struct({ ...mutation, type: Schema.Literal("planner.cancel"), planId: canonicalUuid }),
   Schema.Struct({ ...mutation, type: Schema.Literal("planner.read"), planId: canonicalUuid }),
+  // V0.8C: the Run to derive a candidate re-run draft from. Read-only on the Runtime: Runtime
+  // checks eligibility and derives everything else; no writer, `.ai` write, Run or revision change.
+  Schema.Struct({ ...mutation, type: Schema.Literal("workflow.derive"), runId: identifier }),
 ]);
 export type WeavraControlMutation = typeof WeavraControlMutation.Type;
 
@@ -834,6 +837,7 @@ export const WeavraControlErrorCode = Schema.Literals([
   "PLANNER_BUSY",
   "PLANNER_NOT_FOUND",
   "PLANNER_NOT_READY",
+  "RERUN_NOT_APPLICABLE",
 ]);
 export type WeavraControlErrorCode = typeof WeavraControlErrorCode.Type;
 
@@ -1101,6 +1105,9 @@ export const WeavraControlCapabilities = Schema.Struct({
   // V0.8B: absent means the Planner does not exist on this connection. As with COMPLEX, the
   // advertisement is not readiness or permission. The `commands` tuple above stays unchanged.
   plannerContractVersion: Schema.optionalKey(Schema.Literal(1)),
+  // V0.8C: absent means re-run derivation (`workflow.derive`) does not exist on this connection.
+  // Advertisement is not readiness or permission, and the `commands` tuple stays unchanged.
+  rerunContractVersion: Schema.optionalKey(Schema.Literal(1)),
   recipes: Schema.Array(
     Schema.Struct({
       id: identifier,
@@ -1111,6 +1118,84 @@ export const WeavraControlCapabilities = Schema.Struct({
   ).check(Schema.isMaxLength(WEAVRA_CONTROL_MAX_RESPONSE_BYTES)),
 });
 export type WeavraControlCapabilities = typeof WeavraControlCapabilities.Type;
+
+// V0.8C explicit re-run wire contract (docs/architecture/COMPLEX_RERUN.md §4–§6), duplicated from
+// the Runtime wire shapes and never imported across build roots. A derived draft is candidate data:
+// a filled-in planning form for an ordinary new Run. Nothing resumes, no evidence is reused, and
+// nothing runs until the human loads it, prepares and confirms a Runtime preview.
+export const WEAVRA_RERUN_MAX_DERIVED_RESPONSE_BYTES = 49_152;
+/**
+ * The existing codes of the prepare pipeline that a derived draft is dry-run through (§4 step 5):
+ * classification, COMPLEX compilation with claim facts and Policy, and the preview's response
+ * bound. Refusals of `workflow.derive` itself are ordinary error responses, never a check result.
+ */
+export const WeavraPrepareCheckCode = Schema.Literals([
+  "INVALID_REQUEST",
+  "INVALID_GOAL",
+  "UNSUPPORTED_WORKFLOW",
+  "INVALID_CRITERIA",
+  "RESPONSE_TOO_LARGE",
+] as const satisfies ReadonlyArray<WeavraControlErrorCode>);
+/** A leftover exactly as `git status -z` names it (§5); never its contents, diff or mode. */
+const leftoverPath = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.makeFilter((path: string) => !path.includes("\u0000"), {
+    expected: "a path name without NUL",
+  }),
+);
+/** §5: the changes that would fail a clean start, in sorted order and bounded by count and bytes. */
+export const WeavraRerunLeftovers = Schema.Struct({
+  clean: Schema.NullOr(Schema.Boolean),
+  paths: Schema.Array(leftoverPath).check(Schema.isMaxLength(200), strictlyAscending),
+  truncated: Schema.Boolean,
+}).check(
+  Schema.makeFilter(
+    (leftovers) =>
+      leftovers.paths.reduce((bytes, path) => bytes + utf8.encode(path).byteLength, 0) <= 16_384 &&
+      // Only a dirty checkout names leftovers. Unknown state (Git could not run) names none, so it
+      // can never read as clean; a clean checkout has nothing to list or truncate.
+      (leftovers.clean === false
+        ? leftovers.paths.length > 0
+        : leftovers.paths.length === 0 && !leftovers.truncated),
+    { expected: "leftover names only for a dirty checkout, within 200 names and 16,384 bytes" },
+  ),
+);
+/** §4 step 6: a fixed-template note of at most 200 UTF-8 bytes; it never holds file contents. */
+const rerunNote = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isPattern(/\S/),
+  Schema.makeFilter((note: string) => utf8.encode(note).byteLength <= 200),
+);
+/** The §6 success data of `workflow.derive`: a candidate draft, never a plan, preview or Run. */
+export const WeavraDerivedDraft = Schema.Struct({
+  kind: Schema.Literal("derived-draft"),
+  runId: identifier,
+  sourcePlanDigest: digest,
+  sourceStatus: Schema.Literals(["BLOCKED", "CANCELLED", "FAILED", "INTERRUPTED"]),
+  goal,
+  acceptanceStatements,
+  draft: WeavraComplexDraft,
+  prepareCheck: Schema.Struct({
+    ok: Schema.Boolean,
+    code: Schema.NullOr(WeavraPrepareCheckCode),
+  }).check(
+    Schema.makeFilter((check) => check.ok === (check.code === null), {
+      expected: "a code exactly when the dry-run failed",
+    }),
+  ),
+  leftovers: WeavraRerunLeftovers,
+  notes: Schema.Array(rerunNote).check(Schema.isMaxLength(16)),
+}).check(
+  // Criterion indexes are 1-based positions of the acceptance statements carried with the draft.
+  Schema.makeFilter(
+    (derived) =>
+      derived.draft.tasks.every((task) =>
+        task.criterionIndexes.every((index) => index <= derived.acceptanceStatements.length),
+      ),
+    { expected: "criterion indexes of the carried acceptance statements" },
+  ),
+);
+export type WeavraDerivedDraft = typeof WeavraDerivedDraft.Type;
 
 const controlData = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("capabilities"), capabilities: WeavraControlCapabilities }),
@@ -1148,6 +1233,7 @@ const controlData = Schema.Union([
     current: Schema.Boolean,
     draft: WeavraComplexDraft,
   }),
+  WeavraDerivedDraft,
 ]);
 const responseEnvelope = {
   protocolVersion: WeavraSnapshotEnvelope.fields.protocolVersion,
@@ -1169,6 +1255,13 @@ export const WeavraControlResponse = Schema.Union([
       (response) =>
         response.data.kind !== "planner-draft" ||
         jsonBytes(response) + 1 <= WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES,
+    ),
+    // A derived draft line, newline included, is at most 49,152 bytes; beyond that the Runtime
+    // answers RESPONSE_TOO_LARGE, and only the leftover names are ever truncated (§5, §6).
+    Schema.makeFilter(
+      (response) =>
+        response.data.kind !== "derived-draft" ||
+        jsonBytes(response) + 1 <= WEAVRA_RERUN_MAX_DERIVED_RESPONSE_BYTES,
     ),
   ),
   Schema.Struct({
