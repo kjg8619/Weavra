@@ -156,6 +156,9 @@ export interface ComplexTaskSpec {
 	claims: OwnershipClaim[];
 	criteria?: number[];
 	dependsOn?: number[];
+	/** Defaults: `Task <n>` and `Contribution <n>`. */
+	title?: string;
+	goal?: string;
 }
 
 /** Host-compiled plan through the production compiler with trusted fake facts (claims are never grants). */
@@ -179,8 +182,8 @@ export async function complexPlanFor(
 		parent,
 		draft: {
 			tasks: specs.map((spec, index) => ({
-				title: `Task ${index + 1}`,
-				goal: `Contribution ${index + 1}`,
+				title: spec.title ?? `Task ${index + 1}`,
+				goal: spec.goal ?? `Contribution ${index + 1}`,
 				dependsOnIndexes: spec.dependsOn ?? (index ? [index] : []),
 				criterionIndexes: spec.criteria ?? statements.map((_statement, position) => position + 1),
 				ownership: spec.claims,

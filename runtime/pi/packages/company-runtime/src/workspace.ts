@@ -19,6 +19,62 @@ const owned = new Set([".ai/state.json", ".ai/tasks.json", ".ai/writer.lock", ".
 export const isRuntimeOwnedPath = (path: string): boolean =>
 	owned.has(path) || /^\.ai\/runs\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.json$/.test(path);
 const hash = (content: string | Buffer) => createHash("sha256").update(content).digest("hex");
+/** The clean-start status command; `workflow.derive` lists leftovers with exactly this one (COMPLEX_RERUN.md §5). */
+const CLEAN_START_STATUS = ["status", "--porcelain=v1", "-z", "--untracked-files=all"] as const;
+
+/**
+ * The paths of `git status --porcelain=v1 -z` output that fail the clean-start check, sorted and unique: every
+ * entry's path, and the original path of a rename or copy (the next field, without a status prefix), except
+ * Runtime-owned and generated observation paths.
+ */
+export function cleanStartBlockers(status: string, generated: ReadonlySet<string>): string[] {
+	const fields = status.split("\0");
+	const paths = new Set<string>();
+	for (let index = 0; index < fields.length; index++) {
+		const entry = fields[index];
+		if (!entry) continue;
+		paths.add(entry.slice(3));
+		if (/[RC]/.test(entry.slice(0, 2)) && fields[index + 1]) paths.add(fields[++index]);
+	}
+	return [...paths].filter((path) => !isRuntimeOwnedPath(path) && !generated.has(path)).sort();
+}
+
+/** Git under the fixed Runtime flags: no optional locks, fsmonitor or hooks, the verification environment. */
+function runGit(git: string, cwd: string, argv: readonly string[], signal?: AbortSignal) {
+	return runProcess({
+		executable: git,
+		argv: ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...argv],
+		cwd,
+		env: verificationEnvironment(),
+		timeoutMs: 10000,
+		signal,
+		maxOutputBytes: 2 * 1024 * 1024,
+	});
+}
+
+/**
+ * Read-only leftover listing for `workflow.derive` (COMPLEX_RERUN.md §5): the start check's status command and
+ * filters from the project root, without opening a workspace, a writer or a baseline. Null when Git cannot answer
+ * (the project is not its Git root, or the process failed, timed out or was not confirmed stopped): the state is then
+ * unknown, never clean.
+ */
+export async function readCleanStartBlockers(project: string, signal?: AbortSignal): Promise<string[] | null> {
+	try {
+		const cwd = await realpath(project);
+		const git = await resolveExecutable("git", verificationEnvironment().PATH);
+		const read = async (argv: readonly string[]): Promise<string> => {
+			const result = await runGit(git, cwd, argv, signal);
+			if (!result.cleanupConfirmed || result.reason !== "exited" || result.exitCode !== 0)
+				throw new Error("Git status unavailable");
+			return result.stdout;
+		};
+		if ((await realpath((await read(["rev-parse", "--show-toplevel"])).trim())) !== cwd) return null;
+		const generated = await ownedObservationPaths(cwd);
+		return cleanStartBlockers(await read(CLEAN_START_STATUS), generated);
+	} catch {
+		return null;
+	}
+}
 
 /** Full byte/mode snapshots plus Git HEAD/index identity. No stash/reset/checkout/clean/commit. */
 export class GitWorkspace {
@@ -46,15 +102,7 @@ export class GitWorkspace {
 		if (this.cleanupUncertain) throw new ProcessCleanupError();
 		this.activeCommands++;
 		try {
-			const result = await runProcess({
-				executable: this.git,
-				argv: ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...argv],
-				cwd: this.cwd,
-				env: verificationEnvironment(),
-				timeoutMs: 10000,
-				signal,
-				maxOutputBytes: 2 * 1024 * 1024,
-			}).catch(() => {
+			const result = await runGit(this.git, this.cwd, argv, signal).catch(() => {
 				this.cleanupUncertain = true;
 				throw new ProcessCleanupError();
 			});
@@ -70,12 +118,8 @@ export class GitWorkspace {
 	}
 	private async assertClean(signal?: AbortSignal): Promise<void> {
 		const generated = await ownedObservationPaths(this.cwd);
-		const status = (await this.command(["status", "--porcelain=v1", "-z", "--untracked-files=all"], signal))
-			.split("\0")
-			.filter(Boolean);
-		for (const entry of status)
-			if (!isRuntimeOwnedPath(entry.slice(3)) && !generated.has(entry.slice(3)))
-				throw new Error("Dirty workspace: preserve existing changes; no automatic cleanup was performed");
+		if (cleanStartBlockers(await this.command([...CLEAN_START_STATUS], signal), generated).length)
+			throw new Error("Dirty workspace: preserve existing changes; no automatic cleanup was performed");
 	}
 	static async open(cwd: string, policy: PolicyContext, signal?: AbortSignal): Promise<GitWorkspace> {
 		const paths = await FilePolicyPathInspector.open(cwd);

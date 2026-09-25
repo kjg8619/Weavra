@@ -235,6 +235,8 @@ Also required: an actual bounded parallel smoke with a real model (2 independent
 
 Same-file concurrent mutation, shared/subtree/glob ownership, per-task checkouts or worktrees, automatic merge/commit/reset/rollback, concurrent verification, speculative execution, dynamic re-planning, a Planner/Lead model, unbounded fan-out (> 4), cross-provider fallback, and resuming or re-running tasks after a crash.
 
+The explicit re-run of V0.8C ([COMPLEX_RERUN.md](COMPLEX_RERUN.md)) is not a resume and keeps this list intact. `workflow.derive` only derives a candidate draft from the latest terminal Run. The human resolves the leftover changes, then prepares and confirms the draft as an ordinary new Run. No task, Run or evidence is resumed, retried or reused, and COMPLETED tasks are verified again.
+
 ## 13. Design validation
 
 1. `git diff --check`. Only this document and the root work log change.

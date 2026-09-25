@@ -16,6 +16,7 @@ import { browserDigest, browserProjectId } from "./browser-types.ts";
 import { boundCapabilityInventory, createCapabilityBroker, type RuntimeCapabilityBroker } from "./capability-broker.ts";
 import { capabilityJson } from "./capability-catalog.ts";
 import { complexDraftBytes, parseComplexDraft } from "./complex-plan.ts";
+import { boundLeftovers, deriveRerunDraft, rerunFactPaths, rerunSource } from "./complex-rerun.ts";
 import { ComplexProjectionError, projectComplexExecution } from "./complex-state.ts";
 import {
 	COMPLEX_CONTRACT_VERSION,
@@ -43,6 +44,8 @@ import {
 	HOST_CONTROL_RESULT_LIMIT,
 	HOST_PLANNER_COMMANDS,
 	HOST_PLANNER_DRAFT_MAX_RESPONSE_BYTES,
+	HOST_RERUN_COMMANDS,
+	HOST_RERUN_DRAFT_MAX_RESPONSE_BYTES,
 	type HostBrowserPreview,
 	type HostBrowserState,
 	type HostControlApproval,
@@ -58,6 +61,8 @@ import {
 	type HostPlannerFailureCode,
 	type HostPlannerStatus,
 	PLANNER_CONTRACT_VERSION,
+	RERUN_CONTRACT_VERSION,
+	RERUN_PREPARE_CHECK_CODES,
 } from "./host-control-protocol.ts";
 import {
 	applyHostWorkflowRecipe,
@@ -78,6 +83,7 @@ import {
 	plannerRequestDigest,
 	runPlannerSession,
 } from "./planner.ts";
+import { FilePolicyPathInspector } from "./policy-paths.ts";
 import type { ProjectFactSummary, ProjectFactsProjection } from "./project-fact-types.ts";
 import {
 	confirmProjectFact,
@@ -90,6 +96,7 @@ import {
 import { FileStateStore } from "./state-store.ts";
 import { listTaskRecipes, recipeInputTemplate } from "./task-recipes.ts";
 import type { StandardWorkflow } from "./workflow.ts";
+import { readCleanStartBlockers } from "./workspace.ts";
 
 class ControlError extends Error {
 	readonly code: HostControlErrorCode;
@@ -281,7 +288,7 @@ export class HostControlBridge {
 		if ((snapshot.state?.revision ?? 0) !== expected || !snapshot.writerPresent) return;
 		await FileStateStore.recoverDeadOwner(this.root.path, { events: this.options.events }).catch(() => {});
 	}
-	private async currentRun(request: Extract<HostControlMutation, { runId: string }>): Promise<Run> {
+	private async currentRun(request: Extract<HostControlMutation, { expectedStateRevision: number }>): Promise<Run> {
 		const snapshot = await this.canonical();
 		const run = snapshot.state?.runs.find((value) => value.runId === request.runId);
 		if (!run) throw new ControlError("RUN_NOT_FOUND");
@@ -342,9 +349,8 @@ export class HostControlBridge {
 		state.cancellation.abort();
 	}
 	/**
-	 * §5.3 steps 1–2 for one raw submission: the closed draft schema and byte bound first, then the exact
-	 * `workflow.prepare` pipeline at the recorded revision with the request's goal and statements. Nothing is stored:
-	 * no preview, writer or Run. A configuration that moved ends the request STALE instead of validating against it.
+	 * §5.3 steps 1–2 for one raw submission: the prepare dry run at the recorded revision with the request's goal and
+	 * statements. A configuration that moved ends the request STALE instead of validating against it.
 	 */
 	private async plannerDryRun(state: PlannerState, raw: unknown): Promise<PlannerVerdict> {
 		let config: RuntimeConfig | undefined;
@@ -355,6 +361,27 @@ export class HostControlBridge {
 		}
 		if (!config || fingerprint(config) !== state.configurationDigest)
 			throw new PlannerFailure("STALE", "The configuration changed while planning");
+		return this.prepareDryRun(
+			{
+				goal: state.goal,
+				...(state.acceptanceStatements ? { acceptanceStatements: state.acceptanceStatements } : {}),
+				expectedProjectRevision: state.projectRevision,
+			},
+			raw,
+			config,
+		);
+	}
+	/**
+	 * A dry run of the exact `workflow.prepare` pipeline for one raw draft: the closed draft schema and byte bound
+	 * first, then `preparePreview` at `expectedProjectRevision` with the goal and statements, including claim facts,
+	 * current Policy and the response bound. Nothing is stored: no preview, writer or Run. The V0.8B Planner judges each
+	 * submission with it (PLANNER_DRAFT.md §5.3) and `workflow.derive` its candidate draft (COMPLEX_RERUN.md §4 step 5).
+	 */
+	private async prepareDryRun(
+		fields: { goal: string; acceptanceStatements?: string[]; expectedProjectRevision: number },
+		raw: unknown,
+		config: RuntimeConfig,
+	): Promise<{ ok: true; draft: ComplexDraft } | { ok: false; code: HostControlErrorCode; message: string }> {
 		try {
 			const draft = parseComplexDraft(raw);
 			await this.preparePreview(
@@ -363,10 +390,10 @@ export class HostControlBridge {
 					// The longest request id this Host accepts, so the response bound is checked conservatively.
 					id: `${this.ownerId}:${Number.MAX_SAFE_INTEGER}`,
 					ownerId: this.ownerId,
-					expectedProjectRevision: state.projectRevision,
+					expectedProjectRevision: fields.expectedProjectRevision,
 					type: "workflow.prepare",
-					goal: state.goal,
-					...(state.acceptanceStatements ? { acceptanceStatements: state.acceptanceStatements } : {}),
+					goal: fields.goal,
+					...(fields.acceptanceStatements ? { acceptanceStatements: fields.acceptanceStatements } : {}),
 					complexDraft: draft,
 				},
 				config,
@@ -735,6 +762,67 @@ export class HostControlBridge {
 			throw new ControlError("RESPONSE_TOO_LARGE");
 		return { plan, preview, response };
 	}
+	/**
+	 * `workflow.derive` (COMPLEX_RERUN.md §3–§6): a synchronous, deterministic candidate re-run draft of the latest
+	 * terminal COMPLEX Run, its prepare dry run and the leftover changes that would fail a clean start. Read-only: no
+	 * model, no writer lock (it is allowed while one is present), no dead-owner recovery, no `.ai` write, no Run and no
+	 * revision change. Nothing is resumed, retried or reused, and the source Run stays history.
+	 */
+	private async derive(
+		request: Extract<HostControlMutation, { type: "workflow.derive" }>,
+	): Promise<HostControlResponse> {
+		// §3, in the contract's order and before any project file is read.
+		const snapshot = await this.canonical();
+		const latest = snapshot.state?.runs.at(-1);
+		if (!latest || latest.runId !== request.runId) throw new ControlError("RUN_NOT_FOUND");
+		const source = rerunSource(latest);
+		if (!source) throw new ControlError("RERUN_NOT_APPLICABLE");
+		if (this.execution || snapshot.state?.runs.some(isActive)) throw new ControlError("ACTIVE_RUN");
+		if ((snapshot.state?.revision ?? 0) !== request.expectedProjectRevision) throw new ControlError("STALE_PROJECT");
+		// The dry run needs the configuration; without one there is nothing to check (CONTROL_UNAVAILABLE).
+		const config = await this.configuration();
+		// §4: the claim-fact inspector's answers for the current files, then the pure derivation.
+		const paths = rerunFactPaths(source);
+		const facts = paths.length
+			? await (await FilePolicyPathInspector.open(this.root.path)).inspectOwnership(paths)
+			: [];
+		const { goal, acceptanceStatements, draft, notes } = deriveRerunDraft(source, facts);
+		// §4 step 5: the prepare pipeline's dry run. Its closed code set stays closed on the wire: anything else that
+		// pipeline could raise is the dry run's own INVALID_REQUEST ("could not be validated").
+		const verdict = await this.prepareDryRun(
+			{ goal, acceptanceStatements, expectedProjectRevision: request.expectedProjectRevision },
+			draft,
+			config,
+		);
+		const prepareCheck: Extract<HostControlData, { kind: "derived-draft" }>["prepareCheck"] = verdict.ok
+			? { ok: true, code: null }
+			: { ok: false, code: RERUN_PREPARE_CHECK_CODES.find((code) => code === verdict.code) ?? "INVALID_REQUEST" };
+		// §5: the clean-start status names with the same filters; the workspace is never opened.
+		const leftovers = boundLeftovers(await readCleanStartBlockers(this.root.path));
+		// The answer holds only for the revision the client saw: nothing durable moved while files were read.
+		if (((await this.canonical()).state?.revision ?? 0) !== request.expectedProjectRevision)
+			throw new ControlError("STALE_PROJECT");
+		const response = this.success(
+			request,
+			{
+				kind: "derived-draft",
+				runId: source.runId,
+				sourcePlanDigest: source.state.plan.complexPlanDigest,
+				sourceStatus: source.status,
+				goal,
+				acceptanceStatements,
+				draft,
+				prepareCheck,
+				leftovers,
+				notes,
+			},
+			{ projectRevision: request.expectedProjectRevision },
+		);
+		// §6: nothing but leftover paths is ever shortened; a larger answer is refused whole.
+		if (Buffer.byteLength(JSON.stringify(response)) + 1 > HOST_RERUN_DRAFT_MAX_RESPONSE_BYTES)
+			throw new ControlError("RESPONSE_TOO_LARGE");
+		return response;
+	}
 	private async mutate(request: HostControlMutation, origin?: HostBridgeConnection): Promise<HostControlResponse> {
 		if ((this.options.readiness ?? "READY") !== "READY") throw new ControlError("CONTROL_UNAVAILABLE");
 		if (request.type === "facts.prepare") {
@@ -1036,6 +1124,7 @@ export class HostControlBridge {
 				throw new ControlError("RESPONSE_TOO_LARGE");
 			return response;
 		}
+		if (request.type === "workflow.derive") return this.derive(request);
 		const run = await this.currentRun(request);
 		const live = this.workflow?.snapshot;
 		if (this.disposed || !this.execution || live?.runId !== run.runId) throw new ControlError("RUN_NOT_OWNED");
@@ -1090,6 +1179,8 @@ export class HostControlBridge {
 					complexContractVersion: COMPLEX_CONTRACT_VERSION,
 					// V0.8B §7.1: the Planner exists on this connection. Advertisement is not readiness or permission.
 					plannerContractVersion: PLANNER_CONTRACT_VERSION,
+					// V0.8C §6: `workflow.derive` exists on this connection; the `commands` tuple stays unchanged.
+					rerunContractVersion: RERUN_CONTRACT_VERSION,
 					recipes: listTaskRecipes().map(({ id, version, title }) => ({
 						id,
 						version,
@@ -1215,7 +1306,13 @@ export class HostControlBridge {
 							if (record.protocolVersion !== 1) throw new ControlError("UNSUPPORTED_VERSION");
 							if (
 								!command ||
-								!([...HOST_CONTROL_COMMANDS, ...HOST_PLANNER_COMMANDS] as readonly string[]).includes(command)
+								!(
+									[
+										...HOST_CONTROL_COMMANDS,
+										...HOST_PLANNER_COMMANDS,
+										...HOST_RERUN_COMMANDS,
+									] as readonly string[]
+								).includes(command)
 							)
 								throw new ControlError("UNSUPPORTED_COMMAND");
 							if (!Check(HostControlRequestSchema, input)) throw new ControlError("INVALID_REQUEST");
