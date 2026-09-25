@@ -68,6 +68,10 @@ let workspace: string;
 let events: RuntimeEvent[];
 let workers: AgentSession[];
 let dispose: MockInstance<AgentSession["dispose"]>;
+// Worker timeout for the timeout tests. The worker must reach its hung model call before the timeout fires: that took
+// about 10 ms idle and up to 120 ms under local load, but over 250 ms once on a loaded CI runner. The call then hangs
+// until aborted, so each timeout test also waits this long.
+const TIMEOUT_TEST_MS = 1_500;
 
 async function persistReference(ref: RoleSessionReference) {
 	const run = (await store.load("run-1"))!;
@@ -528,7 +532,7 @@ describe("Company Runtime S3 SDK adapter (faux only)", () => {
 			const runner = await PiAgentExecutor.create({
 				...options,
 				maxTurns: mode === "turn-limit" ? 1 : mode === "identity-loop" ? 2 : 32,
-				timeoutMs: mode === "timeout" ? 250 : 3000,
+				timeoutMs: mode === "timeout" ? TIMEOUT_TEST_MS : 3000,
 			});
 			harness.setResponses([
 				fauxAssistantMessage(
@@ -787,7 +791,8 @@ describe("Company Runtime S3 SDK adapter (faux only)", () => {
 		"handles %s, rejects late result, disposes and prevents subsequent roles/actions",
 		async (mode) => {
 			const controller = new AbortController();
-			const runner = mode === "timeout" ? await PiAgentExecutor.create({ ...options, timeoutMs: 250 }) : executor;
+			const runner =
+				mode === "timeout" ? await PiAgentExecutor.create({ ...options, timeoutMs: TIMEOUT_TEST_MS }) : executor;
 			let started!: () => void;
 			const entered = new Promise<void>((resolve) => {
 				started = resolve;
