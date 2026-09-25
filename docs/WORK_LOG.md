@@ -798,6 +798,23 @@
     - 완료 화면: COMPLETED·TERMINAL, 작업 3/3, 앞 두 작업 증거 STALE(과거 기여)와 CT-003 CURRENT 구분, 통합 PASS×3, 호출 7/24, cleanup CONFIRMED, writer 해제.
   - 종료: 캡처한 dev 서버 PID와 작업 디렉터리를 확인한 포트 소유자만 종료했다. 남은 Runtime 브리지 프로세스는 없었다. 캡처는 커밋하지 않았다.
 - 커밋 상태: 기능 커밋 `86004a97`, devlop 병합, 이 기록. devlop 대상 PR.
+## 2026-09-25 KST — #5 후보 3 모델 의도 프로필
+
+- 목적: #5 후보 3을 구현한다(사용자 승인). 기존 모델 프로필 위에 얇은 의도 별칭(simple·standard·review·deep)을 얹고, 역할마다 실제로 쓰인 provider/model을 화면과 기록에 보여 준다. 자동 라우팅·fallback·추가 LLM 호출은 없다.
+- 브랜치/worktree: `feat/model-intent-profiles`, `Weavra-worktrees/v0.7b-complex-runtime`(재사용). 하위 에이전트가 구현했고 메인 세션이 검토와 실제 모델 확인을 했다.
+- 변경(`runtime/pi/packages/company-runtime`):
+  - `config.ts`: 선택 필드 `models.intents`. 설정되지 않은 프로필을 가리키면 설정 오류다.
+  - `src/model-routing.ts`(신규): 순수 조회 함수. QUICK Executor는 `simple`, 없으면 coding. STANDARD/COMPLEX Developer는 `standard`, 없으면 coding. 모든 Reviewer는 `review`, 없으면 reasoning.
+  - `deep`은 TUI `/workflow run --deep <goal>`로 명시할 때만 쓴다. 매핑이 없거나 QUICK 목표면 모델 런타임·provider 호출·run 생성 전에 거부한다. Host Control과 App에는 deep 선택이 없다(wire 변경 없음).
+  - 사용할 수 없는 별칭·프로필·모델·인증이면 실행 전에 명시적 오류로 끝난다(예: `Worker model unavailable for Reviewer review -> creative; fallback disabled`). 다른 모델로 대체하지 않는다.
+  - 표시: TUI plan preview는 역할별 `alias → profile → provider/model`과 출처(설정 또는 기본)를 보여 준다. `/workflow status`, `/team`, Evidence Pack에는 기록된 alias/profile과 요청·실제 provider/model이 나온다.
+  - Kernel·Task Contract·AC·risk·Policy(config digest 포함)·완료 권한은 바뀌지 않는다.
+- 현재 검증:
+  - 하위 에이전트(Node 24.19.0): `npm run check` 통과. 신규 단위 13개와 SDK suite 7개 통과. `./test.sh` exit 0(company-runtime 1,969 PASS, coding-agent 2,785 PASS, 기존 skip 50).
+  - 변이 확인: 별칭 라우팅을 끄면 9개, deep을 자동화하면 6개가 실패했다.
+  - 메인 세션 실제 확인(유료 1회, commandcode `deepseek/deepseek-v4.1-flash`, `intents: {simple: fast, standard: coding, review: reasoning}`): STANDARD run이 운영 App `ControlTransport` 경유로 COMPLETED. 기록된 측정은 Developer `standard → coding`, Reviewer `review → reasoning`이고, 요청과 실제 provider/model이 모두 `commandcode/deepseek-v4.1-flash`로 일치했다.
+- 보류: App 표시와 선택(wire 변경 필요), Host Control 경유 deep 선택, 같은 provider 내 fallback.
+- 커밋 상태: `79c8ec28`, devlop 병합, 이 기록. devlop 대상 PR.
 
 ## 2026-09-25 KST — 고아 Run 복구: App 준비 버튼 조건 (1/2)
 

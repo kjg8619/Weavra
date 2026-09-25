@@ -10,6 +10,7 @@ import type { RuntimeConfig } from "./config.ts";
 import type { Risk, TaskContract, Workflow } from "./contracts.ts";
 import { type ExecutionMode, proposeExecutionMode } from "./execution-contract.ts";
 import { HostWorkflowError } from "./host-workflow-error.ts";
+import { workflowModelRoutes } from "./model-routing.ts";
 import type { PlanPreview } from "./plan-preview.ts";
 import { FilePolicyPathInspector } from "./policy-paths.ts";
 import { resolveProjectProtectedPaths } from "./project-protection.ts";
@@ -44,6 +45,8 @@ export interface HostWorkflowDraft {
 	recipe?: { id: string; version: number; digest: string };
 	/** Shape-checked structured COMPLEX proposal; present iff workflow is COMPLEX. Draft data, never authority. */
 	complexDraft?: ComplexDraft;
+	/** Explicit per-run user choice (TUI `--deep` only): Developers use `models.intents.deep`. Never automatic. */
+	deep?: true;
 }
 
 export interface HostWorkflowPlan extends HostWorkflowDraft {
@@ -60,8 +63,16 @@ export function prepareHostWorkflowDraft(input: {
 	riskOverride?: RiskOverride;
 	/** Untrusted `workflow.prepare.complexDraft`; required for COMPLEX and rejected for QUICK/STANDARD. */
 	complexDraft?: unknown;
+	/** Explicit per-run `deep` model intent for Developers (TUI `--deep`); Host Control never sets it. */
+	deep?: boolean;
 }): HostWorkflowDraft {
-	const { goal, config, riskOverride, complexDraft } = input;
+	const { goal, config, riskOverride, complexDraft, deep } = input;
+	// Refused before any dialog, model or Run: deep is never selected automatically and has no fallback.
+	if (deep && !config.models.intents?.deep)
+		throw new HostWorkflowError(
+			"INVALID_REQUEST",
+			"--deep needs models.intents.deep naming a configured profile in .ai/config.yaml; deep is never selected automatically and has no fallback",
+		);
 	const proposal = proposeExecutionMode(goal);
 	if (proposal.requiresConfirmation || !proposal.mode) throw new HostWorkflowError("INVALID_GOAL", proposal.reason);
 	try {
@@ -89,6 +100,11 @@ export function prepareHostWorkflowDraft(input: {
 			);
 		if (selection.workflow === "QUICK" && ["R2", "R3"].includes(classification.risk))
 			throw new HostWorkflowError("UNSUPPORTED_WORKFLOW", "R2/R3 cannot run as QUICK; STANDARD is required");
+		if (deep && selection.workflow === "QUICK")
+			throw new HostWorkflowError(
+				"UNSUPPORTED_WORKFLOW",
+				"--deep routes this run's Developers to models.intents.deep; this goal selects QUICK (one Executor, no Developer); no downgrade or fallback performed",
+			);
 		return {
 			goal,
 			config: structuredClone(config),
@@ -99,6 +115,7 @@ export function prepareHostWorkflowDraft(input: {
 			...(riskOverride ? { riskOverride: { from: riskOverride.from, to: riskOverride.to } } : {}),
 			statements: [goal],
 			...(selection.workflow === "COMPLEX" ? { complexDraft: parseComplexDraft(complexDraft) } : {}),
+			...(deep ? { deep: true as const } : {}),
 		};
 	} catch (error) {
 		if (error instanceof HostWorkflowError) throw error;
@@ -172,6 +189,8 @@ function hostPlanPreview(
 		executionMode,
 		risk,
 		...(riskOverride ? { riskOverride } : {}),
+		// The same deterministic routing the adapter preflights and executes; display data, never a grant.
+		modelRoutes: workflowModelRoutes(config, workflow, snapshot.deep === true),
 		acceptanceCriteria: taskContract.acceptanceCriteria,
 		allowedPaths: config.files.allowed_paths,
 		checks: config.verification.checks,
@@ -267,7 +286,7 @@ export async function createHostWorkflow(options: CreateHostWorkflowOptions): Pr
 			options.plan.workflow === "COMPLEX" ? "UNSUPPORTED_WORKFLOW" : "INVALID_REQUEST",
 			`Unsupported classification/workflow: ${options.plan.workflow}/${options.plan.risk}; a COMPLEX plan runs only as COMPLEX with its confirmed plan; no model, writer or Run was created`,
 		);
-	const { goal, executionMode } = options.plan;
+	const { goal, executionMode, deep } = options.plan;
 	const { config, taskContract, recipe, riskOverride, complexPlan } = structuredClone({
 		config: options.plan.config,
 		taskContract: options.plan.taskContract,
@@ -311,6 +330,8 @@ export async function createHostWorkflow(options: CreateHostWorkflowOptions): Pr
 				r3Scope,
 				// V0.8A: a COMPLEX wave runs up to its frozen maxParallel Developers at once; otherwise one worker.
 				maxConcurrentWorkers: complexPlan?.limits.maxParallel ?? 1,
+				// The user-confirmed per-run model choice only; it changes no contract, Policy or authority.
+				...(deep ? { deep: true } : {}),
 			});
 			return { executor, policy: executor.policyContext };
 		},

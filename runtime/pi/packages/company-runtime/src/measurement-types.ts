@@ -76,7 +76,11 @@ export const ReviewerContextSummarySchema = Type.Object(
 export const WorkerMeasurementSchema = Type.Object(
 	{
 		role,
+		/** The profile this invocation used; requested provider/model come from its frozen configuration mapping. */
 		profile: text,
+		// #5: the configured models.intents alias that selected `profile`; absent means the role default profile
+		// (as for every measurement recorded before aliases existed).
+		modelIntent: Type.Optional(Type.Enum(["simple", "standard", "review", "deep"])),
 		revision: counter,
 		step,
 		requestedProvider: text,
