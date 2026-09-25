@@ -42,6 +42,12 @@ export const HOST_CONTROL_COMMANDS = [
  * advertised only through `plannerContractVersion`.
  */
 export const HOST_PLANNER_COMMANDS = ["planner.start", "planner.cancel", "planner.read"] as const;
+/**
+ * V0.8C explicit re-run (COMPLEX_RERUN.md §6): a read-only candidate draft, never a resume, prepare or execution.
+ * Accepted when requested but, like the Planner commands, not added to the strictly decoded `commands` tuple: it is
+ * advertised only through `rerunContractVersion`.
+ */
+export const HOST_RERUN_COMMANDS = ["workflow.derive"] as const;
 const strict = { additionalProperties: false } as const;
 const identifier = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" });
 const counter = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
@@ -133,6 +139,8 @@ export const HostControlRequestSchema = Type.Union([
 	),
 	Type.Object({ ...mutation, type: Type.Literal("planner.cancel"), planId }, strict),
 	Type.Object({ ...mutation, type: Type.Literal("planner.read"), planId }, strict),
+	/** V0.8C (§6): derive a candidate re-run draft from the latest terminal COMPLEX Run. */
+	Type.Object({ ...mutation, type: Type.Literal("workflow.derive"), runId: identifier }, strict),
 ]);
 export type HostControlRequest = Static<typeof HostControlRequestSchema>;
 export type HostControlMutation = Extract<HostControlRequest, { ownerId: string }>;
@@ -183,8 +191,44 @@ export const HOST_CONTROL_ERROR_CODES = [
 	"PLANNER_BUSY",
 	"PLANNER_NOT_FOUND",
 	"PLANNER_NOT_READY",
+	// V0.8C re-run (§3): the latest Run is not a terminal, unfinished, non-R3 COMPLEX Run with a Host-confirmed plan.
+	"RERUN_NOT_APPLICABLE",
 ] as const;
 export type HostControlErrorCode = (typeof HOST_CONTROL_ERROR_CODES)[number];
+
+/** V0.8C re-run contract (COMPLEX_RERUN.md §6): advertised in `control.hello`; advertisement is not permission. */
+export const RERUN_CONTRACT_VERSION = 1;
+/** §3: the source statuses a re-run draft is derived from (never COMPLETED, never an active Run). */
+export const RERUN_SOURCE_STATUSES = ["BLOCKED", "CANCELLED", "FAILED", "INTERRUPTED"] as const;
+/**
+ * §4 step 5: the codes of the prepare pipeline a derived draft is dry-run through (classification, COMPLEX
+ * compilation with claim facts and Policy, the preview's response bound). Refusals of `workflow.derive` itself are
+ * ordinary error responses, never a check result.
+ */
+export const RERUN_PREPARE_CHECK_CODES = [
+	"INVALID_REQUEST",
+	"INVALID_GOAL",
+	"UNSUPPORTED_WORKFLOW",
+	"INVALID_CRITERIA",
+	"RESPONSE_TOO_LARGE",
+] as const satisfies readonly HostControlErrorCode[];
+/** §6: bound of a whole `derived-draft` response line, newline included. */
+export const HOST_RERUN_DRAFT_MAX_RESPONSE_BYTES = 49152;
+/** §4 step 6: at most this many fixed-template notes, each at most `RERUN_NOTE_MAX_BYTES` UTF-8 bytes. */
+export const RERUN_MAX_NOTES = 16;
+export const RERUN_NOTE_MAX_BYTES = 200;
+/** §5: at most this many leftover paths and UTF-8 bytes of names, in sorted order; beyond that `truncated`. */
+export const RERUN_LEFTOVER_MAX_PATHS = 200;
+export const RERUN_LEFTOVER_MAX_BYTES = 16384;
+/**
+ * §5 leftover changes that would fail the clean-start check: names only, never contents, diffs or modes. `clean` is
+ * null (unknown, never clean) and `paths` empty when Git could not answer.
+ */
+export interface HostRerunLeftovers {
+	clean: boolean | null;
+	paths: string[];
+	truncated: boolean;
+}
 
 /** V0.8B Planner contract (PLANNER_DRAFT.md §7): advertised in `control.hello`; advertisement is not permission. */
 export const PLANNER_CONTRACT_VERSION = 1;
@@ -355,6 +399,8 @@ export interface HostControlCapabilities {
 	complexContractVersion?: 2;
 	/** V0.8B Planner contract (§7.1); absent (older Runtime) means the Planner does not exist on this connection. */
 	plannerContractVersion?: typeof PLANNER_CONTRACT_VERSION;
+	/** V0.8C re-run contract (§6); absent (older Runtime) means `workflow.derive` does not exist on this connection. */
+	rerunContractVersion?: typeof RERUN_CONTRACT_VERSION;
 }
 export type HostControlData =
 	| { kind: "capabilities"; capabilities: HostControlCapabilities }
@@ -379,6 +425,24 @@ export type HostControlData =
 			current: boolean;
 			/** Exactly as the Planner submitted it: candidate data that `workflow.prepare` recompiles. */
 			draft: ComplexDraft;
+	  }
+	| {
+			/** V0.8C (§6): a candidate re-run draft of the latest terminal COMPLEX Run. Nothing is resumed or reused. */
+			kind: "derived-draft";
+			/** The source Run, which stays history. */
+			runId: string;
+			sourcePlanDigest: string;
+			sourceStatus: (typeof RERUN_SOURCE_STATUSES)[number];
+			/** The source parent's goal and acceptance statements in AC order: AC-001 is statement 1. */
+			goal: string;
+			acceptanceStatements: string[];
+			/** Planning-form data only: `workflow.prepare` recompiles whatever the editor holds. */
+			draft: ComplexDraft;
+			/** The prepare pipeline's dry run of this draft: that pipeline's error code, or null when it would prepare. */
+			prepareCheck: { ok: true; code: null } | { ok: false; code: (typeof RERUN_PREPARE_CHECK_CODES)[number] };
+			leftovers: HostRerunLeftovers;
+			/** At most 16 fixed-template notes of at most 200 UTF-8 bytes each; never file contents. */
+			notes: string[];
 	  };
 export type HostControlResponse = HostBridgeIdentity & {
 	type: "control_response";
