@@ -1093,3 +1093,23 @@
   - confirm 뒤 Planner 카드는 사라졌다.
   - 종료할 때는 기록한 dev 서버 PID와, 작업 디렉터리를 확인한 포트 소유자만 종료했다. 남은 bridge 프로세스는 없었다.
 - 커밋 상태: `7bc8f8d7`(corpus), `2bf0e75b`(smoke), 병합 커밋, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — V0.8C #55 명시적 재실행 설계 계약
+
+- 배경: 로드맵 #59 Phase F. Phase E(V0.8B Planner, #51–#54)가 닫힌 뒤 시작했다. 사용자 결정은 "중단 Run 이어서 실행"이었지만, 기존 계약이 재개·재생·재시도·되돌리기·증거 재사용을 모두 금지하므로 **명시적인 새 Run**으로 설계했다.
+- 브랜치/worktree: `design/v0.8c-rerun-contract`, `Weavra-worktrees/v0.8a-parallel-contract`(재사용). 코드 사실 조사는 읽기 전용 하위 에이전트가 했고, 설계는 메인 세션이 작성했다.
+- 산출물: `docs/architecture/COMPLEX_RERUN.md`(신규). #56 Runtime, #57 App, #58 corpus의 구현 계약이다.
+- 결정과 근거(코드 확인 결과):
+  - **깨끗한 시작 조건은 그대로다.** 새 Run의 시작은 `git status --porcelain`이 비어 있어야 한다(Runtime 소유 경로는 제외). 이전 Run이 남긴 변경이 있으면 START_FAILED가 된다. 현재 작업 공간을 기준선으로 받아들이는 선택지는 없고, Runtime은 커밋하지 않는다. 그래서 이 조건을 유지한다.
+  - **`workflow.derive`(결정적, 읽기 전용, 모델 없음).** 최신 종료 COMPLEX Run(BLOCKED·CANCELLED·FAILED·INTERRUPTED, 미완료 행 있음, R3 아님)에서 후보 초안을 만든다.
+    - parent와 AC는 같고, 작업 수·순서·의존성도 유지한다.
+    - COMPLETED 작업은 claim 없는 검증 작업으로 바꿔 새로 검증한다. 모든 AC를 덮어야 하고 작업은 2–8개여야 하므로, 이 작업들을 빼지 않고 바꾼다.
+    - 미완료 작업의 claim은 현재 파일 상태에 맞춘다. 파일이 있으면 `create`를 `modify`로 바꾼다.
+    - 응답에는 prepare dry-run 결과, 정해진 형식의 메모(내용 없음), 남은 변경 경로(시작 검사와 같은 git status 기준, 최대 200개, 이름만)를 담는다.
+  - **순서.** claim은 도출 시점의 파일을 따르므로, 사용자가 남은 변경을 커밋하거나 버린 뒤 다시 도출한다.
+  - **저장하지 않는 것.** writer lock, `.ai` 쓰기, revision 변경, Run 사이 lineage가 모두 없다. 새 Run은 parent·plan ID가 새로 정해지므로 이전 증거와 절대 일치하지 않는다.
+  - **App 선행 수정.** 종료된 Run 뒤에 writer가 남아 있으면 지금은 Prepare를 누를 수 없어 App만으로는 복구할 수 없다. 이 경우 Prepare를 허용하고, 판단은 Runtime에 맡긴다: 죽은 소유자면 복구 뒤 STALE_PROJECT, 살아 있으면 WRITER_PRESENT.
+  - `rerunContractVersion: 1` capability, 새 오류 코드 `RERUN_NOT_APPLICABLE`. 머지는 소비자 우선(#57 → #56)이다.
+  - 검증 설계: #58 corpus R01–R08, 실제 모델 smoke, 실제 UI 확인.
+- 현재 검증: 인용한 코드 사실(`workspace.ts:14-20,71-79`, `workflow.ts:502`, `kernel.ts:951-952`, `WeavraControls.tsx:344-353` 등)을 `00302ecd`에서 확인했다. PR CI는 문서만 바꾼 상태로 세 job을 통과해야 머지한다.
+- 커밋 상태: `8fb4d8e4`, devlop 병합, 이 기록. devlop 대상 PR.
