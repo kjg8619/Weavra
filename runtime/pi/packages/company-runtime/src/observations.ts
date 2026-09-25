@@ -15,6 +15,7 @@ import {
 	modelRouteSource,
 	recordedModelRoute,
 	resolveModelRoute,
+	resolvePlannerRoute,
 } from "./model-routing.ts";
 import { SANDBOX_DISABLED_WARNING } from "./sandbox-advice.ts";
 
@@ -252,6 +253,7 @@ export function formatHistory(state: ObservationState, number = 1): string {
 	].join("\n");
 }
 export function formatConfiguration(config: RuntimeConfig): string {
+	const planner = resolvePlannerRoute(config);
 	const output = [
 		"Current config (not an active run's frozen configuration):",
 		`Workflow: ${config.runtime.workflow}; COMPLEX runs only from a structured task plan prepared and confirmed through Host Control (App); /workflow run does not accept one`,
@@ -270,6 +272,7 @@ export function formatConfiguration(config: RuntimeConfig): string {
 			const route = resolveModelRoute(config, role);
 			return `  ${role}: ${route.intent} -> ${route.profile} (${modelRouteSource(route)})`;
 		}),
+		`  Planner: plan -> ${planner.profile} (${planner.alias ? "models.intents.plan" : "role default; no alias configured"}); Host Control planning drafts only, never a Run worker`,
 		`  deep: ${config.models.intents?.deep ? `${config.models.intents.deep}; only for STANDARD Developers of an explicit /workflow run --deep <goal>` : "not configured; /workflow run --deep is refused"}`,
 		`Allowed paths: ${config.files.allowed_paths.map((path) => displayText(path)).join(", ") || "none"}`,
 		...config.verification.checks.map((check) =>

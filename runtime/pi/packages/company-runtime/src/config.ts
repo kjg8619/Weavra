@@ -39,6 +39,8 @@ export const RuntimeConfigSchema = Type.Object(
 							standard: Type.Optional(profileName),
 							review: Type.Optional(profileName),
 							deep: Type.Optional(profileName),
+							// V0.8B: the Host Planner's draft session (PLANNER_DRAFT.md §5.1); default `reasoning`, no fallback.
+							plan: Type.Optional(profileName),
 						},
 						strict,
 					),

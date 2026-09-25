@@ -6,7 +6,13 @@ import {
 	type RegisteredBrowserCheck,
 } from "./browser-types.ts";
 import type { CapabilityInventory } from "./capability-types.ts";
-import { ComplexDraftSchema, type ComplexExecution, type ComplexPlan } from "./complex-types.ts";
+import {
+	COMPLEX_PLAN_ID_PATTERN,
+	type ComplexDraft,
+	ComplexDraftSchema,
+	type ComplexExecution,
+	type ComplexPlan,
+} from "./complex-types.ts";
 import type { CheckResult, StepReference } from "./contracts.ts";
 import type { HostBridgeIdentity, HostSnapshotSummary } from "./host-bridge-protocol.ts";
 import type { ProjectFactsProjection } from "./project-fact-types.ts";
@@ -30,12 +36,26 @@ export const HOST_CONTROL_COMMANDS = [
 	"facts.prepare",
 	"facts.confirm",
 ] as const;
+/**
+ * V0.8B Planner commands (PLANNER_DRAFT.md §7.2): candidate drafts only, never prepare, confirm or execution. Accepted
+ * when requested but not added to the advertised `commands` tuple, which older Apps decode strictly: the Planner is
+ * advertised only through `plannerContractVersion`.
+ */
+export const HOST_PLANNER_COMMANDS = ["planner.start", "planner.cancel", "planner.read"] as const;
 const strict = { additionalProperties: false } as const;
 const identifier = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" });
 const counter = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
 const digest = Type.String({ pattern: "^sha256:[0-9a-f]{64}$" });
 const envelope = { protocolVersion: Type.Literal(1), id: identifier };
+/** A Runtime-issued planning request id: canonical lowercase UUID, as the App sends it. */
+const planId = Type.String({ pattern: COMPLEX_PLAN_ID_PATTERN });
 const mutation = { ...envelope, ownerId: identifier, expectedProjectRevision: counter };
+/** `workflow.prepare` goal and statement bounds; `planner.start` uses exactly the same (§7.2). */
+const goal = Type.String({ minLength: 1, maxLength: 2048, pattern: "\\S" });
+const acceptanceStatements = Type.Array(Type.String({ minLength: 1, maxLength: 500, pattern: "\\S" }), {
+	minItems: 1,
+	maxItems: 16,
+});
 export const HostControlRequestSchema = Type.Union([
 	Type.Object({ ...envelope, type: Type.Literal("control.hello") }, strict),
 	Type.Object({ ...envelope, type: Type.Literal("control.snapshot") }, strict),
@@ -65,16 +85,14 @@ export const HostControlRequestSchema = Type.Union([
 		{
 			...mutation,
 			type: Type.Literal("workflow.prepare"),
-			goal: Type.String({ minLength: 1, maxLength: 2048, pattern: "\\S" }),
+			goal,
 			recipeId: Type.Optional(Type.String({ minLength: 1, maxLength: 64, pattern: "^[a-z0-9-]+$" })),
 			recipeInputs: Type.Optional(
 				Type.Record(Type.String({ pattern: "^[a-z0-9_]+$" }), Type.String({ maxLength: 2048 }), {
 					maxProperties: 16,
 				}),
 			),
-			acceptanceStatements: Type.Optional(
-				Type.Array(Type.String({ minLength: 1, maxLength: 500, pattern: "\\S" }), { minItems: 1, maxItems: 16 }),
-			),
+			acceptanceStatements: Type.Optional(acceptanceStatements),
 			/** Structured COMPLEX proposal (§4); required for COMPLEX, rejected otherwise and with a recipe. */
 			complexDraft: Type.Optional(ComplexDraftSchema),
 		},
@@ -104,6 +122,17 @@ export const HostControlRequestSchema = Type.Union([
 		},
 		strict,
 	),
+	Type.Object(
+		{
+			...mutation,
+			type: Type.Literal("planner.start"),
+			goal,
+			acceptanceStatements: Type.Optional(acceptanceStatements),
+		},
+		strict,
+	),
+	Type.Object({ ...mutation, type: Type.Literal("planner.cancel"), planId }, strict),
+	Type.Object({ ...mutation, type: Type.Literal("planner.read"), planId }, strict),
 ]);
 export type HostControlRequest = Static<typeof HostControlRequestSchema>;
 export type HostControlMutation = Extract<HostControlRequest, { ownerId: string }>;
@@ -150,8 +179,54 @@ export const HOST_CONTROL_ERROR_CODES = [
 	"FACT_SOURCE_CHANGED",
 	"INVALID_FACT",
 	"FACT_LIMIT",
+	// V0.8B Planner (§7.2): planning or a Run execution in progress; unknown or not RUNNING; not READY.
+	"PLANNER_BUSY",
+	"PLANNER_NOT_FOUND",
+	"PLANNER_NOT_READY",
 ] as const;
 export type HostControlErrorCode = (typeof HOST_CONTROL_ERROR_CODES)[number];
+
+/** V0.8B Planner contract (PLANNER_DRAFT.md §7): advertised in `control.hello`; advertisement is not permission. */
+export const PLANNER_CONTRACT_VERSION = 1;
+export const PLANNER_STATUSES = ["RUNNING", "READY", "FAILED", "CANCELLED"] as const;
+/** Closed §5.5 failure codes; CANCELLED is a status, not a failure code. */
+export const PLANNER_FAILURE_CODES = [
+	"MODEL_UNAVAILABLE",
+	"CONTEXT_TOO_LARGE",
+	"TIMEOUT",
+	"PROVIDER_ERROR",
+	"BUDGET_EXHAUSTED",
+	"BUDGET_UNKNOWN",
+	"NO_DRAFT",
+	"DRAFT_INVALID",
+	"STALE",
+] as const;
+export type HostPlannerFailureCode = (typeof PLANNER_FAILURE_CODES)[number];
+/** Bound of a whole `planner-draft` response line; the draft alone is at most `COMPLEX_DRAFT_MAX_BYTES` (12,288). */
+export const HOST_PLANNER_DRAFT_MAX_RESPONSE_BYTES = 16384;
+/**
+ * §7.3 snapshot status of this Host's planning request: small and draftless (`planner.read` returns the draft).
+ * Host process memory only; present only after a `planner.start` on this Host and dropped by a successful confirm.
+ */
+export interface HostPlannerStatus {
+	schemaVersion: 1;
+	planId: string;
+	status: (typeof PLANNER_STATUSES)[number];
+	requestDigest: string;
+	/** The project revision recorded at `planner.start`. */
+	projectRevision: number;
+	/** True only while the project revision and configuration fingerprint equal the recorded values. */
+	current: boolean;
+	startedAt: number;
+	finishedAt: number | null;
+	/** The requested route (alias -> profile -> provider/model); null when no route could be resolved. */
+	route: { alias: "plan" | null; profile: string; provider: string; model: string } | null;
+	usage: { invocations: number; reportedTokens: number | null };
+	/** READY only. */
+	taskCount: number | null;
+	/** FAILED only. */
+	failureCode: HostPlannerFailureCode | null;
+}
 
 export interface HostControlPreview {
 	previewId: string;
@@ -258,6 +333,8 @@ export interface HostControlState {
 	 * never projected from an older Run. Its ownerId/projectRevision/stateRevision/runId equal this snapshot's.
 	 */
 	complexExecution?: ComplexExecution;
+	/** V0.8B (§7.3): present only after a `planner.start` on this Host; absent (never null) otherwise. */
+	planner?: HostPlannerStatus;
 }
 export interface HostControlCapabilities {
 	authority: "Runtime/Kernel";
@@ -276,6 +353,8 @@ export interface HostControlCapabilities {
 	 * Runtime emitted 1; absent (older Runtime) means not exposed. Never mixed on one connection.
 	 */
 	complexContractVersion?: 2;
+	/** V0.8B Planner contract (§7.1); absent (older Runtime) means the Planner does not exist on this connection. */
+	plannerContractVersion?: typeof PLANNER_CONTRACT_VERSION;
 }
 export type HostControlData =
 	| { kind: "capabilities"; capabilities: HostControlCapabilities }
@@ -289,8 +368,17 @@ export type HostControlData =
 	| {
 			kind: "accepted";
 			requestId: string;
-			command: "workflow.confirm" | "workflow.cancel" | "approval.resolve";
+			command: "workflow.confirm" | "workflow.cancel" | "approval.resolve" | "planner.start" | "planner.cancel";
 			runId: string | null;
+	  }
+	| {
+			kind: "planner-draft";
+			planId: string;
+			requestDigest: string;
+			projectRevision: number;
+			current: boolean;
+			/** Exactly as the Planner submitted it: candidate data that `workflow.prepare` recompiles. */
+			draft: ComplexDraft;
 	  };
 export type HostControlResponse = HostBridgeIdentity & {
 	type: "control_response";

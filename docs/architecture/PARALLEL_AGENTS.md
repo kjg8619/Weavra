@@ -19,7 +19,7 @@
 - One global budget ledger.
 - One Kernel, one writer, one Run.
 
-`maxParallel = 1` schedules and ends exactly like V0.7B; its v2 trace only adds a brief `HANDED_OFF` between implement and self-check. There is no Planner, no automatic merge, commit or rollback, no shared ownership, no unlimited fan-out and no model fallback.
+`maxParallel = 1` schedules and ends exactly like V0.7B; its v2 trace only adds a brief `HANDED_OFF` between implement and self-check. There is no automatic merge, commit or rollback, no shared ownership, no unlimited fan-out and no model fallback. A Run has no Planner either: since V0.8B an optional Planner may propose a plan draft before preparation, as unreviewed candidate data with no authority, and never takes part in a Run ([PLANNER_DRAFT.md](PLANNER_DRAFT.md)).
 
 ## 2. What changes from V0.7B
 

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
-import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { join } from "node:path";
+import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Check } from "typebox/value";
 import runtimePackage from "../package.json" with { type: "json" };
 import { validBrowserCheckEvidence } from "./browser-evidence.ts";
@@ -14,10 +15,15 @@ import {
 import { browserDigest, browserProjectId } from "./browser-types.ts";
 import { boundCapabilityInventory, createCapabilityBroker, type RuntimeCapabilityBroker } from "./capability-broker.ts";
 import { capabilityJson } from "./capability-catalog.ts";
-import { complexDraftBytes } from "./complex-plan.ts";
+import { complexDraftBytes, parseComplexDraft } from "./complex-plan.ts";
 import { ComplexProjectionError, projectComplexExecution } from "./complex-state.ts";
-import { COMPLEX_CONTRACT_VERSION, COMPLEX_DRAFT_MAX_BYTES, type ComplexExecution } from "./complex-types.ts";
-import { loadRuntimeConfig } from "./config.ts";
+import {
+	COMPLEX_CONTRACT_VERSION,
+	COMPLEX_DRAFT_MAX_BYTES,
+	type ComplexDraft,
+	type ComplexExecution,
+} from "./complex-types.ts";
+import { loadRuntimeConfig, type RuntimeConfig } from "./config.ts";
 import type { ApprovalDecision, ApprovalRequest, Run } from "./contracts.ts";
 import { taskContractDigest } from "./criterion-evidence.ts";
 import type { RuntimeEventSink } from "./events.ts";
@@ -35,6 +41,8 @@ import {
 	HOST_CONTROL_MAX_RESPONSE_BYTES,
 	HOST_CONTROL_PREVIEW_TTL_MS,
 	HOST_CONTROL_RESULT_LIMIT,
+	HOST_PLANNER_COMMANDS,
+	HOST_PLANNER_DRAFT_MAX_RESPONSE_BYTES,
 	type HostBrowserPreview,
 	type HostBrowserState,
 	type HostControlApproval,
@@ -47,6 +55,9 @@ import {
 	HostControlRequestSchema,
 	type HostControlResponse,
 	type HostFactPreview,
+	type HostPlannerFailureCode,
+	type HostPlannerStatus,
+	PLANNER_CONTRACT_VERSION,
 } from "./host-control-protocol.ts";
 import {
 	applyHostWorkflowRecipe,
@@ -56,6 +67,17 @@ import {
 	HostWorkflowError,
 	prepareHostWorkflowDraft,
 } from "./host-workflow.ts";
+import { type PlannerRoute, resolvePlannerRoute } from "./model-routing.ts";
+import {
+	buildPlanningContext,
+	PLANNER_MAX_REPORTED_TOKENS,
+	PlannerFailure,
+	type PlannerVerdict,
+	plannerClassification,
+	plannerCriteria,
+	plannerRequestDigest,
+	runPlannerSession,
+} from "./planner.ts";
 import type { ProjectFactSummary, ProjectFactsProjection } from "./project-fact-types.ts";
 import {
 	confirmProjectFact,
@@ -96,6 +118,27 @@ type Prepared = {
 	consumed: boolean;
 };
 type PendingApproval = { request: ApprovalRequest; settle: (approved: boolean) => void };
+/** V0.8B planning request (PLANNER_DRAFT.md §3, §6): Host process memory only, never durable. */
+type PlannerState = {
+	planId: string;
+	status: HostPlannerStatus["status"];
+	requestDigest: string;
+	goal: string;
+	acceptanceStatements?: string[];
+	/** Recorded at `planner.start`; `current` and STALE compare against them. */
+	projectRevision: number;
+	configurationDigest: string;
+	startedAt: number;
+	finishedAt: number | null;
+	route: PlannerRoute | null;
+	usage: HostPlannerStatus["usage"];
+	failureCode: HostPlannerFailureCode | null;
+	/** READY only: exactly as submitted. */
+	draft?: ComplexDraft;
+	/** The connection that started planning; its close cancels a RUNNING request (§8). */
+	owner: HostBridgeConnection | undefined;
+	cancellation: AbortController;
+};
 export interface HostControlOptions {
 	cwd: string;
 	projectTrusted: boolean;
@@ -104,6 +147,8 @@ export interface HostControlOptions {
 	createModels?: (signal: AbortSignal) => Promise<ModelRuntime>;
 	events?: RuntimeEventSink;
 	approvalTimeoutMs?: number;
+	/** Trusted Host/test override (1..3,600,000 ms) of the whole planning request; otherwise `agents.worker_timeout_ms`. */
+	plannerTimeoutMs?: number;
 	now?: () => number;
 }
 
@@ -132,6 +177,9 @@ export class HostControlBridge {
 	private cancelling = false;
 	private startFailure: "START_FAILED" | null = null;
 	private approval?: PendingApproval;
+	private planner?: PlannerState;
+	/** The background planning request, until its session is disposed (also after a cancel). */
+	private planning?: Promise<void>;
 
 	private constructor(options: HostControlOptions, root: { path: string; dev: number; ino: number }) {
 		this.options = { ...options, cwd: root.path };
@@ -277,6 +325,178 @@ export class HostControlBridge {
 			if (signal?.aborted || this.disposed) abort();
 		});
 	}
+	/** §6: true only while the recorded project revision and configuration fingerprint are still current. */
+	private async plannerCurrent(state: PlannerState): Promise<boolean> {
+		try {
+			if (((await this.canonical()).state?.revision ?? 0) !== state.projectRevision) return false;
+			return fingerprint(await this.configuration()) === state.configurationDigest;
+		} catch {
+			return false;
+		}
+	}
+	/** RUNNING → CANCELLED at once; the session is aborted and disposed, and its late result is discarded (§8). */
+	private cancelPlanner(state: PlannerState): void {
+		if (state.status !== "RUNNING") return;
+		state.status = "CANCELLED";
+		state.finishedAt = this.now();
+		state.cancellation.abort();
+	}
+	/**
+	 * §5.3 steps 1–2 for one raw submission: the closed draft schema and byte bound first, then the exact
+	 * `workflow.prepare` pipeline at the recorded revision with the request's goal and statements. Nothing is stored:
+	 * no preview, writer or Run. A configuration that moved ends the request STALE instead of validating against it.
+	 */
+	private async plannerDryRun(state: PlannerState, raw: unknown): Promise<PlannerVerdict> {
+		let config: RuntimeConfig | undefined;
+		try {
+			config = await this.configuration();
+		} catch {
+			/* Unavailable configuration is a changed configuration. */
+		}
+		if (!config || fingerprint(config) !== state.configurationDigest)
+			throw new PlannerFailure("STALE", "The configuration changed while planning");
+		try {
+			const draft = parseComplexDraft(raw);
+			await this.preparePreview(
+				{
+					protocolVersion: 1,
+					// The longest request id this Host accepts, so the response bound is checked conservatively.
+					id: `${this.ownerId}:${Number.MAX_SAFE_INTEGER}`,
+					ownerId: this.ownerId,
+					expectedProjectRevision: state.projectRevision,
+					type: "workflow.prepare",
+					goal: state.goal,
+					...(state.acceptanceStatements ? { acceptanceStatements: state.acceptanceStatements } : {}),
+					complexDraft: draft,
+				},
+				config,
+			);
+			return { ok: true, draft };
+		} catch (error) {
+			if (error instanceof HostWorkflowError) return { ok: false, code: error.code, message: error.message };
+			if (error instanceof ControlError)
+				return {
+					ok: false,
+					code: error.code,
+					message:
+						error.code === "RESPONSE_TOO_LARGE"
+							? `The prepared preview of this draft would exceed the ${HOST_CONTROL_MAX_RESPONSE_BYTES}-byte Host Control response`
+							: "The draft could not be prepared",
+				};
+			return { ok: false, code: "INVALID_REQUEST", message: "The draft could not be validated" };
+		}
+	}
+	/**
+	 * The background planning request (§3): context, model runtime and session, bounded by one whole-request timeout.
+	 * A result lands only while this exact request is still RUNNING; cancellation, owner close, shutdown and a new
+	 * start discard it. Nothing durable is written: no writer lock, no `.ai` write, no Run and no revision change.
+	 */
+	private async plan(
+		state: PlannerState,
+		config: RuntimeConfig,
+		classification: ReturnType<typeof plannerClassification>,
+	): Promise<void> {
+		const { signal } = state.cancellation;
+		let timedOut = false;
+		const timer = setTimeout(() => {
+			timedOut = true;
+			state.cancellation.abort();
+		}, this.options.plannerTimeoutMs ?? config.agents.worker_timeout_ms);
+		let outcome: { draft: ComplexDraft } | { code: HostPlannerFailureCode };
+		try {
+			const { route } = state;
+			if (!route) throw new PlannerFailure("MODEL_UNAVAILABLE", "No Planner route; fallback disabled");
+			const context = await buildPlanningContext({
+				cwd: this.root.path,
+				goal: state.goal,
+				...(state.acceptanceStatements ? { acceptanceStatements: state.acceptanceStatements } : {}),
+				config,
+				...classification,
+				signal,
+			});
+			let models: ModelRuntime;
+			try {
+				models = this.options.createModels
+					? await this.options.createModels(signal)
+					: await ModelRuntime.create({
+							authPath: join(this.options.agentDir, "auth.json"),
+							modelsPath: join(this.options.agentDir, "models.json"),
+							allowModelNetwork: false,
+							signal,
+						});
+			} catch {
+				signal.throwIfAborted();
+				throw new PlannerFailure("MODEL_UNAVAILABLE", "The Planner model runtime is unavailable");
+			}
+			const draft = await runPlannerSession({
+				cwd: this.root.path,
+				agentDir: this.options.agentDir,
+				route,
+				modelRuntime: models,
+				context,
+				maxReportedTokens: Math.min(
+					PLANNER_MAX_REPORTED_TOKENS,
+					config.budget?.max_reported_tokens ?? PLANNER_MAX_REPORTED_TOKENS,
+				),
+				signal,
+				assertCurrent: async () => {
+					if (!(await this.plannerCurrent(state)))
+						throw new PlannerFailure("STALE", "The project revision or configuration changed while planning");
+				},
+				validate: (raw) => this.plannerDryRun(state, raw),
+				onUsage: (usage) => {
+					if (this.planner === state && state.status === "RUNNING") state.usage = usage;
+				},
+			});
+			// §6: checked again before READY; a draft for a moved project is discarded.
+			if (!(await this.plannerCurrent(state)))
+				throw new PlannerFailure("STALE", "The project revision or configuration changed while planning");
+			signal.throwIfAborted();
+			outcome = { draft };
+		} catch (error) {
+			outcome = {
+				code: timedOut ? "TIMEOUT" : error instanceof PlannerFailure ? error.code : "PROVIDER_ERROR",
+			};
+		} finally {
+			clearTimeout(timer);
+		}
+		if (this.planner !== state || state.status !== "RUNNING") return;
+		state.finishedAt = this.now();
+		if ("draft" in outcome) {
+			state.status = "READY";
+			state.draft = outcome.draft;
+		} else {
+			state.status = "FAILED";
+			state.failureCode = outcome.code;
+		}
+	}
+	/** §7.3 snapshot DTO: small and draftless; `current` is computed for this snapshot's revision and configuration. */
+	private plannerStatus(
+		state: PlannerState,
+		projectRevision: number,
+		config: RuntimeConfig | null,
+	): HostPlannerStatus {
+		const { route } = state;
+		return {
+			schemaVersion: 1,
+			planId: state.planId,
+			status: state.status,
+			requestDigest: state.requestDigest,
+			projectRevision: state.projectRevision,
+			current:
+				state.projectRevision === projectRevision &&
+				config !== null &&
+				fingerprint(config) === state.configurationDigest,
+			startedAt: state.startedAt,
+			finishedAt: state.finishedAt,
+			route: route
+				? { alias: route.alias, profile: route.profile, provider: route.provider, model: route.model }
+				: null,
+			usage: { ...state.usage },
+			taskCount: state.status === "READY" && state.draft ? state.draft.tasks.length : null,
+			failureCode: state.status === "FAILED" ? state.failureCode : null,
+		};
+	}
 	private async snapshot(
 		request: HostControlRequest,
 		attempt = 0,
@@ -414,6 +634,8 @@ export class HostControlBridge {
 			}
 		}
 		publishInventory({ projectRevision, sourceChanged });
+		// §7.3: present only after a planner.start on this Host, so non-planning snapshots are byte-identical.
+		const planner = this.planner ? this.plannerStatus(this.planner, projectRevision, finalConfig) : undefined;
 		const inventory = this.capabilities.reader.list({ limit: 32 });
 		const capabilityInventory = inventory.ok
 			? inventory.inventory
@@ -438,6 +660,7 @@ export class HostControlBridge {
 					pendingApproval,
 					capabilityInventory,
 					...(complexExecution ? { complexExecution } : {}),
+					...(planner ? { planner } : {}),
 					snapshot: {
 						status: observation.status,
 						graph,
@@ -450,7 +673,69 @@ export class HostControlBridge {
 			observation.identity,
 		);
 	}
-	private async mutate(request: HostControlMutation): Promise<HostControlResponse> {
+	/**
+	 * The deterministic `workflow.prepare` pipeline after its idle checks: classification, recipe, parent freeze,
+	 * COMPLEX compilation with claim facts and current Policy, preview digest and the response bound. Stores nothing,
+	 * so the V0.8B Planner dry-runs a submission through exactly this code (PLANNER_DRAFT.md §5.3).
+	 */
+	private async preparePreview(
+		request: Extract<HostControlMutation, { type: "workflow.prepare" }>,
+		config: RuntimeConfig,
+	): Promise<{ plan: Prepared["plan"]; preview: HostControlPreview; response: HostControlResponse }> {
+		const { complexDraft } = request;
+		let draft = prepareHostWorkflowDraft({
+			goal: request.goal,
+			config,
+			...(complexDraft !== undefined ? { complexDraft } : {}),
+		});
+		if (request.recipeInputs && !request.recipeId) throw new ControlError("INVALID_RECIPE");
+		if (request.recipeId)
+			draft = applyHostWorkflowRecipe(draft, { recipeId: request.recipeId, inputs: request.recipeInputs ?? {} });
+		const statements = request.acceptanceStatements ?? draft.statements;
+		const plan =
+			draft.workflow === "COMPLEX"
+				? await finalizeComplexHostWorkflowPlan(draft, statements, { cwd: this.root.path })
+				: finalizeHostWorkflowPlan(draft, statements);
+		const fields = {
+			previewId: randomUUID(),
+			ownerId: this.ownerId,
+			projectRevision: request.expectedProjectRevision,
+			expiresAt: this.now() + HOST_CONTROL_PREVIEW_TTL_MS,
+			goal: plan.goal,
+			workflow: plan.workflow,
+			executionMode: plan.executionMode,
+			risk: plan.risk,
+			allowedPaths: [...config.files.allowed_paths],
+			checks: config.verification.checks.map(({ id, kind, required }) => ({ id, kind, required })),
+			acceptanceCriteria: plan.taskContract.acceptanceCriteria.map((criterion) => ({
+				id: criterion.id,
+				statement: criterion.statement,
+				checkIds: [...criterion.verification.checkIds],
+				reviewRequired: criterion.verification.reviewRequired,
+			})),
+			taskContractDigest: taskContractDigest(plan.taskContract),
+			recipe: plan.recipe ?? null,
+			configuration: {
+				mutationMode: config.mutation.mode,
+				verifierTrustMode: config.verification.trust.mode,
+				verifierSandboxMode: config.verification.sandbox.mode,
+				contextPackMode: config.agents.context_pack.mode,
+				verificationRepairMode: config.verification.repair.mode,
+				lspEnabled: config.code_intelligence?.lsp.enabled === true,
+			},
+			// Absent (not null) for QUICK/STANDARD; the preview digest below covers the complete plan.
+			...(plan.complexPlan ? { complexPlan: plan.complexPlan } : {}),
+		};
+		const preview: HostControlPreview = {
+			...fields,
+			previewDigest: fingerprint({ fields, config, root: this.root, contract: plan.taskContract }),
+		};
+		const response = this.success(request, { kind: "prepared", preview });
+		if (Buffer.byteLength(JSON.stringify(response)) + 1 > HOST_CONTROL_MAX_RESPONSE_BYTES)
+			throw new ControlError("RESPONSE_TOO_LARGE");
+		return { plan, preview, response };
+	}
+	private async mutate(request: HostControlMutation, origin?: HostBridgeConnection): Promise<HostControlResponse> {
 		if ((this.options.readiness ?? "READY") !== "READY") throw new ControlError("CONTROL_UNAVAILABLE");
 		if (request.type === "facts.prepare") {
 			await this.idleRevision(request.expectedProjectRevision);
@@ -607,56 +892,7 @@ export class HostControlBridge {
 			// A preview is only ever bound to the client's own expected revision; a recovery that moved it is STALE_PROJECT.
 			await this.idleRevision(request.expectedProjectRevision);
 			const config = await this.configuration();
-			let draft = prepareHostWorkflowDraft({
-				goal: request.goal,
-				config,
-				...(complexDraft !== undefined ? { complexDraft } : {}),
-			});
-			if (request.recipeInputs && !request.recipeId) throw new ControlError("INVALID_RECIPE");
-			if (request.recipeId)
-				draft = applyHostWorkflowRecipe(draft, { recipeId: request.recipeId, inputs: request.recipeInputs ?? {} });
-			const statements = request.acceptanceStatements ?? draft.statements;
-			const plan =
-				draft.workflow === "COMPLEX"
-					? await finalizeComplexHostWorkflowPlan(draft, statements, { cwd: this.root.path })
-					: finalizeHostWorkflowPlan(draft, statements);
-			const fields = {
-				previewId: randomUUID(),
-				ownerId: this.ownerId,
-				projectRevision: request.expectedProjectRevision,
-				expiresAt: this.now() + HOST_CONTROL_PREVIEW_TTL_MS,
-				goal: plan.goal,
-				workflow: plan.workflow,
-				executionMode: plan.executionMode,
-				risk: plan.risk,
-				allowedPaths: [...config.files.allowed_paths],
-				checks: config.verification.checks.map(({ id, kind, required }) => ({ id, kind, required })),
-				acceptanceCriteria: plan.taskContract.acceptanceCriteria.map((criterion) => ({
-					id: criterion.id,
-					statement: criterion.statement,
-					checkIds: [...criterion.verification.checkIds],
-					reviewRequired: criterion.verification.reviewRequired,
-				})),
-				taskContractDigest: taskContractDigest(plan.taskContract),
-				recipe: plan.recipe ?? null,
-				configuration: {
-					mutationMode: config.mutation.mode,
-					verifierTrustMode: config.verification.trust.mode,
-					verifierSandboxMode: config.verification.sandbox.mode,
-					contextPackMode: config.agents.context_pack.mode,
-					verificationRepairMode: config.verification.repair.mode,
-					lspEnabled: config.code_intelligence?.lsp.enabled === true,
-				},
-				// Absent (not null) for QUICK/STANDARD; the preview digest below covers the complete plan.
-				...(plan.complexPlan ? { complexPlan: plan.complexPlan } : {}),
-			};
-			const preview: HostControlPreview = {
-				...fields,
-				previewDigest: fingerprint({ fields, config, root: this.root, contract: plan.taskContract }),
-			};
-			const response = this.success(request, { kind: "prepared", preview });
-			if (Buffer.byteLength(JSON.stringify(response)) + 1 > HOST_CONTROL_MAX_RESPONSE_BYTES)
-				throw new ControlError("RESPONSE_TOO_LARGE");
+			const { plan, preview, response } = await this.preparePreview(request, config);
 			await this.idleRevision(request.expectedProjectRevision);
 			this.prepared = { plan, preview, configurationDigest: fingerprint(config), consumed: false };
 			this.browserPrepared = undefined;
@@ -664,6 +900,8 @@ export class HostControlBridge {
 			return response;
 		}
 		if (request.type === "workflow.confirm") {
+			// §8: never an implicit cancel; the user cancels planning first (also while a cancelled session disposes).
+			if (this.planning) throw new ControlError("PLANNER_BUSY");
 			const prepared = this.prepared;
 			if (!prepared || prepared.preview.previewId !== request.previewId) throw new ControlError("PLAN_NOT_FOUND");
 			if (prepared.consumed) throw new ControlError("PLAN_CONSUMED");
@@ -718,7 +956,85 @@ export class HostControlBridge {
 				this.execution = undefined;
 				this.cancelling = false;
 			});
+			// §8: a successful confirm starts the Run and drops the planner state (READY, FAILED or CANCELLED).
+			this.planner = undefined;
 			return this.success(request, { kind: "accepted", requestId: request.id, command: request.type, runId: null });
+		}
+		if (request.type === "planner.start") {
+			// §7.2: one planning request or Run execution per Host; a cancelled session still disposing counts.
+			if (this.execution || this.planning) throw new ControlError("PLANNER_BUSY");
+			// The same idleness test as prepare, including the dead-owner recovery that answers STALE_PROJECT.
+			await this.recoverDeadOwner(request.expectedProjectRevision);
+			await this.idleRevision(request.expectedProjectRevision);
+			const config = await this.configuration();
+			// Exactly the draftless prepare classification: only ComplexPlanRequiredError for a non-R3 Risk proceeds.
+			const classification = plannerClassification(request.goal, config);
+			plannerCriteria(request.goal, request.acceptanceStatements, config);
+			let route: PlannerRoute | null = null;
+			try {
+				route = resolvePlannerRoute(config);
+			} catch {
+				/* FAILED/MODEL_UNAVAILABLE in the background, with no model call: there is no fallback. */
+			}
+			await this.idleRevision(request.expectedProjectRevision);
+			if (this.disposed) throw new ControlError("CONTROL_UNAVAILABLE");
+			if (this.execution || this.planning) throw new ControlError("PLANNER_BUSY");
+			const state: PlannerState = {
+				planId: randomUUID(),
+				status: "RUNNING",
+				requestDigest: plannerRequestDigest(request.goal, request.acceptanceStatements),
+				goal: request.goal,
+				...(request.acceptanceStatements ? { acceptanceStatements: [...request.acceptanceStatements] } : {}),
+				projectRevision: request.expectedProjectRevision,
+				configurationDigest: fingerprint(config),
+				startedAt: this.now(),
+				finishedAt: null,
+				route,
+				usage: { invocations: 0, reportedTokens: 0 },
+				failureCode: null,
+				owner: origin,
+				cancellation: new AbortController(),
+			};
+			// Replaces a READY, FAILED or CANCELLED request, including an unread draft (§8).
+			this.planner = state;
+			this.planning = this.plan(state, config, classification).finally(() => {
+				this.planning = undefined;
+			});
+			return this.success(request, {
+				kind: "accepted",
+				requestId: request.id,
+				command: request.type,
+				runId: null,
+			});
+		}
+		if (request.type === "planner.cancel") {
+			const state = this.planner;
+			if (!state || state.planId !== request.planId || state.status !== "RUNNING")
+				throw new ControlError("PLANNER_NOT_FOUND");
+			this.cancelPlanner(state);
+			return this.success(request, {
+				kind: "accepted",
+				requestId: request.id,
+				command: request.type,
+				runId: null,
+			});
+		}
+		if (request.type === "planner.read") {
+			const state = this.planner;
+			if (!state || state.planId !== request.planId) throw new ControlError("PLANNER_NOT_FOUND");
+			if (state.status !== "READY" || !state.draft) throw new ControlError("PLANNER_NOT_READY");
+			const response = this.success(request, {
+				kind: "planner-draft",
+				planId: state.planId,
+				requestDigest: state.requestDigest,
+				projectRevision: state.projectRevision,
+				// A non-current draft stays readable as a starting point; prepare recompiles it regardless (§6).
+				current: await this.plannerCurrent(state),
+				draft: structuredClone(state.draft),
+			});
+			if (Buffer.byteLength(JSON.stringify(response)) + 1 > HOST_PLANNER_DRAFT_MAX_RESPONSE_BYTES)
+				throw new ControlError("RESPONSE_TOO_LARGE");
+			return response;
 		}
 		const run = await this.currentRun(request);
 		const live = this.workflow?.snapshot;
@@ -754,7 +1070,7 @@ export class HostControlBridge {
 			runId: run.runId,
 		});
 	}
-	private async handle(request: HostControlRequest): Promise<HostControlResponse> {
+	private async handle(request: HostControlRequest, origin?: HostBridgeConnection): Promise<HostControlResponse> {
 		if (request.type === "control.hello")
 			return this.success(request, {
 				kind: "capabilities",
@@ -772,6 +1088,8 @@ export class HostControlBridge {
 					// §10.3 / V0.8A §8: this Runtime implements exactly COMPLEX contract v2 (implementation waves) and
 					// always says so. Advertisement is not readiness, authority or permission to execute.
 					complexContractVersion: COMPLEX_CONTRACT_VERSION,
+					// V0.8B §7.1: the Planner exists on this connection. Advertisement is not readiness or permission.
+					plannerContractVersion: PLANNER_CONTRACT_VERSION,
 					recipes: listTaskRecipes().map(({ id, version, title }) => ({
 						id,
 						version,
@@ -798,7 +1116,7 @@ export class HostControlBridge {
 		this.sequence = sequence;
 		let response: HostControlResponse;
 		try {
-			response = await this.mutate(request);
+			response = await this.mutate(request, origin);
 		} catch (error) {
 			response = this.failure(
 				error instanceof ControlError ||
@@ -823,6 +1141,8 @@ export class HostControlBridge {
 			if (closed) return;
 			closed = true;
 			this.connections.delete(connection);
+			// §8: the connection that started planning closing cancels a RUNNING request; its late result is discarded.
+			if (this.planner?.owner === connection) this.cancelPlanner(this.planner);
 			try {
 				onClose?.();
 			} catch {
@@ -893,12 +1213,15 @@ export class HostControlBridge {
 							if (typeof record.type === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(record.type))
 								command = record.type;
 							if (record.protocolVersion !== 1) throw new ControlError("UNSUPPORTED_VERSION");
-							if (!command || !(HOST_CONTROL_COMMANDS as readonly string[]).includes(command))
+							if (
+								!command ||
+								!([...HOST_CONTROL_COMMANDS, ...HOST_PLANNER_COMMANDS] as readonly string[]).includes(command)
+							)
 								throw new ControlError("UNSUPPORTED_COMMAND");
 							if (!Check(HostControlRequestSchema, input)) throw new ControlError("INVALID_REQUEST");
 							const request = input as HostControlRequest;
 							if (!ready && request.type !== "control.hello") throw new ControlError("HANDSHAKE_REQUIRED");
-							const response = await this.handle(request);
+							const response = await this.handle(request, connection);
 							if (request.type === "control.hello" && response.success) ready = true;
 							send(response);
 						} catch (error) {
@@ -921,11 +1244,14 @@ export class HostControlBridge {
 	async shutdown(): Promise<void> {
 		this.disposed = true;
 		for (const connection of this.connections) connection.close();
+		if (this.planner) this.cancelPlanner(this.planner);
 		this.cancellation?.abort();
 		this.workflow?.cancel();
 		this.approval?.settle(false);
 		await this.queue;
 		await this.execution;
+		await this.planning;
+		this.planner = undefined;
 		this.prepared = undefined;
 		this.browserPrepared = undefined;
 		this.factPrepared = undefined;

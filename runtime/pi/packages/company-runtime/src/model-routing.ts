@@ -9,7 +9,8 @@ import type { Workflow } from "./contracts.ts";
  * approval or completion authority.
  */
 export type ModelProfile = keyof RuntimeConfig["models"]["profiles"];
-export type ModelIntent = keyof NonNullable<RuntimeConfig["models"]["intents"]>;
+/** Aliases of Run worker roles, the only ones a Run measurement records. `plan` routes only the Host Planner. */
+export type ModelIntent = Exclude<keyof NonNullable<RuntimeConfig["models"]["intents"]>, "plan">;
 export type ModelRole = "Executor" | "Developer" | "Reviewer";
 
 export interface ModelRoute {
@@ -51,6 +52,34 @@ export function resolveModelRoute(config: RuntimeConfig, role: ModelRole, deep =
 		role,
 		intent,
 		source: configured ? "config" : "default",
+		profile,
+		provider: mapping.provider,
+		model: mapping.model,
+	};
+}
+
+/**
+ * V0.8B Planner route (PLANNER_DRAFT.md §5.1): the Host Planner is not a Run worker, so it is not a `ModelRole`
+ * and records no Run measurement. `models.intents.plan` names its profile; without the alias it uses `reasoning`,
+ * the Reviewer default. An alias naming no configured profile fails instead of picking another model.
+ */
+export interface PlannerRoute {
+	role: "Planner";
+	/** `plan` when `models.intents.plan` named the profile; null when the `reasoning` default applies. */
+	alias: "plan" | null;
+	profile: ModelProfile;
+	provider: string;
+	model: string;
+}
+
+export function resolvePlannerRoute(config: RuntimeConfig): PlannerRoute {
+	const configured = config.models.intents?.plan;
+	const profile: ModelProfile = configured ?? "reasoning";
+	const mapping = config.models.profiles[profile];
+	if (!mapping) throw new Error(`Model intent plan names unconfigured profile ${profile}; fallback disabled`);
+	return {
+		role: "Planner",
+		alias: configured ? "plan" : null,
 		profile,
 		provider: mapping.provider,
 		model: mapping.model,
