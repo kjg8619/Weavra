@@ -30,6 +30,15 @@ Production app modules do not import Runtime implementation source. The root cro
 - Kernel owns state transitions and completion. UI preview, transport success, worker text, and registration success cannot manufacture PASS/COMPLETE.
 - Owned loopback static documents and fresh profiles only. No authenticated user profile, personal browser session, remote crawling, action loop, automatic browser repair, or C09/V0.6D work.
 
+## Shell commands and the command guard (#5)
+
+An agent can run shell commands in one place: the interactive `weavra` conversation's built-in `bash` tool (and `powershell` if a user enables it). Workflow workers have no shell tool, and Policy denies `bash`, `sh`, `shell` and `exec` tool ids. Registered checks are trusted Host configuration, run as argv without a shell.
+
+- The command guard (`runtime/pi/packages/company-runtime/src/command-guard.ts`) classifies the conversation's shell commands locally as `read_only`, `reversible`, `destructive` or `unknown`. It runs inside the existing `tool_call` hook.
+- `destructive` and `unknown` commands need an explicit per-call confirmation from the user. Without a UI they are refused. Dismissal, timeout or any error also refuses.
+- A classification grants nothing. It does not change Policy, workflow, Kernel or RegisteredVerifier decisions, and it makes no Jev, model or network call.
+- It does not claim to protect the worker or registered-check paths, commands the user types with `!`, or other tools.
+
 ## C09 reviewed Project Facts
 
 [Reviewed Project Facts](PROJECT_FACTS.md) is the separately authorized V0.6D scope after consolidation; the C08 capture boundary above is unchanged. Explicit Host prepare → human review/confirm stores bounded advisory statements in the existing canonical state under its writer lease. Runtime derives source freshness at observation and each worker provider-use boundary. The App neither asserts validity nor persists independent facts. Source change/recreation/read failure withholds stale content. Facts cannot widen scope, grant permissions/approval, replace registered checks or Reviewer PASS, or produce Kernel COMPLETE.
