@@ -246,12 +246,15 @@ revisions, approval grants and consumption, Policy, and completion.
 
 #### Prepare, refresh, and confirm
 
-1. Wait for **CONTROL CONNECTED** and fresh canonical state. A busy owner, an active Run owned
-   by this connection, or a writer without an active Run prevents preparing another plan. When
-   another owner holds the active Run (for example after its Host was killed), **Prepare
-   workflow** lets the Runtime recover it: if that owner provably stopped, its Run becomes
-   INTERRUPTED (nothing resumes) and prepare returns `STALE_PROJECT`, so prepare again once the
-   fresh state appears; a live or unprovable owner still gets `WRITER_PRESENT` or `ACTIVE_RUN`.
+1. Wait for **CONTROL CONNECTED** and fresh canonical state. A busy owner, this connection's
+   own Run while it is active or still holds the writer, or a writer lock without any Run
+   prevents preparing another plan. When another owner holds the active Run (for example after
+   its Host was killed), **Prepare workflow** lets the Runtime recover it: if that owner provably
+   stopped, its Run becomes INTERRUPTED (nothing resumes) and prepare returns `STALE_PROJECT`,
+   so prepare again once the fresh state appears; a live or unprovable owner still gets
+   `WRITER_PRESENT` or `ACTIVE_RUN`. Prepare also lets the Runtime decide when a writer lock
+   remains after the latest Run ended: it releases a provably dead owner's lock (prepare returns
+   `STALE_PROJECT` when that changed the project), and a live owner gets `WRITER_PRESENT`.
 2. Enter a **Workflow goal** (up to 2,048 characters). Optionally select a **Reviewed recipe**
    and fill its **Recipe inputs (JSON data only)** template. Inputs are string-valued data,
    not shell commands, tools, or configuration overrides.

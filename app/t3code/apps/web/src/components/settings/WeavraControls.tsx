@@ -350,7 +350,17 @@ export function WeavraControls({
   // Another Runtime owner, such as a killed Host, holds this project's active Run. Prepare lets the
   // Runtime decide: it marks the Run INTERRUPTED only when that owner provably stopped.
   const foreignActiveRun = fresh && !state?.busy && runActive && state?.ownedRunId !== run?.runId;
-  const canPrepareWorkflow = canPrepare || (foreignActiveRun && !submitting);
+  // A writer lock outlived the latest Run, e.g. its owner died after the Run ended
+  // (COMPLEX_RERUN.md §7). Prepare lets the Runtime decide as well: it releases the lock only when
+  // that owner provably stopped. A lock without any Run, or this connection's own Run, still blocks.
+  const staleWriter =
+    fresh &&
+    !state?.busy &&
+    !!run &&
+    !runActive &&
+    state?.snapshot.status.writerPresent === true &&
+    state.ownedRunId !== run.runId;
+  const canPrepareWorkflow = canPrepare || ((foreignActiveRun || staleWriter) && !submitting);
   // V0.8B Planner: it exists only when the Runtime advertises it beside the COMPLEX editor it fills.
   const plannerExposed =
     complexSupported && observation?.capabilities?.plannerContractVersion === 1;
@@ -897,6 +907,18 @@ export function WeavraControls({
             preparing a workflow marks its Run INTERRUPTED; nothing resumes and partial workspace
             changes remain. If the owner is still running or cannot be proven stopped, the Runtime
             refuses.
+          </p>
+        )}
+        {staleWriter && (
+          <p
+            aria-label="Writer lock after the latest Run"
+            className="text-xs text-muted-foreground"
+          >
+            A writer lock is still present although the latest Run ended {run?.status}. If its owner
+            has stopped, preparing a workflow lets the Runtime release the lock; when that changes
+            the project, prepare returns STALE_PROJECT, so prepare again once the refreshed state
+            appears. If the owner is still running or cannot be proven stopped, the Runtime refuses
+            with WRITER_PRESENT. Nothing resumes, and partial workspace changes remain.
           </p>
         )}
         <form
