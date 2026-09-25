@@ -235,9 +235,10 @@ root. The read-only argv, protocol v1, and snapshot-only capabilities remain unc
 No additional network Host or listener is introduced.
 
 The control command set is closed: `control.hello`, `control.snapshot`, `workflow.prepare`,
-`workflow.confirm`, `workflow.cancel`, `approval.resolve`, the browser and fact review commands
-and, only when the Runtime advertises the Planner, `planner.start`, `planner.cancel` and
-`planner.read`. Its strict UTF-8 JSONL limits
+`workflow.confirm`, `workflow.cancel`, `approval.resolve`, the browser and fact review commands,
+only when the Runtime advertises the Planner, `planner.start`, `planner.cancel` and
+`planner.read`, and only when it advertises re-run derivation, `workflow.derive`. Its strict
+UTF-8 JSONL limits
 are **32,768 request bytes** and **65,536 response bytes**, including the newline. T3 supplies
 goal text, reviewed recipe input data, and acceptance-criterion prose, not executable
 instructions or authority-bearing overrides. Runtime/Kernel owns classification, allowed
@@ -246,12 +247,15 @@ revisions, approval grants and consumption, Policy, and completion.
 
 #### Prepare, refresh, and confirm
 
-1. Wait for **CONTROL CONNECTED** and fresh canonical state. A busy owner, an active Run owned
-   by this connection, or a writer without an active Run prevents preparing another plan. When
-   another owner holds the active Run (for example after its Host was killed), **Prepare
-   workflow** lets the Runtime recover it: if that owner provably stopped, its Run becomes
-   INTERRUPTED (nothing resumes) and prepare returns `STALE_PROJECT`, so prepare again once the
-   fresh state appears; a live or unprovable owner still gets `WRITER_PRESENT` or `ACTIVE_RUN`.
+1. Wait for **CONTROL CONNECTED** and fresh canonical state. A busy owner, this connection's
+   own Run while it is active or still holds the writer, or a writer lock without any Run
+   prevents preparing another plan. When another owner holds the active Run (for example after
+   its Host was killed), **Prepare workflow** lets the Runtime recover it: if that owner provably
+   stopped, its Run becomes INTERRUPTED (nothing resumes) and prepare returns `STALE_PROJECT`,
+   so prepare again once the fresh state appears; a live or unprovable owner still gets
+   `WRITER_PRESENT` or `ACTIVE_RUN`. Prepare also lets the Runtime decide when a writer lock
+   remains after the latest Run ended: it releases a provably dead owner's lock (prepare returns
+   `STALE_PROJECT` when that changed the project), and a live owner gets `WRITER_PRESENT`.
 2. Enter a **Workflow goal** (up to 2,048 characters). Optionally select a **Reviewed recipe**
    and fill its **Recipe inputs (JSON data only)** template. Inputs are string-valued data,
    not shell commands, tools, or configuration overrides.
@@ -378,6 +382,27 @@ and confirm the rows like any task plan, and the Runtime validates them again. A
 shows its code with a fixed explanation and is never retried automatically. Confirming a preview
 while planning runs returns `PLANNER_BUSY`; cancel planning first.
 
+#### Re-plan unfinished work
+
+A Runtime that advertises `rerunContractVersion: 1` beside a COMPLEX contract adds **Re-plan
+unfinished work** under the COMPLEX execution view; T3 never sends `workflow.derive` to any other
+Runtime. It appears on a fresh connection when the latest Run is COMPLEX, ended BLOCKED,
+CANCELLED, FAILED or INTERRUPTED with at least one task not COMPLETED, and is not R3. The Runtime
+derives a candidate draft for an ordinary new Run, without a model, a writer or any state change:
+completed tasks become read-only verification tasks that are checked again, and unfinished tasks
+keep their claims, with `create` turned into `modify` where the file now exists. Nothing resumes
+and no evidence is reused. Refusals (`RERUN_NOT_APPLICABLE`, `RUN_NOT_FOUND`, `ACTIVE_RUN`,
+`STALE_PROJECT`) show fixed guidance and are never retried.
+
+The draft fills the goal, the criteria and the task rows, asking first if the editor holds
+anything else. While the editor holds it unchanged, a banner names the source Run and status.
+The panel also lists the leftover changes that would fail a clean start. T3 says the checkout is
+clean only when the Runtime reports it, and says "Workspace state unknown" when Git could not
+run. Commit or discard leftovers in your own tools; neither T3 nor the Runtime does either. Then
+select **Derive again**, because claims follow the files at derive time. The panel shows the
+Runtime's prepare dry-run and its notes. Nothing is prepared, confirmed or stored automatically:
+prepare and confirm the rows like any task plan.
+
 #### Unavailable state and limits
 
 **CONTROL UNAVAILABLE** disables actions when the environment is unsupported, disconnected,
@@ -388,8 +413,9 @@ protocol errors before reopening the view; restart T3 when changing its server e
 Do not remove a writer lock or infer owner liveness from it to bypass unavailable controls.
 
 This slice supports the existing QUICK/STANDARD Workflow paths and, when advertised, the
-COMPLEX projection and Planner drafts above; not arbitrary write/edit/tool/shell dispatch,
-generic R3, resume/recovery, rollback, or fallback. T3 remains a Host requesting Runtime
+COMPLEX projection, Planner drafts and re-plans of unfinished work above; not arbitrary
+write/edit/tool/shell dispatch, generic R3, resume/recovery, rollback, or fallback. A re-plan is a
+new Run prepared from a derived draft, never a resume. T3 remains a Host requesting Runtime
 actions and showing bounded canonical summaries; it never becomes the Task Contract, Policy,
 approval-consumption, planning, task-scheduling or completion authority.
 

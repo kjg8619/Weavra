@@ -431,13 +431,15 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
         input.request.type === "planner.read";
       // A structured COMPLEX draft is never sent to a Runtime that advertises no COMPLEX contract.
       // The draft shape is the same in contract v1 and v2. Without `plannerContractVersion: 1` the
-      // Planner does not exist on this connection, so no planner command is ever sent to it.
+      // Planner does not exist on this connection, so no planner command is ever sent to it; the
+      // same holds for re-run derivation without `rerunContractVersion: 1`.
       if (
         !capabilities ||
         (input.request.type === "workflow.prepare" &&
           input.request.complexDraft !== undefined &&
           capabilities.complexContractVersion === undefined) ||
-        (planner && capabilities.plannerContractVersion !== 1)
+        (planner && capabilities.plannerContractVersion !== 1) ||
+        (input.request.type === "workflow.derive" && capabilities.rerunContractVersion !== 1)
       )
         return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
       const bridge = entry.bridge;
@@ -487,9 +489,17 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
                             data.kind === "planner-draft" &&
                             data.planId === request.planId &&
                             plannerDraftConsistent(data.draft)
-                          : data.kind === "accepted" &&
-                            data.command === request.type &&
-                            data.requestId === request.id;
+                          : request.type === "workflow.derive"
+                            ? // The candidate draft of exactly the requested Run (COMPLEX_RERUN.md
+                              // §4): `create` and `modify` claims only, never a deletion.
+                              data.kind === "derived-draft" &&
+                              data.runId === request.runId &&
+                              data.draft.tasks.every((task) =>
+                                task.ownership.every((claim) => claim.operation !== "delete"),
+                              )
+                            : data.kind === "accepted" &&
+                              data.command === request.type &&
+                              data.requestId === request.id;
           if (!valid) return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
         }
         yield* refresh.pipe(Effect.catch((error) => unavailable(entry, error)));

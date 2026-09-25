@@ -1113,3 +1113,31 @@
   - 검증 설계: #58 corpus R01–R08, 실제 모델 smoke, 실제 UI 확인.
 - 현재 검증: 인용한 코드 사실(`workspace.ts:14-20,71-79`, `workflow.ts:502`, `kernel.ts:951-952`, `WeavraControls.tsx:344-353` 등)을 `00302ecd`에서 확인했다. PR CI는 문서만 바꾼 상태로 세 job을 통과해야 머지한다.
 - 커밋 상태: `8fb4d8e4`, devlop 병합, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — V0.8C #57 App 재실행 소비자
+
+- 목적: COMPLEX_RERUN.md §6·§7의 App 쪽 구현이다. 소비자 우선 규칙에 따라 Runtime(#56)보다 먼저 머지한다.
+- 브랜치/worktree: `feat/v0.8c-rerun-app`, `Weavra-worktrees/v0.7b-complex-app`(재사용). 하위 에이전트가 구현했고 메인 세션이 검토했다. #56은 별도 worktree에서 동시에 진행 중이다.
+- 변경(`app/t3code`만):
+  - 선행 수정(`11f7a446`): 종료된 Run 뒤에 writer lock이 남아 있으면 Prepare를 허용한다. 모든 종료 상태에 적용한다. 이 연결의 Run, busy 상태, stale·disconnected 상태, Run이 없는 lock에서는 계속 비활성이다.
+  - 계약:
+    - `rerunContractVersion: 1`을 추가했다. hello의 `commands` 목록은 바꾸지 않았다.
+    - `workflow.derive`, 엄격한 `derived-draft`(응답 줄 ≤49,152 bytes), `RERUN_NOT_APPLICABLE`을 추가했다.
+    - `prepareCheck` 코드는 5종만 허용하고, 실패일 때만 코드를 둔다.
+    - leftovers는 정렬·중복 없음·최대 200개·16,384 bytes이고, `clean` 값과 목록이 서로 맞아야 한다.
+    - notes는 최대 16개이고 각 200 bytes 이하다.
+  - 서버: capability가 없으면 derive를 보내지 않는다. `derived-draft`는 derive 응답일 때만, 같은 runId이고 delete claim이 없을 때만 받는다.
+  - 클라이언트 상태: 재실행 가능 조건, derive 요청, 불러온 도출 초안 표식, 초안이 바뀌지 않았는지 확인하는 검사를 추가했다.
+  - UI: 종료된 COMPLEX 실행 화면에 "Re-plan unfinished work"를 추가했다.
+    - 교체 전에 확인을 받고, 목표·기준·작업 행을 채운다.
+    - §7 배너를 보여 준다. 편집하면 "edited" 안내로 바뀐다.
+    - leftovers를 네 가지 상태(dirty, truncated, unknown, clean)로 보여 준다.
+    - prepare 검사 결과, 메모, Derive again 버튼, 거부 안내를 보여 준다.
+    - 자동 prepare, Git 호출, 초안 저장은 없다.
+  - 문서: `docs/operations/development.md`에 "Re-plan unfinished work" 절을 추가했다.
+- 현재 검증(하위 에이전트):
+  - `node scripts/validate.mjs t3` → `VALIDATE t3: ALL GATES PASS`. 전체 변경에 대해 실행했다.
+  - 테스트: contracts +7(합계 48), server +8·transport +4, client +6, web +16(합계 60).
+  - 변이 확인: capability 게이트를 없애면 서버 3개·UI 1개, 불러온 뒤 자동 prepare를 넣으면 5개, lock 허용 조건을 모든 writer 상태로 넓히면 2개가 실패했다. runId 일치, delete 금지, 교체 확인, R3 제외 등 추가 변이도 모두 잡혔다.
+- 메인 세션: App의 해석(prepareCheck 코드 5종, leftovers 규칙, 문자열을 그대로 돌려줄 것, 이미 종료된 Run의 lock 해제는 revision이 바뀌지 않을 수 있다는 점)을 Runtime 에이전트에게 전달했다.
+- 커밋 상태: `11f7a446`, `3376500f`, `7541c0e0`, `ab30f4d8`, `aecc9f30`, `886162c0`, devlop 병합, 이 기록. devlop 대상 PR.

@@ -14,6 +14,7 @@ import {
   type WeavraControlResponse,
   type WeavraControlState,
   type WeavraComplexDraft,
+  type WeavraDerivedDraft,
   type WeavraPlannerStatus,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
@@ -41,6 +42,10 @@ import type { RpcSession } from "../rpc/session.ts";
 import {
   createEnvironmentWeavraControlCommand,
   createEnvironmentWeavraControlStateAtoms,
+  deriveRequest,
+  derivedDraftFitsEditor,
+  derivedDraftUnchanged,
+  derivedLoadedDraft,
   makeEnvironmentWeavraControlState,
   plannerCancelRequest,
   plannerDraftUnchanged,
@@ -50,6 +55,8 @@ import {
   plannerRequestDigest,
   plannerStartRequest,
   plannerStatusOf,
+  rerunEligible,
+  rerunExposed,
   type WeavraControlViewState,
 } from "./weavraControl.ts";
 import { makeCapabilityInventoryTracker } from "./capabilityInventory.ts";
@@ -1554,4 +1561,245 @@ it("keeps a loaded draft only for its own planning request and notices any edit,
     expect(plannerDraftUnchanged(loaded, edited)).toBe(false);
   }
   expect(plannerDraftUnchanged(null, plannerDraft)).toBe(false);
+});
+
+// V0.8C re-run client state (docs/architecture/COMPLEX_RERUN.md §6, §7).
+const derived: WeavraDerivedDraft = {
+  kind: "derived-draft",
+  runId: "complex-run",
+  sourcePlanDigest: digest,
+  sourceStatus: "BLOCKED",
+  goal: "Split the parser",
+  acceptanceStatements: ["Parsing still works"],
+  draft: {
+    tasks: [
+      {
+        title: "Verify: Task 1",
+        goal: "Re-verify without changes: Contribute to the parent",
+        dependsOnIndexes: [],
+        criterionIndexes: [1],
+        ownership: [],
+        checkIds: ["test"],
+      },
+      {
+        title: "Task 2",
+        goal: "Contribute to the parent",
+        dependsOnIndexes: [1],
+        criterionIndexes: [1],
+        ownership: [{ path: "src/1.ts", operation: "modify" }],
+        checkIds: ["test"],
+      },
+    ],
+  },
+  prepareCheck: { ok: false, code: "INVALID_CRITERIA" },
+  leftovers: { clean: null, paths: [], truncated: false },
+  notes: ["CT-002 claim src/1.ts: modify target is missing"],
+};
+const derivedReply = (data: unknown) =>
+  ({ ...plannerRead(data), command: "workflow.derive" }) as WeavraControlResponse;
+type EndedRow = WeavraComplexExecutionV1["tasks"][number];
+/** The latest COMPLEX Run after it ended: CT-001 COMPLETED, CT-002 settled unfinished. */
+function ended(
+  patch: {
+    status?: NonNullable<WeavraControlState["snapshot"]["status"]["run"]>["status"];
+    risk?: "R1" | "R3";
+    rows?: ReadonlyArray<EndedRow>;
+  } = {},
+): WeavraControlState {
+  const state = complexObserved(10).state;
+  const rows = patch.rows ?? [
+    { ...complexRow("CT-001"), status: "COMPLETED" },
+    { ...complexRow("CT-002"), status: "BLOCKED", failureCode: "CHECK_FAILED" },
+  ];
+  return {
+    ...state,
+    busy: false,
+    complexExecution: { ...state.complexExecution, phase: "TERMINAL", tasks: [...rows] },
+    snapshot: {
+      ...state.snapshot,
+      status: {
+        ...state.snapshot.status,
+        run: {
+          ...state.snapshot.status.run,
+          status: patch.status ?? "BLOCKED",
+          risk: patch.risk ?? "R1",
+        },
+      },
+    },
+  };
+}
+
+it("exposes re-run derivation only on a connection that advertises it", () => {
+  const base = observed(10);
+  expect(rerunExposed(base)).toBe(false);
+  const advertised = {
+    ...base,
+    capabilities: { ...base.capabilities!, rerunContractVersion: 1 as const },
+  };
+  expect(rerunExposed(advertised)).toBe(true);
+  expect(rerunExposed({ ...advertised, capabilities: null })).toBe(false);
+  expect(rerunExposed(undefined)).toBe(false);
+});
+
+it("offers a re-plan only for the latest terminal non-R3 COMPLEX Run with an unfinished row (§7)", () => {
+  for (const status of ["BLOCKED", "CANCELLED", "FAILED", "INTERRUPTED"] as const) {
+    expect([status, rerunEligible(ended({ status }))]).toEqual([status, true]);
+  }
+  const allCompleted = ["CT-001", "CT-002"].map((id): EndedRow => ({
+    ...complexRow(id),
+    status: "COMPLETED",
+  }));
+  const standard = ended();
+  const { complexExecution: _execution, ...withoutProjection } = ended();
+  for (const [label, state] of [
+    ["COMPLETED", ended({ status: "COMPLETED", rows: allCompleted })],
+    ["RUNNING", ended({ status: "RUNNING" })],
+    ["WAITING_APPROVAL", ended({ status: "WAITING_APPROVAL" })],
+    ["CREATED", ended({ status: "CREATED" })],
+    ["R3", ended({ risk: "R3" })],
+    ["every row COMPLETED", ended({ rows: allCompleted })],
+    [
+      "STANDARD",
+      {
+        ...standard,
+        snapshot: {
+          ...standard.snapshot,
+          status: {
+            ...standard.snapshot.status,
+            run: { ...standard.snapshot.status.run!, workflow: "STANDARD" as const },
+          },
+        },
+      },
+    ],
+    ["no projection", withoutProjection],
+    [
+      "no Run",
+      {
+        ...withoutProjection,
+        snapshot: {
+          ...withoutProjection.snapshot,
+          status: { ...withoutProjection.snapshot.status, run: null },
+        },
+      },
+    ],
+  ] as const) {
+    expect([label, rerunEligible(state)]).toEqual([label, false]);
+  }
+  expect(rerunEligible(null)).toBe(false);
+});
+
+it("builds workflow.derive with nothing but the envelope and the Run", () => {
+  expect(deriveRequest(plannerEnvelope, "complex-run")).toEqual({
+    ...plannerEnvelope,
+    type: "workflow.derive",
+    runId: "complex-run",
+  });
+  for (const runId of ["", "has space", "x".repeat(129)]) {
+    expect(() => deriveRequest(plannerEnvelope, runId)).toThrow();
+  }
+  expect(() =>
+    deriveRequest({ ...plannerEnvelope, resume: true } as typeof plannerEnvelope, "complex-run"),
+  ).toThrow();
+});
+
+it("keeps a derived draft only for its own Run, read beside that Run's projection", () => {
+  const execution = ended().complexExecution;
+  const loaded = derivedLoadedDraft(derivedReply(derived), "complex-run", execution);
+  const { kind: _kind, ...fields } = derived;
+  expect(loaded).toEqual({ ...fields, completedTasks: 1 });
+  expect(derivedLoadedDraft(derivedReply(derived), "other-run", execution)).toBeNull();
+  expect(
+    derivedLoadedDraft(derivedReply({ ...derived, runId: "other-run" }), "complex-run", execution),
+  ).toBeNull();
+  // The count of completed tasks comes from exactly the source Run's projection.
+  expect(
+    derivedLoadedDraft(derivedReply(derived), "complex-run", { ...execution!, runId: "later-run" }),
+  ).toBeNull();
+  expect(derivedLoadedDraft(derivedReply(derived), "complex-run", undefined)).toBeNull();
+  // The derived draft keeps the source plan's task count.
+  expect(
+    derivedLoadedDraft(
+      derivedReply({
+        ...derived,
+        draft: { tasks: [...derived.draft.tasks, derived.draft.tasks[1]] },
+      }),
+      "complex-run",
+      execution,
+    ),
+  ).toBeNull();
+  expect(derivedLoadedDraft(accepted(cancelInput), "complex-run", execution)).toBeNull();
+  expect(
+    derivedLoadedDraft(
+      plannerRead({
+        kind: "planner-draft",
+        planId,
+        requestDigest: PLANNER_FIXTURE_DIGEST,
+        projectRevision: 10,
+        current: true,
+        draft: derived.draft,
+      }),
+      "complex-run",
+      execution,
+    ),
+  ).toBeNull();
+});
+
+it("loads only a goal and criteria that the editor holds exactly", () => {
+  expect(derivedDraftFitsEditor(derived)).toBe(true);
+  // A multi-line goal is still one goal field.
+  expect(derivedDraftFitsEditor({ ...derived, goal: "Split\nthe parser" })).toBe(true);
+  for (const [label, value] of [
+    ["goal with surrounding whitespace", { ...derived, goal: " Split the parser" }],
+    ["goal with a carriage return", { ...derived, goal: "Split\rthe parser" }],
+    ["statement spanning two lines", { ...derived, acceptanceStatements: ["One\nTwo"] }],
+    ["statement with a carriage return", { ...derived, acceptanceStatements: ["One\rTwo"] }],
+    ["statement with surrounding whitespace", { ...derived, acceptanceStatements: ["One "] }],
+  ] as const) {
+    expect([label, derivedDraftFitsEditor(value)]).toEqual([label, false]);
+  }
+});
+
+it("tells whether the editor would still prepare exactly the derived draft, not key order", () => {
+  const editor = {
+    goal: derived.goal,
+    acceptanceStatements: derived.acceptanceStatements,
+    draft: {
+      tasks: derived.draft.tasks.map(
+        (task) => Object.fromEntries(Object.entries(task).toReversed()) as typeof task,
+      ),
+    },
+  };
+  expect(derivedDraftUnchanged(derived, editor)).toBe(true);
+  const [first, second] = derived.draft.tasks;
+  for (const [label, edited] of [
+    ["goal", { ...editor, goal: `${derived.goal}!` }],
+    ["statement", { ...editor, acceptanceStatements: ["Parsing works"] }],
+    [
+      "extra statement",
+      { ...editor, acceptanceStatements: [...derived.acceptanceStatements, "More"] },
+    ],
+    ["no statements", { ...editor, acceptanceStatements: [] }],
+    [
+      "verification task given a claim",
+      {
+        ...editor,
+        draft: {
+          tasks: [{ ...first!, ownership: [{ path: "src/0.ts", operation: "modify" }] }, second!],
+        },
+      },
+    ],
+    [
+      "claim operation",
+      {
+        ...editor,
+        draft: {
+          tasks: [first!, { ...second!, ownership: [{ path: "src/1.ts", operation: "create" }] }],
+        },
+      },
+    ],
+    ["title", { ...editor, draft: { tasks: [{ ...first!, title: "Task 1" }, second!] } }],
+  ] as const) {
+    expect([label, derivedDraftUnchanged(derived, edited)]).toEqual([label, false]);
+  }
+  expect(derivedDraftUnchanged(null, editor)).toBe(false);
 });

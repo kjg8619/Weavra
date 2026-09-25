@@ -9,6 +9,7 @@ import {
   type WeavraControlObservation,
   type WeavraControlResponse,
   type WeavraControlState,
+  type WeavraDerivedDraft,
   type WeavraPlannerStatus,
 } from "@t3tools/contracts";
 import { sha256Hex } from "@t3tools/shared/sha256";
@@ -330,31 +331,31 @@ export function plannerElapsedMs(planner: WeavraPlannerStatus, observedAt: numbe
   return end === null ? null : Math.max(0, end - planner.startedAt);
 }
 
-type PlannerEnvelope = Pick<
+type MutationEnvelope = Pick<
   WeavraControlMutation,
   "protocolVersion" | "id" | "ownerId" | "expectedProjectRevision"
 >;
-const decodePlannerRequest = Schema.decodeUnknownSync(WeavraControlMutation, {
+const decodeMutation = Schema.decodeUnknownSync(WeavraControlMutation, {
   onExcessProperty: "error",
 });
 /** Only the goal and criteria; Runtime classifies and bounds the rest. Throws on invalid input. */
 export function plannerStartRequest(
-  envelope: PlannerEnvelope,
+  envelope: MutationEnvelope,
   goal: string,
   acceptanceStatements: ReadonlyArray<string>,
 ) {
-  return decodePlannerRequest({
+  return decodeMutation({
     ...envelope,
     type: "planner.start",
     goal,
     ...(acceptanceStatements.length > 0 ? { acceptanceStatements } : {}),
   });
 }
-export function plannerCancelRequest(envelope: PlannerEnvelope, planId: string) {
-  return decodePlannerRequest({ ...envelope, type: "planner.cancel", planId });
+export function plannerCancelRequest(envelope: MutationEnvelope, planId: string) {
+  return decodeMutation({ ...envelope, type: "planner.cancel", planId });
 }
-export function plannerReadRequest(envelope: PlannerEnvelope, planId: string) {
-  return decodePlannerRequest({ ...envelope, type: "planner.read", planId });
+export function plannerReadRequest(envelope: MutationEnvelope, planId: string) {
+  return decodeMutation({ ...envelope, type: "planner.read", planId });
 }
 
 /** The editor's record of the Planner draft it loaded (§9). Page-session memory only. */
@@ -382,4 +383,110 @@ export function plannerDraftUnchanged(
   editor: WeavraComplexDraft,
 ): boolean {
   return loaded !== null && sameDraft(loaded.draft, editor);
+}
+
+// V0.8C re-run (docs/architecture/COMPLEX_RERUN.md §6, §7). A derived draft is candidate data for
+// the human's editor: a filled-in planning form for an ordinary new Run. These helpers never
+// prepare, confirm, run Git or persist anything, and nothing resumes or reuses evidence.
+
+/** Advertisement only: without `rerunContractVersion: 1` re-run derivation does not exist. */
+export function rerunExposed(observation: WeavraControlObservation | null | undefined): boolean {
+  return observation?.capabilities?.rerunContractVersion === 1;
+}
+
+const rerunSourceStatuses: ReadonlySet<string> = new Set([
+  "BLOCKED",
+  "CANCELLED",
+  "FAILED",
+  "INTERRUPTED",
+]);
+/**
+ * The §7 snapshot conditions for offering a re-plan: the latest Run is a COMPLEX Run that ended
+ * BLOCKED, CANCELLED, FAILED or INTERRUPTED, is not R3, and its projection has an unfinished row.
+ * Runtime checks eligibility again (§3); this only decides what the App offers.
+ */
+export function rerunEligible(state: WeavraControlState | null | undefined): boolean {
+  const run = state?.snapshot.status.run;
+  const execution = state?.complexExecution;
+  return (
+    run !== null &&
+    run !== undefined &&
+    execution !== undefined &&
+    execution.runId === run.runId &&
+    run.workflow === "COMPLEX" &&
+    rerunSourceStatuses.has(run.status) &&
+    run.risk !== "R3" &&
+    execution.tasks.some((task) => task.status !== "COMPLETED")
+  );
+}
+
+/** The mutation envelope and the Run to derive from; Runtime derives everything else. */
+export function deriveRequest(envelope: MutationEnvelope, runId: string) {
+  return decodeMutation({ ...envelope, type: "workflow.derive", runId });
+}
+
+/** The editor's record of the derived draft it loaded (§7). Page-session memory only. */
+export interface DerivedLoadedDraft extends Omit<WeavraDerivedDraft, "kind"> {
+  /** COMPLETED rows of the source Run: they became read-only verification tasks. */
+  readonly completedTasks: number;
+}
+/**
+ * The derived draft of a `workflow.derive` response for exactly this Run, read beside the
+ * projection of that Run, else null. The draft keeps the source plan's task count (§4 step 2).
+ */
+export function derivedLoadedDraft(
+  response: WeavraControlResponse,
+  runId: string,
+  execution: WeavraControlState["complexExecution"],
+): DerivedLoadedDraft | null {
+  if (!response.success || response.data.kind !== "derived-draft") return null;
+  const { kind: _kind, ...derived } = response.data;
+  if (
+    derived.runId !== runId ||
+    execution?.runId !== runId ||
+    execution.tasks.length !== derived.draft.tasks.length
+  )
+    return null;
+  return {
+    ...derived,
+    completedTasks: execution.tasks.filter((task) => task.status === "COMPLETED").length,
+  };
+}
+/**
+ * True when the editor can hold the draft's goal and criteria exactly: a trimmed goal and trimmed
+ * single-line statements, with no carriage return a text field would turn into a line break.
+ * Otherwise loading would edit them silently, because prepare trims the goal and sends one
+ * criterion per nonblank line.
+ */
+export function derivedDraftFitsEditor(
+  derived: Pick<WeavraDerivedDraft, "goal" | "acceptanceStatements">,
+) {
+  return (
+    !derived.goal.includes("\r") &&
+    derived.goal.trim() === derived.goal &&
+    derived.acceptanceStatements.every(
+      (statement) => !/[\r\n]/.test(statement) && statement.trim() === statement,
+    )
+  );
+}
+/** What the editor would prepare: the trimmed goal, the criterion lines and the task rows. */
+export interface DerivedEditorContent {
+  readonly goal: string;
+  readonly acceptanceStatements: ReadonlyArray<string>;
+  readonly draft: WeavraComplexDraft;
+}
+/** True while the editor would prepare exactly the loaded derived draft; key order is not an edit. */
+export function derivedDraftUnchanged(
+  loaded: Pick<DerivedLoadedDraft, "goal" | "acceptanceStatements" | "draft"> | null,
+  editor: DerivedEditorContent,
+): boolean {
+  return (
+    loaded !== null &&
+    editor.goal === loaded.goal &&
+    editor.acceptanceStatements.length === loaded.acceptanceStatements.length &&
+    editor.acceptanceStatements.every(
+      (statement, index) => statement === loaded.acceptanceStatements[index],
+    ) &&
+    sameDraft(loaded.draft, editor.draft)
+  );
 }

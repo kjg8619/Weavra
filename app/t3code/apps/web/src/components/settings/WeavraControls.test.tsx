@@ -16,6 +16,7 @@ import {
   type WeavraControlPreview,
   type WeavraControlResponse,
   type WeavraControlState,
+  type WeavraDerivedDraft,
   type WeavraFactPreview,
   type WeavraPlannerFailureCode,
   type WeavraPlannerStatus,
@@ -1484,16 +1485,11 @@ describe("Prepare while another owner holds the active Run", () => {
     data.phase = "disconnected";
     expect(control(render(), "Prepare workflow").props.disabled).toBe(true);
     data.phase = "connected";
-    // A writer retained without an active Run is still not preparable.
+    // A writer lock without any Run is still not preparable. After a terminal Run it is, since
+    // COMPLEX_RERUN.md §7 (see "Prepare after a terminal Run left its writer lock").
     const current = data.observation!.state!;
     update({
-      snapshot: {
-        ...current.snapshot,
-        status: {
-          ...current.snapshot.status,
-          run: { ...current.snapshot.status.run!, status: "INTERRUPTED" },
-        },
-      },
+      snapshot: { ...current.snapshot, status: { ...current.snapshot.status, run: null } },
     });
     expect(control(render(), "Prepare workflow").props.disabled).toBe(true);
     expect(data.invoke).not.toHaveBeenCalled();
@@ -2031,5 +2027,589 @@ describe("V0.8B Planner draft", () => {
     );
     expect(sentTypes()).toEqual(["planner.start", "workflow.prepare", "workflow.confirm"]);
     expect(labelled(render(), "Planner running")).not.toBeNull();
+  });
+});
+
+type RunStatus = NonNullable<WeavraControlState["snapshot"]["status"]["run"]>["status"];
+/** The latest Run ended, but its writer lock remains, e.g. its owner died before releasing it. */
+function staleLock(status: RunStatus = "BLOCKED", patch: Partial<WeavraControlState> = {}) {
+  orphaned();
+  const current = data.observation!.state!;
+  update({
+    snapshot: {
+      ...current.snapshot,
+      status: {
+        ...current.snapshot.status,
+        writerPresent: true,
+        run: { ...current.snapshot.status.run!, status },
+      },
+    },
+    ...patch,
+  });
+}
+const staleNote = (tree: ReactElement<Record<string, unknown>>) =>
+  labelled(tree, "Writer lock after the latest Run");
+
+describe("Prepare after a terminal Run left its writer lock (COMPLEX_RERUN.md §7)", () => {
+  it("offers only workflow prepare after every terminal status, and says the Runtime decides", () => {
+    advertisePlanner();
+    enterPlannerRequest();
+    for (const status of ["BLOCKED", "CANCELLED", "FAILED", "INTERRUPTED", "COMPLETED"] as const) {
+      staleLock(status);
+      const tree = render();
+      expect([status, control(tree, "Prepare workflow").props.disabled]).toEqual([status, false]);
+      expect(words(staleNote(tree))).toContain(`the latest Run ended ${status}`);
+      expect(orphanNote(tree)).toBeNull();
+    }
+    const tree = render();
+    expect(words(staleNote(tree))).toContain("prepare returns STALE_PROJECT");
+    expect(words(staleNote(tree))).toContain("the Runtime refuses with WRITER_PRESENT");
+    // Every other gate that a writer blocks stays as it was.
+    expect(control(tree, "Prepare fact").props.disabled).toBe(true);
+    expect(control(tree, "Draft with Planner").props.disabled).toBe(true);
+    expect(visitElements(tree, (node) => text(node) === "Cancel workflow")).toBeNull();
+    expect(data.invoke).not.toHaveBeenCalled();
+  });
+  it("keeps prepare disabled for this connection's own Run, busy, stale or disconnected views, and a lock without a Run", () => {
+    change("Workflow goal", preview.goal);
+    staleLock();
+    const base = data.observation!;
+    const withoutRun = () =>
+      update({
+        snapshot: {
+          ...base.state!.snapshot,
+          status: { ...base.state!.snapshot.status, run: null },
+        },
+      });
+    for (const [label, apply] of [
+      ["this connection's own Run", () => update({ ownedRunId: "run-1" })],
+      ["busy owner", () => update({ busy: true })],
+      [
+        "stale observation",
+        () => {
+          data.observation = { ...base, stale: true };
+        },
+      ],
+      [
+        "disconnected environment",
+        () => {
+          data.phase = "disconnected";
+        },
+      ],
+      ["writer lock without any Run", withoutRun],
+    ] as const) {
+      data.observation = base;
+      data.phase = "connected";
+      apply();
+      const tree = render();
+      expect([label, control(tree, "Prepare workflow").props.disabled]).toEqual([label, true]);
+      expect([label, staleNote(tree)]).toEqual([label, null]);
+    }
+    expect(data.invoke).not.toHaveBeenCalled();
+  });
+  it("sends one plain prepare and, after STALE_PROJECT, waits for fresh state and an explicit retry", async () => {
+    staleLock("INTERRUPTED");
+    change("Workflow goal", preview.goal);
+    data.invoke.mockResolvedValue(AsyncResult.success(refused("STALE_PROJECT")));
+    await submitPrepare();
+    expect(data.invoke.mock.calls[0]?.[0].input.request).toEqual({
+      protocolVersion: 1,
+      id: "owner:2",
+      ownerId: "owner",
+      expectedProjectRevision: 9,
+      type: "workflow.prepare",
+      goal: preview.goal,
+    });
+    expect(words(render())).toContain(
+      "Runtime rejected the command: STALE_PROJECT. The project changed before a plan was prepared",
+    );
+    expect(words(render())).toContain(
+      "Nothing was prepared or retried; prepare again once the refreshed state appears.",
+    );
+    await flush();
+    expect(data.invoke).toHaveBeenCalledOnce();
+    // The fresh read shows the lock released; prepare is the ordinary one again.
+    const current = data.observation!.state!;
+    update({
+      projectRevision: 10,
+      nextRequestId: "owner:3",
+      snapshot: {
+        ...current.snapshot,
+        status: { ...current.snapshot.status, writerPresent: false },
+      },
+    });
+    expect(staleNote(render())).toBeNull();
+    data.invoke.mockResolvedValue(AsyncResult.success(response({ kind: "prepared", preview })));
+    await submitPrepare();
+    expect(data.invoke.mock.calls[1]?.[0].input.request).toMatchObject({
+      id: "owner:3",
+      expectedProjectRevision: 10,
+      type: "workflow.prepare",
+    });
+  });
+  it("reports a live owner's WRITER_PRESENT once and keeps the lock in view", async () => {
+    staleLock();
+    change("Workflow goal", preview.goal);
+    data.invoke.mockResolvedValue(AsyncResult.success(refused("WRITER_PRESENT")));
+    await submitPrepare();
+    await flush();
+    expect(words(render())).toContain("Runtime rejected the command: WRITER_PRESENT.");
+    expect(data.invoke).toHaveBeenCalledOnce();
+    expect(staleNote(render())).not.toBeNull();
+  });
+});
+
+// V0.8C re-run (docs/architecture/COMPLEX_RERUN.md §7): a candidate draft for the editor only.
+const blockedRow: ComplexRow = {
+  ...idleRow("CT-002"),
+  status: "BLOCKED",
+  attempt: 1,
+  workerInvocations: 2,
+  entryWorkspaceDigest: "2".repeat(64),
+  changedFiles: ["src/validate.ts"],
+  selfCheck: "FAIL",
+  failureCode: "CHECK_FAILED",
+};
+const derivedData: WeavraDerivedDraft = {
+  kind: "derived-draft",
+  runId: "run-1",
+  sourcePlanDigest: complexPlan.complexPlanDigest,
+  sourceStatus: "BLOCKED",
+  goal: preview.goal,
+  acceptanceStatements: ["Parse input", "Validate input"],
+  draft: {
+    tasks: [
+      {
+        title: "Verify: Extract parser",
+        goal: "Re-verify without changes: Move parsing into src/parse.ts",
+        dependsOnIndexes: [],
+        criterionIndexes: [1],
+        ownership: [],
+        checkIds: ["test"],
+      },
+      {
+        title: "Add validation",
+        goal: "Reject duplicate keys",
+        dependsOnIndexes: [1],
+        criterionIndexes: [2],
+        ownership: [{ path: "src/validate.ts", operation: "modify" }],
+        checkIds: ["test", "lint"],
+      },
+    ],
+  },
+  prepareCheck: { ok: true, code: null },
+  leftovers: {
+    clean: false,
+    paths: ["src/config.ts", "src/parse.ts", "src/validate.ts"],
+    truncated: false,
+  },
+  notes: ["CT-002 claim src/validate.ts: create became modify (file exists)"],
+};
+const derivedReply = (patch: Partial<WeavraDerivedDraft> = {}) =>
+  AsyncResult.success({
+    ...response({ ...derivedData, ...patch }),
+    command: "workflow.derive",
+  });
+function advertiseRerun() {
+  if (data.observation!.capabilities!.complexContractVersion === undefined) advertiseComplex(2);
+  data.observation = {
+    ...data.observation!,
+    capabilities: { ...data.observation!.capabilities!, rerunContractVersion: 1 },
+  };
+}
+/** The latest COMPLEX Run ended: CT-001 COMPLETED, CT-002 unfinished, the writer released. */
+function endedComplex(
+  status: RunStatus = "BLOCKED",
+  patch: { risk?: "R1" | "R3"; tasks?: ComplexRow[] } = {},
+) {
+  complexRunning();
+  const current = data.observation!.state!;
+  update({
+    busy: false,
+    complexExecution: complexExecution({
+      phase: "TERMINAL",
+      tasks: patch.tasks ?? [completedTask("CT-001", "STALE"), blockedRow],
+      integration: {
+        check: "NOT_RUN",
+        review: "NOT_RUN",
+        test: "NOT_RUN",
+        workspaceDigest: null,
+        evidenceFreshness: "NONE",
+        failureCode: null,
+      },
+      failureCode: "CHECK_FAILED",
+    }),
+    snapshot: {
+      ...current.snapshot,
+      status: {
+        ...current.snapshot.status,
+        writerPresent: false,
+        run: { ...current.snapshot.status.run!, status, risk: patch.risk ?? "R1" },
+      },
+    },
+  });
+}
+const derivedPanel = () => words(control(render(), "Derived re-run draft"));
+async function loadDerived(patch: Partial<WeavraDerivedDraft> = {}) {
+  data.invoke.mockResolvedValue(derivedReply(patch));
+  await click(
+    labelled(render(), "Derived re-run draft") ? "Derive again" : "Re-plan unfinished work",
+  );
+}
+
+describe("V0.8C re-run of unfinished COMPLEX work", () => {
+  it("renders nothing about re-run and sends no derive without the capability", async () => {
+    const rerunSurface = (tree: ReactElement<Record<string, unknown>>) =>
+      visitElements(
+        tree,
+        (node) =>
+          /re-plan|deriv|unfinished/i.test(String(node.props["aria-label"] ?? "")) ||
+          (node.type === "button" && /re-plan|deriv/i.test(text(node))),
+      );
+    for (const runtime of ["baseline", "COMPLEX v1", "COMPLEX v2 with Planner"]) {
+      if (runtime === "COMPLEX v1") advertiseComplex(1);
+      if (runtime === "COMPLEX v2 with Planner") advertisePlanner();
+      endedComplex();
+      expect([runtime, rerunSurface(render())]).toEqual([runtime, null]);
+      expect([runtime, /re-plan|deriv/i.test(words(render()))]).toEqual([runtime, false]);
+    }
+    // The COMPLEX projection and every other control stay as they were.
+    expect(visitElements(render(), (node) => node.type === ComplexExecutionView)).not.toBeNull();
+    await prepare();
+    expect(sentTypes()).toEqual(["workflow.prepare"]);
+  });
+  it("offers Re-plan unfinished work only for the latest terminal non-R3 COMPLEX Run with unfinished tasks on a current connection", () => {
+    advertiseRerun();
+    const offered = () => labelled(render(), "Unfinished COMPLEX work");
+    for (const status of ["BLOCKED", "CANCELLED", "FAILED", "INTERRUPTED"] as const) {
+      endedComplex(status);
+      expect([status, offered() !== null]).toEqual([status, true]);
+      expect(control(render(), "Re-plan unfinished work").props.disabled).toBe(false);
+    }
+    expect(words(offered())).toContain("Run run-1 ended INTERRUPTED with 1 of 2 tasks unfinished.");
+    expect(words(offered())).toContain(
+      "Nothing resumes, no evidence is reused, and nothing is prepared or started until you do it.",
+    );
+    const base = data.observation!;
+    const allCompleted = [completedTask("CT-001", "STALE"), completedTask("CT-002", "CURRENT")];
+    for (const [label, apply] of [
+      ["COMPLETED Run", () => endedComplex("COMPLETED", { tasks: allCompleted })],
+      ["running Run", () => complexRunning()],
+      ["every task COMPLETED", () => endedComplex("BLOCKED", { tasks: allCompleted })],
+      ["R3 Run", () => endedComplex("BLOCKED", { risk: "R3" })],
+      [
+        "no COMPLEX projection",
+        () => {
+          const { complexExecution: _execution, ...withoutProjection } = base.state!;
+          data.observation = { ...base, state: withoutProjection };
+        },
+      ],
+      [
+        "stale observation",
+        () => {
+          data.observation = { ...base, stale: true };
+        },
+      ],
+      [
+        "disconnected environment",
+        () => {
+          data.phase = "disconnected";
+        },
+      ],
+      [
+        "control not supported",
+        () => {
+          data.support = "unsupported";
+        },
+      ],
+    ] as const) {
+      data.observation = base;
+      data.phase = "connected";
+      data.support = "supported";
+      apply();
+      expect([label, offered()]).toEqual([label, null]);
+    }
+    data.observation = base;
+    data.phase = "connected";
+    data.support = "supported";
+    // A busy owner shows it disabled. A writer lock does not hide it: deriving is read-only (§3).
+    update({ busy: true });
+    expect(control(render(), "Re-plan unfinished work").props.disabled).toBe(true);
+    update({
+      busy: false,
+      snapshot: {
+        ...base.state!.snapshot,
+        status: { ...base.state!.snapshot.status, writerPresent: true },
+      },
+    });
+    expect(control(render(), "Re-plan unfinished work").props.disabled).toBe(false);
+    expect(data.invoke).not.toHaveBeenCalled();
+  });
+  it("derives on click, then fills the goal, criteria and rows exactly and prepares nothing", async () => {
+    advertiseRerun();
+    endedComplex();
+    await loadDerived();
+    expect(data.invoke.mock.calls[0]?.[0].input.request).toEqual({
+      protocolVersion: 1,
+      id: "owner:2",
+      ownerId: "owner",
+      expectedProjectRevision: 9,
+      type: "workflow.derive",
+      runId: "run-1",
+    });
+    // The editor was empty, so nothing was asked.
+    expect(data.confirm).not.toHaveBeenCalled();
+    const tree = render();
+    expect(control(tree, "Workflow goal").props.value).toBe(preview.goal);
+    expect(control(tree, "COMPLEX acceptance criteria").props.value).toBe(
+      "Parse input\nValidate input",
+    );
+    expect(control(tree, "Task 1 title").props.value).toBe("Verify: Extract parser");
+    expect(control(tree, "Task 1 goal").props.value).toBe(
+      "Re-verify without changes: Move parsing into src/parse.ts",
+    );
+    expect(labelled(tree, "Task 1 claim 1 path")).toBeNull();
+    expect(control(tree, "Task 1 check IDs").props.value).toBe("test");
+    expect(control(tree, "Task 2 claim 1 operation").props.value).toBe("modify");
+    expect(control(tree, "Task 2 claim 1 path").props.value).toBe("src/validate.ts");
+    expect(control(tree, "Task 2 check IDs").props.value).toBe("test lint");
+    expect(control(tree, "Task 2 depends on task 1").props.checked).toBe(true);
+    expect(control(tree, "Task 2 maps criterion 1").props.checked).toBe(false);
+    expect(control(tree, "Task 2 maps criterion 2").props.checked).toBe(true);
+    expect(derivedPanel()).toContain(
+      "Derived from Run run-1 (BLOCKED): 1 completed task becomes a read-only verification task that is checked again; unfinished tasks keep their claims (create → modify where the file now exists). Review before Prepare.",
+    );
+    expect(derivedPanel()).toContain(
+      "Claims follow the files at derive time. After you commit or discard leftover changes in your own tools, derive again",
+    );
+    expect(words(tree)).toContain("Draft derived from Run run-1 loaded into the editor.");
+    // No automatic prepare or confirm: only the derive was sent.
+    await flush();
+    expect(sentTypes()).toEqual(["workflow.derive"]);
+    expect(labelled(render(), "Runtime Plan Preview")).toBeNull();
+    // An explicit Prepare sends exactly the derived goal, criteria and draft.
+    data.invoke.mockResolvedValue(
+      AsyncResult.success(response({ kind: "prepared", preview: complexPreview })),
+    );
+    await submitPrepare();
+    expect(data.invoke.mock.calls[1]?.[0].input.request).toMatchObject({
+      type: "workflow.prepare",
+      goal: preview.goal,
+      acceptanceStatements: ["Parse input", "Validate input"],
+    });
+    expect(data.invoke.mock.calls[1]?.[0].input.request.complexDraft).toEqual(derivedData.draft);
+    expect(sentTypes()).toEqual(["workflow.derive", "workflow.prepare"]);
+  });
+  it("counts the completed tasks that become verification tasks from the source Run", async () => {
+    advertiseRerun();
+    endedComplex("INTERRUPTED", {
+      tasks: [{ ...blockedRow, id: "CT-001", status: "INTERRUPTED" }, blockedRow],
+    });
+    await loadDerived({ sourceStatus: "INTERRUPTED" });
+    expect(derivedPanel()).toContain(
+      "Derived from Run run-1 (INTERRUPTED): 0 completed tasks become read-only verification tasks that are checked again;",
+    );
+  });
+  it("keeps the banner only while the editor would prepare exactly the derived draft", async () => {
+    advertiseRerun();
+    endedComplex();
+    await loadDerived();
+    expect(derivedPanel()).toContain("Derived from Run run-1 (BLOCKED)");
+    for (const [label, apply, revert] of [
+      [
+        "task title",
+        () => change("Task 1 title", "Verify parser"),
+        () => change("Task 1 title", "Verify: Extract parser"),
+      ],
+      [
+        "claim operation",
+        () => change("Task 2 claim 1 operation", "create"),
+        () => change("Task 2 claim 1 operation", "modify"),
+      ],
+      [
+        "criteria",
+        () => change("COMPLEX acceptance criteria", "Parse input"),
+        () => change("COMPLEX acceptance criteria", "Parse input\nValidate input"),
+      ],
+      [
+        "goal",
+        () => change("Workflow goal", "Fix another bug"),
+        () => change("Workflow goal", preview.goal),
+      ],
+    ] as const) {
+      apply();
+      expect([label, derivedPanel().includes("Derived from Run")]).toEqual([label, false]);
+      expect(derivedPanel()).toContain("The editor no longer holds the derived draft unchanged.");
+      // The leftovers and the dry-run stay in view; they describe the draft as derived.
+      expect(derivedPanel()).toContain("These changes block a new Run");
+      revert();
+      expect([label, derivedPanel().includes("Derived from Run run-1 (BLOCKED)")]).toEqual([
+        label,
+        true,
+      ]);
+    }
+    // Whitespace that Prepare trims is not an edit.
+    change("Workflow goal", `  ${preview.goal}\n`);
+    expect(derivedPanel()).toContain("Derived from Run run-1 (BLOCKED)");
+    // Discarding the task plan is the way out.
+    await click("Discard task plan");
+    expect(labelled(render(), "Derived re-run draft")).toBeNull();
+    expect(sentTypes()).toEqual(["workflow.derive"]);
+  });
+  it("asks before replacing a non-empty editor that differs, and keeps it when declined", async () => {
+    advertiseRerun();
+    endedComplex();
+    change("Workflow goal", "My own goal");
+    data.confirm.mockResolvedValueOnce(false);
+    await loadDerived();
+    expect(data.confirm).toHaveBeenCalledOnce();
+    expect(data.confirm.mock.calls[0]?.[0]).toContain(
+      "Replace the editor's goal, acceptance criteria and task rows with the draft derived from Run run-1 (BLOCKED)?",
+    );
+    expect(control(render(), "Workflow goal").props.value).toBe("My own goal");
+    expect(labelled(render(), "Task 1")).toBeNull();
+    expect(labelled(render(), "Derived re-run draft")).toBeNull();
+    expect(words(render())).toContain(
+      "Kept the editor's goal, criteria and task rows. Nothing was loaded.",
+    );
+    await loadDerived();
+    expect(data.confirm).toHaveBeenCalledTimes(2);
+    expect(control(render(), "Workflow goal").props.value).toBe(preview.goal);
+    // The editor holds exactly this draft, so the same derivation loads again without asking.
+    await loadDerived();
+    expect(data.confirm).toHaveBeenCalledTimes(2);
+    expect(sentTypes()).toEqual(["workflow.derive", "workflow.derive", "workflow.derive"]);
+  });
+  it("derives again after leftovers are resolved, asking before it replaces the earlier draft", async () => {
+    advertiseRerun();
+    endedComplex();
+    await loadDerived();
+    const [verify, unfinished] = derivedData.draft.tasks;
+    await loadDerived({
+      draft: {
+        tasks: [
+          verify!,
+          { ...unfinished!, ownership: [{ path: "src/validate.ts", operation: "create" }] },
+        ],
+      },
+      leftovers: { clean: true, paths: [], truncated: false },
+      notes: [],
+    });
+    expect(data.invoke.mock.calls[1]?.[0].input.request).toMatchObject({
+      type: "workflow.derive",
+      runId: "run-1",
+    });
+    // The editor held the earlier derived rows; they differ from the new ones.
+    expect(data.confirm).toHaveBeenCalledOnce();
+    expect(control(render(), "Task 2 claim 1 operation").props.value).toBe("create");
+    expect(words(control(render(), "Leftover changes"))).toBe(
+      "No leftover changes at derive time.",
+    );
+    expect(derivedPanel()).toContain("Derived from Run run-1 (BLOCKED)");
+    expect(labelled(render(), "Derivation notes")).toBeNull();
+    expect(sentTypes()).toEqual(["workflow.derive", "workflow.derive"]);
+  });
+  it("lists leftovers and never claims a clean checkout unless the Runtime reports it", async () => {
+    advertiseRerun();
+    endedComplex();
+    const leftovers = () => words(control(render(), "Leftover changes"));
+    await loadDerived({
+      leftovers: { clean: false, paths: ["src/[id].tsx", "src/config.ts"], truncated: false },
+    });
+    expect(leftovers()).toContain(
+      "These changes block a new Run until you commit or discard them. The Runtime never does either.",
+    );
+    expect(leftovers()).toContain("src/[id].tsx");
+    expect(leftovers()).toContain("src/config.ts");
+    expect(leftovers()).not.toContain("More changes exist");
+    expect(leftovers()).not.toContain("No leftover changes");
+    await loadDerived({ leftovers: { clean: false, paths: ["src/config.ts"], truncated: true } });
+    expect(leftovers()).toContain(
+      "More changes exist than are listed; the list stops at 200 names or 16,384 bytes.",
+    );
+    await loadDerived({ leftovers: { clean: null, paths: [], truncated: false } });
+    expect(leftovers()).toContain("Workspace state unknown");
+    expect(leftovers()).not.toContain("No leftover changes");
+    expect(leftovers()).not.toContain("These changes block");
+    await loadDerived({ leftovers: { clean: true, paths: [], truncated: false } });
+    expect(leftovers()).toBe("No leftover changes at derive time.");
+    // Only the leftovers differed between these derivations, so nothing was asked.
+    expect(data.confirm).not.toHaveBeenCalled();
+  });
+  it("shows the prepare dry-run result and every note", async () => {
+    advertiseRerun();
+    endedComplex();
+    await loadDerived();
+    expect(words(control(render(), "Prepare check"))).toBe(
+      "Prepare dry-run at derive time: passed. This is not a preview; Prepare checks the editor again.",
+    );
+    const notes = [
+      "CT-001 completed files missing: src/parse.ts; a verification task cannot recreate them",
+      "CT-002 claim src/validate.ts: modify target is missing",
+    ];
+    await loadDerived({ prepareCheck: { ok: false, code: "INVALID_CRITERIA" }, notes });
+    expect(words(control(render(), "Prepare check"))).toBe(
+      "Prepare dry-run at derive time: refused with INVALID_CRITERIA. Edit the task plan before Prepare; the notes may say why.",
+    );
+    const listed = elements(control(render(), "Derivation notes"), "li").map((item) => text(item));
+    expect(listed).toEqual(notes);
+  });
+  it("never loads a draft of another Run, or criteria the editor cannot hold exactly", async () => {
+    advertiseRerun();
+    endedComplex();
+    await loadDerived({ runId: "other-run" });
+    expect(words(render())).toContain(
+      "Runtime returned a draft that does not match the requested Run. Nothing was loaded.",
+    );
+    expect(labelled(render(), "Task 1")).toBeNull();
+    await loadDerived({ acceptanceStatements: ["Parse input\nand keep it", "Validate input"] });
+    expect(words(render())).toContain(
+      "cannot be edited one criterion per line without changing them. Nothing was loaded",
+    );
+    expect(labelled(render(), "Task 1")).toBeNull();
+    expect(labelled(render(), "Derived re-run draft")).toBeNull();
+    expect(control(render(), "Workflow goal").props.value).toBe("");
+    expect(data.confirm).not.toHaveBeenCalled();
+  });
+  it("shows Runtime refusals of derive with fixed guidance and no retry", async () => {
+    advertiseRerun();
+    endedComplex();
+    const refusal = (
+      code: "RERUN_NOT_APPLICABLE" | "RUN_NOT_FOUND" | "ACTIVE_RUN" | "STALE_PROJECT",
+    ) =>
+      AsyncResult.success({
+        ...refused("STALE_PROJECT"),
+        command: "workflow.derive",
+        error: { code },
+      });
+    for (const [code, hint] of [
+      ["RERUN_NOT_APPLICABLE", "and is not R3, can be re-planned. Nothing was derived."],
+      ["RUN_NOT_FOUND", "That Run is no longer the latest Run. Nothing was derived."],
+      ["ACTIVE_RUN", "A Run is active on this project or this Runtime. Nothing was derived."],
+      ["STALE_PROJECT", "Nothing was derived; derive again once the refreshed state appears."],
+    ] as const) {
+      data.invoke.mockResolvedValue(refusal(code));
+      await click("Re-plan unfinished work");
+      await flush();
+      expect(words(render())).toContain(`Runtime rejected the command: ${code}.${" "}`);
+      expect(words(render())).toContain(hint);
+    }
+    expect(sentTypes()).toEqual(Array(4).fill("workflow.derive"));
+    expect(labelled(render(), "Derived re-run draft")).toBeNull();
+  });
+  it("gives the editor one origin: a Planner load and a derived load replace each other's banner", async () => {
+    advertisePlanner();
+    advertiseRerun();
+    endedComplex();
+    await loadDerived();
+    update({ planner: plannerReady });
+    data.invoke.mockResolvedValue(readReply());
+    await click("Load into editor");
+    expect(labelled(render(), "Derived re-run draft")).toBeNull();
+    expect(labelled(render(), "Loaded Planner proposal")).not.toBeNull();
+    await loadDerived();
+    expect(labelled(render(), "Loaded Planner proposal")).toBeNull();
+    expect(labelled(render(), "Derived re-run draft")).not.toBeNull();
+    expect(sentTypes()).toEqual(["workflow.derive", "planner.read", "workflow.derive"]);
   });
 });
