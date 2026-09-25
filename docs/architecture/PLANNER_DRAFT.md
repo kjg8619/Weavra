@@ -67,7 +67,7 @@ The Host builds the context deterministically, before the first model call, from
 | Goal and acceptance statements, labelled `AC-001`… in the compiler's order; without statements, the goal is the only AC (`AC-001`), as in prepare | The `planner.start` request | Goal ≤2,048 characters; ≤16 statements of ≤500 characters |
 | Execution mode (EDIT or READ_ONLY) and Risk | The same classification as prepare | — |
 | Plan rules | Fixed Host text | The §4 limits of COMPLEX_SEQUENTIAL_WORKFLOW and V0.8A `maxParallel`: 2–8 tasks, earlier-row dependencies, full AC coverage, exclusive exact-file claims, `create` needs a missing file in an existing directory, `modify` needs an existing UTF-8 text file, READ_ONLY has zero claims, required checks only |
-| Registered checks | `.ai/config.yaml` | `id`, `kind`, `required` only; never `executable` or `args` |
+| Registered checks | `.ai/config.yaml` | `id`, `kind`, `required` only; never `executable` or `args`. Amendment A1 (§4.1) adds `exercises` |
 | Allowed paths | `files.allowed_paths` | As configured |
 | File listing | The same listing and exclusion rules as `runtime_list_files`, rooted at the allowed paths, under current Policy | 500 files, 65,536 bytes, depth ≤4; `.ai/` and protected paths never appear |
 | Project instructions | The existing snapshot | ≤64 KiB, not truncated |
@@ -76,6 +76,37 @@ The Host builds the context deterministically, before the first model call, from
 The whole context is at most **196,608 UTF-8 bytes**. If it would be larger, planning ends FAILED/`CONTEXT_TOO_LARGE` before any model call. Nothing is truncated silently.
 
 The context carries no secrets, credentials, check commands, `.ai` state, Run history, evidence or diffs. File contents are never included; only names are. Sending the context to the configured provider has the same privacy boundary as a worker prompt.
+
+### 4.1 Amendment A1 — check exercise targets ([#65](https://github.com/kjg8619/Weavra/issues/65))
+
+**Problem.** A real-model smoke (#54) ran with acceptance criteria that named no file paths. The Planner guessed the module names (`src/parser.js`) while the registered checks import `src/parse.mjs`, so the Run ended BLOCKED/CHECK_FAILED. The Kernel's checks and review caught it, so there was no false completion. Without paths the draft was still not useful. The Planner cannot see what the checks exercise, because verifier sources are protected paths: `resolveVerifierTrustSources` hides them from workers, and this contract lists names inside the allowed paths only.
+
+**Addition.** Each `checks[]` entry gains `exercises`, derived by the Host as follows:
+
+1. **Verifier sources.** Take the check's direct verifier sources, the same `resolveVerifierTrustSources` list the Policy protects. They include files named in `args` and declared trust files. The browser implementation files are excluded.
+2. **Read and scan.** Read each source that is a regular file, up to 262,144 bytes per file and 16 files per check. Match the JS/TS relative module specifiers:
+   - `import … from "…"` and `import "…"`
+   - `export … from "…"`
+   - dynamic `import("…")` and `require("…")`
+
+   The specifier must be a string literal starting with `./` or `../`. Nothing is executed or evaluated.
+3. **Resolve.** Resolve each specifier against the source file's directory and normalize it to a project-relative POSIX path.
+   - An explicit extension is kept as written.
+   - An extensionless specifier resolves to the one existing regular file among `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`, or to `index.*` inside the directory. If none or several match, it is dropped.
+4. **Filter.** Keep only paths that are inside `files.allowed_paths`, pass the listing Policy (`isListablePath`: not protected, not `.ai`), and are not verifier sources themselves. Existing and missing files are both kept, because a missing one is a `create` target.
+5. **Order and bound.** Deduplicate and sort in JavaScript default order. At most 16 paths per check and 64 per context. Beyond that, drop the rest and set `exercisesTruncated: true` on that check.
+
+**What does not change:**
+- The context still never includes verifier file names, contents, assertions, commands or `args`.
+- `exercises` names only modules inside the allowed paths that a check imports. A human writing the plan puts exactly these paths into task goals and claims anyway.
+- Non-JS/TS checks, or checks whose sources import nothing inside the allowed paths, get `exercises: []`, and the Planner behaves as before.
+- The 196,608-byte cap still applies.
+
+**Plan rules.** The plan rules gain one line: prefer the `exercises` paths when choosing claims for a check's criteria. A missing path is a `create` claim and an existing one is `modify`.
+
+**Authority.** The draft is still validated by the prepare dry-run and reviewed by a human. `exercises` grants nothing.
+
+**Corpus.** The #54 corpus L01 asserts `exercises` for the fixture checks: `test-parse → ["src/parse.mjs"]`, `test-format → ["src/format.mjs"]`. It also asserts that no verifier path such as `test/…` appears anywhere in the context.
 
 ## 5. Planner session
 
