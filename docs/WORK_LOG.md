@@ -770,3 +770,31 @@
   - 실제 브라우저 capture 재사용 거부(C37) 실측.
   - 더 많은 반복의 속도·비용 측정.
 - 커밋 상태: devlop 대상 PR. 머지하고 CI가 통과하면 #20·#21·#22를 닫는다.
+
+## 2026-09-25 KST — 리뷰어 효능 평가(유료 소액)와 실제 App UI 확인
+
+- 목적: Weavra의 핵심 가치인 독립 리뷰가 실제로 결함을 잡는지 직접 측정한다(사용자 승인). 함께, 승인받은 실제 클라이언트 UI 확인 결과를 기록한다.
+- 리뷰어 효능 평가(`feat/reviewer-efficacy-eval`, 커밋 `86004a97`, 하위 에이전트 구현, 메인 세션 검토):
+  - `npm run reviewer-eval`: 사례마다 Weavra STANDARD 1회를 실제 Worker SDK·Policy·검증기(sandbox required)·Kernel로 실행한다. Developer는 사례별 faux 모델로 해법 파일만 적용하고, Reviewer만 실제 모델이다.
+  - `max_revision_cycles 0`이라 첫 판정으로 결정된다. 숨은 oracle이 최종 파일을 판정한다.
+  - 사례: B07–B10에서 보이는 검사만 맞춘 결함 해법 7개와 다르게 쓴 올바른 해법 4개(`src/benchmark-solutions.ts`로 이동, 기존 테스트 데이터와 byte 동일).
+  - `--confirm-paid` 없이는 SDK·자격 증명 코드가 로드되기 전에 거부한다. 기록은 버전이 있는 스키마 검증 JSON(digest 포함)과 Markdown이다. 모델 본문은 저장하지 않는다.
+  - 테스트 16개(faux): PASS 리뷰어면 결함 해법이 완료되고 oracle에서 실패함(거짓 완료 기록), REVISE 리뷰어면 차단됨, 세션 구성, 유료 가드, 기록 무결성.
+  - 검증: `npm run check` exit 0, evals 13 files / 149 PASS, `./test.sh` exit 0, faux 실행기 경로 통과.
+- 실제 실행(commandcode `deepseek/deepseek-v4.1-flash` Reviewer, 11 사례 × 1회, 재시도 없음):
+  - **결함 포착 7/7(100%)**: 모두 REVISE → Kernel BLOCKED. **오탐 0/4**: 올바른 해법은 모두 PASS → COMPLETED, oracle PASS. **거짓 완료 0/11**.
+  - UNMET으로 표시한 기준이 각 결함이 실제로 위반한 기준과 정확히 일치했다. 예: 이중 따옴표 버그는 AC-002만, 쿠키 하드코딩은 AC-003만. 충족된 기준을 UNMET으로 표시한 적은 없다.
+  - 비용: Reviewer 보고 토큰 합 202,301(캐시 포함), 사례당 중앙 13.4초. 사례당 2–5턴, 읽기 전용 도구 3–9회로 diff 밖 파일까지 확인했다.
+  - 해석:
+    - 보이는 검사가 놓치는 기준 수준의 결함을 독립 Reviewer가 잡는다는 첫 직접 증거다. 같은 결함 해법도 Reviewer가 PASS하면 완료되어 oracle에서 실패한다(faux 반사실 테스트).
+    - 한계: 모델 하나, 사례당 1회, 쉬운 조건(작은 diff, 기준에 예시 명시, 오도하는 handoff 없음). 더 미묘한 결함, 설득적인 handoff, 큰 변경은 측정하지 않았다.
+    - Reviewer는 blocker 이슈를 달면서도 BLOCK 대신 REVISE를 냈다. 기본 revision 1회 설정이라면 Developer에게 한 번 되돌아간다.
+- 실제 App UI 확인(사용자 승인, 메인 세션):
+  - 환경: App worktree에서 `vp run dev --home-dir /tmp/wx-ui/t3`, `T3_WEAVRA_CONTROL=1`, devlop Runtime 실행 파일, 격리된 `WEAVRA_HOME`, 대본 루프백 모델, 헤드리스 Chromium(playwright-core). 실사용 데이터(`~/.weavra/app/userdata`)는 건드리지 않았다.
+  - 흐름: `project add`로 데모 프로젝트 등록 → Settings → Project → Weavra · Workflow control(CONTROL CONNECTED, RUNTIME CONTRACT v2).
+    - UI로 3작업 계획 입력: 부모 기준 3개, 작업별 제목·목표·기준·claim·검사, CT-003 의존성.
+    - Prepare → 전체 COMPLEX 미리보기: plan·parent digest, 작업·의존성·claim, 통합, "한 번에 최대 2개 구현" 한도.
+    - 확인 대화상자 → 실행 화면에서 CT-001·CT-002 **CURRENT WAVE · IMPLEMENTING**, CT-003 PENDING, 호출 2/24, 작업별 제어 버튼 없음.
+    - 완료 화면: COMPLETED·TERMINAL, 작업 3/3, 앞 두 작업 증거 STALE(과거 기여)와 CT-003 CURRENT 구분, 통합 PASS×3, 호출 7/24, cleanup CONFIRMED, writer 해제.
+  - 종료: 캡처한 dev 서버 PID와 작업 디렉터리를 확인한 포트 소유자만 종료했다. 남은 Runtime 브리지 프로세스는 없었다. 캡처는 커밋하지 않았다.
+- 커밋 상태: 기능 커밋 `86004a97`, devlop 병합, 이 기록. devlop 대상 PR.
