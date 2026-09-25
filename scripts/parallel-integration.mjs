@@ -347,8 +347,22 @@ await scenario("P09", "a two-row wave with one invocation left is BLOCKED before
   });
 }
 
+/** Developer model calls of a run: wall-clock span, summed call time, and whether calls of different tasks overlapped. */
+function implementationPhase(requests) {
+  const calls = requests.filter((request) => request.role === "Developer");
+  assert.ok(calls.length > 0 && calls.every((call) => call.endedAt !== null), "every Developer call must have ended");
+  const span = Math.max(...calls.map((call) => call.endedAt)) - Math.min(...calls.map((call) => call.startedAt));
+  const busy = calls.reduce((sum, call) => sum + call.endedAt - call.startedAt, 0);
+  const overlapped = calls.some((a) => calls.some((b) => a.complexTaskId !== b.complexTaskId && a.startedAt < b.endedAt && b.startedAt < a.endedAt));
+  return { span, busy, overlapped };
+}
+
 {
   // Speedup: identical 2-task plans with a fixed model latency, serial (max_parallel 1) vs one wave of two.
+  // Only implementation runs concurrently, so the saving is bounded by the Developer time, and the whole-run wall clock
+  // of two separate runs is reported, not asserted: on a shared CI runner its noise can exceed the saving. The asserted
+  // measurement is within each run: the wave's implementation wall clock is below the serial sum of its Developer calls,
+  // and the serial run never overlaps them.
   const timings = {};
   for (const maxParallel of [1, 2])
     await scenario(`P01-speed-${maxParallel}`, `wall clock with a 400 ms model latency, max_parallel ${maxParallel}`, true, {
@@ -357,12 +371,19 @@ await scenario("P09", "a two-row wave with one invocation left is BLOCKED before
         const projectRoot = await two(`speed-${maxParallel}`, { maxParallel });
         const started = Date.now();
         const { state } = await run(`speed ${maxParallel}`, { model, projectRoot, draft: TWO, statements: STATEMENTS.slice(0, 2), goal: "Implement the parser and formatter across multiple modules" });
-        timings[maxParallel] = Date.now() - started;
+        timings[maxParallel] = { run: Date.now() - started, ...implementationPhase(model.requests) };
         return state;
       },
     });
-  console.log(`   speed: serial ${timings[1]} ms, one wave of two ${timings[2]} ms, ratio ${(timings[2] / timings[1]).toFixed(2)}`);
-  assert.ok(timings[2] < timings[1], "one wave of two must finish faster than the serial run");
+  const [serial, wave] = [timings[1], timings[2]];
+  const ms = (value) => Math.round(value);
+  console.log(`   speed: whole run serial ${serial.run} ms, one wave of two ${wave.run} ms, ratio ${(wave.run / serial.run).toFixed(2)} (reported, not asserted)`);
+  console.log(
+    `   implementation: serial span ${ms(serial.span)} ms for ${ms(serial.busy)} ms of Developer calls; wave span ${ms(wave.span)} ms for ${ms(wave.busy)} ms, ratio ${(wave.span / wave.busy).toFixed(2)}`,
+  );
+  assert.equal(serial.overlapped, false, "max_parallel 1 must never overlap Developer calls of different tasks");
+  assert.equal(wave.overlapped, true, "the wave's two Developers must overlap");
+  assert.ok(wave.span < wave.busy, "the wave's implementation wall clock must be below the serial sum of its Developer calls");
 }
 
 finish(5, "PARALLEL");

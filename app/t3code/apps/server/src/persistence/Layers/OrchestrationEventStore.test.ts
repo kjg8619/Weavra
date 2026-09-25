@@ -13,6 +13,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+import * as TestClock from "effect/testing/TestClock";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { PersistenceDecodeError } from "../Errors.ts";
@@ -329,6 +330,21 @@ for (const reader of ["all", "aggregate"] as const) {
       );
       // oxlint-disable-next-line typescript/no-extraneous-class -- Identifies page markers for V8's heap query.
       class ReplayPage {}
+      // Counts live page markers after a full GC, without heap-size thresholds.
+      // V8 can hold a consumed page for a moment on its own: an in-flight
+      // concurrent TurboFan job keeps the closure it compiles alive (the stream's
+      // per-page loop closure captures its page), and the first query's
+      // ExperimentalWarning keeps its stack until the next tick. The replay stays
+      // suspended in this callback while this waits (up to ~2s), so only those
+      // engine references can drain; a page the replay still holds cannot.
+      const livePages = Effect.gen(function* () {
+        let live = NodeV8.queryObjects(ReplayPage, { format: "count" });
+        for (let attempt = 0; live > 1 && attempt < 40; attempt++) {
+          yield* Effect.sleep("50 millis").pipe(TestClock.withLive);
+          live = NodeV8.queryObjects(ReplayPage, { format: "count" });
+        }
+        return live;
+      });
       let count = 0;
       const replay =
         reader === "all"
@@ -341,12 +357,11 @@ for (const reader of ["all", "aggregate"] as const) {
               limit: 1_501,
             });
       yield* Stream.runForEach(replay, (event) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
           assert.equal(event.sequence, count + 1);
           if (count % 500 === 0) {
-            // Count live page markers after full GC, without timing or heap-size thresholds.
             Object.assign(event, { replayPage: new ReplayPage() });
-            assert.isAtMost(NodeV8.queryObjects(ReplayPage, { format: "count" }), 1);
+            assert.isAtMost(yield* livePages, 1);
           }
           count++;
         }),
