@@ -51,6 +51,7 @@ COMPLEX ([design](COMPLEX_SEQUENTIAL_WORKFLOW.md)) runs one frozen parent Task C
 | Review verdict | an independent Reviewer session | the Developer |
 | Which task may change which file (COMPLEX) | the confirmed plan's exact-file claims, checked before and at each effect | Policy ALLOW alone, dependencies between tasks, the App |
 | Completion | the Kernel, after `assertCanComplete` | the App, transport success, any worker |
+| Whether the interactive `weavra` conversation runs a destructive or unclassified shell command (#5) | the user, in the command guard's prompt: destructive per call, an unclassified command per call or for the session (memory only); refused without a UI | the local classifier, which only explains; workers have no shell at all |
 
 Browser observations are `CANDIDATE_ONLY`. Registering a browser check is not verification; only fresh captures by `RegisteredVerifier` count. Reviewed project facts are advisory context only.
 

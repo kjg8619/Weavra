@@ -104,7 +104,65 @@ Weavra Extension의 소스 TypeScript는 local Pi가 로드하므로 **company-r
 | `/graph view [latest\|runId]` | V0.2B 정적 read-only TUI overlay; navigation/close만 지원 |
 | `/lsp [status]` | V0.3B read-only 프로젝트 LSP 설정/process 조회; 서버/Provider 시작 없음 |
 
-Factory는 기존 네 명령 및 `/graph`, `/lsp`와 lifecycle/input 보호 훅, TUI `session_start`의 짧은 Weavra 로드 알림만 등록한다. 시작 시 config/state I/O·Agent 실행은 하지 않고 기존 Pi 헤더를 교체하지 않는다. Print/JSON/RPC에는 시작 배너를 출력하지 않는다. 모든 명령은 project trust를 요구한다. run/config는 `.ai/config.yaml`을 검사하지만 상태 조회는 config/model/auth 없이 저장된 source를 읽는다. run은 부모 Agent가 idle일 때만 시작하며 등록된 check 실행을 UI에서 확인받는다. 활성 run 동안 일반 입력·부모 도구·user bash를 차단한다. 명령은 빠르게 반환하므로 status/cancel을 계속 사용할 수 있다. 설정 생성·자동 모델 대체·일반 대화의 조직 실행 변환은 없다.
+Factory는 기존 네 명령 및 `/graph`, `/lsp`와 lifecycle/input 보호 훅, TUI `session_start`의 짧은 Weavra 로드 알림만 등록한다. 시작 시 config/state I/O·Agent 실행은 하지 않고 기존 Pi 헤더를 교체하지 않는다. Print/JSON/RPC에는 시작 배너를 출력하지 않는다. 모든 명령은 project trust를 요구한다. run/config는 `.ai/config.yaml`을 검사하지만 상태 조회는 config/model/auth 없이 저장된 source를 읽는다. run은 부모 Agent가 idle일 때만 시작하며 등록된 check 실행을 UI에서 확인받는다. 활성 run 동안 일반 입력·부모 도구·user bash를 차단한다. 그 밖에는 같은 `tool_call` 훅이 부모 대화의 bash 명령을 [로컬 명령 위험 가드](#5-로컬-명령-위험-가드-대화형-bash)로 검사한다. 명령은 빠르게 반환하므로 status/cancel을 계속 사용할 수 있다. 설정 생성·자동 모델 대체·일반 대화의 조직 실행 변환은 없다.
+
+## #5 로컬 명령 위험 가드 (대화형 bash)
+
+`weavra`로 연 부모 대화에서 Pi 내장 `bash` 도구가 명령을 실행하기 전에, 로컬 결정론적 규칙으로 명령을 분류한다. 파괴적이거나 분류되지 않은 명령은 사용자가 명시적으로 확인해야 실행된다. 새 실행 통로가 아니라 기존 `tool_call` 훅(`extension.ts`)을 보강한 것이다. Jev·모델·네트워크 호출은 없다.
+
+### 실행 경로와 적용 범위
+
+| 경로 | 셸 실행 | 결정 주체 | 가드 |
+|---|---|---|---|
+| workflow worker (Developer·Reviewer·Executor) | 없음. `runtime_*` 파일 도구·check 요청·submit만 제공한다(`agent-tools.ts`). 세션에는 내장/확장 도구가 없다(`agent-runner.ts`: `tools: worker.tools`, `defaultTools: []`, 빈 extension runtime). Policy는 `bash`/`sh`/`shell`/`exec` tool id를 거절한다(`policy.ts`). | Policy | 적용하지 않으며 보호한다고 주장하지 않음 |
+| 등록된 check | trusted Host 설정. 셸 없이 argv로 실행하고 셸·인라인 eval 실행 파일은 거절한다(`verification.ts`, `evaluateRegisteredCheck`, `process-runner.ts`). | RegisteredVerifier·Policy | 적용하지 않음 |
+| 대화형 CLI(`weavra`)의 `bash` 도구 | 있음(Pi 기본 도구, `bash -c`) | 사용자 확인 | **적용** |
+| `powershell` 도구(기본 비활성, 사용자가 켠 경우) | 있음 | 사용자 확인 | 적용. 분류하지 않고 항상 `unknown` |
+| 사용자가 직접 입력한 `!cmd`/`!!cmd`(`user_bash`) | 있음 | 사용자 본인 | 적용하지 않음(사용자의 명시적 명령) |
+| `read`/`write`/`edit` 등 다른 도구, 다른 extension의 도구 | 해당 없음 | 해당 없음 | 적용하지 않음 |
+
+workflow가 workspace를 소유하는 동안에는 기존처럼 부모 도구 호출 전체가 먼저 차단되며 가드는 호출되지 않는다. 가드는 Policy의 순수 보호 경로 판정(`isProtectedPath`)만 재사용할 뿐 Policy 결정·workflow·Kernel·RegisteredVerifier를 호출하지 않는다. 따라서 이들의 실행 횟수와 완료 권한은 바뀌지 않는다.
+
+### 분류(`command-syntax.ts`, `command-risk.ts`)
+
+순수 함수다. 명령 문자열만 읽고 파일·프로세스·네트워크·모델을 사용하지 않는다. bash/POSIX sh 문법을 가정한다.
+
+- `read_only`: 인자와 무관하게 읽기·출력만 하는 명령(`ls`, `cat`, `grep`, `head`, `wc`, `jq` 등), `git status/log/diff/show/blame` 등(`--output`, `git -c` 제외), `-delete`/`-exec`/`-fprint`가 없는 `find`, `-i`가 없는 `sed`, `/dev/null` 등으로의 리디렉션.
+- `reversible`: 이름이 명시된 프로젝트 파일의 로컬 편집. 스크립트 검사를 통과한 `sed -i`, 출력 리디렉션 `>`/`>>`, `mkdir`, `touch`, `tee`, `rmdir`, 비재귀 `chmod`, `git add`, `git restore --staged`가 해당한다. 대상은 프로젝트 안의 리터럴 상대 경로여야 한다. worker Policy가 보호하는 경로(`.git`, `.ai`, `.env`, 키, `config.*` 등, `isProtectedPath` 재사용)는 제외한다. `reversible`은 rollback 보장이 아니라 "버전 관리나 백업으로만 되돌릴 수 있는 로컬 편집"이라는 설명이다.
+- `destructive`: `rm`, `git reset --hard`, dry-run이 아닌 `git clean`, 강제·삭제 `git push`, 경로 지정 `git checkout --`·`git restore`, `git branch -D`, `git stash drop/clear`, `dd`, `mkfs`류, `shred`, `truncate`, 넓은 경로에 대한 `chmod/chown -R`, `find -delete`, 다운로드를 셸·인터프리터로 파이프(`curl … | sh`) 등.
+- `unknown`: 그 밖의 모든 것. 인식하지 못한 프로그램, 프로젝트 코드를 실행하는 도구(`npm test`, `make`, `node script.js`), 파서가 모델링하지 않는 문법(명령 치환, 제어문, 함수, 배열, process substitution 등), 프로젝트 밖이나 리터럴이 아닌 경로로의 쓰기, 옵션을 끼워 넣을 수 있는 확장·glob 인자, 환경 변수 변경(`PATH=…`), `sudo`.
+- 복합 명령은 가장 심각한 부분의 분류를 따른다. 따옴표 안의 연산자는 데이터로 취급한다. 따옴표·이스케이프·`/bin/` 경로로 감싼 프로그램 이름도 같은 규칙으로 분류한다.
+- `sed`: GNU(옵션 순열), GNU(POSIXLY_CORRECT), BSD(`-i` 다음 인자를 백업 접미사로 사용) 세 가지 argv 해석을 모두 검사한다. 스크립트에 `e`/`r`/`R`/`w`/`W` 명령이나 `s///e`·`s///w` 플래그가 있으면 `unknown`이다.
+
+### 결정(`command-guard.ts`)
+
+분류는 허가가 아니며 가드는 어떤 권한도 부여하지 않는다.
+
+- `read_only`/`reversible`: 가드 도입 전처럼 실행한다.
+- `destructive`: TUI/RPC 선택 대화상자(`Deny` 기본, `Run once`)에서 확인한 경우에만 이번 호출을 1회 실행한다. 호출마다 다시 묻고 세션 허용은 제공하지 않는다.
+- `unknown`: 같은 대화상자에 `Allow for this session`이 추가된다(`Deny` 기본 유지). 이를 고르면 **정확히 같은 명령**이 현재 세션이 끝날 때까지 묻지 않고 실행된다. 같은 명령인지는 앞뒤 공백(space·tab·newline)만 제거한 명령 텍스트의 sha256과 도구(`bash`/`powershell`)로 판단한다. 따옴표·안쪽 공백·인자가 하나라도 다르면 다시 묻는다. 허용 목록은 extension 메모리에만 있고 저장하지 않는다. 새 세션·resume·fork·reload의 `session_start`마다 비운다. 명령이 destructive로 분류되면 세션 허용과 무관하게 매번 묻는다.
+- 대화상자에는 분류·이유·명령이 나온다(제어 문자는 escape, 긴 명령은 앞뒤만 표시).
+- UI가 없는 print/json 모드: **변경 없음.** destructive/unknown 명령은 `WEAVRA_COMMAND_GUARD=off`가 아니면 거절하며 이유와 opt-out 방법을 tool 오류로 반환한다. 세션 허용은 대화상자에서만 생기고, 이미 있어도 print/json 모드에서는 적용하지 않는다.
+- 대화상자 닫기·시간 초과·abort·UI 오류·기록 실패: 실행하지 않으며 세션 허용도 생기지 않는다.
+
+### 기록
+
+각 결정은 실행 전에 세션 JSONL(`~/.weavra/agent/sessions/…`)에 custom entry `weavra.command-guard`로 남는다. LLM 컨텍스트에는 들어가지 않는다. 필드는 `tool`, `toolCallId`, `category`, 고정 문구 `reasons`, 분류기 어휘 안의 `programs`(그 밖은 `(other)`), 앞뒤 공백을 제거한 명령의 `commandSha256`·`commandBytes`, `confirmation`(`not_required`, `confirmed`, `allowed_session`, `allowed_session_cached`, `declined`, `unavailable`, `failed`), `decision`, `remoteCalls: 0`이다. `allowed_session`은 사용자가 세션 허용을 고른 호출, `allowed_session_cached`는 그 허용으로 대화상자 없이 실행된 이후의 같은 명령이다. 명령 원문과 인자·경로는 기록하지 않는다(원문은 세션의 tool call 메시지에 이미 있다). 기록할 수 없으면 명령을 실행하지 않는다. 실행 전에 durable intent를 남기는 Policy와 같은 원칙이다.
+
+### 설정과 동작 변경
+
+- 기본값은 켜짐이다. `WEAVRA_COMMAND_GUARD=off`만 가드를 끈다(명시적 opt-out). `confirm`/`on`/미설정은 켜짐이며, 그 밖의 값은 무시하고 켜진 상태를 유지한다. 프로젝트 `.ai/config.yaml`로는 끌 수 없다. TUI 시작 배너에 가드 상태가 1줄 표시된다.
+- **기존 CLI 동작 변경**: 이전에는 부모 대화의 모든 bash 명령이 확인 없이 실행되었다. 이제 TUI/RPC에서는 destructive 명령마다 확인을 묻는다. `npm test` 같은 unknown 명령은 처음 한 번 묻고, 사용자가 `Allow for this session`을 고르면 같은 세션의 같은 명령은 다시 묻지 않는다. print/json 모드(`weavra -p` 등)에서는 unknown 명령도 거절하며 세션 허용이 없다. 비대화형 자동화에서 이전 동작이 필요하면 `WEAVRA_COMMAND_GUARD=off`를 명시한다.
+
+### 한계
+
+- 명령 텍스트만 판단한다. Git hooks/config, package script, alias, `PATH`, `shellCommandPrefix`처럼 프로그램이 읽는 설정은 보지 않으므로 sandbox가 아니다.
+- 시크릿 유출 필터가 아니다. `cat .env` 같은 읽기와 `read` 도구는 그대로 동작한다.
+- Weavra extension은 CLI extension으로 먼저 로드되어 `tool_call` 훅에서 먼저 실행된다. 나중에 로드된 extension이 `event.input.command`를 바꾸면 그 결과는 이 가드의 판단 밖이다(extension은 trusted code다).
+- bash/POSIX 밖의 문법(zsh 전용 문법, fish)은 모델링하지 않으며 인식하지 못하면 `unknown`이다. PowerShell은 분류하지 않는다. Windows 지원을 주장하지 않는다. 검증 환경은 macOS(darwin), Node 24, faux provider 테스트다.
+- Jev 등 원격 보조 검사는 없다. 도입한다면 별도 범위에서 전송 정책·timeout·예산·오류 처리를 따로 설계한다.
+
+테스트: `test/command-risk.test.ts`(분류 표·`sed -i`·따옴표·복합 명령·fuzz), `test/command-guard.test.ts`(가로채기·확인·세션 허용·UI 없음 거절·실패 시 거절·기록·opt-out·worker와 Policy 불변), `packages/coding-agent/test/suite/company-runtime-command-guard.test.ts`(실제 AgentSession tool loop, faux model, 셸을 실행하지 않는 bash 대역).
 
 ## Weavra Status Projection
 

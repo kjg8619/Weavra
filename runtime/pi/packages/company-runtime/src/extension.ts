@@ -6,6 +6,14 @@ import {
 	type ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
 import { r3OverrideCandidate } from "./classification.ts";
+import {
+	COMMAND_GUARD_ENTRY_TYPE,
+	COMMAND_GUARD_ENVIRONMENT,
+	type CommandGuardMode,
+	commandGuardSetting,
+	guardShellToolCall,
+	isGuardedShellTool,
+} from "./command-guard.ts";
 import { loadRuntimeConfig } from "./config.ts";
 import type { RuntimeEventSink } from "./events.ts";
 import { formatEvidencePack, projectEvidencePack } from "./evidence.ts";
@@ -45,11 +53,20 @@ export interface CompanyExtensionOptions {
 	createModels?: (signal: AbortSignal) => Promise<ModelRuntime>;
 	events?: RuntimeEventSink;
 	approvalTimeoutMs?: number;
+	/** Overrides WEAVRA_COMMAND_GUARD for this registration (tests/Hosts); never visible to workers or the model. */
+	commandGuard?: CommandGuardMode;
 }
 export function registerCompanyRuntime(
-	pi: Pick<ExtensionAPI, "registerCommand" | "on">,
+	/** `appendEntry` records command-guard decisions; without it a guarded shell call is refused, never run unrecorded. */
+	pi: Pick<ExtensionAPI, "registerCommand" | "on"> & Partial<Pick<ExtensionAPI, "appendEntry">>,
 	options: CompanyExtensionOptions = {},
 ): void {
+	// Read once per registration. A project's .ai/config.yaml cannot turn the guard off.
+	const commandGuard = options.commandGuard
+		? { mode: options.commandGuard, ignoredValue: false }
+		: commandGuardSetting(process.env[COMMAND_GUARD_ENVIRONMENT]);
+	// `unknown` commands the user allowed for this session: memory only, cleared at every session start.
+	const sessionAllowances = new Set<string>();
 	let pending: Promise<void> | undefined;
 	let exporting: Promise<void> | undefined;
 	let workflow: StandardWorkflow | undefined;
@@ -589,23 +606,41 @@ export function registerCompanyRuntime(
 		});
 	}
 	pi.on("session_start", (_event, ctx) => {
+		sessionAllowances.clear();
 		closeGraphViewer();
 		clearStatus();
 		if (ctx.mode === "tui" && ctx.hasUI) {
 			statusUI = ctx.ui;
 			clearStatus();
 			ctx.ui.notify(
-				"Weavra Runtime loaded — development\nQUICK / STANDARD · R0–R2 / scoped R3\n/workflow · /state · /team · /risk · /graph — /workflow help",
+				[
+					"Weavra Runtime loaded — development",
+					"QUICK / STANDARD · R0–R2 / scoped R3",
+					"/workflow · /state · /team · /risk · /graph — /workflow help",
+					commandGuard.mode === "off"
+						? `Command guard: OFF (${COMMAND_GUARD_ENVIRONMENT}=off); bash runs without Weavra confirmation`
+						: commandGuard.ignoredValue
+							? `Command guard: on; ignored ${COMMAND_GUARD_ENVIRONMENT} value (only off disables it)`
+							: "Command guard: bash asks before destructive or unclassified commands",
+				].join("\n"),
 				"info",
 			);
 		}
 	});
 	pi.on("input", () => (pending || exporting ? { action: "handled" } : { action: "continue" }));
-	pi.on("tool_call", () =>
-		pending || exporting
-			? { block: true, reason: "Weavra workflow owns workspace; use /workflow cancel", terminate: true }
-			: undefined,
-	);
+	pi.on("tool_call", (event, ctx) => {
+		if (pending || exporting)
+			return { block: true, reason: "Weavra workflow owns workspace; use /workflow cancel", terminate: true };
+		// #5 command guard: the parent conversation's shell tools only. Workers have no shell and are not affected.
+		if (commandGuard.mode === "off" || !isGuardedShellTool(event.toolName)) return undefined;
+		return guardShellToolCall(event, ctx, {
+			record: (entry) => {
+				if (!pi.appendEntry) throw new Error("Command guard decisions cannot be recorded");
+				pi.appendEntry(COMMAND_GUARD_ENTRY_TYPE, entry);
+			},
+			sessionAllowances,
+		});
+	});
 	pi.on("user_bash", () =>
 		pending || exporting
 			? {
