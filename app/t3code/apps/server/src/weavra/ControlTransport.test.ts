@@ -829,3 +829,67 @@ for (const [label, status, accepted] of [
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 }
+
+// V0.8B Planner: the advertisement and the snapshot status decode strictly on the real transport;
+// which connection may carry planner state is the RuntimeController's check.
+for (const [label, version, accepted] of [
+  ["Planner contract v1", 1, true],
+  ["an unknown Planner version", 2, false],
+  ["a null Planner version", null, false],
+  ["a guessed string Planner version", "1", false],
+] as const) {
+  it.effect(`capability advertisement with ${label} is exact, never inferred`, () =>
+    Effect.gen(function* () {
+      const result = yield* exchangePatched(helloRequest, { plannerContractVersion: version });
+      expect(result).toMatchObject(
+        accepted
+          ? {
+              _tag: "Success",
+              success: { data: { capabilities: { plannerContractVersion: version } } },
+            }
+          : { _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } },
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+const transportPlanner = {
+  schemaVersion: 1,
+  planId: "00000000-0000-4000-8000-000000000001",
+  status: "READY",
+  requestDigest: digest,
+  projectRevision: 8,
+  current: true,
+  startedAt: 1000,
+  finishedAt: 2000,
+  route: { alias: "plan", profile: "reasoning", provider: "loopback", model: "scripted" },
+  usage: { invocations: 1, reportedTokens: 10 },
+  taskCount: 2,
+  failureCode: null,
+};
+for (const [label, planner, accepted] of [
+  ["a READY status", transportPlanner, true],
+  ["a status that carries its draft", { ...transportPlanner, draft: { tasks: [] } }, false],
+  ["a READY status without its task count", { ...transportPlanner, taskCount: null }, false],
+  [
+    "a status as a failure code",
+    { ...transportPlanner, status: "FAILED", taskCount: null, failureCode: "CANCELLED" },
+    false,
+  ],
+  [
+    "a current status of another project revision",
+    { ...transportPlanner, projectRevision: 7 },
+    false,
+  ],
+  ["null in place of the optional status", null, false],
+] as const) {
+  it.effect(`decodes planner ${label} strictly before publication`, () =>
+    Effect.gen(function* () {
+      const result = yield* exchangePatched(snapshotRequest, { planner });
+      expect(result).toMatchObject(
+        accepted
+          ? { _tag: "Success", success: { data: { state: { planner } } } }
+          : { _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } },
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}

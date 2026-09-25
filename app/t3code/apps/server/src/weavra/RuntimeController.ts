@@ -31,6 +31,7 @@ import { ProjectionSnapshotQuery } from "../orchestration/Services/ProjectionSna
 import { subscribeBeforeSnapshotWithoutMutex } from "../utils/subscribeBeforeSnapshot.ts";
 import { complexPreviewConsistent, complexStateConsistent } from "./ComplexProjection.ts";
 import { type ControlTransport, openControlTransport } from "./ControlTransport.ts";
+import { plannerDraftConsistent, plannerStateConsistent } from "./PlannerProjection.ts";
 
 const sameInventory = Schema.toEquivalence(WeavraCapabilityInventory);
 
@@ -63,11 +64,14 @@ interface Entry {
   stopped: boolean;
   inventory?: NonNullable<WeavraControlState["capabilityInventory"]>;
   retiredInventoryEpochs: Set<string>;
+  /** The transport, and so the Host, that this server forwarded a `planner.start` to. */
+  plannerStartedOn?: ControlTransport;
 }
 function consistent(
   response: WeavraControlResponse,
   previous: WeavraControlState | null,
   capabilities: WeavraControlCapabilities,
+  plannerStarted: boolean,
 ): boolean {
   if (!response.success || response.data.kind !== "snapshot") return false;
   const state = response.data.state;
@@ -111,6 +115,7 @@ function consistent(
         approval.stateRevision === state.stateRevision &&
         approval.projectRevision === state.projectRevision)) &&
     complexStateConsistent(state, capabilities, previous) &&
+    plannerStateConsistent(state, capabilities, previous, plannerStarted) &&
     (!previous ||
       (state.projectRevision >= previous.projectRevision &&
         (previous.snapshot.status.run?.runId !== run?.runId ||
@@ -247,7 +252,12 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
         return yield* new WeavraControlTransportError({ code: "TRANSPORT_CLOSED" });
       if (
         response.ownerId !== capabilities.ownerId ||
-        !consistent(response, entry.latest.state, capabilities) ||
+        !consistent(
+          response,
+          entry.latest.state,
+          capabilities,
+          entry.plannerStartedOn === bridge,
+        ) ||
         !response.success ||
         response.data.kind !== "snapshot" ||
         !acceptsInventory(response.data.state)
@@ -415,13 +425,19 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
       if (entry.pending >= 8)
         return yield* new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" });
       const capabilities = entry.latest.capabilities;
+      const planner =
+        input.request.type === "planner.start" ||
+        input.request.type === "planner.cancel" ||
+        input.request.type === "planner.read";
       // A structured COMPLEX draft is never sent to a Runtime that advertises no COMPLEX contract.
-      // The draft shape is the same in contract v1 and v2.
+      // The draft shape is the same in contract v1 and v2. Without `plannerContractVersion: 1` the
+      // Planner does not exist on this connection, so no planner command is ever sent to it.
       if (
         !capabilities ||
         (input.request.type === "workflow.prepare" &&
           input.request.complexDraft !== undefined &&
-          capabilities.complexContractVersion === undefined)
+          capabilities.complexContractVersion === undefined) ||
+        (planner && capabilities.plannerContractVersion !== 1)
       )
         return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
       const bridge = entry.bridge;
@@ -429,6 +445,8 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
       entry.pending++;
       const operation = Effect.gen(function* () {
         yield* validate(entry);
+        // From here on this Host may report planner state (§7.3), even if the reply is lost.
+        if (input.request.type === "planner.start") entry.plannerStartedOn = bridge;
         const response = yield* bridge.exchange(input.request);
         yield* validate(entry);
         if (response.ownerId !== entry.latest.capabilities?.ownerId)
@@ -464,9 +482,14 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
                         data.preview.statement === request.statement
                       : request.type === "facts.confirm"
                         ? data.kind === "fact-confirmed"
-                        : data.kind === "accepted" &&
-                          data.command === request.type &&
-                          data.requestId === request.id;
+                        : request.type === "planner.read"
+                          ? // Exactly the requested proposal, with only Planner-shaped claims.
+                            data.kind === "planner-draft" &&
+                            data.planId === request.planId &&
+                            plannerDraftConsistent(data.draft)
+                          : data.kind === "accepted" &&
+                            data.command === request.type &&
+                            data.requestId === request.id;
           if (!valid) return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
         }
         yield* refresh.pipe(Effect.catch((error) => unavailable(entry, error)));
