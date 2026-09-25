@@ -296,10 +296,10 @@ describe("§4 Planning Context", () => {
 			],
 			executionMode: "EDIT",
 			risk: "R1",
-			// id, kind and required only: never an executable or argument.
+			// id, kind, required and the A1 exercises only: never an executable, argument or verifier source.
 			checks: [
-				{ id: "lint", kind: "lint", required: false },
-				{ id: "test", kind: "test", required: true },
+				{ id: "lint", kind: "lint", required: false, exercises: [] },
+				{ id: "test", kind: "test", required: true, exercises: [] },
 			],
 			allowedPaths: ["src"],
 			// The runtime_list_files rules: .ai/, protected paths, instructions, trust sources and node_modules are absent.
@@ -307,7 +307,11 @@ describe("§4 Planning Context", () => {
 			projectInstructions: { path: "src/AGENTS.md", content: "Always keep modules small.\n" },
 			projectFacts: [],
 		});
-		expect(value.planRules).toHaveLength(9);
+		expect(value.planRules).toHaveLength(10);
+		// Amendment A1 (#65): one plan rule prefers a check's exercises for the claims of its criteria.
+		expect(value.planRules).toContain(
+			'Each check\'s exercises lists files inside allowedPaths that the check imports. Prefer those paths when choosing claims for the criteria that check verifies: a missing path is a "create" claim and an existing one is "modify".',
+		);
 		expect(context.prompt).not.toMatch(
 			/SECRET_FILE_CONTENT|TOKEN=|PRIVATE KEY|--secret-arg|--test-arg|\/usr\/bin\/true|trusted verifier|outside allowed|state\.json/,
 		);

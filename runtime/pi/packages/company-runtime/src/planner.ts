@@ -9,6 +9,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { workerResources } from "./agent-runner.ts";
 import { BudgetController } from "./budget.ts";
+import { planningChecks } from "./check-exercises.ts";
 import { complexPlanLimits } from "./complex-plan.ts";
 import {
 	COMPLEX_DRAFT_MAX_BYTES,
@@ -162,6 +163,8 @@ function planRules(executionMode: ExecutionMode, maxParallel: number): string[] 
 		`checkIds selects 1-${COMPLEX_MAX_TASK_CHECKS} IDs of registered checks with required true, each once. Optional checks cannot be selected.`,
 		`ownership lists exact-file claims { path, operation } with operation "create" or "modify". A file is claimed by at most one task in the whole plan: no shared, case- or Unicode-aliased, directory, glob or subtree claims. At most ${COMPLEX_MAX_TASK_CLAIMS} claims per task and ${COMPLEX_MAX_PLAN_CLAIMS} per plan.`,
 		'"create" needs a missing file whose parent directory already exists (directories are never created); "modify" needs an existing UTF-8 text file. Claims stay inside allowedPaths; protected paths and Runtime state are never claimable.',
+		// Amendment A1 (§4.1): the check exercise targets steer claims; they grant nothing.
+		'Each check\'s exercises lists files inside allowedPaths that the check imports. Prefer those paths when choosing claims for the criteria that check verifies: a missing path is a "create" claim and an existing one is "modify".',
 		executionMode === "READ_ONLY"
 			? "This request is READ_ONLY: every task has ownership [] (zero claims)."
 			: "A task with ownership [] is a read-only contribution.",
@@ -220,7 +223,8 @@ export interface PlanningContext {
 
 /**
  * §4 Planning Context: deterministic, built before the first model call from the sources `workflow.prepare` uses.
- * Names only, never file contents, check commands, `.ai` state, Run history, evidence, diffs or credentials. Over
+ * Names only, never file contents, check commands, `.ai` state, Run history, evidence, diffs or credentials. Checks
+ * carry `id`, `kind`, `required` and the §4.1 `exercises` targets, never a verifier source name or content. Over
  * 196,608 UTF-8 bytes is FAILED/CONTEXT_TOO_LARGE before any model call; nothing is truncated silently.
  */
 export async function buildPlanningContext(input: {
@@ -271,6 +275,14 @@ export async function buildPlanningContext(input: {
 		configDigest: PLANNER_IDENTITY,
 	};
 	const fileListing = await planningFileListing(inspector, policy, signal);
+	// Amendment A1 (§4.1): each check's import targets under the same Policy; unreadable sources only shorten a list.
+	const checks = await planningChecks({
+		projectPath: inspector.projectPath,
+		checks: config.verification.checks,
+		policy,
+		inspector,
+		signal,
+	});
 	// VALID facts only, rechecked as for workers; unavailable facts are none, never last-good content.
 	const projectFacts: () => ProjectFactSummary[] = await loadProjectFactProjection(
 		inspector.projectPath,
@@ -287,7 +299,7 @@ export async function buildPlanningContext(input: {
 		executionMode: input.executionMode,
 		risk: input.risk,
 		planRules: planRules(input.executionMode, complexPlanLimits(config, input.risk).maxParallel),
-		checks: config.verification.checks.map(({ id, kind, required }) => ({ id, kind, required })),
+		checks,
 		allowedPaths: [...config.files.allowed_paths],
 		fileListing,
 		projectInstructions,
