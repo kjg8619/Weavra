@@ -13,6 +13,8 @@ import {
   type WeavraControlObserveInput,
   type WeavraControlResponse,
   type WeavraControlState,
+  type WeavraComplexDraft,
+  type WeavraPlannerStatus,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
@@ -40,6 +42,14 @@ import {
   createEnvironmentWeavraControlCommand,
   createEnvironmentWeavraControlStateAtoms,
   makeEnvironmentWeavraControlState,
+  plannerCancelRequest,
+  plannerDraftUnchanged,
+  plannerElapsedMs,
+  plannerLoadedDraft,
+  plannerReadRequest,
+  plannerRequestDigest,
+  plannerStartRequest,
+  plannerStatusOf,
   type WeavraControlViewState,
 } from "./weavraControl.ts";
 import { makeCapabilityInventoryTracker } from "./capabilityInventory.ts";
@@ -1347,3 +1357,201 @@ it.effect(
       expect(remote.sent).toEqual([]);
     }).pipe(Effect.scoped),
 );
+
+// V0.8B Planner client state (docs/architecture/PLANNER_DRAFT.md §6, §9).
+const plannerGoal = "Split the config parser into parse and validate modules";
+const plannerStatements = [
+  "parseConfig keeps its current behavior",
+  "validateConfig rejects duplicate keys",
+];
+// sha256 of the UTF-8 JSON ["weavra-planner-request-v1", goal, statements], computed outside the
+// App with Node crypto and `shasum -a 256` (both agree).
+const PLANNER_FIXTURE_DIGEST =
+  "sha256:29350ea702ea51a4b633fb065b20653d2070a6e744e76f0ac605424e4179f9f6";
+const planId = "5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e";
+const plannerRunning: WeavraPlannerStatus = {
+  schemaVersion: 1,
+  planId,
+  status: "RUNNING",
+  requestDigest: PLANNER_FIXTURE_DIGEST,
+  projectRevision: 10,
+  current: true,
+  startedAt: 1_000,
+  finishedAt: null,
+  route: null,
+  usage: { invocations: 0, reportedTokens: 0 },
+  taskCount: null,
+  failureCode: null,
+};
+const plannerEnvelope = {
+  protocolVersion: 1,
+  id: "owner:11",
+  ownerId: "owner",
+  expectedProjectRevision: 10,
+} as const;
+const plannerDraft: WeavraComplexDraft = {
+  tasks: [
+    {
+      title: "Extract parser",
+      goal: "Move parsing into src/parse.ts",
+      dependsOnIndexes: [],
+      criterionIndexes: [1],
+      ownership: [{ path: "src/parse.ts", operation: "create" }],
+      checkIds: ["test"],
+    },
+    {
+      title: "Add validation",
+      goal: "Reject duplicate keys in src/validate.ts",
+      dependsOnIndexes: [1],
+      criterionIndexes: [2],
+      ownership: [{ path: "src/validate.ts", operation: "create" }],
+      checkIds: ["test", "lint"],
+    },
+  ],
+};
+function plannerRead(data: unknown): WeavraControlResponse {
+  return {
+    protocolVersion: 1,
+    type: "control_response",
+    id: "owner:11",
+    command: "planner.read",
+    ownerId: "owner",
+    runId: null,
+    stateRevision: null,
+    projectRevision: 10,
+    eventId: null,
+    timestamp: 11,
+    success: true,
+    data,
+  } as WeavraControlResponse;
+}
+
+it("pins the planner request digest to fixtures computed outside the App (§6)", () => {
+  expect(plannerRequestDigest(plannerGoal, plannerStatements)).toBe(PLANNER_FIXTURE_DIGEST);
+  // Omitted statements bind as [].
+  expect(plannerRequestDigest(plannerGoal)).toBe(
+    "sha256:7e83f534ce4638c8d468a3b44612444054b37f8e66a7f8383c19cee1a3d0842c",
+  );
+  expect(plannerRequestDigest(plannerGoal, [])).toBe(plannerRequestDigest(plannerGoal));
+  // UTF-8 bytes of JSON.stringify, including escaped quotes and backslashes.
+  expect(
+    plannerRequestDigest("설정 파서를 parse/validate 모듈로 나눈다", [
+      '중복 키는 거부된다 — "quoted" \\ back',
+    ]),
+  ).toBe("sha256:e08f78263a2ecdf073872009e77741475e80cfffcdf510849b5ddc7b0892879e");
+  // The goal and statements are bound exactly as sent: no trimming, reordering or re-splitting.
+  for (const [goal, statements] of [
+    [`${plannerGoal} `, plannerStatements],
+    [plannerGoal, plannerStatements.toReversed()],
+    [plannerGoal, [plannerStatements.join("\n")]],
+    [plannerGoal, [...plannerStatements, plannerStatements[1]!]],
+  ] as const) {
+    expect(plannerRequestDigest(goal, statements)).not.toBe(PLANNER_FIXTURE_DIGEST);
+  }
+});
+
+it("exposes planner status only from a connection that advertises the Planner", () => {
+  const base = observed(10);
+  const withPlanner = { ...base, state: { ...base.state!, planner: plannerRunning } };
+  // An older Runtime has no Planner, whatever a snapshot carries.
+  expect(plannerStatusOf(withPlanner)).toBeNull();
+  const advertised = {
+    ...withPlanner,
+    capabilities: { ...withPlanner.capabilities!, plannerContractVersion: 1 as const },
+  };
+  expect(plannerStatusOf(advertised)).toEqual(plannerRunning);
+  expect(plannerStatusOf({ ...advertised, state: base.state })).toBeNull();
+  expect(plannerStatusOf({ ...advertised, capabilities: null })).toBeNull();
+  expect(plannerStatusOf(undefined)).toBeNull();
+});
+
+it("measures planning time on the Host clock and never below zero", () => {
+  expect(plannerElapsedMs(plannerRunning, 13_500)).toBe(12_500);
+  expect(plannerElapsedMs(plannerRunning, null)).toBeNull();
+  expect(plannerElapsedMs(plannerRunning, 500)).toBe(0);
+  const ready: WeavraPlannerStatus = {
+    ...plannerRunning,
+    status: "READY",
+    finishedAt: 5_000,
+    usage: { invocations: 1, reportedTokens: 900 },
+    taskCount: 2,
+  };
+  expect(plannerElapsedMs(ready, 99_999)).toBe(4_000);
+});
+
+it("builds planner start, cancel and read requests with nothing but the contract payload", () => {
+  expect(plannerStartRequest(plannerEnvelope, plannerGoal, plannerStatements)).toEqual({
+    ...plannerEnvelope,
+    type: "planner.start",
+    goal: plannerGoal,
+    acceptanceStatements: plannerStatements,
+  });
+  expect(plannerStartRequest(plannerEnvelope, plannerGoal, [])).toEqual({
+    ...plannerEnvelope,
+    type: "planner.start",
+    goal: plannerGoal,
+  });
+  expect(plannerCancelRequest(plannerEnvelope, planId)).toEqual({
+    ...plannerEnvelope,
+    type: "planner.cancel",
+    planId,
+  });
+  expect(plannerReadRequest(plannerEnvelope, planId)).toEqual({
+    ...plannerEnvelope,
+    type: "planner.read",
+    planId,
+  });
+  for (const [goal, statements] of [
+    [" ", plannerStatements],
+    ["x".repeat(2049), plannerStatements],
+    [plannerGoal, Array(17).fill("criterion")],
+    [plannerGoal, ["x".repeat(501)]],
+    [plannerGoal, ["  "]],
+  ] as const) {
+    expect(() => plannerStartRequest(plannerEnvelope, goal, statements)).toThrow();
+  }
+  expect(() => plannerReadRequest(plannerEnvelope, "plan-1")).toThrow();
+  expect(() =>
+    plannerStartRequest(
+      { ...plannerEnvelope, risk: "R0" } as typeof plannerEnvelope,
+      plannerGoal,
+      plannerStatements,
+    ),
+  ).toThrow();
+});
+
+it("keeps a loaded draft only for its own planning request and notices any edit, not key order", () => {
+  const read = plannerRead({
+    kind: "planner-draft",
+    planId,
+    requestDigest: PLANNER_FIXTURE_DIGEST,
+    projectRevision: 10,
+    current: false,
+    draft: plannerDraft,
+  });
+  const loaded = plannerLoadedDraft(read, planId);
+  expect(loaded).toEqual({
+    planId,
+    requestDigest: PLANNER_FIXTURE_DIGEST,
+    current: false,
+    draft: plannerDraft,
+  });
+  expect(plannerLoadedDraft(read, "0b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e")).toBeNull();
+  expect(plannerLoadedDraft(accepted(cancelInput), planId)).toBeNull();
+  const reordered = {
+    tasks: plannerDraft.tasks.map(
+      (task) => Object.fromEntries(Object.entries(task).toReversed()) as typeof task,
+    ),
+  };
+  expect(plannerDraftUnchanged(loaded, reordered)).toBe(true);
+  const [first, second] = plannerDraft.tasks;
+  for (const edited of [
+    { tasks: [first!, { ...second!, checkIds: ["test"] }] },
+    { tasks: [first!, { ...second!, dependsOnIndexes: [] }] },
+    { tasks: [{ ...first!, ownership: [{ path: "src/parse.ts", operation: "modify" }] }, second!] },
+    { tasks: [first!, second!, first!] },
+  ] satisfies ReadonlyArray<WeavraComplexDraft>) {
+    expect(plannerDraftUnchanged(loaded, edited)).toBe(false);
+  }
+  expect(plannerDraftUnchanged(null, plannerDraft)).toBe(false);
+});
