@@ -17,6 +17,7 @@ import {
   type WeavraControlObservation,
   type WeavraControlPreview,
   WeavraControlState,
+  type WeavraDerivedDraft,
   type WeavraPlannerStatus,
   WeavraTaskContract,
 } from "@t3tools/contracts";
@@ -103,12 +104,14 @@ const empty={status:{source:'durable-canonical-state',ownerObserved:false,state:
 let state={ownerId,nextRequestId:ownerId+':1',projectRevision:0,stateRevision:null,ownedRunId:null,busy:false,cancelling:false,startFailure:null,preview:null,browserPreview:null,factPreview:null,projectFacts:{status:'available',entries:[]},pendingApproval:null,snapshot:empty};
 if(mode==='orphan'){state.stateRevision=4;state.snapshot={...empty,status:{source:'durable-canonical-state',ownerObserved:false,state:'available',writerPresent:true,run:{runId:'orphan-run',status:'RUNNING',phase:'IMPLEMENT',workflow:'STANDARD',risk:'R1',executionMode:'EDIT',codeRevision:0,currentStep:{stepId:'implement',attempt:1},activeAgentCount:1,taskContractDigest:digest,createdAt:1,updatedAt:1}}};}
 if(existsSync('canonical.json')){const old=JSON.parse(readFileSync('canonical.json','utf8'));state={...old,ownerId,nextRequestId:ownerId+':1',ownedRunId:null,busy:false,cancelling:false,preview:null,browserPreview:null,factPreview:null,pendingApproval:null};delete state.planner;}
-const complex=mode==='complex'?1:mode==='complex-v2'?2:0;
+// V0.8C re-run peer: workflow.derive answers with derived.json, else RERUN_NOT_APPLICABLE.
+const rerun=String(mode).startsWith('rerun');
+const complex=mode==='complex'?1:mode==='complex-v2'||rerun?2:0;
 // V0.8B Planner peer: planning state lives in this process only, keyed by a fresh planId per start.
 const planner=String(mode).startsWith('planner');
 let plans=0;
 const planIdOf=(n)=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
-const capabilities={authority:'Runtime/Kernel',control:'workflow-control-v1',ownerId,commands:['control.hello','control.snapshot','workflow.prepare','workflow.confirm','workflow.cancel','approval.resolve','browser.inspect','browser.prepare','browser.confirm','facts.prepare','facts.confirm'],maxRequestBytes:32768,maxResponseBytes:65536,resultLimit:64,previewTtlMs:300000,runtimeVersion:'0.85.1',readiness:mode==='not-setup'&&launch===1?'NOT_SETUP':'READY',...(complex?{complexContractVersion:complex}:{}),...(planner?{plannerContractVersion:1}:{}),recipes:[]};
+const capabilities={authority:'Runtime/Kernel',control:'workflow-control-v1',ownerId,commands:['control.hello','control.snapshot','workflow.prepare','workflow.confirm','workflow.cancel','approval.resolve','browser.inspect','browser.prepare','browser.confirm','facts.prepare','facts.confirm'],maxRequestBytes:32768,maxResponseBytes:65536,resultLimit:64,previewTtlMs:300000,runtimeVersion:'0.85.1',readiness:mode==='not-setup'&&launch===1?'NOT_SETUP':'READY',...(complex?{complexContractVersion:complex}:{}),...(planner?{plannerContractVersion:1}:{}),...(rerun?{rerunContractVersion:1}:{}),recipes:[]};
 const reply=(request,data,error)=>({protocolVersion:1,type:'control_response',id:request.id,command:request.type,ownerId,runId:state.snapshot.status.run?.runId??null,stateRevision:state.stateRevision,projectRevision:state.projectRevision,eventId:null,timestamp:1000,success:!error,...(error?{error:{code:error}}:{data})});
 const save=()=>writeFileSync('canonical.json',JSON.stringify(state));
 for await(const line of createInterface({input:process.stdin})){
@@ -155,6 +158,12 @@ for await(const line of createInterface({input:process.stdin})){
     if(state.planner?.planId!==request.planId)response=reply(request,null,'PLANNER_NOT_FOUND');
     else if(state.planner.status!=='READY')response=reply(request,null,'PLANNER_NOT_READY');
     else response=reply(request,{kind:'planner-draft',planId:mode==='planner-other'?planIdOf(99):request.planId,requestDigest:state.planner.requestDigest,projectRevision:state.planner.projectRevision,current:state.planner.current,draft:JSON.parse(readFileSync('planner-draft.json','utf8'))});
+   }else if(request.type==='workflow.derive'){
+    if(mode==='rerun-misplaced')response=reply(request,{kind:'fact-confirmed',factId:'fact-1'});
+    else if(!existsSync('derived.json'))response=reply(request,null,'RERUN_NOT_APPLICABLE');
+    else response=reply(request,{...JSON.parse(readFileSync('derived.json','utf8')),runId:mode==='rerun-other'?'other-run':request.runId});
+   }else if(mode==='rerun-misplaced'&&request.type==='workflow.prepare'){
+    response=reply(request,JSON.parse(readFileSync('derived.json','utf8')));
    }else if(request.type==='workflow.prepare'&&request.complexDraft){
     if(!complex)response=reply(request,null,'INVALID_REQUEST');
     else{state.preview={...JSON.parse(readFileSync('complex-preview.json','utf8')),ownerId,projectRevision:state.projectRevision};response=reply(request,{kind:'prepared',preview:state.preview});}
@@ -2547,3 +2556,126 @@ describe("Planner snapshot consistency (V0.8B §3, §7.3)", () => {
     expect(plannerDraftConsistent(deleting)).toBe(false);
   });
 });
+
+// V0.8C re-run (docs/architecture/COMPLEX_RERUN.md §6, §7): the server forwards workflow.derive only
+// to a Runtime that advertises it and accepts only the candidate draft of exactly the requested Run.
+const derivedDraft: WeavraDerivedDraft = {
+  kind: "derived-draft",
+  runId: "run-1",
+  sourcePlanDigest: `sha256:${"7".repeat(64)}`,
+  sourceStatus: "BLOCKED",
+  goal: plannerGoal,
+  acceptanceStatements: plannerStatements,
+  draft: {
+    tasks: [
+      {
+        title: "Verify: Extract parser",
+        goal: "Re-verify without changes: Move parsing into src/parse.ts",
+        dependsOnIndexes: [],
+        criterionIndexes: [1],
+        ownership: [],
+        checkIds: ["test"],
+      },
+      plannerDraft.tasks[1]!,
+    ],
+  },
+  prepareCheck: { ok: true, code: null },
+  leftovers: { clean: false, paths: ["src/config.ts", "src/parse.ts"], truncated: false },
+  notes: [],
+};
+const deriveOf = (state: WeavraControlState): WeavraControlMutation => ({
+  ...fields(state),
+  type: "workflow.derive",
+  runId: "run-1",
+});
+
+for (const mode of ["normal", "complex-v2", "planner"] as const) {
+  it.effect(`never sends workflow.derive to a Runtime without re-run derivation (${mode})`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup(mode);
+      expect(fixture.initial.capabilities).not.toHaveProperty("rerunContractVersion");
+      yield* fixture.fs.writeFileString(`${fixture.root}/derived.json`, encodeJson(derivedDraft));
+      expect(
+        yield* fixture.controller
+          .command({ projectId, request: deriveOf(fixture.initial.state!) })
+          .pipe(Effect.result),
+      ).toMatchObject({ _tag: "Failure", failure: { code: "INCOMPATIBLE_CAPABILITIES" } });
+      expect(yield* fixture.fs.exists(`${fixture.root}/requests`)).toBe(false);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+it.effect(
+  "forwards workflow.derive to an advertising Runtime and returns only its answer for that Run",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup("rerun");
+      expect(fixture.initial.capabilities?.rerunContractVersion).toBe(1);
+      // A refusal is the Runtime's answer, not a transport failure.
+      expect(
+        yield* fixture.controller.command({ projectId, request: deriveOf(fixture.initial.state!) }),
+      ).toMatchObject({ success: false, error: { code: "RERUN_NOT_APPLICABLE" } });
+      const refreshed = (yield* connected(fixture.queue)).state!;
+      yield* fixture.fs.writeFileString(`${fixture.root}/derived.json`, encodeJson(derivedDraft));
+      expect(
+        yield* fixture.controller.command({ projectId, request: deriveOf(refreshed) }),
+      ).toMatchObject({ success: true, data: derivedDraft });
+      // The server adds nothing: no prepare, confirm or retry follows a derived draft.
+      yield* connected(fixture.queue);
+      expect(yield* requestLog(fixture)).toEqual(["workflow.derive", "workflow.derive"]);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+for (const [label, mode, derived] of [
+  ["a derived draft of another Run", "rerun-other", derivedDraft],
+  [
+    "a derived draft with a deletion claim",
+    "rerun",
+    {
+      ...derivedDraft,
+      draft: {
+        tasks: [
+          derivedDraft.draft.tasks[0]!,
+          {
+            ...derivedDraft.draft.tasks[1]!,
+            ownership: [{ path: "src/config.ts", operation: "delete" as const }],
+          },
+        ],
+      },
+    },
+  ],
+] as const) {
+  it.effect(`rejects ${label} instead of offering it to the editor`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup(mode);
+      yield* fixture.fs.writeFileString(`${fixture.root}/derived.json`, encodeJson(derived));
+      const result = yield* fixture.controller
+        .command({ projectId, request: deriveOf(fixture.initial.state!) })
+        .pipe(Effect.result);
+      expect(result).toMatchObject({ _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } });
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+for (const [label, request] of [
+  [
+    "a derived draft answering workflow.prepare",
+    (state: WeavraControlState): WeavraControlMutation => ({
+      ...fields(state),
+      type: "workflow.prepare",
+      goal: "Fix fixture",
+    }),
+  ],
+  ["another kind answering workflow.derive", deriveOf],
+] as const) {
+  it.effect(`accepts a derived draft only as the answer to workflow.derive: ${label}`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup("rerun-misplaced");
+      yield* fixture.fs.writeFileString(`${fixture.root}/derived.json`, encodeJson(derivedDraft));
+      const result = yield* fixture.controller
+        .command({ projectId, request: request(fixture.initial.state!) })
+        .pipe(Effect.result);
+      expect(result).toMatchObject({ _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } });
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}

@@ -2,6 +2,10 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   createEnvironmentWeavraControlCommand,
   createEnvironmentWeavraControlStateAtoms,
+  deriveRequest,
+  derivedDraftFitsEditor,
+  derivedDraftUnchanged,
+  derivedLoadedDraft,
   plannerCancelRequest,
   plannerDraftUnchanged,
   plannerElapsedMs,
@@ -10,6 +14,9 @@ import {
   plannerRequestDigest,
   plannerStartRequest,
   plannerStatusOf,
+  rerunEligible,
+  rerunExposed,
+  type DerivedLoadedDraft,
   type PlannerLoadedDraft,
 } from "@t3tools/client-runtime/state/weavraControl";
 import {
@@ -143,6 +150,13 @@ const plannerUsage = ({ invocations, reportedTokens }: WeavraPlannerStatus["usag
   `${invocations} of 3 model calls · ${reportedTokens ?? "unknown"} reported tokens`;
 const plannerSeconds = (elapsedMs: number | null) =>
   elapsedMs === null ? "unknown" : `${Math.floor(elapsedMs / 1000)} s`;
+/** The COMPLEX_RERUN.md §7 banner, shown while the editor holds the derived draft unchanged. */
+const derivedBanner = ({ runId, sourceStatus, completedTasks }: DerivedLoadedDraft) =>
+  `Derived from Run ${runId} (${sourceStatus}): ${
+    completedTasks === 1
+      ? "1 completed task becomes a read-only verification task that is"
+      : `${completedTasks} completed tasks become read-only verification tasks that are`
+  } checked again; unfinished tasks keep their claims (create → modify where the file now exists). Review before Prepare.`;
 /** Fixed guidance after a Runtime refusal; the refusal code itself is always shown. */
 function rejectionHint(
   request: WeavraControlMutation,
@@ -178,6 +192,16 @@ function rejectionHint(
       return code === "PLANNER_NOT_FOUND" || code === "PLANNER_NOT_READY"
         ? " That proposal is no longer available; nothing was loaded."
         : "";
+    case "workflow.derive":
+      return code === "RERUN_NOT_APPLICABLE"
+        ? " Only the latest COMPLEX Run that ended BLOCKED, CANCELLED, FAILED or INTERRUPTED with unfinished tasks, and is not R3, can be re-planned. Nothing was derived."
+        : code === "RUN_NOT_FOUND"
+          ? " That Run is no longer the latest Run. Nothing was derived."
+          : code === "ACTIVE_RUN"
+            ? " A Run is active on this project or this Runtime. Nothing was derived."
+            : code === "STALE_PROJECT"
+              ? " The project changed before the draft was derived. Nothing was derived; derive again once the refreshed state appears."
+              : "";
     default:
       return "";
   }
@@ -207,6 +231,8 @@ export function WeavraControls({
   // Planner proposals stay page-session memory: the loaded one and one dismissed locally.
   const [loadedDraft, setLoadedDraft] = useState<PlannerLoadedDraft | null>(null);
   const [dismissedPlanId, setDismissedPlanId] = useState<string | null>(null);
+  // The loaded re-run draft (COMPLEX_RERUN.md §7) is page-session memory too, never persisted.
+  const [derivedDraft, setDerivedDraft] = useState<DerivedLoadedDraft | null>(null);
   const [preview, setPreview] = useState<WeavraControlPreview | null>(null);
   const [preparedDraft, setPreparedDraft] = useState<string | null>(null);
   const [commandState, setCommandState] = useState<CommandState>(idle);
@@ -313,6 +339,8 @@ export function WeavraControls({
     browserDraftIdentity,
     factPreviewCurrent,
     factDraftIdentity,
+    goal,
+    complexCriteria,
     complexRows,
   });
   useLayoutEffect(() => {
@@ -324,6 +352,8 @@ export function WeavraControls({
       browserDraftIdentity,
       factPreviewCurrent,
       factDraftIdentity,
+      goal,
+      complexCriteria,
       complexRows,
     };
   }, [
@@ -334,6 +364,8 @@ export function WeavraControls({
     browserDraftIdentity,
     factPreviewCurrent,
     factDraftIdentity,
+    goal,
+    complexCriteria,
     complexRows,
     latest,
   ]);
@@ -350,17 +382,27 @@ export function WeavraControls({
   // Another Runtime owner, such as a killed Host, holds this project's active Run. Prepare lets the
   // Runtime decide: it marks the Run INTERRUPTED only when that owner provably stopped.
   const foreignActiveRun = fresh && !state?.busy && runActive && state?.ownedRunId !== run?.runId;
-  const canPrepareWorkflow = canPrepare || (foreignActiveRun && !submitting);
+  // A writer lock outlived the latest Run, e.g. its owner died after the Run ended
+  // (COMPLEX_RERUN.md §7). Prepare lets the Runtime decide as well: it releases the lock only when
+  // that owner provably stopped. A lock without any Run, or this connection's own Run, still blocks.
+  const staleWriter =
+    fresh &&
+    !state?.busy &&
+    !!run &&
+    !runActive &&
+    state?.snapshot.status.writerPresent === true &&
+    state.ownedRunId !== run.runId;
+  const canPrepareWorkflow = canPrepare || ((foreignActiveRun || staleWriter) && !submitting);
   // V0.8B Planner: it exists only when the Runtime advertises it beside the COMPLEX editor it fills.
   const plannerExposed =
     complexSupported && observation?.capabilities?.plannerContractVersion === 1;
   const planner = plannerExposed ? plannerStatusOf(observation) : null;
-  const plannerStatements = lines(complexCriteria);
+  const editorStatements = lines(complexCriteria);
   const canStartPlanner =
     plannerExposed &&
     canPrepare &&
     goal.trim() !== "" &&
-    plannerStatements.length > 0 &&
+    editorStatements.length > 0 &&
     planner?.status !== "RUNNING";
   const canCancelPlanner = plannerExposed && fresh && planner?.status === "RUNNING" && !submitting;
   const canLoadPlanner = plannerExposed && canEditDraft && planner?.status === "READY";
@@ -368,10 +410,23 @@ export function WeavraControls({
     planner?.status === "READY" && planner.planId !== dismissedPlanId ? planner : null;
   // The Host's request binding, recomputed for what the editor holds now (§6).
   const editorDigest =
-    plannerProposal || loadedDraft ? plannerRequestDigest(goal.trim(), plannerStatements) : null;
-  const loadedUnchanged = plannerDraftUnchanged(loadedDraft, toComplexDraft(complexRows));
+    plannerProposal || loadedDraft ? plannerRequestDigest(goal.trim(), editorStatements) : null;
+  const editorDraft = toComplexDraft(complexRows);
+  const loadedUnchanged = plannerDraftUnchanged(loadedDraft, editorDraft);
   const loadedCurrent =
     planner && planner.planId === loadedDraft?.planId ? planner.current : loadedDraft?.current;
+  // V0.8C re-run: it exists only when the Runtime advertises it beside the COMPLEX editor it fills,
+  // and is offered on the latest Run's execution view (COMPLEX_RERUN.md §7).
+  const rerunAdvertised = complexSupported && rerunExposed(observation);
+  const rerunOffered = rerunAdvertised && fresh && rerunEligible(state);
+  const canDerive = rerunOffered && canEditDraft;
+  const derivedShown =
+    rerunAdvertised && derivedDraft !== null && run?.runId === derivedDraft.runId;
+  const derivedUnchanged = derivedDraftUnchanged(derivedDraft, {
+    goal: goal.trim(),
+    acceptanceStatements: editorStatements,
+    draft: editorDraft,
+  });
   const canCancel =
     fresh &&
     state?.busy &&
@@ -485,10 +540,67 @@ export function WeavraControls({
         }
         editComplexRows(() => toComplexRows(loaded.draft));
         setLoadedDraft(loaded);
+        setDerivedDraft(null);
         setCommandState({
           status: "accepted",
           message:
             "Planner proposal loaded into the editor. Review every task, claim and check, then Prepare. Nothing was prepared or started.",
+        });
+      } else if (response.data.kind === "derived-draft") {
+        // Candidate data for the editor only: nothing is prepared, confirmed, stored or run.
+        const current = latest.current;
+        const derived =
+          request.type === "workflow.derive"
+            ? derivedLoadedDraft(response, request.runId, current.state?.complexExecution)
+            : null;
+        if (!derived) {
+          setCommandState({
+            status: "rejected",
+            message:
+              "Runtime returned a draft that does not match the requested Run. Nothing was loaded.",
+          });
+          return;
+        }
+        if (!derivedDraftFitsEditor(derived)) {
+          setCommandState({
+            status: "rejected",
+            message:
+              "The derived goal or acceptance criteria cannot be edited one criterion per line without changing them. Nothing was loaded; write the task plan by hand.",
+          });
+          return;
+        }
+        const editor = {
+          goal: current.goal.trim(),
+          acceptanceStatements: lines(current.complexCriteria),
+          draft: toComplexDraft(current.complexRows),
+        };
+        const empty =
+          editor.goal === "" &&
+          editor.acceptanceStatements.length === 0 &&
+          current.complexRows.length === 0;
+        if (!empty && !derivedDraftUnchanged(derived, editor)) {
+          setCommandState({ status: "submitting", message: "Waiting for explicit confirmation." });
+          const replace = await requestConfirmDialog(
+            `Replace the editor's goal, acceptance criteria and task rows with the draft derived from Run ${derived.runId} (${derived.sourceStatus})?\nThe current editor content is not kept. Review every task, claim and check before Prepare.`,
+          );
+          if (!mounted.current) return;
+          if (!replace) {
+            setCommandState({
+              status: "idle",
+              message: "Kept the editor's goal, criteria and task rows. Nothing was loaded.",
+            });
+            return;
+          }
+        }
+        invalidateDraft();
+        setGoal(derived.goal);
+        setComplexCriteria(derived.acceptanceStatements.join("\n"));
+        setComplexRows(toComplexRows(derived.draft));
+        setDerivedDraft(derived);
+        setLoadedDraft(null);
+        setCommandState({
+          status: "accepted",
+          message: `Draft derived from Run ${derived.runId} loaded into the editor. Resolve leftover changes and review every task, claim and check, then Prepare. Nothing was prepared or started.`,
         });
       } else if (response.data.kind === "prepared") {
         setFactPreview(null);
@@ -700,7 +812,7 @@ export function WeavraControls({
     const fields = common();
     if (!fields || !canStartPlanner) return;
     try {
-      void submit(plannerStartRequest(fields, goal.trim(), plannerStatements));
+      void submit(plannerStartRequest(fields, goal.trim(), editorStatements));
     } catch {
       setCommandState({
         status: "rejected",
@@ -718,6 +830,10 @@ export function WeavraControls({
     const fields = common();
     if (fields && canLoadPlanner && planner)
       void submit(plannerReadRequest(fields, planner.planId));
+  };
+  const derive = () => {
+    const fields = common();
+    if (fields && canDerive && run) void submit(deriveRequest(fields, run.runId));
   };
   const inspectBrowser = () => {
     const fields = common();
@@ -888,6 +1004,24 @@ export function WeavraControls({
             </p>
           )
         )}
+        {rerunOffered && run && state?.complexExecution && (
+          <section
+            aria-label="Unfinished COMPLEX work"
+            className="space-y-2 rounded-md border border-border p-3 text-xs"
+          >
+            <p>
+              Run {run.runId} ended {run.status} with{" "}
+              {state.complexExecution.tasks.filter((task) => task.status !== "COMPLETED").length} of{" "}
+              {state.complexExecution.tasks.length} tasks unfinished. Re-planning asks the Runtime
+              for a candidate draft of a new Run: completed tasks become read-only verification
+              tasks that are checked again, and unfinished tasks keep their claims. Nothing resumes,
+              no evidence is reused, and nothing is prepared or started until you do it.
+            </p>
+            <Button size="sm" variant="outline" disabled={!canDerive} onClick={derive}>
+              Re-plan unfinished work
+            </Button>
+          </section>
+        )}
         {foreignActiveRun && (
           <p
             aria-label="Another owner holds this project"
@@ -897,6 +1031,18 @@ export function WeavraControls({
             preparing a workflow marks its Run INTERRUPTED; nothing resumes and partial workspace
             changes remain. If the owner is still running or cannot be proven stopped, the Runtime
             refuses.
+          </p>
+        )}
+        {staleWriter && (
+          <p
+            aria-label="Writer lock after the latest Run"
+            className="text-xs text-muted-foreground"
+          >
+            A writer lock is still present although the latest Run ended {run?.status}. If its owner
+            has stopped, preparing a workflow lets the Runtime release the lock; when that changes
+            the project, prepare returns STALE_PROJECT, so prepare again once the refreshed state
+            appears. If the owner is still running or cannot be proven stopped, the Runtime refuses
+            with WRITER_PRESENT. Nothing resumes, and partial workspace changes remain.
           </p>
         )}
         <form
@@ -1013,6 +1159,76 @@ export function WeavraControls({
                     <p>Planned for a different goal or criteria than the editor now holds.</p>
                   )}
                 </div>
+              )}
+              {derivedShown && derivedDraft && (
+                <section
+                  aria-label="Derived re-run draft"
+                  className="space-y-2 rounded-md border border-warning/50 p-3 text-xs"
+                >
+                  {derivedUnchanged ? (
+                    <p className="font-medium">{derivedBanner(derivedDraft)}</p>
+                  ) : (
+                    <p>
+                      The editor no longer holds the derived draft unchanged. The prepare check and
+                      notes below describe the draft as derived; Prepare checks the editor again.
+                    </p>
+                  )}
+                  <p className="text-muted-foreground">
+                    Claims follow the files at derive time. After you commit or discard leftover
+                    changes in your own tools, derive again so that create and modify match the
+                    checkout. This is an ordinary new Run: nothing resumes and no earlier evidence
+                    is reused.
+                  </p>
+                  <div aria-label="Leftover changes" className="space-y-1">
+                    {derivedDraft.leftovers.clean === false ? (
+                      <>
+                        <p>
+                          These changes block a new Run until you commit or discard them. The
+                          Runtime never does either.
+                        </p>
+                        <ul className="space-y-0.5 font-mono">
+                          {derivedDraft.leftovers.paths.map((path) => (
+                            <li key={path} className="break-all">
+                              {path}
+                            </li>
+                          ))}
+                        </ul>
+                        {derivedDraft.leftovers.truncated && (
+                          <p>
+                            More changes exist than are listed; the list stops at 200 names or
+                            16,384 bytes.
+                          </p>
+                        )}
+                      </>
+                    ) : derivedDraft.leftovers.clean === null ? (
+                      <p>
+                        Workspace state unknown: Git could not report leftover changes at derive
+                        time, so changes that block a new Run may remain.
+                      </p>
+                    ) : (
+                      <p>No leftover changes at derive time.</p>
+                    )}
+                  </div>
+                  <p aria-label="Prepare check">
+                    {derivedDraft.prepareCheck.ok
+                      ? "Prepare dry-run at derive time: passed. This is not a preview; Prepare checks the editor again."
+                      : `Prepare dry-run at derive time: refused with ${derivedDraft.prepareCheck.code}. Edit the task plan before Prepare; the notes may say why.`}
+                  </p>
+                  {derivedDraft.notes.length > 0 && (
+                    <ul aria-label="Derivation notes" className="space-y-0.5">
+                      {derivedDraft.notes.map((note, position) => (
+                        // Fixed-template notes may repeat; their position is their identity.
+                        // oxlint-disable-next-line react/no-array-index-key
+                        <li key={position} className="break-words">
+                          {note}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <Button size="sm" variant="outline" disabled={!canDerive} onClick={derive}>
+                    Derive again
+                  </Button>
+                </section>
               )}
               {complexRows.map((row, index) => {
                 const task = index + 1;
@@ -1216,6 +1432,7 @@ export function WeavraControls({
                       onClick={() => {
                         editComplexRows(() => []);
                         setComplexCriteria("");
+                        setDerivedDraft(null);
                       }}
                     >
                       Discard task plan

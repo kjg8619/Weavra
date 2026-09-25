@@ -893,3 +893,26 @@ for (const [label, planner, accepted] of [
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 }
+
+// V0.8C re-run: the advertisement decodes strictly on the real transport; whether a connection may
+// receive workflow.derive is the RuntimeController's check.
+for (const [label, version, accepted] of [
+  ["re-run contract v1", 1, true],
+  ["an unknown re-run version", 2, false],
+  ["a null re-run version", null, false],
+  ["a guessed string re-run version", "1", false],
+] as const) {
+  it.effect(`capability advertisement with ${label} is exact, never inferred`, () =>
+    Effect.gen(function* () {
+      const result = yield* exchangePatched(helloRequest, { rerunContractVersion: version });
+      expect(result).toMatchObject(
+        accepted
+          ? {
+              _tag: "Success",
+              success: { data: { capabilities: { rerunContractVersion: version } } },
+            }
+          : { _tag: "Failure", failure: { code: "INVALID_PAYLOAD" } },
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
