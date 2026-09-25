@@ -1,4 +1,4 @@
-import type { WorkerMeasurement } from "./measurement.ts";
+import type { WorkerMeasurement, WorkerUsage } from "./measurement.ts";
 
 const invocationLimit = 1_000;
 const tokenLimit = 10_000_000;
@@ -111,10 +111,18 @@ export class BudgetController {
 
 	/** Records the settled invocation. Unavailable usage keeps the ledger honest instead of assuming zero. */
 	record(role: string, measurement: WorkerMeasurement): void {
+		this.recordUsage(role, measurement.usage);
+	}
+
+	/**
+	 * Settles one invocation from its provider-reported usage alone, with the same rules as `record`. The V0.8B Host
+	 * Planner uses it: planning belongs to no Run, so it has no worker measurement.
+	 */
+	recordUsage(role: string, usage: Pick<WorkerUsage, "source" | "totalTokens">): void {
 		if (this.outstanding > 0) this.outstanding -= 1;
 		else this.invocations += 1;
-		if (measurement.usage.source !== "provider") this.usageUnknown = true;
-		this.tokens += measurement.usage.totalTokens;
+		if (usage.source !== "provider") this.usageUnknown = true;
+		this.tokens += usage.totalTokens;
 		// Overages after an in-flight call are recorded; the next invocation is denied. Never a billing hard cap.
 		const maxTokens = this.limits.maxReportedTokens;
 		if (maxTokens !== undefined && this.tokens >= maxTokens && !this.denial)

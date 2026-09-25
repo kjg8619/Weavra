@@ -4,7 +4,7 @@ Adaptive Agent Workflow Runtime — **Weavra v0.1 RC1 기반 development build**
 
 사용자 설치·Quick Start·기능 범위는 [Weavra README](../../README.md)를 참고한다. 이 문서는 S0~S6 및 RC 수정의 구현 참조다. 내부 `company-runtime`/`CompanyKernel` 명칭과 Pi workspace package 버전 `0.85.1`은 유지하며 Weavra 제품 버전과 구분한다.
 
-Host 독립 Kernel, StateStore·Policy, 독립 Pi SDK 역할에 실제 Git evidence·등록 check·명령/lifecycle을 연결했다. **STANDARD/R0~R2와 QUICK/R0~R1**을 지원한다. R2는 제한된 파일 변경과 독립 리뷰를 결합한 경로다. R3는 명시적 인간 승인을 받은 단일 tracked 텍스트 파일 삭제만 지원한다. COMPLEX는 Host Control로 준비·확인한 구조화 계획의 2~8개 task를 한 Run에서 실행하는 경로로만 지원한다([V0.7B](#v07b-complex-순차-workflow)). 독립 task의 구현은 최대 4개까지 wave로 동시에 실행할 수 있고 검증은 항상 한 번에 하나다([V0.8A](#v08a-complex-병렬-구현-wave)). 범용 R3 실행, 자동 resume/rollback/commit, Planner는 지원하지 않는다. [GPT RC-01~08 validation](../../docs/GPT_RC_VALIDATION_2026-09-16.md)의 한정된 실제 검증을 통과했으며 정식 V0.1 release 선언은 아니다. DeepSeek는 NOT VERIFIED다.
+Host 독립 Kernel, StateStore·Policy, 독립 Pi SDK 역할에 실제 Git evidence·등록 check·명령/lifecycle을 연결했다. **STANDARD/R0~R2와 QUICK/R0~R1**을 지원한다. R2는 제한된 파일 변경과 독립 리뷰를 결합한 경로다. R3는 명시적 인간 승인을 받은 단일 tracked 텍스트 파일 삭제만 지원한다. COMPLEX는 Host Control로 준비·확인한 구조화 계획의 2~8개 task를 한 Run에서 실행하는 경로로만 지원한다([V0.7B](#v07b-complex-순차-workflow)). 독립 task의 구현은 최대 4개까지 wave로 동시에 실행할 수 있고 검증은 항상 한 번에 하나다([V0.8A](#v08a-complex-병렬-구현-wave)). 선택적 Planner는 그 계획의 초안을 사람이 검토할 후보 데이터로만 제안한다([V0.8B](#v08b-planner-초안)). 범용 R3 실행, 자동 resume/rollback/commit은 지원하지 않는다. [GPT RC-01~08 validation](../../docs/GPT_RC_VALIDATION_2026-09-16.md)의 한정된 실제 검증을 통과했으며 정식 V0.1 release 선언은 아니다. DeepSeek는 NOT VERIFIED다.
 
 ## 로딩
 
@@ -666,6 +666,8 @@ readiness는 project config validation이나 Provider readiness가 아니라 **�
 | `browser.prepare` | candidate digest와 Host가 검토한 expectation을 Runtime 등록 preview로 고정; 모델 호출 없음 |
 | `browser.confirm` | exact preview의 명시적 확인 후 기존 project config에 browser check 등록; 실행/PASS 아님 |
 
+V0.8B Host는 후보 초안만 다루는 `planner.start`·`planner.cancel`·`planner.read`도 받는다([V0.8B](#v08b-planner-초안)). 이전 App이 광고 `commands` tuple을 엄격하게 decode하므로 이 세 command는 tuple에 넣지 않고 `plannerContractVersion: 1`로만 알린다. 어느 것도 prepare·confirm·실행을 대신하지 않는다.
+
 - **입력은 data뿐이다.** classification·execution mode·scope·checks·frozen Task Contract·revision, approval grant/consumption·Policy·PASS·COMPLETE는 Runtime/Kernel이 소유한다. T3가 임의 계약 필드나 도구/셸 명령을 실행 인수로 지정하지 않는다. confirmation 뒤 계약을 UI에서 변경하지 않는다.
 - owner UUID + **Runtime-issued 단조 증가 request ID** + 최대 **64개 payload-bound receipt**를 사용한다. 다른 payload로 같은 ID를 재사용하거나 같은 epoch에서 이미 evicted된 ID를 replay해 새 실행을 만들 수 없다. 이 bounded receipt는 durable replay log나 재시작 recovery가 아니다.
 - **ACK != canonical outcome.** confirm/cancel/approval 응답을 `COMPLETED`/`CANCELLED`/`CONSUMED`로 바꾸지 않는다. fresh canonical Run·revision·approval 기록과 cleanup 상태를 따로 확인한다. read-only의 `ownerObserved: false`와 writer presence는 계속 liveness 증명이 아니며 control owner identity와 혼동하지 않는다.
@@ -776,6 +778,24 @@ weavra browser observe \
 - **관측.** `complexExecution`은 `schemaVersion: 2`와 `activeTaskIds`(plan 순서, integration·종료 시 빈 목록)를 싣는다. V0.7B Runtime이 남긴 COMPLEX Run(v1 plan)은 읽기 전용 이력이며, 종료된 경우에만 v1 plan과 digest를 그대로 둔 v2 execution으로 투영한다. TUI 행·footer와 `/state evidence`는 active task 전체, task별 wave 번호, `HANDED_OFF`를 보여준다.
 - **검증 범위.** faux provider의 Kernel race corpus(PARALLEL_AGENTS.md §11 P01–P12, P15–P17), StateStore·Host Control·SDK 병렬 테스트, #21 App과 결합한 #18 corpus 14 시나리오(`maxParallel = 1`)가 근거다. 실모델 병렬 smoke, 실제 경계의 재연결·crash(P13/P14)와 속도 향상 측정은 #22 전까지 NOT VERIFIED다.
 
+## V0.8B Planner 초안
+
+설계 계약: [PLANNER_DRAFT.md](../../../../docs/architecture/PLANNER_DRAFT.md). COMPLEX 목표의 task 계획을 모델이 **후보 데이터로만** 제안한다. Planner에는 권한이 없다. 사람이 초안을 편집기에 불러와 고친 뒤 기존 `workflow.prepare` → preview → `workflow.confirm`을 그대로 거쳐야 무엇이든 실행된다(`src/planner.ts`, `src/host-control.ts`).
+
+| command | 계약 |
+|---|---|
+| `planner.start` | goal·선택적 AC prose(prepare와 같은 bound). prepare와 같은 idle 검사(죽은 소유자 복구 뒤 `STALE_PROJECT` 포함)와 분류를 거쳐, draftless prepare가 R3가 아닌 `ComplexPlanRequiredError`를 낼 때만 접수하고 즉시 `accepted`를 돌려준다. 계획은 background에서 진행한다. 그 밖에는 모델 호출 없이 기존 코드(`STALE_PROJECT`·`ACTIVE_RUN`·`WRITER_PRESENT`·`INVALID_REQUEST`·`INVALID_GOAL`·`UNSUPPORTED_WORKFLOW`)나 `PLANNER_BUSY`(계획 또는 이 Host의 Run 실행 진행 중)로 거부한다 |
+| `planner.cancel` | RUNNING 요청을 즉시 `CANCELLED`로 바꾸고 세션을 중단·폐기한다. 늦게 온 결과는 버린다. RUNNING이 아니면 `PLANNER_NOT_FOUND` |
+| `planner.read` | READY 초안(최대 12,288 bytes, 응답 최대 16,384 bytes)을 `planner-draft`로 돌려준다. 모르는 planId는 `PLANNER_NOT_FOUND`, READY가 아니면 `PLANNER_NOT_READY` |
+
+- **관측.** `control.hello`는 `plannerContractVersion: 1`을 광고한다(권한·준비 완료 표시가 아님). 광고 `commands` tuple은 V0.8A와 같다. `planId`는 소문자 canonical UUID다. `control.snapshot`의 `planner`는 이 Host에서 `planner.start`가 접수된 뒤에만 있고(그 전에는 V0.8A와 같은 모양), 상태·`requestDigest`·기록된 `projectRevision`·`current`·route(alias → profile → provider/model)·usage·READY task 수·FAILED 코드만 담는다. 초안은 snapshot에 싣지 않는다. 성공한 `workflow.confirm`이 이 상태를 지운다.
+- **Planning Context.** 첫 user message는 `role: "Planner"` JSON 하나다. goal, prepare 순서의 `AC-001…`, 실행 모드·Risk, 고정 plan 규칙, 등록 check의 id·kind·required, allowed paths, `runtime_list_files`와 같은 규칙의 파일 이름 목록(최대 500개·64 KiB·깊이 4, `.ai/`·보호 경로 제외), 설정된 project instruction snapshot, VALID fact를 담는다. 파일 내용·check 명령·`.ai` 상태·Run 이력·secret은 없다. 196,608 bytes를 넘거나 instruction을 bound 안에서 읽지 못하면 모델 호출 전에 `CONTEXT_TOO_LARGE`이고 잘라내지 않는다.
+- **세션.** Run에 속하지 않는 새 SDK 세션이다(skill·extension·AGENTS 탐색 없음, compaction·retry 끔, transcript는 메모리). 도구는 `submit_plan_draft` 하나다. 제출은 닫힌 draft schema, 이어서 `workflow.prepare`와 같은 dry-run(`prepareHostWorkflowDraft` → `finalizeComplexHostWorkflowPlan` → `compileComplexPlan`, claim fact·현재 Policy·응답 크기 포함)으로 검사하고 아무것도 저장하지 않는다. 첫 실패에는 Host 코드와 compiler 메시지만 담은 2,048 bytes 이하 correction을 한 번 준다. 텍스트만 답하면 고정 reminder를 correction 전에 한 번 준다. 모델 호출은 Host가 매번 허락해야 하며 최대 3회다. 토큰 상한은 `min(200,000, budget.max_reported_tokens)`이고 BudgetController 규칙대로 호출 전에 예약한다. 요청 전체는 `agents.worker_timeout_ms` 안에 끝나야 한다. 라우팅은 `models.intents.plan`, 없으면 `reasoning`이며 fallback은 없다.
+- **실패 코드(닫힌 집합).** `MODEL_UNAVAILABLE`, `CONTEXT_TOO_LARGE`, `TIMEOUT`, `PROVIDER_ERROR`, `BUDGET_EXHAUSTED`, `BUDGET_UNKNOWN`, `NO_DRAFT`, `DRAFT_INVALID`, `STALE`. `CANCELLED`는 실패 코드가 아니라 상태다.
+- **binding.** 접수할 때 `requestDigest`(`sha256:` + `JSON.stringify(["weavra-planner-request-v1", goal, acceptanceStatements])` UTF-8의 소문자 hex SHA-256, statements가 없으면 `[]`), project revision, prepare가 비교하는 config fingerprint를 기록한다. RUNNING 중 revision이나 config가 바뀌면 다음 모델 호출 전이나 READY 전에 `STALE`이다. READY 뒤에는 snapshot과 `planner.read`마다 `current`를 계산한다. `workflow.prepare`는 불러온 초안을 항상 다시 compile한다.
+- **다른 control과의 관계.** RUNNING 중 `workflow.prepare`는 허용되고 `workflow.confirm`은 `PLANNER_BUSY`다(암묵적 취소 없음). 새 `planner.start`는 READY·FAILED·CANCELLED 상태를 대체한다. 계획을 시작한 연결이 닫히거나 Host가 종료되면 RUNNING을 취소한다. writer lock·`.ai` 쓰기·Run·project revision 변경은 없다.
+- **검증 범위.** faux provider의 단위·Host Control 테스트(`test/planner.test.ts`, `test/host-planner.test.ts`)만 근거다. App(#53)과 결합한 경계 corpus(#54)와 실모델 smoke는 NOT VERIFIED다.
+
 ## #5 모델 의도 프로필
 
 기존 `models.profiles` 위의 얇은 별칭이다([#5](https://github.com/kjg8619/Weavra/issues/5) 후보 3). 역할마다 별칭이 하나씩 정해져 있고, 선택 필드 `models.intents`가 그 별칭을 **이미 설정된 profile 이름**에 연결한다. 연결하지 않은 별칭은 역할의 기존 기본 profile을 그대로 쓴다. `models.intents`가 없으면 라우팅·측정·config digest가 이전과 같다.
@@ -798,6 +818,7 @@ models:
 | `standard` | STANDARD·COMPLEX Developer | `coding` |
 | `review` | STANDARD Reviewer, COMPLEX task·final Reviewer | `reasoning` |
 | `deep` | `/workflow run --deep <goal>`로 시작한 STANDARD run의 Developer | 없음(`--deep` 거부) |
+| `plan` | V0.8B Host Planner 초안 세션(Run worker가 아니며 Run 측정에 남지 않음) | `reasoning` |
 
 - **결정적 라우팅.** 역할 → 별칭 → profile 조회만 한다(`src/model-routing.ts`). LLM·Jev·분류기 호출, 비용·성능 기반 자동 선택, 자동 승격은 없다. 별칭 이름의 비용·품질 뉘앙스를 제품 기본값이나 검증된 우열로 취급하지 않는다.
 - **`deep`은 명시 opt-in.** TUI에서 run 하나에 대해 `--deep`으로만 고른다. `models.intents.deep`이 없거나 목표가 QUICK(Developer 없음)이면 model runtime·provider 호출·Run 생성 전에 설명 가능한 오류로 거부한다. Host Control/App에는 deep 선택이 없다(wire 변경 없음).
@@ -848,7 +869,7 @@ verification:
       required: true
 ```
 
-- 필수: `schemaVersion: 1`, `models.profiles.coding`, `models.profiles.reasoning`. 각 profile에는 비어 있지 않은 `provider`, `model`이 필요하다. `fast`, `creative`는 선택이다. 선택 `models.intents`(`simple`/`standard`/`review`/`deep` → profile 이름)는 [모델 의도 프로필](#5-모델-의도-프로필)을 따른다.
+- 필수: `schemaVersion: 1`, `models.profiles.coding`, `models.profiles.reasoning`. 각 profile에는 비어 있지 않은 `provider`, `model`이 필요하다. `fast`, `creative`는 선택이다. 선택 `models.intents`(`simple`/`standard`/`review`/`deep`/`plan` → profile 이름)는 [모델 의도 프로필](#5-모델-의도-프로필)을 따른다.
 - `runtime.workflow`: `adaptive` 기본값 또는 `QUICK`/`STANDARD`/`COMPLEX`. 설정 파싱은 workflow 판정·실행이 아니다.
 - `agents.max_parallel`: COMPLEX 구현 wave의 동시 task 수 `1..4`, 기본 `1`. plan에 고정되며 R3는 `1`이다. QUICK/STANDARD는 무시한다. STANDARD의 Reviewer REVISE 한도는 `0..3`, 기본 `1`이다. QUICK/R3의 effective 한도는 항상 0이며 V0.5C verification repair 최대 1회와 별개다.
 - `agents.worker_timeout_ms`: 기본 `180000`(180초), 정수 `10000..600000`(10~600초). Developer·Reviewer·Executor의 각 역할 호출에 동일하게 적용한다. 전체 run이나 개별 Provider 요청의 timeout이 아니며 여러 tool/retry turns를 포함한 역할 실행 총 예산이다. 역할별 설정·무제한 값은 지원하지 않는다. `/workflow config`로 현재 값을 확인할 수 있다.

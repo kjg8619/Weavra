@@ -180,7 +180,7 @@ The draft itself is never in the snapshot. `planner.read` returns it, so the sna
 The landing order is **consumer-first**: #53 (App) merges before #52 (Runtime).
 
 - **New App, old Runtime:** `plannerContractVersion` is absent, so the Planner control is hidden and nothing changes.
-- **Old App, new Runtime:** the App never sends `planner.*`, so the snapshot never carries `planner`, and nothing changes.
+- **Old App, new Runtime:** not supported. `control.hello` now carries `plannerContractVersion`, and an App older than #53 rejects that unknown capability key under its strict decoder, so it cannot connect at all. The same held for `complexContractVersion` when V0.7B added it, and it holds for every new capability key. This is why #53 must land first. App and Runtime ship from one repository, so a released pair always matches. Snapshots are unchanged until an App starts planning, because they carry `planner` only after a `planner.start`.
 - **New App, new Runtime:** both sides decode the new commands, kinds and codes strictly. The App server's response checks cover the new kinds.
 
 ## 8. Interaction with the existing controls
