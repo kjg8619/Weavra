@@ -3,7 +3,7 @@
 // gates force the interleavings. Every snapshot must pass the App consumer checks; falseCompletion = 0.
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import {
@@ -300,14 +300,6 @@ await scenario("P09", "a two-row wave with one invocation left is BLOCKED before
         Effect.gen(function* () {
           // Every snapshot below passes the App consumer checks, including the recovery transition.
           const next = yield* connect("P14 new Host", projectRoot, 2);
-          // One raw read first: a failure here (once STATE_UNAVAILABLE on CI, not reproduced locally) still fails the
-          // scenario, but reports the durable state and whether an immediate re-read succeeds.
-          const first = yield* next.transport.exchange({ protocolVersion: 1, id: crypto.randomUUID(), type: "control.snapshot" });
-          if (!first.success) {
-            const diagnosis = yield* Effect.promise(() => orphanDiagnosis(projectRoot));
-            const retry = yield* next.transport.exchange({ protocolVersion: 1, id: crypto.randomUUID(), type: "control.snapshot" });
-            assert.fail(`P14 new Host first snapshot ${JSON.stringify(first.error)}; immediate re-read ${retry.success ? "succeeded" : JSON.stringify(retry.error)}; ${diagnosis}`);
-          }
           const seen = yield* next.snapshot();
           const orphanId = seen.snapshot.status.run.runId;
           assert.equal(seen.snapshot.status.run.status, "RUNNING");
@@ -353,24 +345,6 @@ await scenario("P09", "a two-row wave with one invocation left is BLOCKED before
       );
     },
   });
-}
-
-/** Bounded description of an orphaned project's durable state, for a failed read after the owner was killed. */
-async function orphanDiagnosis(projectRoot) {
-  const listing = await readdir(join(projectRoot, ".ai")).catch((error) => [`unreadable ${error.code}`]);
-  let summary;
-  try {
-    const state = JSON.parse(await readFile(join(projectRoot, ".ai/state.json"), "utf8"));
-    const run = state.runs.at(-1);
-    summary = JSON.stringify({
-      revision: state.revision,
-      run: run && { status: run.status, revision: run.revision, phase: run.complex?.phase, rows: run.complex?.tasks?.map((row) => row.status), active: run.activeAgents?.length },
-      actions: (state.actions ?? []).filter((action) => action.runId === run?.runId).map((action) => action.status),
-    });
-  } catch (error) {
-    summary = `state.json unreadable: ${error.message}`;
-  }
-  return `.ai: ${listing.join(", ")}; state: ${summary}`.slice(0, 4000);
 }
 
 /** Developer model calls of a run: wall-clock span, summed call time, and whether calls of different tasks overlapped. */

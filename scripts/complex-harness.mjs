@@ -3,7 +3,7 @@
 // executable over stdio Host Control; workers talk to a scripted loopback model (scripts/scripted-model-server.mjs).
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -116,12 +116,72 @@ export async function writeModels(model) {
   );
 }
 
+/**
+ * Diagnostic only, after a snapshot failed: re-runs the Runtime's own durable read and COMPLEX projection in-process
+ * (the source next to the executable under test) and lists `.ai`, so a CI-only failure names the path that refused.
+ */
+export async function diagnoseSnapshot(project) {
+  const source = join(dirname(dirname(executable)), "src");
+  const parts = [];
+  try {
+    const { FileStateStore } = await import(join(source, "state-store.ts"));
+    const read = await FileStateStore.readSnapshot(project).then((value) => ({ value }), (error) => ({ error }));
+    if (read.error) {
+      // readSnapshot wraps its cause; report the file facts it checks (type, links, size, JSON) directly.
+      parts.push(`readSnapshot threw: ${read.error?.message}`);
+      const file = join(project, ".ai/state.json");
+      const stat = await lstat(file).catch((error) => ({ error }));
+      parts.push(stat.error ? `state.json lstat ${stat.error.code}` : `state.json file ${stat.isFile()}, nlink ${stat.nlink}, ${stat.size} bytes`);
+      const text = await readFile(file, "utf8").catch(() => undefined);
+      if (text !== undefined)
+        try {
+          JSON.parse(text);
+          parts.push("state.json parses (so the schema or directory check refused)");
+        } catch (error) {
+          parts.push(`state.json JSON: ${error.message}`);
+        }
+    }
+    else {
+      const { state, writerPresent, tasksCurrent } = read.value;
+      const run = state?.runs.at(-1);
+      parts.push(`revision ${state?.revision}, writer ${writerPresent}, tasksCurrent ${tasksCurrent}, run ${run?.workflow}/${run?.status} r${run?.revision}, rows ${run?.complex?.tasks?.map((row) => row.status).join("/")}`);
+      if (run?.workflow === "COMPLEX") {
+        const { projectComplexExecution } = await import(join(source, "complex-state.ts"));
+        try {
+          projectComplexExecution(run, { ownerId: "diagnosis", projectRevision: state.revision, stateRevision: run.revision });
+          parts.push("projection ok");
+        } catch (error) {
+          parts.push(`projection refused: ${error.message}`);
+        }
+      }
+    }
+  } catch (error) {
+    parts.push(`diagnosis failed: ${error.message}`);
+  }
+  parts.push(`.ai: ${(await readdir(join(project, ".ai")).catch((error) => [`unreadable ${error.code}`])).join(", ")}`);
+  return parts.join("; ").slice(0, 4000);
+}
+
 /** One checked App observer over one Runtime connection: every snapshot must pass the App consumer rules. */
-const observer = (name, transport, capabilities) => {
+const observer = (name, transport, capabilities, project) => {
   let previous = null;
   const snapshots = [];
+  const read = () => transport.exchange({ protocolVersion: 1, id: crypto.randomUUID(), type: "control.snapshot" });
   const snapshot = () =>
-    transport.exchange({ protocolVersion: 1, id: crypto.randomUUID(), type: "control.snapshot" }).pipe(
+    read().pipe(
+      // A failed snapshot still fails the scenario; first it records which read failed, whether an immediate
+      // re-read succeeds, and what the Runtime's own read and projection say about the durable state.
+      Effect.flatMap((response) =>
+        response.success
+          ? Effect.succeed(response)
+          : Effect.gen(function* () {
+              const diagnosis = yield* Effect.promise(() => diagnoseSnapshot(project));
+              const retry = yield* read();
+              assert.fail(
+                `${name}: snapshot #${snapshots.length + 1} ${JSON.stringify(response.error)}; re-read ${retry.success ? "succeeded" : JSON.stringify(retry.error)}; ${diagnosis}`,
+              );
+            }),
+      ),
       Effect.map((response) => {
         assert.equal(response.success, true, `${name}: ${JSON.stringify(response)}`);
         const state = response.data.state;
@@ -141,7 +201,7 @@ export const connect = (name, project, version = 2) =>
     const hello = yield* transport.exchange({ protocolVersion: 1, id: crypto.randomUUID(), type: "control.hello" });
     assert.equal(hello.success, true, JSON.stringify(hello));
     assert.equal(hello.data.capabilities.complexContractVersion, version, `${name}: Runtime must advertise COMPLEX contract v${version}`);
-    return { transport, capabilities: hello.data.capabilities, ...observer(name, transport, hello.data.capabilities) };
+    return { transport, capabilities: hello.data.capabilities, ...observer(name, transport, hello.data.capabilities, project) };
   });
 export const start = (name, connection, { draft, goal, statements }) =>
   Effect.gen(function* () {

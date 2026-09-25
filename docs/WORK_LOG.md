@@ -20,7 +20,7 @@
   - 반복 횟수를 늘린 속도·비용 측정.
   - 고아 복구의 남은 한계: lock 없는 활성 Run, PID만 보는 사망 증명.
   - App device script가 stop 모드에서도 결과를 쓰지 않는 `xcrun simctl help`(30초 timeout)를 실행한다. simulator 서비스가 차가운 Mac에서는 stop마다 최대 30초가 걸릴 수 있다.
-  - P14에서 소유 Host를 강제 종료한 뒤 새 Host의 첫 snapshot이 `STATE_UNAVAILABLE`로 한 번 실패했다(PR #50 CI). 원인은 아직 모르고, 진단 출력을 추가해 두었다.
+  - P14에서 소유 Host를 강제 종료한 뒤 새 Host의 snapshot이 `STATE_UNAVAILABLE`로 실패하는 CI 전용 문제(PR #50에서 2회). 원인은 아직 모르고, 두 corpus 관찰자에 진단을 추가했다.
 - 원본 Pi/T3Code 저장소는 수정하지 않는다. 아래 기록은 날짜별 append-only이며, 현재 실행 결과와 이전 저장소의 역사적 결과를 구분한다.
 
 ## 2026-09-21 KST — 독립 저장소 및 원본 스냅샷 import 완료
@@ -935,12 +935,17 @@
      - 수정: 테스트 bin에 `exit 1`만 하는 xcrun stub을 두었다.
      - 재현: 40초 걸리는 xcrun이 PATH에 있어도 3.4초에 통과한다. 스크립트가 건강한 hub를 재시작하게 바꾸면 여전히 실패한다.
 - 새로 관측한 실패(원인 미확인):
-  - PR #50의 첫 CI에서 P14가 한 번 실패했다. 소유 Host를 강제 종료한 뒤 새 Host가 처음 읽은 snapshot이 `STATE_UNAVAILABLE`였다.
+  - PR #50의 CI 두 번 모두 P14가 `STATE_UNAVAILABLE`로 실패했다. 소유 Host를 강제 종료한 뒤 새 Host의 snapshot에서 났다.
+  - 두 번째 실패는 첫 snapshot을 따로 진단한 뒤에 났다. 그래서 첫 읽기가 아니라 그 뒤의 읽기(재확인, 복구, 새 Run 진행)에서 난 것이다.
   - 로컬에서는 재현되지 않았다.
-    - 강제 종료 시점을 무작위로 바꿔 35회 돌렸고, 그중 20회는 CPU 부하를 걸었다. 모두 통과했다.
-    - 중단 없이 끝까지 간 run에서 저장된 revision 1–79를 모두 Host 투영에 넣어 봤는데, 거부된 것이 없었다.
-    - 코드상 snapshot이 `STATE_UNAVAILABLE`을 내는 경로는 다섯 가지다: 상태 읽기 실패, 읽는 동안 revision 변경(3회), 실행 변경, stateRevision 없음, COMPLEX 투영 불일치.
-  - 원인을 가리지 않으려고 P14에 진단을 넣었다. 첫 snapshot이 실패하면 `.ai` 목록, 상태 요약, 즉시 다시 읽은 결과를 출력하고 시나리오는 그대로 실패한다.
+    - 강제 종료 직후 첫 snapshot: 35회(그중 20회는 CPU 부하).
+    - 복구와 새 Run 완료까지의 전체 흐름: 12회.
+    - 매 run에서 저장된 revision 79–85개를 Runtime 투영에 넣어 봤는데, 거부된 것이 없었다.
+  - 코드상 snapshot이 `STATE_UNAVAILABLE`을 내는 경로는 다섯 가지다: 상태 읽기 실패, 읽는 동안 revision 변경(3회), 실행 변경, stateRevision 없음, COMPLEX 투영 불일치.
+  - 진단을 넣었다. 두 corpus의 snapshot 관찰자가 실패한 snapshot을 받으면 다음을 출력하고, 시나리오는 그대로 실패한다.
+    - 몇 번째 읽기에서 실패했는지와 즉시 다시 읽은 결과.
+    - Runtime 자체의 `readSnapshot`·COMPLEX 투영을 같은 durable state로 다시 돌린 결과: 실패 메시지, 파일 형식·링크·크기, JSON 여부.
+    - `.ai` 목록.
 - 현재 검증:
   - 메인 세션:
     - 두 corpus 로컬 통과(COMPLEX 14, PARALLEL 9, falseCompletion 0).
