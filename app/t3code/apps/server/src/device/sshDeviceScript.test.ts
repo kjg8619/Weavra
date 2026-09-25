@@ -56,6 +56,12 @@ describe("remote helper lifecycle", () => {
         const bin = NodePath.join(home, "bin");
         await NodeFSP.mkdir(bin);
         await NodeFSP.writeFile(NodePath.join(bin, "adb"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+        // Every script run probes iOS with `xcrun simctl help` (30s timeout). With Xcode
+        // installed that waits on CoreSimulatorService, which a cold macOS runner answers in
+        // seconds or not at all. Pin it like adb so the lifecycle ignores host simulators.
+        await NodeFSP.writeFile(NodePath.join(bin, "xcrun"), "#!/bin/sh\nexit 1\n", {
+          mode: 0o755,
+        });
         const root = NodePath.join(home, ".weavra", "app", "device");
         const hubDir = NodePath.join(root, `tools/expo-device-hub@${DEVICE_HUB_VERSION}`);
         const agentDir = NodePath.join(root, `tools/agent-device@${AGENT_DEVICE_VERSION}`);
