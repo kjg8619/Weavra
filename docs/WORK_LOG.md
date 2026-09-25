@@ -1212,3 +1212,33 @@
   - 확인 스크립트는 처음에 브라우저 경로, 교체 모달, 대본 카운터 문제로 몇 번 다시 실행했다. 제품 결함이 아니라 스크립트 쪽 문제였다.
   - 종료할 때는 기록한 dev 서버 PID와 작업 디렉터리를 확인한 포트 소유자만 종료했다. 남은 bridge 프로세스는 없었다.
 - 커밋 상태: `96a933d0`(corpus), `082dd65f`(smoke), 병합 커밋, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — #65 Planner 검사 대상 경로(설계 개정 A1)
+
+- 배경: V0.8B #54 실제 모델 smoke에서 AC에 파일 경로가 없으면 Planner가 모듈 이름을 추측했다(`src/parser.js`). 등록된 검사는 `src/parse.mjs`를 불러오므로 Run이 BLOCKED/CHECK_FAILED로 끝났다(거짓 완료 0). 사용자 결정으로 backlog #65를 진행했다.
+- 브랜치/worktree: `feat/planner-check-targets`, `Weavra-worktrees/v0.7b-complex-runtime`(재사용). 설계 개정은 메인 세션이, 구현은 하위 에이전트가 했고, 실제 모델 확인은 메인 세션이 했다.
+- 설계(PLANNER_DRAFT.md §4.1 개정 A1):
+  - 검사의 테스트 파일은 검증 기준(verifier source)이라 보호 경로다. worker는 이름·내용을 볼 수 없다. 이 원칙은 그대로 둔다.
+  - Host가 테스트 파일의 JS/TS 상대 import(`import`/`export … from`/`import()`/`require`)를 실행 없이 결정적으로 해석한다.
+  - 해석 결과 가운데 허용 경로 안에 있고, 목록 Policy를 통과하며, 검증 파일이 아닌 모듈 경로만 `checks[].exercises`로 준다. 개수는 검사당 16개, 전체 64개까지다.
+  - 검증 파일의 이름·내용·검사 명령은 계속 넣지 않는다. 계획 규칙에는 "claim을 고를 때 exercises 경로를 우선하라"를 한 줄 추가했다.
+  - wire는 바뀌지 않으므로 App 변경도 없다.
+- 구현(`runtime/pi/packages/company-runtime`):
+  - `src/check-exercises.ts`(신규):
+    - 실행하지 않는 lexer: 주석·문자열·템플릿·정규식을 건너뛰고, escape가 없는 `./`·`../` 리터럴만 받는다.
+    - 안전한 읽기: trust snapshot 규칙을 따르고 파일당 262,144 bytes까지만 읽는다. 링크·바이너리·보호 이름은 건너뛴다.
+    - 확장자 없는 경로는 정확히 하나가 있을 때만 해석하고, `index.*`도 같은 규칙이다.
+    - 필터와 개수 제한을 적용하고, 취소를 확인한다.
+  - `src/planner.ts`: 계획 규칙을 추가하고 Planning Context `checks`에 exercises를 넣었다.
+  - `scripts/planner-integration.mjs` L01: `test-parse → ["src/parse.mjs"]`, `test-format → ["src/format.mjs"]`이고 문맥에 `test/` 경로가 없는지 확인한다.
+- 현재 검증:
+  - 하위 에이전트:
+    - 새 테스트 12개가 모든 import 형태, 거부해야 할 import, 주석·문자열 안의 import, 허용 경로·보호 경로·검증 파일 제외, 확장자 해석, 개수 제한, 읽기 실패, 누설 없음, 결정성을 확인한다.
+    - 변이 확인 4종(허용 경로 필터, 검증 파일 제외 두 가지, bare specifier)을 모두 잡았다.
+    - `npm run check` exit 0. `./test.sh` exit 0(company-runtime 2,261 PASS).
+    - COMPLEX 14·PARALLEL 9·PLANNER 13·RERUN 5 corpus가 모두 falseCompletion 0으로 통과했다.
+  - 메인 세션 실제 모델 smoke(commandcode `deepseek/deepseek-v4.1-flash`, `max_parallel 2`, **AC에 경로 없음**, 1회):
+    - Planner: READY, 5초, 호출 1회, 2,208 토큰. `src/parse.mjs`·`src/format.mjs`를 claim한 독립 작업 2개였다.
+    - Run: COMPLETED(병렬 웨이브, 작업·통합 PASS×3), 72초, 125,490 토큰, cleanup CONFIRMED.
+    - 같은 조건의 개선 전 smoke는 모듈 이름을 추측해 BLOCKED였다.
+- 커밋 상태: `f675afa9`(설계 개정), `99bb86d0`(구현), devlop 병합, 이 기록. devlop 대상 PR.
