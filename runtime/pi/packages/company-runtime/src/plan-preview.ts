@@ -4,6 +4,7 @@ import type { ComplexPlan } from "./complex-types.ts";
 import type { RuntimeConfig } from "./config.ts";
 import type { AcceptanceCriterion, Risk, Workflow } from "./contracts.ts";
 import type { ExecutionMode } from "./execution-contract.ts";
+import { type ModelRoute, modelRouteSource } from "./model-routing.ts";
 import { SANDBOX_DISABLED_WARNING } from "./sandbox-advice.ts";
 
 export interface PlanPreview {
@@ -13,6 +14,8 @@ export interface PlanPreview {
 	risk: Risk;
 	/** User-confirmed keyword-only R3 override; display only, never an approval or a tool grant. */
 	riskOverride?: RiskOverride;
+	/** Per-role model routing (#5) the run will preflight and use; display only, never a permission. */
+	modelRoutes: readonly ModelRoute[];
 	acceptanceCriteria: readonly AcceptanceCriterion[];
 	allowedPaths: readonly string[];
 	checks: RuntimeConfig["verification"]["checks"];
@@ -102,6 +105,11 @@ export function formatPlanPreview(plan: PlanPreview): string {
 		),
 		...(complex ? formatComplexPlan(complex) : []),
 		`Roles: ${plan.workflow === "QUICK" ? "Executor" : complex ? "Developer -> independent Reviewer for each task, then a new independent final Reviewer (no Planner/Lead)" : "Developer -> independent Reviewer"}`,
+		"Models (alias -> profile -> provider/model; fixed per role, no automatic selection or fallback; never changes contract, risk, Policy or review):",
+		...plan.modelRoutes.map(
+			(route) =>
+				`  ${route.role}: ${route.intent} -> ${route.profile} -> ${displayText(route.provider)}/${displayText(route.model)} (${modelRouteSource(route)})`,
+		),
 		`Project instruction: ${plan.projectInstructionPath ? `${plan.projectInstructionPath} (configured; frozen prompt context, not readable by workers)` : "none"}`,
 		`LSP: ${plan.lspEnabled ? "enabled (trusted local program, not sandboxed)" : "disabled"}`,
 		`Mutation mode: ${plan.mutationMode}${plan.mutationMode === "strict" ? " (strict freshness/precondition enforcement for existing files; not a permission and not approval)" : ""}`,

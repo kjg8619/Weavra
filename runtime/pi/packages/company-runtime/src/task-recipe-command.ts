@@ -1,12 +1,15 @@
 import { taskRecipeById } from "./task-recipes.ts";
 
 /**
- * Explicit recipe selection for the run command (V0.5B, B3). Pure Host-side parsing: it never invokes a
- * provider, never loads a skill and never grants anything. `/workflow run <goal>` keeps working unchanged.
+ * Explicit run-command selections: a reviewed recipe (V0.5B, B3) and the `deep` model intent (#5). Pure Host-side
+ * parsing: it never invokes a provider, never loads a skill and never grants anything. `/workflow run <goal>` keeps
+ * working unchanged.
  */
 export interface WorkflowRunArgument {
 	goal: string;
 	recipeId?: string;
+	/** Explicit per-run choice: this run's Developers use `models.intents.deep`. Never implied by goal text. */
+	deep?: true;
 }
 
 export class WorkflowRunArgumentError extends Error {
@@ -17,8 +20,8 @@ export class WorkflowRunArgumentError extends Error {
 }
 
 /**
- * Fixed syntax: leading `--recipe <id>` followed by the goal. Only leading flags are parsed, so a goal that
- * merely contains the text "--recipe" stays a goal; any other leading flag is rejected instead of guessed.
+ * Fixed syntax: leading `--recipe <id>` and/or `--deep` followed by the goal. Only leading flags are parsed, so a goal
+ * that merely contains the text "--recipe" or "--deep" stays a goal; any other leading flag is rejected, not guessed.
  */
 export function parseWorkflowRunArgument(argument: string): WorkflowRunArgument {
 	const tokens = argument
@@ -26,9 +29,16 @@ export function parseWorkflowRunArgument(argument: string): WorkflowRunArgument 
 		.split(/\s+/)
 		.filter((token) => token.length > 0);
 	let recipeId: string | undefined;
+	let deep = false;
 	let index = 0;
 	while (index < tokens.length && tokens[index].startsWith("--")) {
 		const token = tokens[index];
+		if (token === "--deep") {
+			if (deep) throw new WorkflowRunArgumentError("duplicate --deep");
+			deep = true;
+			index += 1;
+			continue;
+		}
 		if (token !== "--recipe") throw new WorkflowRunArgumentError(`unknown flag ${token}`);
 		if (recipeId !== undefined) throw new WorkflowRunArgumentError("duplicate --recipe");
 		const value = tokens[index + 1];
@@ -40,9 +50,7 @@ export function parseWorkflowRunArgument(argument: string): WorkflowRunArgument 
 	}
 	const goal = tokens.slice(index).join(" ").trim();
 	if (!goal) throw new WorkflowRunArgumentError("a goal is required");
-	if (recipeId !== undefined) {
-		if (!taskRecipeById(recipeId)) throw new WorkflowRunArgumentError(`unknown recipe ${recipeId}`);
-		return { goal, recipeId };
-	}
-	return { goal };
+	if (recipeId !== undefined && !taskRecipeById(recipeId))
+		throw new WorkflowRunArgumentError(`unknown recipe ${recipeId}`);
+	return { goal, ...(recipeId !== undefined ? { recipeId } : {}), ...(deep ? { deep: true as const } : {}) };
 }

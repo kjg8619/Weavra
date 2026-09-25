@@ -91,6 +91,7 @@ Weavra Extension의 소스 TypeScript는 local Pi가 로드하므로 **company-r
 |---|---|
 | `/workflow help`, `/state help`, `/team help`, `/risk help` | Weavra 사용법; workflow help에 risk/Reviewer/Approval·commit/rollback 제한 안내 |
 | `/workflow run <goal>` | 신뢰 확인 후 비동기 preflight·분류에 따른 QUICK/STANDARD 실행 시작 |
+| `/workflow run --deep <goal>` | 그 STANDARD run의 Developer만 `models.intents.deep`으로 실행. 명시 opt-in이며 미설정·QUICK이면 run 전에 거부([#5](#5-모델-의도-프로필)) |
 | `/workflow`, `/workflow status [runId]` | live Kernel 또는 저장된 run의 출처·시각·상태·변경 요약 |
 | `/workflow history [page]`, `/workflow config` | 저장 run 이력 / 현재 설정과 effective revision 안내 |
 | `/workflow cancel` | 취소 요청 후 worker/check 정리와 종료 보고를 기다림; rollback 없음 |
@@ -441,7 +442,7 @@ Host가 확인한 수용 기준(Acceptance Criteria)을 run 단위로 고정한�
 
 ## V0.3F Measurement & Evidence
 
-- 모든 worker invocation을 `run.workerMeasurements[]`로 측정한다: requested/actual provider·model, responseModel/thinking(없으면 UNKNOWN), duration, turns, tool 호출 수(이름별), provider-reported usage, outcome. prompt·completion·reasoning text·tool args는 저장하지 않는다.
+- 모든 worker invocation을 `run.workerMeasurements[]`로 측정한다: 사용한 profile(설정된 별칭이 골랐으면 `modelIntent`), requested/actual provider·model, responseModel/thinking(없으면 UNKNOWN), duration, turns, tool 호출 수(이름별), provider-reported usage, outcome. prompt·completion·reasoning text·tool args는 저장하지 않는다.
 - usage는 `AssistantMessage.usage`만 사용하고 reasoning을 total에 더하지 않는다. 한 message라도 usage가 없으면 `source: "unavailable"`로 표시하고 0으로 위장하지 않는다. 가격이 불명확하면 Evidence Pack은 `Estimated cost: UNKNOWN`을 출력한다.
 - `budget: { max_worker_invocations?, max_reported_tokens? }`(미설정=unlimited). 호출 수는 모델 호출 전에 정확히 차단되고, token은 provider-reported 기반으로 다음 호출만 차단하며 accounting UNKNOWN이면 fail closed다. Budget denial은 workspace를 바꾸지 않고 approval을 만들지 않는다.
 - Run 시작 시 provenance snapshot(Runtime source commit, CLI bundle SHA-256/mtime/version, target HEAD, config/contract digest)을 1회 기록하며, 확인 불가 값은 UNKNOWN이다.
@@ -775,9 +776,39 @@ weavra browser observe \
 - **관측.** `complexExecution`은 `schemaVersion: 2`와 `activeTaskIds`(plan 순서, integration·종료 시 빈 목록)를 싣는다. V0.7B Runtime이 남긴 COMPLEX Run(v1 plan)은 읽기 전용 이력이며, 종료된 경우에만 v1 plan과 digest를 그대로 둔 v2 execution으로 투영한다. TUI 행·footer와 `/state evidence`는 active task 전체, task별 wave 번호, `HANDED_OFF`를 보여준다.
 - **검증 범위.** faux provider의 Kernel race corpus(PARALLEL_AGENTS.md §11 P01–P12, P15–P17), StateStore·Host Control·SDK 병렬 테스트, #21 App과 결합한 #18 corpus 14 시나리오(`maxParallel = 1`)가 근거다. 실모델 병렬 smoke, 실제 경계의 재연결·crash(P13/P14)와 속도 향상 측정은 #22 전까지 NOT VERIFIED다.
 
+## #5 모델 의도 프로필
+
+기존 `models.profiles` 위의 얇은 별칭이다([#5](https://github.com/kjg8619/Weavra/issues/5) 후보 3). 역할마다 별칭이 하나씩 정해져 있고, 선택 필드 `models.intents`가 그 별칭을 **이미 설정된 profile 이름**에 연결한다. 연결하지 않은 별칭은 역할의 기존 기본 profile을 그대로 쓴다. `models.intents`가 없으면 라우팅·측정·config digest가 이전과 같다.
+
+```yaml
+models:
+  profiles:
+    coding: { provider: your-provider, model: your-coding-model }
+    reasoning: { provider: your-provider, model: your-review-model }
+    fast: { provider: your-provider, model: your-small-model }
+  intents:
+    simple: fast # QUICK Executor
+    review: reasoning # every Reviewer
+    deep: reasoning # Developers of an explicit /workflow run --deep only
+```
+
+| 별칭 | 역할 | 미설정 시 |
+|---|---|---|
+| `simple` | QUICK Executor | `coding` |
+| `standard` | STANDARD·COMPLEX Developer | `coding` |
+| `review` | STANDARD Reviewer, COMPLEX task·final Reviewer | `reasoning` |
+| `deep` | `/workflow run --deep <goal>`로 시작한 STANDARD run의 Developer | 없음(`--deep` 거부) |
+
+- **결정적 라우팅.** 역할 → 별칭 → profile 조회만 한다(`src/model-routing.ts`). LLM·Jev·분류기 호출, 비용·성능 기반 자동 선택, 자동 승격은 없다. 별칭 이름의 비용·품질 뉘앙스를 제품 기본값이나 검증된 우열로 취급하지 않는다.
+- **`deep`은 명시 opt-in.** TUI에서 run 하나에 대해 `--deep`으로만 고른다. `models.intents.deep`이 없거나 목표가 QUICK(Developer 없음)이면 model runtime·provider 호출·Run 생성 전에 설명 가능한 오류로 거부한다. Host Control/App에는 deep 선택이 없다(wire 변경 없음).
+- **fallback 없음.** 별칭이 설정되지 않은 profile을 가리키면 config 오류다. 실행할 workflow의 모든 route(QUICK: Executor, STANDARD·COMPLEX: Developer·Reviewer)의 provider·model·auth를 Run 생성 전에 확인하고, 실패하면 `Worker model unavailable for Reviewer review -> fast; fallback disabled`처럼 역할·별칭·profile을 밝혀 멈춘다. 다른 model·provider로 바꾸지 않는다.
+- **권한 불변.** 모델 선택은 Task Contract·AC·risk·Execution Contract·Policy·review·approval·Kernel 완료 판정을 바꾸지 않는다. `--deep`이어도 Policy와 config digest는 같다. Kernel 요청의 `profile`과 `AgentSessionCreated` 이벤트는 역할의 기본 class(coding/reasoning)를 유지하고 별칭은 Pi Adapter에서만 적용한다.
+- **표시.** Plan Preview는 역할마다 `alias -> profile -> provider/model`과 출처(`models.intents.<alias>` 또는 role default)를 보여준다. `WorkerMeasurement`는 사용한 `profile`과 requested provider·model을 기록하고, 설정된 별칭이 골랐을 때만 `modelIntent`를 남긴다(없으면 역할 기본, 이전 측정과 같다). `/workflow status`·`/state`·`/state evidence`는 이 측정으로 역할별 별칭·profile·requested/actual provider·model을, `/team`은 역할의 최근 측정 profile을, `/workflow config`는 현재 별칭 연결을 보여준다. `weavra.worker` telemetry span도 라우팅된 profile·model과 선택적 `modelIntent`를 쓴다. 새 durable secret은 없다.
+- **범위 밖.** App 표시·선택, 동일 제공자 내 fallback, 비용 기반 라우팅. 검증은 faux provider 테스트뿐이며 실제 작업 1건에서 선택 profile과 사용 모델을 확인하는 유료 호출은 별도 동의·예산이 필요하다.
+
 ## 설정 schema 1
 
-최소 실행 예제는 [examples/config.yaml](examples/config.yaml)이다. 아래는 기본값을 명시한 **수동으로 작성할 예시**다. 모델 ID와 검증 script는 프로젝트에 맞게 교체하고 실행 내용을 검토한다. STANDARD는 coding/reasoning 모델·인증을 모두, QUICK은 coding만 사전 검사한다.
+최소 실행 예제는 [examples/config.yaml](examples/config.yaml)이다. 아래는 기본값을 명시한 **수동으로 작성할 예시**다. 모델 ID와 검증 script는 프로젝트에 맞게 교체하고 실행 내용을 검토한다. STANDARD는 Developer·Reviewer route(기본 coding/reasoning)의 모델·인증을 모두, QUICK은 Executor route(기본 coding)만 사전 검사한다.
 
 ```yaml
 schemaVersion: 1
@@ -817,7 +848,7 @@ verification:
       required: true
 ```
 
-- 필수: `schemaVersion: 1`, `models.profiles.coding`, `models.profiles.reasoning`. 각 profile에는 비어 있지 않은 `provider`, `model`이 필요하다. `fast`, `creative`는 선택이다.
+- 필수: `schemaVersion: 1`, `models.profiles.coding`, `models.profiles.reasoning`. 각 profile에는 비어 있지 않은 `provider`, `model`이 필요하다. `fast`, `creative`는 선택이다. 선택 `models.intents`(`simple`/`standard`/`review`/`deep` → profile 이름)는 [모델 의도 프로필](#5-모델-의도-프로필)을 따른다.
 - `runtime.workflow`: `adaptive` 기본값 또는 `QUICK`/`STANDARD`/`COMPLEX`. 설정 파싱은 workflow 판정·실행이 아니다.
 - `agents.max_parallel`: COMPLEX 구현 wave의 동시 task 수 `1..4`, 기본 `1`. plan에 고정되며 R3는 `1`이다. QUICK/STANDARD는 무시한다. STANDARD의 Reviewer REVISE 한도는 `0..3`, 기본 `1`이다. QUICK/R3의 effective 한도는 항상 0이며 V0.5C verification repair 최대 1회와 별개다.
 - `agents.worker_timeout_ms`: 기본 `180000`(180초), 정수 `10000..600000`(10~600초). Developer·Reviewer·Executor의 각 역할 호출에 동일하게 적용한다. 전체 run이나 개별 Provider 요청의 timeout이 아니며 여러 tool/retry turns를 포함한 역할 실행 총 예산이다. 역할별 설정·무제한 값은 지원하지 않는다. `/workflow config`로 현재 값을 확인할 수 있다.
@@ -989,7 +1020,7 @@ Reviewer는 `VerificationResult.reviewContext`의 명시적 `{diff, evidence:[{r
 - DefaultResourceLoader를 생성하거나 reload하지 않는다. 명시적 ResourceLoader가 Extensions/Skills/Prompt templates/AGENTS/Themes/append prompt를 빈 값으로 반환한다. `noExtensions` 하나에 의존하지 않는다.
 - system prompt는 역할 규칙과 선택적인 frozen `projectInstructions` context다. V0.3D configured file은 preflight snapshot으로 전달하며 AGENTS.md를 자동 사용하지 않는다. Host가 검토한 규칙을 이 문자열로 전달할 수 있으며 정책 권한을 낮추지 못한다.
 - Settings는 역할별 in-memory이고 자동 compaction·agent retry·provider retry·skill command를 끈다. 프로젝트/전역 Settings 파일은 로드하지 않는다.
-- 생성 시 coding/reasoning 모두 `config mapping → ModelRuntime.getProvider/getModel → checkAuth/getAuth`를 확인한다. 실행 직전 선택 profile/auth를 다시 확인하고 명시한 model을 SDK에 전달한다. 누락·설정 오류·인증 실패는 시작 전 오류이며 fallback을 허용하지 않는다.
+- 생성 시 그 workflow가 쓸 모든 역할 route(별칭 미설정 시 STANDARD는 coding/reasoning, QUICK은 coding)의 `config mapping → ModelRuntime.getProvider/getModel → checkAuth/getAuth`를 확인한다. 실행 직전 그 역할의 route profile/auth를 다시 확인하고 명시한 model을 SDK에 전달한다([#5](#5-모델-의도-프로필)). 누락·설정 오류·인증 실패는 시작 전 오류이며 fallback을 허용하지 않는다.
 - 주입된 ModelRuntime의 기존 Pi 인증·Provider 범위를 사용한다. 부모의 동적 등록/메모리 인증을 자동 공유하지 않는다. 공유가 필요하면 Host가 검토한 Runtime을 명시적으로 주입하고 실행 중 변경하지 않아야 한다. 사전 auth 해석 성공은 원격 서비스 가용성 보장이 아니다. OAuth 갱신 등이 필요한 실환경 auth는 네트워크를 사용할 수 있으나 테스트는 faux만 사용한다.
 
 ### 취소와 이벤트
@@ -1053,7 +1084,7 @@ S3의 단일 역할 검증에 이어 S4는 아래 전체 순차 흐름을 연결
 ```text
 /workflow run Fix typo in src/app.ts
   → QUICK/R1, targetPath=src/app.ts
-  → 새 Executor (coding profile)
+  → 새 Executor (simple 별칭, 기본 coding profile)
   → SELF_CHECK → TEST → Kernel guard → COMPLETE
 ```
 
@@ -1061,7 +1092,7 @@ S3의 단일 역할 검증에 이어 S4는 아래 전체 순차 흐름을 연결
 - QUICK 후보: question·typo·명시적 작은 변경/한 파일 작업. unknown·refactor·아키텍처/다수 모듈/대규모 및 R2/R3는 QUICK 실행 대상이 아니다. R1은 goal에서 한 개의 확장자 있는 literal 상대 파일 경로를 요구한다. 예: `Fix typo in src/app.ts`, `작은 설정 수정 ui/settings.json`. 공백 있는 파일명·문장에 붙인 조사 등은 초기 parser에서 지원하지 않으므로 경로를 별도 토큰으로 쓴다.
 - R0(`Explain src/app.ts`)는 write/edit 도구가 없고 Policy도 mutation을 거부한다. R1은 시작 시 고정된 targetPath 한 개만 수정한다. 설정 예시도 기존 `.ai`/config/credential 보호를 우회하지 않는다. dependency 대상은 action에서 R2로 승격·미실행 처리된다.
 - 실제 workspace 변경이 한 파일을 넘거나 보수적 변경 구간 합계 100행을 넘으면 BLOCKED다. 공통 prefix/suffix를 뺀 removed+added 구간을 세므로 떨어진 작은 수정도 사이 구간이 길면 거부할 수 있다. 의미적 영향 범위를 증명하는 분석기나 OS sandbox는 아니다.
-- Executor는 기존 `coding` mapping을 사용한다. `fast` 자동 선택·cost routing·fallback이 없다. `PiAgentExecutor.create`에 Host가 고정한 `quickScope`를 넘기고 요청의 scope와 일치해야 한다. QUICK은 Reviewer를 생성하거나 reasoning auth를 조회하지 않지만 config schema의 coding/reasoning mapping 필수 조건은 유지한다.
+- Executor는 `simple` 별칭을 사용하고, 설정하지 않으면 기존 `coding` mapping이다. 비용 기반 자동 선택·fallback은 없다. `PiAgentExecutor.create`에 Host가 고정한 `quickScope`를 넘기고 요청의 scope와 일치해야 한다. QUICK은 Reviewer를 생성하거나 reasoning auth를 조회하지 않지만 config schema의 coding/reasoning mapping 필수 조건은 유지한다.
 - 제출은 기존 `submit_handoff`에 ExecutorHandoffSchema를 사용한다. 기존 handoff 필드에 요구사항별 `requirement/status/explanation`이 필수이며 `role: Executor`다. 정확한 requirement coverage·MET·설명, actual changed_files 일치, unresolved 없음이 필요하다. QUICK/R0 read-only 설명·분석에서 known_risks는 정보성 finding일 수 있으므로 보존하되 완료를 막지 않는다. 실제 changedFiles는 반드시 비어 있어야 한다. QUICK/R1 mutation은 known_risks가 남으면 기존대로 BLOCKED이며 STANDARD 재실행이 필요하다. 이 모델 진술만으로 완료하지 않으며 실제 필수 SELF_CHECK/TEST evidence를 함께 검사한다. 의미적 정확성은 프로젝트 check 품질과 사용자 확인에 의존한다.
 - Kernel이 구현 직후 실제 digest를 `executorDigest`에 결합한다. 이후 SELF_CHECK/TEST/COMPLETE에서 달라지면 stale로 차단한다. **QUICK에서는 check autofix도 결과 제출 후 변경이므로 완료 불가**다. 형식 변경은 Executor 단계에서 끝내거나 처음부터 STANDARD로 실행한다.
 - Run에는 `quickScope`, 구조화 `executorResult`, `executorDigest`, 기존 workspace의 `changedLines`를 저장한다. 전체 diff/transcript를 `.ai`에 중복 저장하지 않는다. 이벤트는 기존 Step/attempt/sequence이며 Reviewer 이벤트만 없다. 모든 QUICK step의 attempt는 1이며 재작업/자동 hot-switch는 없다.
