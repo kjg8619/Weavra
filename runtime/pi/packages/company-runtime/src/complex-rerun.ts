@@ -117,6 +117,10 @@ export interface RerunDerivation {
  * re-evaluated against the current file: `create` of an existing regular file becomes `modify`, and nothing else
  * changes. `facts` are the claim-fact inspector's answers for `rerunFactPaths(source)`; notes never hold contents.
  */
+const VERIFY_TITLE_PREFIX = "Verify: ";
+const VERIFY_GOAL_PREFIX = "Re-verify without changes: ";
+const prefixOnce = (prefix: string, text: string) => (text.startsWith(prefix) ? text : `${prefix}${text}`);
+
 export function deriveRerunDraft(source: RerunSource, facts: readonly ComplexPathFact[]): RerunDerivation {
 	const { parent, state } = source;
 	const { plan } = state;
@@ -136,9 +140,10 @@ export function deriveRerunDraft(source: RerunSource, facts: readonly ComplexPat
 				notes.push(
 					`${task.id} completed files missing: ${missing.join(", ")}; a verification task cannot recreate them`,
 				);
+			// A source task that already carries the prefix (a re-run of a re-run) keeps it once.
 			return {
-				title: codePointPrefix(`Verify: ${task.title}`, COMPLEX_TITLE_MAX_LENGTH),
-				goal: codePointPrefix(`Re-verify without changes: ${task.goal}`, COMPLEX_GOAL_MAX_LENGTH),
+				title: codePointPrefix(prefixOnce(VERIFY_TITLE_PREFIX, task.title), COMPLEX_TITLE_MAX_LENGTH),
+				goal: codePointPrefix(prefixOnce(VERIFY_GOAL_PREFIX, task.goal), COMPLEX_GOAL_MAX_LENGTH),
 				dependsOnIndexes,
 				criterionIndexes,
 				ownership: [],

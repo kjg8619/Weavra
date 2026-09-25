@@ -295,6 +295,13 @@ describe("§4 derivation", () => {
 		// Short text is not cut.
 		derivable.state.plan.tasks[0].title = "Parse";
 		expect(deriveRerunDraft(derivable, []).draft.tasks[0].title).toBe("Verify: Parse");
+		// A re-run of a re-run: an already prefixed verification task keeps each prefix once.
+		derivable.state.plan.tasks[0].title = "Verify: Parse";
+		derivable.state.plan.tasks[0].goal = "Re-verify without changes: Create src/parse.mjs";
+		expect(deriveRerunDraft(derivable, []).draft.tasks[0]).toMatchObject({
+			title: "Verify: Parse",
+			goal: "Re-verify without changes: Create src/parse.mjs",
+		});
 		// Unfinished rows keep their title and goal exactly.
 		expect(deriveRerunDraft(derivable, []).draft.tasks[1]).toMatchObject({ title: "Task 2", goal: "Contribution 2" });
 	});
