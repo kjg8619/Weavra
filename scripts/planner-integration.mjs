@@ -170,7 +170,14 @@ await scenario("L01", "a READY draft is read, prepared unchanged on the first tr
         assert.ok(Buffer.byteLength(planner.contexts[0], "utf8") <= 196_608);
         assert.ok(context.fileListing.files.length > 0 && context.fileListing.files.every((file) => file.startsWith("src/")), JSON.stringify(context.fileListing));
         assert.ok(!JSON.stringify(context).includes(".ai/") && !JSON.stringify(context).includes(".git/"));
-        assert.ok(context.checks.every((check) => Object.keys(check).sort().join() === "id,kind,required"), "checks carry no commands");
+        assert.ok(context.checks.every((check) => Object.keys(check).sort().join() === "exercises,id,kind,required"), "checks carry no commands");
+        // Amendment A1 (#65): each check names the modules its test imports; no verifier path such as test/… appears.
+        assert.deepEqual(
+          Object.fromEntries(context.checks.map((check) => [check.id, check.exercises])),
+          { "test-format": ["src/format.mjs"], "test-parse": ["src/parse.mjs"] },
+          JSON.stringify(context.checks),
+        );
+        assert.ok(!planner.contexts[0].includes("test/"), "the Planning Context names no verifier path");
         // The human path, unchanged: prepare recompiles the loaded draft, confirm starts the Run.
         yield* start("L01", connection, { draft: read.data.draft, goal: GOAL, statements: STATEMENTS });
         const final = yield* settle("L01", connection);

@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readdir, realpath, writeFile } from "node:fs/promises";
+import { mkdir, readdir, realpath, writeFile } from "node:fs/promises";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { type Context, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
@@ -240,6 +240,68 @@ describe("planning lifecycle (§3, §5)", () => {
 			projectFacts: [],
 		});
 		expect(JSON.stringify(seen?.context)).not.toMatch(/usr\/bin\/true|--test-arg|--secret-arg|config\.yaml/);
+	});
+
+	it("carries each check's exercise targets and no verifier path; a draft claiming them is READY and prepares (#65)", async () => {
+		const config = {
+			...CONFIG,
+			verification: {
+				checks: [
+					CONFIG.verification.checks[0],
+					{
+						id: "test-parse",
+						kind: "test",
+						executable: process.execPath,
+						args: ["--test", "test/parse.test.mjs"],
+					},
+				],
+			},
+		};
+		const { client, faux, project } = await setup({ config });
+		await mkdir(join(project.cwd, "test"));
+		await writeFile(
+			join(project.cwd, "test/parse.test.mjs"),
+			'import { test } from "node:test";\nimport { parse } from "../src/parse.mjs";\ntest("ORACLE_PARSE_CASE", () => parse("a"));\n',
+		);
+		// The Planner follows the exercises: the missing module is created, the existing one modified.
+		const draft = {
+			tasks: [
+				{
+					...DRAFT.tasks[0],
+					ownership: [{ path: "src/parse.mjs", operation: "create" }],
+					checkIds: ["test-parse"],
+				},
+				{ ...DRAFT.tasks[1], ownership: [{ path: "src/app.ts", operation: "modify" }], checkIds: ["test-parse"] },
+			],
+		};
+		let context: Record<string, unknown> | undefined;
+		faux.setResponses([
+			(value) => {
+				context = planningContext(value);
+				return submission(draft);
+			},
+		]);
+		await client.start();
+		const ready = (await client.settle()).planner!;
+		expect(ready).toMatchObject({ status: "READY", usage: { invocations: 1 } });
+		expect(context?.checks).toEqual([
+			{ id: "lint", kind: "lint", required: false, exercises: [] },
+			{ id: "test-parse", kind: "test", required: true, exercises: ["src/parse.mjs"] },
+		]);
+		expect(context?.fileListing).toEqual({ files: ["src/app.ts"], truncated: false });
+		expect(JSON.stringify(context)).not.toMatch(/test\/|parse\.test|ORACLE_PARSE_CASE|node:test|--test/);
+		expect(JSON.stringify(context)).not.toContain(process.execPath);
+		const read = await client.mutation({ type: "planner.read", planId: ready.planId });
+		if (!read.success || read.data.kind !== "planner-draft") throw new Error(JSON.stringify(read));
+		expect(read.data.draft).toEqual(draft);
+		expect(
+			await client.mutation({
+				type: "workflow.prepare",
+				goal: COMPLEX_GOAL,
+				acceptanceStatements: STATEMENTS,
+				complexDraft: read.data.draft,
+			}),
+		).toMatchObject({ success: true, data: { kind: "prepared", preview: { workflow: "COMPLEX" } } });
 	});
 
 	it("a text answer gets the one fixed reminder; a submission after it is READY after 2 invocations", async () => {
