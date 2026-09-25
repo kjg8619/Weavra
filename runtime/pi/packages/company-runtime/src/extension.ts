@@ -160,7 +160,7 @@ export function registerCompanyRuntime(
 	};
 	registerLspCommand(pi, (cwd) => (project === cwd && pending ? workflow?.lspStatus : undefined));
 	const usage = {
-		workflow: "/workflow [help|run <goal>|status [runId]|history [page]|config|cancel]",
+		workflow: "/workflow [help|run [--recipe <id>] [--deep] <goal>|status [runId]|history [page]|config|cancel]",
 		state: "/state [runId] | /state checks|decisions [runId] [page] | /state review [runId] | /state check <number> [runId] | /state evidence [runId] | /state export",
 		team: "/team [runId]",
 		risk: "/risk [runId]",
@@ -193,6 +193,7 @@ export function registerCompanyRuntime(
 											"Scoped R3: one tracked text-file deletion, separate one-time Human Approval (default Deny), then independent Reviewer and checks.",
 											"Both workflows require trusted config, clean Git, required checks and fresh evidence. Approval is not completion.",
 											"COMPLEX: 2-8 sequential tasks from a structured plan prepared and confirmed through Host Control (App); /workflow run refuses it. /workflow status shows its task rows.",
+											"Models: role aliases simple (Executor), standard (Developer), review (Reviewer) use models.intents or default to coding/coding/reasoning. --deep uses models.intents.deep for that STANDARD run's Developers only. No automatic selection or fallback.",
 											"No automatic commit/rollback or resume. Cancel with /workflow cancel, not parent Esc.",
 											usage.state,
 											usage.team,
@@ -308,6 +309,8 @@ export function registerCompanyRuntime(
 									goal,
 									config: loaded.config,
 									...(riskOverride ? { riskOverride } : {}),
+									// Explicit per-run model choice; refused here when unconfigured or QUICK.
+									...(runArgument.deep ? { deep: true } : {}),
 								});
 							} catch (error) {
 								// A free-text goal never carries a COMPLEX plan, and COMPLEX is never downgraded.

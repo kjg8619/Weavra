@@ -25,6 +25,8 @@ export interface ObservedAssistantMessage {
 export interface WorkerIdentity {
 	role: Role;
 	profile: string;
+	/** Present only when a configured model intent alias selected `profile`. */
+	modelIntent?: WorkerMeasurement["modelIntent"];
 	revision: number;
 	step: StepReference;
 	requestedProvider: string;

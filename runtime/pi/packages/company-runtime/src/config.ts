@@ -14,6 +14,7 @@ import { isPolicyPath, isProtectedPath } from "./policy.ts";
 const text = Type.String({ minLength: 1, pattern: "\\S" });
 const strict = { additionalProperties: false } as const;
 const profile = Type.Object({ provider: text, model: text }, strict);
+const profileName = Type.Enum(["coding", "reasoning", "fast", "creative"]);
 
 export const RuntimeConfigSchema = Type.Object(
 	{
@@ -28,6 +29,19 @@ export const RuntimeConfigSchema = Type.Object(
 						creative: Type.Optional(profile),
 					},
 					strict,
+				),
+				// Model intent aliases (#5): each names a configured profile; routing is fixed per role (model-routing.ts).
+				// Absent stays absent, so existing routing and configuration digests are unchanged.
+				intents: Type.Optional(
+					Type.Object(
+						{
+							simple: Type.Optional(profileName),
+							standard: Type.Optional(profileName),
+							review: Type.Optional(profileName),
+							deep: Type.Optional(profileName),
+						},
+						strict,
+					),
 				),
 			},
 			strict,
@@ -248,6 +262,12 @@ export function parseRuntimeConfig(source: string) {
 			"Invalid runtime config: check schemaVersion, model profiles, supported fields and policy limits",
 		);
 	}
+	// Alias and profile names are closed enums, so naming them never echoes a configured value.
+	for (const [intent, name] of Object.entries(value.models.intents ?? {}))
+		if (!value.models.profiles[name])
+			throw new Error(
+				`Invalid runtime config: models.intents.${intent} names profile ${name}, which is not configured in models.profiles`,
+			);
 	if (
 		value.project &&
 		(!isPolicyPath(value.project.instructions.path) || isProtectedPath(value.project.instructions.path))

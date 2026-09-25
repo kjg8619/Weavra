@@ -132,6 +132,7 @@ describe("V0.5A context pipeline leakage regression", () => {
 			workflow: "STANDARD",
 			executionMode: "EDIT",
 			risk: "R1",
+			modelRoutes: [],
 			acceptanceCriteria: [],
 			allowedPaths: ["src", "test"],
 			checks: [],
