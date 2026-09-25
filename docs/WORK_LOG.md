@@ -2,9 +2,24 @@
 
 ## 현재 진행 요약
 
-- 갱신: 2026-09-24, Asia/Seoul (UTC+09:00). 저장소 통합 baseline과 Product Independence Phase 1은 완료된 역사적 결과로 보존한다.
-- 진행 단계: V0.7B COMPLEX 순차 워크플로. #15 설계 계약(`docs/architecture/COMPLEX_SEQUENTIAL_WORKFLOW.md`)은 머지됐다. 설계의 소비자 우선 규칙에 따라 #17 App 소비자를 먼저 올리고, #16 Runtime 생산자는 별도 worktree에서 단계별(A 기반 → B 엔진 → C 상태 출력)로 진행 중이다. #18 통합 검증은 둘 다 머지된 뒤 시작한다.
-- 그다음: #19 병렬 에이전트 설계 → #20 Runtime ∥ #21 App → #22 스트레스 검증(각각 선행 이슈 종료 후). #5 OmO 후보는 별도 백로그다.
+- 갱신: 2026-09-25, Asia/Seoul (UTC+09:00). 저장소 통합 baseline과 Product Independence Phase 1은 완료된 역사적 결과로 보존한다.
+- 로드맵 #23의 단계 이슈가 모두 닫혔다.
+  - Phase A: V0.6D Project Facts(#6–#10).
+  - Phase B: V0.7A Capability Broker(#11–#14).
+  - Phase C: V0.7B COMPLEX 순차 워크플로(#15–#18).
+  - Phase D: V0.8A 병렬 에이전트(#19–#22).
+  - C·D는 설계를 고정한 뒤 소비자 우선으로 머지했고, 통합 검증(#18, #22)을 통과한 뒤 구현 이슈를 닫았다.
+- CI cross-boundary job은 실제 Runtime ↔ 운영 App 경계 corpus를 매번 실행한다. COMPLEX 14개와 병렬 9개 시나리오이며 falseCompletion은 0이다.
+- 별도 backlog #5도 닫았다.
+  - 후보 3 모델 의도 프로필(PR #45)과 후보 1 로컬 커맨드 리스크 가드(PR #47)를 구현했다.
+  - 후보 2 Jev 웹 문구 검토는 전송 정책·키 보관·비용을 정하기 전까지 보류한다.
+- #22에서 발견한 고아 Run 공백은 App(PR #46)과 Runtime(PR #48)으로 닫았다.
+- 알려진 후속 과제(미착수):
+  - App의 모델 의도 표시·선택. wire 변경이 필요하다.
+  - 실제 브라우저 capture 재사용 거부(C37) 실측.
+  - 반복 횟수를 늘린 속도·비용 측정.
+  - 고아 복구의 남은 한계: lock 없는 활성 Run, PID만 보는 사망 증명.
+  - App CI의 GitManager 테스트 임시 저장소 삭제 ENOTEMPTY flaky. PR #48에서 실패 job 재실행으로 통과했다.
 - 원본 Pi/T3Code 저장소는 수정하지 않는다. 아래 기록은 날짜별 append-only이며, 현재 실행 결과와 이전 저장소의 역사적 결과를 구분한다.
 
 ## 2026-09-21 KST — 독립 저장소 및 원본 스냅샷 import 완료
@@ -833,3 +848,55 @@
   - 새 테스트: web 4개, 가짜 Runtime 고아 모드 server 1개. 새 조건을 제거하면 실패하는지 변이 확인을 했다.
 - 현재 Runtime과의 호환: 이 PR만 있으면 고아 run 준비 시 `WRITER_PRESENT`가 표시될 뿐이다. Runtime PR이 들어오면 복구까지 이어진다.
 - 커밋 상태: devlop 대상 PR.
+
+## 2026-09-25 KST — #5 후보 1 로컬 커맨드 리스크 가드
+
+- 목적: #5 후보 1을 구현한다(사용자 승인, 로컬 결정론적 규칙만, Jev·원격 호출 없음).
+- 브랜치/worktree: `feat/command-risk-guard`, `Weavra-worktrees/benchmark-stage-metrics`(재사용). 하위 에이전트가 구현했고 메인 세션이 검토와 병합 검증을 했다.
+- 실행 경로 조사(코드 확인):
+  - workflow worker에는 셸이 없다. `runtime_*` 파일 도구와 검사 요청·제출만 있고, Policy가 bash/sh/shell/exec를 거부한다.
+  - 등록 검사는 신뢰된 Host 설정이며, 셸 없이 argv로 실행된다(셸·인라인 eval 거부).
+  - 셸 명령이 실제로 도는 곳은 대화형 `weavra` CLI의 `bash` 도구뿐이고, 가드는 이 경로만 다룬다. 사용자가 `!`로 직접 입력한 명령과 다른 확장의 도구는 대상이 아니다. 문서에 명시했다.
+- 동작(`command-syntax.ts`, `command-risk.ts`, `command-guard.ts`, `extension.ts`의 기존 `tool_call` 처리기에 통합. workflow 소유권 차단이 먼저다):
+  - 분류:
+    - `read_only`: ls/cat/grep/jq, 읽기용 git, `-delete` 없는 find, `-i` 없는 sed 등.
+    - `reversible`: `sed -i`, 리다이렉트, mkdir 등 프로젝트 상대 경로 쓰기. 보호 경로는 제외.
+    - `destructive`: rm, `git reset --hard`, clean, force push, dd, mkfs, 넓은 `chmod -R`, `curl | sh` 등.
+    - `unknown`: 그 밖의 모두(`npm test`, 치환, 제어 흐름, sudo 등). 복합 명령은 가장 나쁜 부분을 따른다.
+  - `read_only`와 `reversible`은 그대로 실행한다.
+  - `destructive`는 매번 확인한다(기본 Deny, `Run once`). `unknown`은 `Run once`와 **"이 세션에서 허용"** 중 고를 수 있다. 세션 허용은 같은 도구와 같은 명령 해시에만 적용되고, 메모리에만 있으며 `session_start`마다 초기화된다.
+  - 대화상자 닫기·timeout·abort·UI 오류·기록 실패는 모두 거부다. print/json 모드에서는 `destructive`·`unknown`을 거부한다(`WEAVRA_COMMAND_GUARD=off`만 해제 가능하고, 프로젝트 설정으로는 끌 수 없다).
+  - 결정은 실행 전에 세션 항목 `weavra.command-guard`로 기록한다. 범주, 이유, 정해진 어휘의 프로그램 이름, 명령 sha256과 크기, 결정, `remoteCalls: 0`을 남기며, 원문 명령은 저장하지 않는다.
+  - 분류는 허가가 아니다. `reversible` 판정이 Policy 거부를 바꾸지 않는다(READ_ONLY 쓰기, 범위 밖, 보호 경로, 위조 승인 테스트).
+- 동작 변화: print/json 모드의 `npm test` 같은 unknown 명령은 이제 거부된다. TUI에서는 확인을 받거나 세션 허용을 한다.
+- 현재 검증:
+  - 하위 에이전트: 단위·통합 테스트, 변이 확인, `./test.sh` exit 0(company-runtime 2,117, coding-agent 2,781).
+  - 메인 세션: devlop(#45 모델 의도 프로필 포함)을 병합한 결과로 확인했다. `npm run check` exit 0, 관련 테스트(command-risk·command-guard·extension·model-intents 205, SDK suite 10) 통과.
+  - PR #47 CI: runtime/pi(전체 `./test.sh` 포함)·app/t3code·cross-boundary 모두 통과한 뒤 devlop에 머지했다(`7d43d2f4`).
+- 한계: 명령 텍스트만 읽는다. git hook·package script·alias·PATH는 모델링하지 않으므로 샌드박스나 비밀 필터가 아니다. bash/POSIX 문법만 다루고, Windows 지원은 주장하지 않는다.
+- #5 결론:
+  - 후보 3은 구현했다(PR #45).
+  - 후보 1은 PR #47로 구현했다.
+  - 후보 2(Jev 웹 문구 검토)는 보류다. 외부 API로 화면 문구를 보내야 해서 전송 정책·키 보관·비용 결정이 먼저 필요하다.
+  - 세 후보의 결론을 이슈에 근거 댓글로 남기고 #5를 닫았다.
+- 커밋 상태: `420941b1`, `070eea4d`, `ed532c8d`, devlop 병합 `f07c1c61`. PR #47로 머지했다. 이 기록은 동시 PR 사이의 WORK_LOG 충돌을 피하려고 머지 뒤 문서 PR로 따로 올렸다.
+
+## 2026-09-25 KST — 고아 Run 복구: Runtime Host prepare 시점 복구 (2/2)
+
+- 목적: #22 P14에서 발견한 공백을 Runtime 쪽에서 닫는다(사용자 결정 "App prepare 시 복구"). App 쪽 준비 조건(1/2)은 PR #46으로 머지됐다.
+- 브랜치/worktree: `fix/host-orphan-recovery`, `Weavra-worktrees/runtime-review-followups-2`(재사용). 하위 에이전트가 구현했고, 메인 세션이 설계 조정(복구 후 `STALE_PROJECT`)과 병합 검증을 했다.
+- 변경(`runtime/pi/packages/company-runtime`, PR #48):
+  - `workflow.prepare`는 먼저 새 `FileStateStore.recoverDeadOwner`를 시도한다. 조건은 네 가지다: 이 Host에 실행 중인 작업이 없음, 저장된 revision이 요청의 `expectedProjectRevision`과 같음, writer lock 존재, 기존 lock 규칙으로 소유자 사망 증명(같은 프로젝트, 같은 hostname, `kill(pid, 0)` ESRCH, 복구 guard).
+  - 복구는 기존 open 시점 복구를 그대로 쓴다. Run과 진행 중 action은 INTERRUPTED가 된다. COMPLEX의 미완료 행은 INTERRUPTED/OWNER_LOST로 바뀌고 COMPLETED 행은 보존된다. `RunInterrupted`를 기록하고 lock을 해제한다. 재개·재실행·되돌리기는 없다.
+  - 복구에 성공하면 revision이 바뀌므로 `STALE_PROJECT`로 답하고 이번 요청에서는 준비하지 않는다. 다음 prepare는 정상이다. App의 revision 일치 검사는 유지된다.
+  - 그 밖의 경우는 아무것도 쓰지 않고 기존 오류 코드로 실패한다. 소유자 생존, 다른 호스트, 읽을 수 없는 lock, PID 1, 다른 복구 guard, 오래된 revision이 모두 해당한다.
+  - `control.snapshot`은 읽기 전용이다. confirm의 guarded start도 그대로다.
+  - `scripts/parallel-integration.mjs` P14를 갱신했다: 고아 표시 → prepare `STALE_PROJECT` → INTERRUPTED/OWNER_LOST 확인 → 새 run COMPLETED.
+  - `docs/architecture/STATE_STORE.md`에 복구 경로를 문서화했다.
+- 현재 검증:
+  - 하위 에이전트: `test/host-orphan-recovery.test.ts` 12개(복구를 끄면 양성 4개 실패), `./test.sh` exit 0, 두 corpus(COMPLEX 14, PARALLEL 9) falseCompletion 0.
+  - 메인 세션: devlop 병합 뒤 `npm run check` exit 0, 관련 84 PASS.
+  - PR CI: runtime/pi(전체 `./test.sh`)·cross-boundary(두 corpus)는 첫 실행에 통과했다. app/t3code는 첫 실행에서 GitManager 테스트의 임시 저장소 삭제가 ENOTEMPTY(`t3code-git-manager-*/.git/info`, `.git/objects/pack`)로 실패했다. 이 PR은 App 파일을 바꾸지 않았으므로 무관한 flaky로 보고 실패 job만 다시 실행했고, 통과했다.
+  - 세 job이 모두 통과한 뒤 devlop에 머지했다(`aae9b508`).
+- 남은 한계: lock 없는 활성 Run은 여전히 `ACTIVE_RUN`이다. 소유자 사망 증명은 PID만 본다. 운영 브리지에는 이벤트 수신자가 없어 App은 저장 상태로 복구를 본다. fact·browser prepare는 복구하지 않는다.
+- 커밋 상태: `fa51f14b`, `4f839d1c`, `f43e5a03`, `0bf89a37`, devlop 병합 `eb4dd181`. PR #48로 머지했다. 이 기록은 머지 뒤 문서 PR로 따로 올렸다.
