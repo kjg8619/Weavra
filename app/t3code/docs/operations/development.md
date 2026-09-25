@@ -235,9 +235,10 @@ root. The read-only argv, protocol v1, and snapshot-only capabilities remain unc
 No additional network Host or listener is introduced.
 
 The control command set is closed: `control.hello`, `control.snapshot`, `workflow.prepare`,
-`workflow.confirm`, `workflow.cancel`, `approval.resolve`, the browser and fact review commands
-and, only when the Runtime advertises the Planner, `planner.start`, `planner.cancel` and
-`planner.read`. Its strict UTF-8 JSONL limits
+`workflow.confirm`, `workflow.cancel`, `approval.resolve`, the browser and fact review commands,
+only when the Runtime advertises the Planner, `planner.start`, `planner.cancel` and
+`planner.read`, and only when it advertises re-run derivation, `workflow.derive`. Its strict
+UTF-8 JSONL limits
 are **32,768 request bytes** and **65,536 response bytes**, including the newline. T3 supplies
 goal text, reviewed recipe input data, and acceptance-criterion prose, not executable
 instructions or authority-bearing overrides. Runtime/Kernel owns classification, allowed
@@ -381,6 +382,27 @@ and confirm the rows like any task plan, and the Runtime validates them again. A
 shows its code with a fixed explanation and is never retried automatically. Confirming a preview
 while planning runs returns `PLANNER_BUSY`; cancel planning first.
 
+#### Re-plan unfinished work
+
+A Runtime that advertises `rerunContractVersion: 1` beside a COMPLEX contract adds **Re-plan
+unfinished work** under the COMPLEX execution view; T3 never sends `workflow.derive` to any other
+Runtime. It appears on a fresh connection when the latest Run is COMPLEX, ended BLOCKED,
+CANCELLED, FAILED or INTERRUPTED with at least one task not COMPLETED, and is not R3. The Runtime
+derives a candidate draft for an ordinary new Run, without a model, a writer or any state change:
+completed tasks become read-only verification tasks that are checked again, and unfinished tasks
+keep their claims, with `create` turned into `modify` where the file now exists. Nothing resumes
+and no evidence is reused. Refusals (`RERUN_NOT_APPLICABLE`, `RUN_NOT_FOUND`, `ACTIVE_RUN`,
+`STALE_PROJECT`) show fixed guidance and are never retried.
+
+The draft fills the goal, the criteria and the task rows, asking first if the editor holds
+anything else. While the editor holds it unchanged, a banner names the source Run and status.
+The panel also lists the leftover changes that would fail a clean start. T3 says the checkout is
+clean only when the Runtime reports it, and says "Workspace state unknown" when Git could not
+run. Commit or discard leftovers in your own tools; neither T3 nor the Runtime does either. Then
+select **Derive again**, because claims follow the files at derive time. The panel shows the
+Runtime's prepare dry-run and its notes. Nothing is prepared, confirmed or stored automatically:
+prepare and confirm the rows like any task plan.
+
 #### Unavailable state and limits
 
 **CONTROL UNAVAILABLE** disables actions when the environment is unsupported, disconnected,
@@ -391,8 +413,9 @@ protocol errors before reopening the view; restart T3 when changing its server e
 Do not remove a writer lock or infer owner liveness from it to bypass unavailable controls.
 
 This slice supports the existing QUICK/STANDARD Workflow paths and, when advertised, the
-COMPLEX projection and Planner drafts above; not arbitrary write/edit/tool/shell dispatch,
-generic R3, resume/recovery, rollback, or fallback. T3 remains a Host requesting Runtime
+COMPLEX projection, Planner drafts and re-plans of unfinished work above; not arbitrary
+write/edit/tool/shell dispatch, generic R3, resume/recovery, rollback, or fallback. A re-plan is a
+new Run prepared from a derived draft, never a resume. T3 remains a Host requesting Runtime
 actions and showing bounded canonical summaries; it never becomes the Task Contract, Policy,
 approval-consumption, planning, task-scheduling or completion authority.
 
