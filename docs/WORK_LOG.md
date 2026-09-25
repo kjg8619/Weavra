@@ -1171,3 +1171,39 @@
     - Host 테스트의 derive·hello 응답 73줄이 #57 App의 엄격한 디코더를 모두 통과했다.
   - 메인 세션: 수정 뒤 re-run 테스트 44개와 `npm run check`를 통과했다. 통합 브랜치의 #58 corpus(`RERUN INTEGRATION PASS: 5`), 실제 모델 smoke, 실제 UI 확인은 #58 기록에 적는다.
 - 커밋 상태: `37a7c738`, `1722e8f2`, `82691ed2`, devlop 병합, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — V0.8C #58 재실행 통합 검증(실제 경계·실제 모델·실제 UI)
+
+- 목적: #57(PR #67)·#56(PR #68)을 합친 실제 경계에서 재실행 계약(COMPLEX_RERUN.md §9)을 검증한다. 실제 모델 smoke와 실제 App UI 확인을 포함한다.
+- 브랜치/worktree: `test/v0.8c-rerun-integration`, `Weavra-worktrees/runtime-review-followups-2`(재사용). 메인 세션이 작성했다.
+- 추가·변경 파일:
+  - `scripts/rerun-integration.mjs`(신규): 재실행 corpus.
+    - 실제 Runtime 실행 파일, 운영 App `ControlTransport`와 엄격한 디코더를 쓰고, 모든 snapshot에 App `ComplexProjection` 검사를 적용한다. worker는 대본 모델이 맡는다.
+    - 남은 변경은 corpus가 사용자 역할로 git을 직접 호출해 커밋하거나 버린다.
+  - `scripts/run-complex-integration.mjs`: 기본으로 rerun corpus까지 네 개를 실행한다.
+  - `.github/workflows/ci.yml`: 단계 이름을 네 corpus에 맞췄다.
+  - `scripts/rerun-live-smoke.mjs`(신규): 유료 opt-in이며 CI에 넣지 않는다.
+- corpus(5개 시나리오, 대본 모델, 유료 호출 0):
+  - R01(+R05, R06): BLOCKED 원본(CT-001 COMPLETED, CT-002 검사 실패)으로 시작한다.
+    - 첫 도출: CT-001은 검증 작업, CT-002는 create→modify와 메모. leftovers는 format·parse 두 파일이고, prepare 검사는 ok였다.
+    - 두 번 도출한 결과가 byte 단위로 같았다. revision, writer, git status는 바뀌지 않았다.
+    - parse를 커밋하고 format을 버린 뒤 다시 도출하자 CT-002가 다시 create가 되었고, 작업 공간은 깨끗했다.
+    - 재실행은 COMPLETED였다. plan·parent 식별자가 새로 정해졌고, 모든 게이트가 새로 PASS했다. 검증 작업은 파일을 바꾸지 않았다.
+  - R03: 최신이 아닌 Run → RUN_NOT_FOUND. 실행 중·COMPLETED·R3(삭제 거부로 BLOCKED) → RERUN_NOT_APPLICABLE.
+  - R04: 남은 변경이 있으면 prepare는 성공해도 시작이 START_FAILED가 되고, 원본 Run이 최신으로 남는다. 깨끗한 시작 조건이 그대로임을 확인했다.
+  - R02: 소유 Host를 강제 종료했다. 도출은 RUNNING 고아를 거부했고, prepare가 복구해 STALE_PROJECT를 돌려줬다. INTERRUPTED에서 도출한 초안으로 재실행해 COMPLETED했다.
+  - R07: 이미 종료된 Run에 죽은 소유자의 lock이 남은 상태를 만들었다. lock이 있어도 도출은 되었고, prepare가 lock을 복구했다(revision이 바뀌지 않아 바로 prepare).
+  - 결과: `RERUN INTEGRATION PASS: 5 scenarios; falseCompletion=0`. 같은 브랜치에서 COMPLEX 14·PARALLEL 9·PLANNER 13도 통과했다.
+  - 변이 확인: Runtime의 create→modify 규칙을 끄면 corpus가 실패한다.
+- 실제 모델 smoke(commandcode `deepseek/deepseek-v4.1-flash`, 1회, 123초):
+  - 원본: CT-001이 COMPLETED(PASS×3, `src/parse.mjs`, 43,250 토큰)된 뒤 CT-002 구현 중에 스크립트가 취소해 CANCELLED가 되었다.
+  - 도출: CT-001은 `Verify: Add parser`(claim 없음), CT-002는 `create src/format.mjs`였다. leftovers는 `src/parse.mjs`뿐이었다. 커밋 후 다시 도출하자 작업 공간이 깨끗했고 prepare 검사가 ok였다.
+  - 재실행: COMPLETED. 검증 작업은 변경 없이 PASS×3, 형식화 작업은 파일 생성 후 PASS×3, 통합은 PASS×3이었다. 호출 5회, 토큰 125,438, cleanup CONFIRMED. snapshot 295개가 App 검사를 통과했다.
+- 실제 App UI(dev 서버, 격리 상태 `/tmp/wx-ui/t3`·`WEAVRA_HOME=/tmp/wx-ui/weavra`, 헤드리스 Chromium, 대본 모델):
+  - 제안 영역("1 of 2 tasks unfinished", "Re-plan unfinished work")이 보였다.
+  - 도출 배너와 남은 변경 목록(`src/format.mjs src/parse.mjs`), "Derive again" 뒤 교체 확인 모달이 표시됐다.
+  - Prepare → Confirm → COMPLETED로 끝났고, 완료 뒤 제안 영역이 사라졌다.
+  - 이 확인에서 재실행한 Run을 다시 도출하면 제목이 `Verify: Verify: …`로 겹치는 문제를 발견했다. #56에서 수정했다(`82691ed2`).
+  - 확인 스크립트는 처음에 브라우저 경로, 교체 모달, 대본 카운터 문제로 몇 번 다시 실행했다. 제품 결함이 아니라 스크립트 쪽 문제였다.
+  - 종료할 때는 기록한 dev 서버 PID와 작업 디렉터리를 확인한 포트 소유자만 종료했다. 남은 bridge 프로세스는 없었다.
+- 커밋 상태: `96a933d0`(corpus), `082dd65f`(smoke), 병합 커밋, 이 기록. devlop 대상 PR.
