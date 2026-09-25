@@ -329,6 +329,8 @@ Local and final Reviewer independence is mandatory for all COMPLEX risk levels; 
 
 `all tasks COMPLETED` alone is insufficient. Kernel must reject completion unless every required task has validated local-success history, the final integration set is fresh and complete, every parent AC is MET with registered evidence, no unresolved Approval/unsafe mutation remains, budget accounting is known/within limits, expected workspace matches, all resources are safely stopped, and the completion write succeeds. Missing/malformed/stale evidence never becomes an empty successful set. A failed terminal persistence write emits no RunCompleted; show local failure separately from the older durable snapshot.
 
+> **Note (V0.8C, [#55](https://github.com/kjg8619/Weavra/issues/55)):** [COMPLEX_RERUN.md](COMPLEX_RERUN.md) adds `workflow.derive`, which turns the latest BLOCKED, CANCELLED, FAILED or INTERRUPTED Run into a candidate draft for the "new explicit Run" above. It is not a resume and reuses no evidence: COMPLETED tasks become read-only verification tasks whose checks and reviews run again, and the new Run has new parent and plan identities, a clean start and fresh evidence for every task. Every rule of this section still applies.
+
 ## 9. Run machine, cancellation and partial failure
 
 ```ts
