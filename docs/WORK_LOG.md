@@ -1008,3 +1008,37 @@
   - 변이 확인: 서버 capability 게이트를 제거하면 2개, UI 게이트를 제거하면 1개, 불러온 뒤 자동 prepare를 넣으면 2개가 실패했다.
 - 메인 세션 확인: digest 고정값 두 개(`sha256:29350ea7…`, statements 생략 시 `sha256:7e83f534…`)를 `shasum`으로 다시 계산해 일치를 확인했다. Runtime 에이전트에게도 같은 값과 App의 해석(commands 목록 불변, 토큰은 0에서 시작, status별 필드 규칙)을 전달했다.
 - 커밋 상태: `cf21baf2`, `e564ac3a`, `2a75de0d`, `70a32c97`, `7fda16f9`, devlop 병합, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — V0.8B #52 Runtime Planner 생산자
+
+- 목적: PLANNER_DRAFT.md §4–§8의 Runtime 쪽 구현이다. App #53(PR #62)이 먼저 머지된 뒤 올린다.
+- 브랜치/worktree: `feat/v0.8b-planner-runtime`, `Weavra-worktrees/v0.7b-complex-runtime`(재사용). 하위 에이전트가 구현했고 메인 세션이 검토했다.
+- 변경(`runtime/pi/packages/company-runtime`):
+  - `src/planner.ts`(신규):
+    - 요청 digest와 분류를 계산한다. 초안 없는 prepare가 non-R3 `ComplexPlanRequiredError`를 낼 때만 진행한다.
+    - Planning Context를 만든다. 파일 목록은 `runtime_list_files` 규칙과 Policy를 따르고, 크기는 196,608 bytes로 막는다.
+    - 수정 메시지는 2,048 bytes 이하로 만든다.
+    - 모델을 해석하고(fallback 없음), 도구 없는 Planner 세션을 연다.
+    - 모델 호출마다 Host 허가, STALE 확인, `BudgetController` 예약을 차례로 거친다. 제출 인자는 SDK가 아니라 Host가 판정한다.
+  - `host-control.ts`:
+    - `planner.start`·`planner.cancel`·`planner.read`를 추가했다. 계획은 백그라운드에서 돌리고, 전체 요청에 timeout을 걸고, READY 직전에 STALE을 확인하고, 늦게 온 결과는 버린다.
+    - dry-run은 prepare 파이프라인을 추출해 그대로 쓴다.
+    - snapshot의 `planner` 상태, 계획 중 confirm의 `PLANNER_BUSY`, confirm 성공 시 planner 상태 비움, 소유 연결 종료·Host 종료 시 취소를 구현했다.
+  - 프로토콜·설정:
+    - `plannerContractVersion: 1`을 추가했다. App의 해석에 맞춰 hello의 `commands` 목록은 기존 11개 그대로다.
+    - 새 오류 코드 3개와 실패 코드, `models.intents.plan`, `PlannerRoute`, `BudgetController.recordUsage`를 추가했다.
+  - 문서: OVERVIEW·PARALLEL_AGENTS의 "Planner 없음" 문장이 PLANNER_DRAFT.md를 가리키게 했다. README에 V0.8B 절을 추가했다.
+  - 메인 세션: PLANNER_DRAFT.md §7.4를 정정했다. #53 이전 App은 새 capability 키를 거부해 연결할 수 없다(`complexContractVersion`도 같았다). 그래서 #53을 먼저 머지한다.
+- 현재 검증:
+  - 하위 에이전트: 새 테스트 60개(`planner.test.ts` 11, `host-planner.test.ts` 49)가 §5.5 실패 코드, §7.2 거부(모델 호출 0), §8 행, L-행을 덮는다.
+  - 변이 확인 15/15에서 테스트가 실패했다. 예: dry-run 생략, 4번째 호출 허용, READY 직전 STALE 확인 생략, 늦은 결과 반영.
+  - `npm run check` exit 0. `./test.sh` exit 0(company-runtime 2,204 PASS).
+  - #53 App과 함께 COMPLEX 14·PARALLEL 9 corpus 통과.
+  - 메인 세션: App·Runtime을 합친 통합 브랜치에서 세 corpus(COMPLEX 14, PARALLEL 9, PLANNER 13)가 통과했다(falseCompletion 0). 계획 중 confirm을 막는 코드를 지우면 corpus가 실패한다.
+- 계약 해석(보수적으로 정함):
+  - 수정 뒤에 텍스트만 온 답은 DRAFT_INVALID이고, 안내는 수정 전에만 한다.
+  - 다른 도구와 섞인 제출, 출력 한도에서 잘린 답(`stopReason: "length"`)은 실패로 처리한다.
+  - prepare가 거부할 statements는 시작할 때 INVALID_REQUEST로 거부한다.
+  - cancel·read는 STALE_PROJECT를 내지 않는다.
+  - 호출 상한은 3회로 고정하고, token 상한만 예산의 최솟값을 따른다.
+- 커밋 상태: `249cbc1d`, `e2d7b8cc`, `3a2c65f1`, `a64a4b6c`, devlop 병합, 이 기록. devlop 대상 PR.
