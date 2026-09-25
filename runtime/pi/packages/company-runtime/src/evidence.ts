@@ -14,7 +14,8 @@ import type {
 } from "./complex-types.ts";
 import { isCriteriaReview, isTaskContract, type Run } from "./contracts.ts";
 import type { WorkerMeasurement } from "./measurement-types.ts";
-import { displayText } from "./observations.ts";
+import type { ModelIntent } from "./model-routing.ts";
+import { displayText, formatModelRoutes } from "./observations.ts";
 
 /**
  * Read-only projection of durable Run state plus the live workflow report. It is never an execution authority,
@@ -136,6 +137,12 @@ export interface EvidenceWorkerSummary {
 	step: string;
 	/** COMPLEX only: the Kernel-assigned task (`CT-00n`) or `integration` this invocation served. */
 	task?: string;
+	/** #5 routing: the profile used and the configured alias that selected it (null = the role default profile). */
+	profile: string;
+	modelIntent: ModelIntent | null;
+	/** From the frozen configuration mapping; `provider`/`model` below are what the provider actually reported. */
+	requestedProvider: string;
+	requestedModel: string;
 	provider: string;
 	model: string;
 	responseModel: string | null;
@@ -552,6 +559,10 @@ export function projectEvidencePack(input: EvidencePackInput): EvidencePack {
 			revision: measurement.revision,
 			step: `${measurement.step.stepId}@${measurement.step.attempt}`,
 			...(measurement.complexContext ? { task: taskLabel(measurement.complexContext) } : {}),
+			profile: measurement.profile,
+			modelIntent: measurement.modelIntent ?? null,
+			requestedProvider: measurement.requestedProvider,
+			requestedModel: measurement.requestedModel,
 			provider: measurement.actualProvider,
 			model: measurement.actualModel,
 			responseModel: measurement.responseModel ?? null,
@@ -722,6 +733,21 @@ export function formatEvidencePack(pack: EvidencePack): string {
 				"    Context only; not verification evidence or completion authority.",
 			);
 	}
+	if (pack.workers.length)
+		lines.push(
+			...formatModelRoutes(
+				pack.workflow,
+				pack.workers.map((worker) => ({
+					role: worker.role,
+					profile: worker.profile,
+					...(worker.modelIntent ? { modelIntent: worker.modelIntent } : {}),
+					requestedProvider: worker.requestedProvider,
+					requestedModel: worker.requestedModel,
+					actualProvider: worker.provider,
+					actualModel: worker.model,
+				})),
+			),
+		);
 	lines.push(
 		`Partial changes: ${pack.partialChanges ? "yes" : "no"}; cleanup: ${pack.cleanup}`,
 		`Failure: ${pack.failure ? `${pack.failure.category}${pack.failure.reason ? `: ${displayText(pack.failure.reason)}` : ""}` : "none (completed)"}`,
