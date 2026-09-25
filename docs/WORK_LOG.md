@@ -954,3 +954,27 @@
   - 하위 에이전트: `node scripts/validate.mjs t3` → `ALL GATES PASS`(server 테스트 5,161 PASS).
   - PR CI: 세 job이 모두 통과해야 머지한다.
 - 커밋 상태: `2d0dbe58`, `51adbe26`(메인 세션), `5d0c56d3`, `2a01aab3`, `cb844e49`(하위 에이전트), 병합 커밋, 이 기록. devlop 대상 PR.
+
+## 2026-09-25 KST — V0.8B #51 Planner 초안 제안 설계 계약
+
+- 배경: 로드맵 #23의 Phase A–D와 #5가 모두 닫혀 다음 단계를 정했다. 사용자 결정은 Planner 초안 제안 → 중단 Run 이어서 실행이며, 새 로드맵 #59와 이슈 #51–#58을 만들었다. #23은 완료 댓글을 남기고 닫았다.
+- 브랜치/worktree: `design/v0.8b-planner-contract`, `Weavra-worktrees/v0.8a-parallel-contract`(재사용). 메인 세션이 작성했고, 코드 사실 조사는 읽기 전용 하위 에이전트가 했다.
+- 산출물:
+  - `docs/architecture/PLANNER_DRAFT.md`(신규): #52 Runtime, #53 App, #54 corpus의 구현 계약.
+  - `COMPLEX_SEQUENTIAL_WORKFLOW.md` §3: 이 문서 §16이 요구하는 수정(amendment) 표시를 추가했다.
+- 결정과 근거(코드 확인 결과):
+  - **도구 없는 세션.** Host가 제한된 Planning Context(최대 196,608 bytes)를 조립해 준다. 담기는 것은 목표·AC, mode·Risk, 계획 규칙, 검사 id·kind·required(명령은 제외), allowed paths와 Policy로 거른 파일 목록, 프로젝트 지침, VALID facts다. 도구는 `submit_plan_draft` 하나뿐이다. 기존 worker는 runId·`ActionAudit`·측정 단계에 묶여 있는데, Run이 생기기 전에는 셋 다 없기 때문이다.
+  - **검증.** 제출된 초안은 `workflow.prepare`와 같은 파이프라인(claim 사실·Policy 포함)으로 미리 컴파일한다. 안내 1회와 수정 1회를 허용하고, 모델 호출은 최대 3회다. 토큰 상한은 `min(200k, budget)`이고 사용량은 snapshot으로만 알린다.
+  - **비동기 명령.** control 큐가 직렬이고 App 요청 timeout이 10초라서 명령 안에서 모델을 부를 수 없다. 그래서 `planner.start`는 바로 돌려준다. snapshot에는 작은 `planner` 상태만 담고, 이 키는 쓰기 전에는 아예 없다. 초안 본문은 64 KiB snapshot 예산과 분리해 `planner.read`로 받는다.
+  - **권한과 저장.** 저장하는 것이 없다. writer lock도, `.ai` 쓰기도, Run도, revision 변경도 없다. 계획 중 confirm은 `PLANNER_BUSY`로 거부하고 암묵적으로 취소하지 않는다. 사람이 편집기에 불러와 prepare → confirm을 해야만 실행되고, prepare가 다시 컴파일하므로 Planner에는 권한이 없다.
+  - **호환성.** `plannerContractVersion: 1` capability를 두고 소비자 우선(#53 → #52)으로 머지한다.
+  - **검증 설계.** #54 corpus L01–L14, 실제 모델 smoke, 실제 App UI 확인.
+- 머지 뒤 계약 정밀화(`82cc3559`): App과 Runtime이 같은 값을 계산하도록 몇 가지를 정확히 적었다.
+  - 요청 digest: `sha256:` + `JSON.stringify` 배열의 hex. statements가 없으면 `[]`다.
+  - `planId`는 UUID이고, 시각은 epoch ms다.
+  - 한 응답에 제출이 여럿이면 실패한 제출 1회로 센다.
+  - statements가 없으면 목표가 유일한 AC다.
+  - Discard는 App 안에서만 처리한다.
+- 현재 검증: 설계가 인용한 코드 사실(줄 번호, 한도, 직렬 큐, 10초 timeout, 65,536 bytes 응답 상한, `ComplexPlanRequiredError` 계기)을 `20ff4632`에서 직접 확인했다. PR #60 CI(세 job)를 통과해 머지했다(`99c36abf`).
+- 구현 착수: #52 Runtime(`Weavra-worktrees/v0.7b-complex-runtime`, `feat/v0.8b-planner-runtime`)과 #53 App(`Weavra-worktrees/v0.7b-complex-app`, `feat/v0.8b-planner-app`)을 하위 에이전트 두 개가 병렬로 구현 중이다. 머지는 계약대로 App → Runtime 순서다.
+- 커밋 상태: `6e75ede4`(PR #60), 계약 정밀화 `82cc3559`, 이 기록. 후속 문서 PR(devlop 대상).
