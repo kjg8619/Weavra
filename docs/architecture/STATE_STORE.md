@@ -1,6 +1,6 @@
 # Runtime State Store: stale writer recovery and terminal-run archive
 
-Status: implemented on `feat/runtime-review-followups-2` (2026-09-24). Scope: `runtime/pi/packages/company-runtime/src/state-store.ts` and its readers. Kernel authority, Policy, approval and the Host wire protocol are unchanged.
+Status: implemented on `feat/runtime-review-followups-2` (2026-09-24); Host Control prepare recovery added on `fix/host-orphan-recovery` (2026-09-25). Scope: `runtime/pi/packages/company-runtime/src/state-store.ts`, its readers and `workflow.prepare` in `host-control.ts`. Kernel authority, Policy, approval and the Host wire schemas are unchanged.
 
 ## Problem
 
@@ -29,6 +29,38 @@ Protocol:
 Normal openers never touch an existing lock, and recoverers exclude each other through the guard, so no fresh lock can be deleted. After recovery, the existing open path marks the dead owner's active run `INTERRUPTED`; there is still no automatic resume. The recovery is reported as `store.recoveredStaleLock` and as a workflow diagnostic.
 
 Not recovered (manual inspection, as before): locks without `hostname` (written before this change), other hosts (for example network filesystems), live or unverifiable PIDs, and a leftover recovery guard. PID-namespace isolation with a shared hostname (containers started with the host UTS namespace) can make a live owner look dead. That owner then fails closed on its next ownership check (`lock lost`). This is a documented limitation.
+
+### Recovery paths
+
+Every path uses the rules and guard above. They differ in whether they may settle a dead owner's Run.
+
+| Path | Settles a dead owner's Run |
+| --- | --- |
+| Normal writer `open` (TUI `/workflow run` and other non-Host writers) | Yes: removes the stale lock, then interrupts and archives as above |
+| Host Control `workflow.prepare` (`FileStateStore.recoverDeadOwner`) | Yes, only through a lock whose same-host owner is provably dead (below) |
+| Guarded opens with `recoverInterrupted: false` (Host `workflow.confirm` start, Host browser and fact confirmation, `/state export`, `weavra browser` candidate save) | No. The Host and export paths refuse first while a lock or an active Run exists. The candidate save checks nothing first: it can remove a dead owner's lock and then refuse the active Run, which leaves an active Run without a lock |
+| `readSnapshot` readers (`control.snapshot`, the read-only bridge, `/graph`, status views) | No. They never write |
+
+**Host Control `workflow.prepare`.** A Host killed mid-run (`kill -9`) leaves its Run active and its lock behind. Before this change the next Host refused every prepare with `WRITER_PRESENT`, so only a non-Host writer could recover the project. Now `workflow.prepare` calls `FileStateStore.recoverDeadOwner` before preparing when this Host has no execution in flight, the canonical revision equals the request's `expectedProjectRevision`, and a lock exists.
+
+`recoverDeadOwner` never creates `.ai` and never takes a free lock. It continues only when the guarded protocol above proves the lock's owner dead. It then opens as the next writer, so the same `open` recovery settles the project:
+
+- the Run becomes `INTERRUPTED` and its `PREPARED` actions `INTERRUPTED`,
+- COMPLEX unfinished rows become `INTERRUPTED`/`OWNER_LOST`; `COMPLETED` rows are kept,
+- `RunInterrupted` is emitted and old terminal runs are archived.
+
+It then releases the lock and returns the dead PID.
+
+A preview is always bound to the request's own `expectedProjectRevision`, which keeps the App's strict revision echo check intact. So the prepare checks that revision again after the recovery:
+
+- **A Run was settled.** Settling it committed a new project revision, so the request is stale. The prepare answers `STALE_PROJECT` and prepares nothing. The client re-reads: the snapshot now shows the Run `INTERRUPTED` and no writer. The next prepare runs normally at the recovered revision.
+- **Nothing was settled.** The dead owner left no active Run and nothing needed archiving, so the revision did not change. The same prepare continues and returns a preview.
+
+In every other case nothing is written and prepare fails as before: owner alive or `EPERM`, another host, a lock without `hostname`, an unreadable lock, a leftover guard, a stale revision (`STALE_PROJECT`), or an active Run with no lock at all (`ACTIVE_RUN`). Such a lockless Run has no owner left to prove dead; only a normal writer `open` settles it.
+
+`control.snapshot` stays read-only and keeps showing the orphan until a prepare recovers it. The `workflow.confirm` guarded start keeps `recoverInterrupted: false` as its freshness fence; after a prepare-time recovery no active Run is left for it to refuse. Nothing is resumed, replayed, rolled back or deleted. Partial changes stay in the checkout, and the next Run still requires a clean workspace.
+
+App note: the Project Settings panel enables prepare only when `writerPresent` is `false` and no Run is active. Until that gating allows a prepare over a writer lock, an App-only user cannot trigger this recovery. That App change is tracked separately.
 
 ## 2. Terminal-run archive
 

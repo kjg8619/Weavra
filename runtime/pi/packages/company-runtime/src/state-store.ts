@@ -270,30 +270,63 @@ export class FileStateStore implements StateStore, ActionAudit {
 		const canonical = await realpath(projectPath);
 		if (!(await lstat(canonical)).isDirectory()) throw new StateStoreError("workspace");
 		const store = new FileStateStore(canonical, options);
+		await store.acquire(false);
+		return store;
+	}
+	/**
+	 * Host Control `workflow.prepare` after a killed owner: acts only through a writer lock whose same-host owner PID
+	 * provably no longer exists (the `open` rules and recovery guard). It then settles that owner's active Run exactly as
+	 * `open` does (INTERRUPTED; COMPLEX unfinished rows INTERRUPTED/OWNER_LOST; nothing resumed), releases the lock and
+	 * resolves the dead PID. Resolves undefined and leaves the project unchanged when the lock is absent or its owner is
+	 * alive, on another host or unprovable. It never creates `.ai` or takes a free lock.
+	 */
+	static async recoverDeadOwner(
+		projectPath: string,
+		options: Pick<FileStateStoreOptions, "now" | "events"> = {},
+	): Promise<{ pid: number } | undefined> {
+		const canonical = await realpath(projectPath);
+		if (!(await lstat(canonical)).isDirectory()) throw new StateStoreError("workspace");
+		const store = new FileStateStore(canonical, { now: options.now, events: options.events });
+		if (!(await store.acquire(true))) return undefined;
+		await store.close();
+		return store.recoveredStaleLock;
+	}
+	/**
+	 * Takes the writer lock, then loads the canonical state with the configured recovery. `deadOwnerOnly` proceeds only
+	 * through a lock that `recoverStaleLock` proved dead and otherwise resolves false without any write.
+	 */
+	private async acquire(deadOwnerOnly: boolean): Promise<boolean> {
 		try {
-			await mkdir(store.directory, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => {
-				if (error.code !== "EEXIST") throw error;
-			});
-			const directory = await lstat(store.directory);
+			if (!deadOwnerOnly)
+				await mkdir(this.directory, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => {
+					if (error.code !== "EEXIST") throw error;
+				});
+			const directory = await lstat(this.directory);
 			if (!directory.isDirectory() || directory.isSymbolicLink()) throw new StateStoreError("directory");
-			store.directoryIdentity = { dev: directory.dev, ino: directory.ino };
-			const createLock = () =>
-				open(store.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+			this.directoryIdentity = { dev: directory.dev, ino: directory.ino };
+			const createLock = () => open(this.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
 			let lock: FileHandle;
-			try {
+			if (deadOwnerOnly) {
+				if (!(await this.recoverStaleLock())) {
+					this.closed = true;
+					return false;
+				}
 				lock = await createLock();
-			} catch (error) {
-				if ((error as NodeJS.ErrnoException).code !== "EEXIST" || !(await store.recoverStaleLock())) throw error;
-				lock = await createLock();
-			}
+			} else
+				try {
+					lock = await createLock();
+				} catch (error) {
+					if ((error as NodeJS.ErrnoException).code !== "EEXIST" || !(await this.recoverStaleLock())) throw error;
+					lock = await createLock();
+				}
 			try {
 				const identity = await lock.stat();
-				store.lockIdentity = { dev: identity.dev, ino: identity.ino };
+				this.lockIdentity = { dev: identity.dev, ino: identity.ino };
 				await lock.writeFile(
 					JSON.stringify({
 						schemaVersion: 1,
-						projectPath: canonical,
-						token: store.token,
+						projectPath: this.projectPath,
+						token: this.token,
 						pid: process.pid,
 						hostname: hostname(),
 					}),
@@ -302,13 +335,13 @@ export class FileStateStore implements StateStore, ActionAudit {
 			} finally {
 				await lock.close();
 			}
-			await store.initialize();
-			return store;
+			await this.initialize();
+			return true;
 		} catch (error) {
 			const failure = error instanceof StateStoreError ? error : new StateStoreError("open/lock");
-			store.closed = true;
+			this.closed = true;
 			try {
-				await store.releaseLock();
+				await this.releaseLock();
 			} catch {
 				failure.cleanupFailed = true;
 			}

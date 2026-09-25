@@ -256,8 +256,14 @@ await scenario("P09", "a two-row wave with one invocation left is BLOCKED before
   // P14: kill -9 the owning Runtime Host mid-wave. A raw stdio client owns the Run so the harness holds the PID.
   const { hold, opened } = barrier(["CT-001", "CT-002"]);
   const parked = gate();
-  await scenario("P14", "owner killed mid-wave: nothing resumes; the orphaned Run stays consistent and is never taken over", false, {
-    model: workers({ hold: { "CT-001": async (e) => { await hold["CT-001"](e); await parked.released; }, "CT-002": async (e) => { await hold["CT-002"](e); await parked.released; } } }),
+  const scripted = workers({ hold: { "CT-001": async (e) => { await hold["CT-001"](e); await parked.released; }, "CT-002": async (e) => { await hold["CT-002"](e); await parked.released; } } });
+  /** The Run ID of every model request, in arrival order. */
+  const runIds = [];
+  await scenario("P14", "owner killed mid-wave: the orphan stays visible read-only; a prepare recovers it INTERRUPTED/OWNER_LOST (STALE_PROJECT, no resume); the next prepare's new Run completes", true, {
+    model: (entry) => {
+      runIds.push(entry.request?.runId);
+      return scripted(entry);
+    },
     run: async (model) => {
       const projectRoot = await project("p14");
       await writeModels(model);
@@ -286,21 +292,55 @@ await scenario("P09", "a two-row wave with one invocation left is BLOCKED before
       assert.equal(prepared.success, true, JSON.stringify(prepared));
       assert.equal((await raw("workflow.confirm", { previewId: prepared.data.preview.previewId, previewDigest: prepared.data.preview.previewDigest })).success, true);
       await opened;
+      const orphanRequests = runIds.length;
       child.kill("SIGKILL");
       await new Promise((resolve) => child.once("exit", resolve));
       parked.release();
       return scoped(
         Effect.gen(function* () {
+          // Every snapshot below passes the App consumer checks, including the recovery transition.
           const next = yield* connect("P14 new Host", projectRoot, 2);
           const seen = yield* next.snapshot();
-          const refused = yield* next.mutate({ type: "workflow.prepare", goal: GOAL, acceptanceStatements: STATEMENTS, complexDraft: DRAFT });
-          assert.equal(refused.success, false, "a new Run must not start over an orphaned active Run");
-          const again = yield* next.snapshot();
-          assert.equal(again.snapshot.status.run.runId, seen.snapshot.status.run.runId);
-          assert.equal(again.ownedRunId, null);
-          for (const row of again.complexExecution.tasks) assert.notEqual(row.status, "COMPLETED");
-          console.log(`   P14 orphan after kill: run ${again.snapshot.status.run.status}, rows ${statuses(again).join("/")}, writerPresent ${again.snapshot.status.writerPresent}, prepare → ${refused.error.code}`);
-          return again;
+          const orphanId = seen.snapshot.status.run.runId;
+          assert.equal(seen.snapshot.status.run.status, "RUNNING");
+          assert.equal(seen.snapshot.status.writerPresent, true);
+          assert.equal(seen.ownedRunId, null);
+          assert.deepEqual(statuses(seen), ["IMPLEMENTING", "IMPLEMENTING", "PENDING"]);
+          // control.snapshot stays read-only: reading again changes nothing.
+          const reread = yield* next.snapshot();
+          assert.deepEqual([reread.projectRevision, reread.stateRevision, reread.snapshot.status.writerPresent], [seen.projectRevision, seen.stateRevision, true]);
+          // workflow.prepare recovers the provably dead same-host owner. That moves the revision the client sent, so it
+          // answers STALE_PROJECT and prepares nothing.
+          const recovering = yield* next.mutate({ type: "workflow.prepare", goal: GOAL, acceptanceStatements: STATEMENTS, complexDraft: DRAFT });
+          assert.equal(recovering.success, false, JSON.stringify(recovering));
+          assert.equal(recovering.error.code, "STALE_PROJECT");
+          const recovered = yield* next.snapshot();
+          assert.equal(recovered.projectRevision, seen.projectRevision + 1);
+          assert.equal(recovered.snapshot.status.run.runId, orphanId);
+          assert.equal(recovered.snapshot.status.run.status, "INTERRUPTED");
+          assert.equal(recovered.snapshot.status.writerPresent, false);
+          assert.equal(recovered.preview, null);
+          assert.deepEqual(recovered.complexExecution.tasks.map((row) => [row.status, row.failureCode]), Array(3).fill(["INTERRUPTED", "OWNER_LOST"]));
+          assert.equal(recovered.complexExecution.cleanup, "UNCONFIRMED");
+          // The next prepare runs normally at the recovered revision, and its preview echoes the revision it was sent.
+          const prepared = yield* next.mutate({ type: "workflow.prepare", goal: GOAL, acceptanceStatements: STATEMENTS, complexDraft: DRAFT });
+          assert.equal(prepared.success, true, JSON.stringify(prepared));
+          const preview = prepared.data.preview;
+          assert.equal(preview.projectRevision, recovered.projectRevision);
+          const accepted = yield* next.mutate({ type: "workflow.confirm", previewId: preview.previewId, previewDigest: preview.previewDigest });
+          assert.equal(accepted.success, true, JSON.stringify(accepted));
+          const final = yield* settle("P14 new Host", next);
+          const runId = final.snapshot.status.run.runId;
+          assert.notEqual(runId, orphanId);
+          assert.deepEqual(statuses(final), ["COMPLETED", "COMPLETED", "COMPLETED"]);
+          // Nothing resumed: after the kill every model request belongs to the new Run, and the orphan keeps its recovery.
+          assert.ok(runIds.slice(orphanRequests).every((id) => id === runId), `requests after the kill: ${runIds.slice(orphanRequests)}`);
+          const durable = JSON.parse(yield* Effect.promise(() => readFile(join(projectRoot, ".ai/state.json"), "utf8")));
+          const orphan = durable.runs.find((run) => run.runId === orphanId);
+          assert.equal(orphan.status, "INTERRUPTED");
+          assert.deepEqual(orphan.complex.tasks.map((row) => [row.status, row.failureCode]), Array(3).fill(["INTERRUPTED", "OWNER_LOST"]));
+          console.log(`   P14 orphan after kill: run RUNNING, rows ${statuses(seen).join("/")}, writerPresent true; prepare → ${recovering.error.code} with the Run ${recovered.snapshot.status.run.status} (${statuses(recovered).join("/")}), writer free; next prepare's new Run ${final.snapshot.status.run.status}`);
+          return final;
         }),
       );
     },
@@ -325,4 +365,4 @@ await scenario("P09", "a two-row wave with one invocation left is BLOCKED before
   assert.ok(timings[2] < timings[1], "one wave of two must finish faster than the serial run");
 }
 
-finish(4, "PARALLEL");
+finish(5, "PARALLEL");
