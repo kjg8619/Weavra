@@ -148,12 +148,19 @@ export function fitnessConfiguration(
 	model: string,
 	sandbox: "required" | "disabled",
 	/** Benchmark-only overrides; omitted keeps the frozen Fitness configuration (and its digest) unchanged. */
-	options: { advisory?: boolean; maxRevisionCycles?: number } = {},
+	options: { advisory?: boolean; maxRevisionCycles?: number; reviewer?: { provider: string; model: string } } = {},
 ): RuntimeConfig {
 	return parseRuntimeConfig(
 		JSON.stringify({
 			schemaVersion: 1,
-			models: { profiles: { coding: { provider, model }, reasoning: { provider, model } } },
+			models: {
+				profiles: {
+					coding: { provider, model },
+					reasoning: options.reviewer
+						? { provider: options.reviewer.provider, model: options.reviewer.model }
+						: { provider, model },
+				},
+			},
 			runtime: { workflow: fixture.workflow },
 			files: { allowed_paths: fixture.allowedPaths },
 			mutation: { mode: "strict" },
@@ -277,6 +284,8 @@ export interface FitnessFixtureExecutionOptions {
 	advisory?: boolean;
 	/** Benchmark-only: product revision limit instead of the Fitness calibration value 0. */
 	maxRevisionCycles?: number;
+	/** Reviewer evaluation only: the reasoning profile (Reviewer) uses this target; `target` keeps the coding profile. */
+	reviewer?: Pick<ProviderTarget, "provider" | "model">;
 	/** Benchmark-only: payload-free worker tool outcomes, in order; never changes the Fitness result. */
 	observeToolResult?: NonNullable<FitnessWorkerObserver["toolResult"]>;
 	/**
@@ -313,6 +322,7 @@ export async function executeFitnessFixture(
 	const config = fitnessConfiguration(fixture, options.target.provider, options.target.model, options.sandbox, {
 		advisory: options.advisory,
 		maxRevisionCycles: options.maxRevisionCycles,
+		reviewer: options.reviewer,
 	});
 	const configurationDigest = fitnessConfigDigest(config);
 	const measurements: WorkerMeasurement[] = [];
