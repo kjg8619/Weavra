@@ -10,7 +10,8 @@ export function messageText(message) {
 /**
  * Loopback OpenAI-compatible chat completions peer for integration tests. `respond` gets the parsed worker
  * request (the first user message is the Runtime's JSON request), tool names and messages, and returns
- * `{ tool, args }` or `{ text }`. Every response reports usage so the Runtime's budget stays known.
+ * `{ tool, args }` or `{ text }`. Every response reports usage so the Runtime's budget stays known. Each entry of
+ * `requests` records when the request arrived and when its response ended (`performance.now()` milliseconds).
  */
 export async function startScriptedModel(respond) {
   const requests = [];
@@ -33,13 +34,15 @@ export async function startScriptedModel(respond) {
     const tools = (body.tools ?? []).map((tool) => tool.function?.name).filter(Boolean);
     const toolResults = messages.filter((message) => message.role === "tool");
     const entry = { request, tools, messages, toolResults, system: messageText(messages.find((m) => m.role === "system")) };
-    requests.push({ role: request?.role, step: request?.step, complexTaskId: request?.complexTask?.task.id ?? null, tools, toolResults: toolResults.length });
+    const record = { role: request?.role, step: request?.step, complexTaskId: request?.complexTask?.task.id ?? null, tools, toolResults: toolResults.length, startedAt: performance.now(), endedAt: null };
+    requests.push(record);
     let reply;
     try {
       reply = await respond(entry);
     } catch (error) {
       response.writeHead(500, { "content-type": "application/json" });
       response.end(JSON.stringify({ error: { message: String(error?.message ?? error) } }));
+      record.endedAt = performance.now();
       return;
     }
     const id = `chatcmpl-${requests.length}`;
@@ -66,6 +69,7 @@ export async function startScriptedModel(respond) {
     }
     response.write(chunk(undefined, { usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 } }));
     response.end("data: [DONE]\n\n");
+    record.endedAt = performance.now();
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   return {

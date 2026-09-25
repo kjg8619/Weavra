@@ -1,12 +1,17 @@
 import {
   EnvironmentId,
   ProjectId,
+  WeavraComplexDraft,
   WeavraComplexExecution,
+  WeavraControlMutation,
   WeavraControlTransportError,
   WS_METHODS,
   type WeavraControlObservation,
+  type WeavraControlResponse,
   type WeavraControlState,
+  type WeavraPlannerStatus,
 } from "@t3tools/contracts";
+import { sha256Hex } from "@t3tools/shared/sha256";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -290,4 +295,91 @@ export function createEnvironmentWeavraControlCommand<R, E>(
         return yield* request(WS_METHODS.weavraControl, input);
       }),
   });
+}
+
+// V0.8B Planner (docs/architecture/PLANNER_DRAFT.md §6, §7, §9). A Planner draft is candidate data
+// for the human's editor. These helpers never prepare, confirm or persist anything.
+
+/**
+ * The Host's `requestDigest` (§6), recomputed for the editor's goal and criteria: `sha256:` and the
+ * lowercase hex SHA-256 of the UTF-8 JSON of the domain, the goal and the statements, exactly as
+ * sent. Omitted statements are `[]`.
+ */
+export function plannerRequestDigest(
+  goal: string,
+  acceptanceStatements: ReadonlyArray<string> = [],
+): string {
+  return `sha256:${sha256Hex(JSON.stringify(["weavra-planner-request-v1", goal, acceptanceStatements]))}`;
+}
+
+/**
+ * The planning status of a connection that advertises the Planner. Without the advertisement the
+ * Planner does not exist there, whatever a snapshot carries.
+ */
+export function plannerStatusOf(
+  observation: WeavraControlObservation | null | undefined,
+): WeavraPlannerStatus | null {
+  return observation?.capabilities?.plannerContractVersion === 1
+    ? (observation.state?.planner ?? null)
+    : null;
+}
+
+/** Planning time by the Host clock: until it finished, else until the last checked observation. */
+export function plannerElapsedMs(planner: WeavraPlannerStatus, observedAt: number | null) {
+  const end = planner.finishedAt ?? observedAt;
+  return end === null ? null : Math.max(0, end - planner.startedAt);
+}
+
+type PlannerEnvelope = Pick<
+  WeavraControlMutation,
+  "protocolVersion" | "id" | "ownerId" | "expectedProjectRevision"
+>;
+const decodePlannerRequest = Schema.decodeUnknownSync(WeavraControlMutation, {
+  onExcessProperty: "error",
+});
+/** Only the goal and criteria; Runtime classifies and bounds the rest. Throws on invalid input. */
+export function plannerStartRequest(
+  envelope: PlannerEnvelope,
+  goal: string,
+  acceptanceStatements: ReadonlyArray<string>,
+) {
+  return decodePlannerRequest({
+    ...envelope,
+    type: "planner.start",
+    goal,
+    ...(acceptanceStatements.length > 0 ? { acceptanceStatements } : {}),
+  });
+}
+export function plannerCancelRequest(envelope: PlannerEnvelope, planId: string) {
+  return decodePlannerRequest({ ...envelope, type: "planner.cancel", planId });
+}
+export function plannerReadRequest(envelope: PlannerEnvelope, planId: string) {
+  return decodePlannerRequest({ ...envelope, type: "planner.read", planId });
+}
+
+/** The editor's record of the Planner draft it loaded (§9). Page-session memory only. */
+export interface PlannerLoadedDraft {
+  readonly planId: string;
+  readonly requestDigest: string;
+  readonly current: boolean;
+  readonly draft: WeavraComplexDraft;
+}
+/** The draft of a `planner.read` response for exactly this planning request, else null. */
+export function plannerLoadedDraft(
+  response: WeavraControlResponse,
+  planId: string,
+): PlannerLoadedDraft | null {
+  if (!response.success || response.data.kind !== "planner-draft") return null;
+  const { data } = response;
+  return data.planId === planId
+    ? { planId, requestDigest: data.requestDigest, current: data.current, draft: data.draft }
+    : null;
+}
+const sameDraft = Schema.toEquivalence(WeavraComplexDraft);
+/** True while the editor holds exactly the loaded draft; key order is not an edit. */
+export function plannerDraftUnchanged(
+  loaded: PlannerLoadedDraft | null,
+  editor: WeavraComplexDraft,
+): boolean {
+  return loaded !== null && sameDraft(loaded.draft, editor);
 }

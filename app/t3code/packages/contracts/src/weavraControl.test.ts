@@ -25,6 +25,8 @@ import {
   WeavraControlRequest,
   WeavraControlResponse,
   WeavraControlState,
+  WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES,
+  WeavraPlannerStatus,
   type WeavraRegisteredBrowserCheck,
 } from "./weavraControl.ts";
 
@@ -1252,5 +1254,299 @@ describe("COMPLEX contract v2 (parallel waves) wire shapes", () => {
         decodeRpc({ projectId: "project", request: { ...complexPrepare, ...forged } }),
       ).toThrow();
     }
+  });
+});
+
+// V0.8B Planner (docs/architecture/PLANNER_DRAFT.md §7): candidate data only, decoded strictly.
+const decodePlanner = Schema.decodeUnknownSync(WeavraPlannerStatus, strict);
+const decodeResponse = Schema.decodeUnknownSync(WeavraControlResponse, strict);
+const planId = "5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e";
+const plannerEnvelope = {
+  protocolVersion: 1,
+  id: "owner:4",
+  ownerId: "owner",
+  expectedProjectRevision: 9,
+} as const;
+const plannerStart = {
+  ...plannerEnvelope,
+  type: "planner.start",
+  goal: "Split the config parser into parse and validate modules",
+  acceptanceStatements: ["One", "Two"],
+} as const;
+const plannerRunning = {
+  schemaVersion: 1,
+  planId,
+  status: "RUNNING",
+  requestDigest: browserDigest,
+  projectRevision: 9,
+  current: true,
+  startedAt: 1000,
+  finishedAt: null,
+  route: {
+    alias: "plan",
+    profile: "reasoning",
+    provider: "commandcode",
+    model: "deepseek/deepseek-v4.1-flash",
+  },
+  usage: { invocations: 1, reportedTokens: 1200 },
+  taskCount: null,
+  failureCode: null,
+} as const satisfies WeavraPlannerStatus;
+const plannerReady = {
+  ...plannerRunning,
+  status: "READY",
+  finishedAt: 5000,
+  usage: { invocations: 2, reportedTokens: 3400 },
+  taskCount: 2,
+} as const satisfies WeavraPlannerStatus;
+const plannerFailed = {
+  ...plannerRunning,
+  status: "FAILED",
+  finishedAt: 5000,
+  failureCode: "DRAFT_INVALID",
+} as const satisfies WeavraPlannerStatus;
+const plannerCancelled = {
+  ...plannerRunning,
+  status: "CANCELLED",
+  finishedAt: 1000,
+  route: null,
+  usage: { invocations: 0, reportedTokens: null },
+} as const satisfies WeavraPlannerStatus;
+function plannerState(planner: unknown, projectRevision = 9) {
+  const { complexExecution: _execution, ...state } = complexState();
+  return {
+    ...state,
+    projectRevision,
+    stateRevision: null,
+    ownedRunId: null,
+    busy: false,
+    planner,
+    snapshot: {
+      ...state.snapshot,
+      status: { ...state.snapshot.status, state: "missing", writerPresent: false, run: null },
+    },
+  };
+}
+const plannerResponse = (data: unknown, command = "planner.read") => ({
+  protocolVersion: 1,
+  type: "control_response",
+  id: "owner:4",
+  command,
+  ownerId: "owner",
+  runId: null,
+  stateRevision: null,
+  projectRevision: 9,
+  eventId: null,
+  timestamp: 6000,
+  success: true,
+  data,
+});
+const plannerDraft = {
+  kind: "planner-draft",
+  planId,
+  requestDigest: browserDigest,
+  projectRevision: 9,
+  current: true,
+  draft,
+} as const;
+
+describe("V0.8B Planner wire shapes", () => {
+  it("advertises the Planner only as exact version 1, beside the unchanged command tuple", () => {
+    const advertised = {
+      ...complexCapabilities,
+      complexContractVersion: 2,
+      plannerContractVersion: 1,
+    };
+    expect(decodeCapabilities(advertised).plannerContractVersion).toBe(1);
+    expect(decodeCapabilities(complexCapabilities)).not.toHaveProperty("plannerContractVersion");
+    for (const version of [2, 0, null, "1", true, 1.5]) {
+      expect(() =>
+        decodeCapabilities({ ...advertised, plannerContractVersion: version }),
+      ).toThrow();
+    }
+    // Advertisement is the version key; the command tuple is not extended.
+    expect(() =>
+      decodeCapabilities({
+        ...advertised,
+        commands: [...advertised.commands, "planner.start", "planner.cancel", "planner.read"],
+      }),
+    ).toThrow();
+  });
+  it("accepts planner.start with only the goal and bounded criteria, and cancel or read with a planId", () => {
+    const { acceptanceStatements: _statements, ...goalOnly } = plannerStart;
+    for (const request of [
+      plannerStart,
+      goalOnly,
+      { ...plannerEnvelope, type: "planner.cancel", planId },
+      { ...plannerEnvelope, type: "planner.read", planId },
+    ]) {
+      expect(decodeRpc({ projectId: "project", request }).request).toEqual(request);
+      const { ownerId: _owner, ...missingOwner } = request;
+      const { expectedProjectRevision: _revision, ...missingRevision } = request;
+      expect(() => decodeWire(missingOwner)).toThrow();
+      expect(() => decodeWire(missingRevision)).toThrow();
+    }
+  });
+  it("rejects forged authority, unknown planner commands and out-of-bound input at the RPC decoder", () => {
+    const decodeRequest = (request: unknown) => decodeRpc({ projectId: "project", request });
+    for (const forged of [
+      { risk: "R0" },
+      { workflow: "COMPLEX" },
+      { executionMode: "EDIT" },
+      { complexDraft: draft },
+      { draft },
+      { planId },
+      { allowedPaths: ["src"] },
+      { checks: ["test"] },
+      { maxParallel: 4 },
+      { model: "other/model" },
+      { route: { alias: "plan" } },
+      { budget: { invocations: 10 } },
+      { recipeId: "bug-fix" },
+      { status: "READY" },
+    ]) {
+      expect(() => decodeRequest({ ...plannerStart, ...forged })).toThrow();
+    }
+    for (const invalid of [
+      { goal: "" },
+      { goal: "   " },
+      { goal: "x".repeat(2049) },
+      { acceptanceStatements: [] },
+      { acceptanceStatements: [" "] },
+      { acceptanceStatements: ["x".repeat(501)] },
+      { acceptanceStatements: Array(17).fill("criterion") },
+    ]) {
+      expect(() => decodeRequest({ ...plannerStart, ...invalid })).toThrow();
+    }
+    for (const type of ["planner.cancel", "planner.read"]) {
+      const request = { ...plannerEnvelope, type, planId };
+      expect(() => decodeRequest({ ...request, planId: planId.toUpperCase() })).toThrow();
+      expect(() => decodeRequest({ ...request, planId: "plan-1" })).toThrow();
+      const { planId: _planId, ...missing } = request;
+      expect(() => decodeRequest(missing)).toThrow();
+      for (const forged of [{ draft }, { status: "READY" }, { goal: plannerStart.goal }]) {
+        expect(() => decodeRequest({ ...request, ...forged })).toThrow();
+      }
+    }
+    for (const type of ["planner.confirm", "planner.prepare", "planner.load", "planner.apply"]) {
+      expect(() => decodeRequest({ ...plannerEnvelope, type, planId })).toThrow();
+    }
+  });
+  it("decodes a planner status only with exactly the fields of its status", () => {
+    for (const status of [plannerRunning, plannerReady, plannerFailed, plannerCancelled]) {
+      expect(decodePlanner(status)).toEqual(status);
+    }
+    expect(
+      decodePlanner({ ...plannerRunning, route: { ...plannerRunning.route, alias: null } }),
+    ).toMatchObject({ route: { alias: null } });
+    for (const invalid of [
+      { ...plannerReady, taskCount: null },
+      { ...plannerRunning, taskCount: 2 },
+      { ...plannerFailed, taskCount: 2 },
+      { ...plannerCancelled, taskCount: 2 },
+      { ...plannerFailed, failureCode: null },
+      { ...plannerReady, failureCode: "DRAFT_INVALID" },
+      { ...plannerRunning, failureCode: "TIMEOUT" },
+      { ...plannerCancelled, failureCode: "CANCELLED" },
+      { ...plannerRunning, finishedAt: 2000 },
+      { ...plannerReady, finishedAt: null },
+      { ...plannerReady, usage: { invocations: 0, reportedTokens: 0 } },
+      { ...plannerRunning, usage: { invocations: 4, reportedTokens: 1200 } },
+      { ...plannerRunning, usage: { invocations: 1, reportedTokens: -1 } },
+      { ...plannerRunning, usage: { ...plannerRunning.usage, costUsd: 1 } },
+      { ...plannerReady, taskCount: 1 },
+      { ...plannerReady, taskCount: 9 },
+      { ...plannerReady, taskCount: 2.5 },
+      { ...plannerFailed, failureCode: "UNKNOWN_FAILURE" },
+      { ...plannerRunning, status: "PLANNING" },
+      { ...plannerReady, status: "COMPLETED" },
+      { ...plannerRunning, planId: planId.toUpperCase() },
+      { ...plannerRunning, planId: "plan-1" },
+      { ...plannerRunning, requestDigest: "a".repeat(64) },
+      { ...plannerRunning, requestDigest: `sha256:${"A".repeat(64)}` },
+      { ...plannerRunning, route: { ...plannerRunning.route, alias: "deep" } },
+      { ...plannerRunning, route: { ...plannerRunning.route, credential: "PRIVATE" } },
+      { ...plannerRunning, route: { ...plannerRunning.route, model: "  " } },
+      { ...plannerRunning, current: "yes" },
+      { ...plannerRunning, schemaVersion: 2 },
+      // The draft never travels in the snapshot, and planning never names a Run or approval.
+      { ...plannerReady, draft },
+      { ...plannerReady, tasks: draft.tasks },
+      { ...plannerRunning, runId: "run" },
+      { ...plannerReady, approved: true },
+    ]) {
+      expect(() => decodePlanner(invalid)).toThrow();
+    }
+  });
+  it("binds the snapshot planner to the enclosing project revision and never accepts null", () => {
+    expect(decodeState(plannerState(plannerRunning)).planner).toEqual(plannerRunning);
+    const { planner: _planner, ...withoutPlanner } = plannerState(plannerRunning);
+    expect(decodeState(withoutPlanner)).not.toHaveProperty("planner");
+    expect(() => decodeState(plannerState(null))).toThrow();
+    // A draft planned at revision 8 stays readable once the project moved on, but not as current.
+    expect(
+      decodeState(plannerState({ ...plannerReady, projectRevision: 8, current: false })).planner,
+    ).toMatchObject({ current: false });
+    expect(() => decodeState(plannerState({ ...plannerReady, projectRevision: 8 }))).toThrow();
+    expect(() => decodeState(plannerState({ ...plannerReady, projectRevision: 10 }))).toThrow();
+    // `current` is defined for READY only (§6); a RUNNING request is checked by the Host instead.
+    expect(
+      decodeState(plannerState({ ...plannerRunning, projectRevision: 8 })).planner,
+    ).toMatchObject({ status: "RUNNING", current: true });
+    expect(() => decodeState(plannerState({ ...plannerRunning, projectRevision: 10 }))).toThrow();
+  });
+  it("decodes planner acknowledgements, drafts and codes, and never a Run from planning", () => {
+    for (const command of ["planner.start", "planner.cancel"] as const) {
+      const accepted = { kind: "accepted", requestId: "owner:4", command, runId: null };
+      expect(decodeResponse(plannerResponse(accepted, command))).toMatchObject({ data: accepted });
+      expect(() =>
+        decodeResponse(plannerResponse({ ...accepted, runId: "run" }, command)),
+      ).toThrow();
+    }
+    expect(decodeResponse(plannerResponse(plannerDraft))).toMatchObject({ data: plannerDraft });
+    for (const invalid of [
+      { ...plannerDraft, status: "READY" },
+      { ...plannerDraft, planId: planId.toUpperCase() },
+      { ...plannerDraft, requestDigest: "a".repeat(64) },
+      { ...plannerDraft, current: null },
+      { ...plannerDraft, draft: { tasks: [{ ...draftTask, id: "CT-001" }, draft.tasks[1]] } },
+      { ...plannerDraft, draft: { tasks: [{ ...draftTask, risk: "R0" }, draft.tasks[1]] } },
+      { ...plannerDraft, draft: { ...draft, limits: { maxParallel: 4 } } },
+      { ...plannerDraft, draft: { tasks: [draftTask] } },
+      { ...plannerDraft, plan: complexPlan },
+    ]) {
+      expect(() => decodeResponse(plannerResponse(invalid))).toThrow();
+    }
+    const { draft: _draft, ...withoutDraft } = plannerDraft;
+    expect(() => decodeResponse(plannerResponse(withoutDraft))).toThrow();
+    for (const code of ["PLANNER_BUSY", "PLANNER_NOT_FOUND", "PLANNER_NOT_READY"]) {
+      const { data: _data, ...envelope } = plannerResponse(null);
+      const refused = { ...envelope, success: false, error: { code } };
+      expect(decodeResponse(refused)).toEqual(refused);
+    }
+  });
+  it("bounds a planner-draft response line by 16,384 bytes, newline included", () => {
+    const utf8 = new TextEncoder();
+    // Pads an envelope field so that the whole line, with its newline, has exactly `bytes` bytes.
+    const sized = (data: unknown, bytes: number) => {
+      const base = plannerResponse(data, "");
+      const padding = bytes - 1 - utf8.encode(JSON.stringify(base)).byteLength;
+      return { ...base, command: "x".repeat(padding) };
+    };
+    const line = (response: unknown) => utf8.encode(`${JSON.stringify(response)}\n`).byteLength;
+    const atLimit = sized(plannerDraft, WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES);
+    expect(line(atLimit)).toBe(WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES);
+    expect(decodeResponse(atLimit)).toEqual(atLimit);
+    const over = sized(plannerDraft, WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES + 1);
+    expect(() => decodeResponse(over)).toThrow();
+    // The bound belongs to the planner-draft kind; other responses keep the general budget.
+    const accepted = {
+      kind: "accepted",
+      requestId: "owner:4",
+      command: "planner.start",
+      runId: null,
+    };
+    const large = sized(accepted, WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES + 1);
+    expect(decodeResponse(large)).toEqual(large);
   });
 });
