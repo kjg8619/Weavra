@@ -19,6 +19,10 @@ if [[ "${1-}" = setup || "${1-}" = doctor ]]; then
   (( $# == 1 )) || fail "setup/doctor cannot be combined with Runtime arguments or worktree options."
   exec node "$DIRECTORY/../src/launcher-home.ts" "$1"
 fi
+if [[ "${1-}" = project ]]; then
+  shift
+  exec node "$DIRECTORY/../src/launcher-project.ts" "$@"
+fi
 if [[ "${1-}" = fitness ]]; then
   shift
   exec node "$DIRECTORY/../src/launcher-fitness.ts" "$@"
@@ -52,8 +56,8 @@ while (( $# )); do
       WORKTREE_MODE="$1"
       shift
       ;;
-    setup|doctor|bridge|fitness|browser)
-      fail "setup/doctor/bridge/fitness/browser must be standalone launcher commands. Use -- for a literal Runtime prompt."
+    setup|doctor|project|bridge|fitness|browser)
+      fail "setup/doctor/project/bridge/fitness/browser must be standalone launcher commands. Use -- for a literal Runtime prompt."
       ;;
     --)
       PI_ARGS+=("$@")
