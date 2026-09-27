@@ -23,6 +23,8 @@ Weavra
 
 Use Node 24.19.0 for the consolidation validation environment. Install/build inside each build root, not at product root; complete commands and evidence are in the [consolidation record](docs/migration/REPOSITORY_CONSOLIDATION.md).
 
+For the bounded source-checkout developer pilot, see the [local team pilot runbook](docs/operations/LOCAL_TEAM_PILOT.md). It documents local install, reviewed project setup, isolated App startup, and evidence review; it is not a hosted or managed release.
+
 ```sh
 # From product root: configure the exact executable without enabling control.
 source scripts/weavra-env.sh

@@ -2,7 +2,9 @@
 
 ## 현재 진행 요약
 
-- 갱신: 2026-09-25, Asia/Seoul (UTC+09:00). 저장소 통합 baseline과 Product Independence Phase 1은 완료된 역사적 결과로 보존한다.
+- 2026-09-27 추가: 실제 업무 설정 중 확인된 대형 저장소 증거 수집 한도를 명시적 `bounded-monorepo` 프로필과 동일 수집기를 사용하는 doctor로 보완했다. strict 편집 모드의 실제 codex-lb 작업은 검사·독립 리뷰를 거쳐 COMPLETED였으며 아래 현재 검증 기록을 따른다.
+- 갱신: 2026-09-26, Asia/Seoul (UTC+09:00). 저장소 통합 baseline과 Product Independence Phase 1은 완료된 역사적 결과로 보존한다.
+- 로컬 팀 파일럿 기반을 `feat/company-pilot`에서 구현했다: 프로젝트 초기화·읽기 전용 진단, 시작 실패 안내, 기존 증거 영역으로의 이동, 팀 운영 안내. 현재 검증과 회사 환경의 미검증 조건은 아래 2026-09-26 기록을 따른다.
 - 로드맵 #23(Phase A–D: V0.6D Project Facts, V0.7A Capability Broker, V0.7B COMPLEX 순차, V0.8A 병렬 에이전트)과 별도 backlog #5를 모두 닫았다.
 - 로드맵 #59도 모두 닫았다.
   - Phase E — V0.8B Planner 초안 제안(#51–#54):
@@ -16,8 +18,8 @@
     - 재개·재시도·증거 재사용은 없다.
 - CI cross-boundary job은 실제 Runtime ↔ 운영 App 경계 corpus 네 개를 매번 실행한다. COMPLEX 14, PARALLEL 9, PLANNER 13, RERUN 5개 시나리오이며 모두 falseCompletion 0이다.
 - 실제 모델(commandcode deepseek-v4.1-flash)과 실제 App UI로 COMPLEX·병렬·Planner·재실행 흐름을 각각 COMPLETED까지 확인했다.
+- #65 구현 완료: Planner Planning Context에 제한된 `checks[].exercises` 대상 경로를 제공한다.
 - 알려진 후속 과제(미착수):
-  - #65: Planning Context에 검사 대상 파일 정보가 없어, AC에 경로가 없으면 Planner가 모듈 이름을 추측한다.
   - App의 모델 의도 표시·선택. wire 변경이 필요하다.
   - RESEARCH 읽기 전용 워크플로.
   - Planner로 미완료 작업을 재계획하기(V0.8B와 V0.8C의 결합).
@@ -1242,3 +1244,60 @@
     - Run: COMPLETED(병렬 웨이브, 작업·통합 PASS×3), 72초, 125,490 토큰, cleanup CONFIRMED.
     - 같은 조건의 개선 전 smoke는 모듈 이름을 추측해 BLOCKED였다.
 - 커밋 상태: `f675afa9`(설계 개정), `99bb86d0`(구현), devlop 병합, 이 기록. devlop 대상 PR.
+
+## 2026-09-26 KST — 회사 업무용 로컬 파일럿 기반 제품화
+
+- 요청과 범위: 회사 업무에 사용할 제품화 작업을 진행했다. 도입 형태 질문에 답변이 없어 사전에 안내한 개발자별 로컬 web/desktop 기준으로 진행했다. 관리형 서비스·회사 배포·실제 모델 품질 검증 완료를 뜻하지 않는다.
+- 작업 위치: `feat/company-pilot`, `Weavra-worktrees/company-pilot`, 시작 HEAD `778b10f2`. 원래 `devlop`과 이전 `workflow-guidance` 작업 트리는 보존했다. commit, push, PR 생성, merge는 하지 않았다.
+- Runtime 변경:
+  - `weavra project init --config <검토된 YAML>`이 Git 루트에서 설정을 검증한 뒤 `.ai/config.yaml`만 덮어쓰기 없이 발행한다. 기존 설정·안전하지 않은 경로·writer lock은 거부하며, `.gitignore`, 자격 증명, 세션, Runtime 상태를 자동 수정하지 않는다.
+  - `weavra project doctor [--json]`은 Git/HEAD/작업 트리, 설정, 필수 검사와 실행 파일·작업 디렉터리, Runtime 상태, sandbox·예산 사전조건을 읽기 전용으로 보고한다. SDK 인증, 네트워크 연결, 검사 통과 또는 완료 증거를 주장하지 않는다. 기존 홈 전용 `setup`/`doctor`는 그대로다.
+  - 메인 검증에서 lock 없는 활성 Run을 READY로 보고하는 새 진단의 누락을 재현했다(exit 0, 회귀 기대값 1). `ACTIVE_RUN_PRESENT`로 차단하도록 수정했고 동일 회귀에서 상태·lock 무변경을 확인했다. 자동 복구 범위는 넓히지 않았다.
+- App 변경: 시작 실패 옆에 현재 설정의 상태·검사 수·모드를 표시하고 `weavra project doctor` 및 별도 모델 설정/인증 점검을 안내한다. stale일 때 캐시된 설정을 숨긴다. 실행 카드의 링크는 기존 증거 영역으로 이동하고 포커스를 전달한다. 프로토콜, 실행/승인/복구 권한, 디자인 토큰 및 의존성을 변경하지 않았다.
+- 설치 검증 중 발견한 기존 검사 문제: 새로 받은 OpenRouter 카탈로그에 `anthropic/claude-3-haiku`가 없어 SSE 테스트의 타입 검사 2건이 실패했고, 원래 테스트도 undefined model 오류와 30초 timeout으로 실패했다. 이전 캐시를 가진 원 checkout은 타입 검사가 통과했다. 해당 테스트만 고정된 typed 모델 fixture로 분리했고, thinking on/off 양쪽과 실제 client 호출·정상 스트림 종료를 검증하도록 보강했다. assertion 삭제, timeout 증가, skip은 하지 않았다.
+- 운영 안내: `docs/operations/LOCAL_TEAM_PILOT.md`와 README 링크에 독립 설치, 검토된 프로젝트 설정, 명시적 control opt-in, 파일럿 전용 홈, 사람의 계획·변경 검토, 중단 후 부분 변경 처리, 백업 및 실제 업무 측정 항목을 정리했다.
+- 현재 실행 결과(Node 24.19.0 / pnpm 11.10.0):
+  - 두 루트의 frozen ignore-scripts 설치, 검토된 모델 데이터 준비, 최종 Runtime `npm run build:offline` exit 0.
+  - Runtime `npm run check` exit 0: Biome 1,533 files / 수정 없음, dependency/import/entry graph, shrinkwrap/install-lock, native TypeScript, browser smoke gate 통과.
+  - 실제 launcher/config 집중 회귀 4 files / 162 tests PASS. SSE 회귀 1 file / 12 tests PASS. App workflow 제어 회귀 1 file / 64 tests PASS. 반복 실행 결과를 합산하지 않는다.
+  - Web package typecheck, 변경 UI의 fmt/lint, 주요 변경 파일 LSP 오류 진단 통과. Web production build exit 0(17초); minified chunk 500 kB 초과 경고는 억제하지 않고 남겼다.
+- 실제 제품 흐름: 격리된 Git 프로젝트·App DB·Runtime 홈·대본 loopback 모델에서 UI로 prepare와 confirm을 실행했다. 정상 STANDARD Run은 실제 파일 변경, self-check 2 PASS, 독립 review PASS, final test 2 PASS 후 COMPLETED였다. 결함 작업은 parse check FAIL로 BLOCKED였고 부분 변경을 보존했다. 모델이 없는 경우 START_FAILED가 표시됐다. 실제 App 서버 종료 후 제어가 비활성화되고 설정 값 11개가 모두 숨겨졌다. 유료 모델 호출이나 회사 저장소 사용은 없었다.
+- 화면 검증: 최종 렌더링 소스 이후 375/768/1280 px에서 시작 실패·완료 증거·검사 실패·연결 끊김의 PNG 12개를 직접 확인했다. 파일 형식·크기·최신성과 가로 넘침 없음, 실제 증거 링크의 fragment 및 대상 포커스를 확인했다. 독립 기능/구조 검토와 시각/배치 검토가 각각 12/12 이미지를 열어 PASS를 반환했고, 종합 QA도 blocking 없이 PASS였다.
+- 정리: 소유한 App 서버와 Chromium 세션을 종료하고 임시 브라우저 프로필 및 Git/Runtime/App fixture 디렉터리를 제거했다. 스크린샷과 검증 보고서는 원 checkout의 미추적 `.omo/productization/`에 남겼으며 제품 소스나 실사용 데이터에 섞지 않았다.
+- 한계: 전체 Runtime/App test suite, 원격 CI, 네이티브 Electron/모바일 설치, 서명된 배포 패키지, 실제 회사 계정·저장소·모델 비용/품질은 이번 결과가 아니다. 회사의 허용 모델·필수 검사·배포/보관 정책과 첫 실제 업무 수용 검증은 운영자가 확정해야 한다.
+
+## 2026-09-27 KST — 실제 업무 설정 및 bounded-monorepo 증거 수집
+
+- 요청: 소유자가 저장소 선택을 위임하고 기존 OpenAI codex-lb 및 commandcode 사용을 승인했다. 기존 미커밋 파일럿을 보존하고 별도 Runtime/App 홈과 깨끗한 Weavra 작업 checkout을 준비했다. 계정 토큰을 복사하거나 기존 라우터를 교체하지 않았다.
+- 실제 차단 재현: 모델 등록·인증 준비와 기존 doctor는 통과했으나 시작은 Run 생성 전 `Git evidence collection failed`로 거부됐다. 기준 저장소는 25,021개 추적 항목·283,042,746 bytes, Git staged index 출력 3,254,602 bytes로 기존 2 MiB 출력/5,000개 항목/32 MiB 한도를 넘었다.
+- 변경: `company-runtime/src/config.ts`, `workspace.ts`, `workflow.ts`에 명시적 유한 프로필을 추가했다. 전체 기존 증거 범위의 해시를 새로 수집하고, 편집 범위 밖 파일은 내용 대신 지문을 유지한다. 기존 추적 링크는 대상 문자열만 관찰하며 변경 시 실패한다. worker/보호 경로/검사/Kernel 권한은 그대로다.
+- 진단: 기존 `project-readiness.ts`에 같은 읽기 전용 collector를 연결했다. 용량·지원하지 않는 항목·읽기 실패를 구별하며, 검사 실행·모델 호출·writer·상태 수리를 하지 않는다.
+- 현재 검증:
+  - doctor 회귀에서 잘못된 READY 두 건을 재현(2 FAIL/19 PASS)한 뒤 수정했다.
+  - config/workspace/observation-files/verifier-trust/launcher-project 통합 5 files / 158 PASS, exit 0.
+  - SDK company-runtime-workflow 53 PASS. opaque 파일의 늦은 변경이 완료를 막는 회귀를 포함한다. 중복 실행 수치는 합산하지 않는다.
+  - `npm run check:ci`와 `npm run build:offline` exit 0. 비수정 Biome 1,534 files, 타입·의존성·import·entry graph·shrinkwrap/install-lock·browser gate 통과.
+  - 실제 모노레포 shared probe: 25,022개 항목·283,044,034 bytes, 15.663초. 새 프로필을 선택한 실제 `project doctor --json`도 READY였다.
+- 운영: 별도 App 재시작 후 인증·업무 checkout 등록을 확인했다. 실제 모델 작업은 새 설정으로 다시 prepare/confirm했고 현재 실행 결과는 아직 판정하지 않았다. 로컬 경로·Run 증거·정리 영수증은 저장소 외부 운영 기록에 보관한다.
+- 한계: 명시된 용량과 시간 안에서만 지원하며, OS sandbox나 청구 한도를 뜻하지 않는다. 실제 업무 검사들은 공유 의존성을 사용하는 검토된 로컬 명령으로 실행한다. 전체 Runtime/App 테스트, 원격 CI, 네이티브 설치·공용 배포 검증은 이번 결과가 아니다.
+- commit 상태: staging, commit, push, PR, merge 없음. 기존 파일럿 및 이전 작업 변경을 보존했다.
+
+## 2026-09-27 KST — codex-lb 실제 작업 수용 검증 완료
+
+- 실제 프로필: 소유자가 승인한 기존 `codex-lb/gpt-6-astra`. 기존 계정 라우터를 사용했고 계정 토큰·개인 세션을 복사하지 않았다. commandcode는 허용된 대안이지만 이번 실행에는 사용하지 않았다.
+- 첫 실제 Run `b8d8f13a-47b3-4d9e-aa53-2af5501fc4cb`는 compatible 모드에서 `readReceipt`를 반복 제출해 IMPLEMENT에서 FAILED였다. 파일 변경 없이 writer를 해제했고 실패 이력을 보존했다. 일부 측정 토큰 161,068개(캐시 포함)로 설정 예산도 초과했으므로 비용/완료로 해석하지 않았다.
+- 예산 증가나 같은 요청의 자동 반복 대신 기존 strict mutation 모드를 명시적으로 선택하고 변경 작업임을 명확히 한 새 계획을 확인했다. strict/anchored 회귀 2 files / 75 PASS, 실제 doctor READY, exit 0.
+- 새 Run `7464f897-09ae-4100-84a2-1a33e608b6eb`: STANDARD/R1/EDIT, COMPLETED/COMPLETE, writer 없음, active agents 0. acceptance 1개 충족, self-check/final test의 검사 기록 4 PASS, 독립 Reviewer PASS.
+- Developer와 Reviewer 두 worker가 실제 프로필로 성공했다. 소요 242.488초, provider 보고 토큰 89,208개(캐시 포함), 4 worker/100,000 token 예산 안에서 완료했다. 금전 비용과 upstream 계정별 라우팅은 확인하지 않았다.
+- 결과는 격리된 Weavra 기준 checkout의 `WeavraSettings.tsx` 한 파일(22 insertions/14 deletions)에 남겼다. 기존 파일럿 수정의 실제 모델 수용 재현이며 중복 병합하지 않았다. 등록된 Web 제어 테스트와 타입 검사는 Runtime이 새로 실행했다.
+- 모델 소스 자체를 별도 Web 서버로 렌더링했다. 연결 시 설정 8개가 보이고, 실제 backend 종료 후 값 0개·입력 비활성화·stale 안내가 나타났다. 1280/375 px 화면을 직접 확인했고, 운영 App 재시작 후 완료 Run·인증·프로젝트 등록도 유지됐다.
+- 정리: 검증 App/Web/Chromium과 상태 watcher 종료, 임시 브라우저 프로필·QA 홈·하위 작업의 임시 build 산출물 제거. 의도된 운영 홈·실행 스크립트·실제 Run 기록·검토할 diff는 보존했다. 두 checkout의 `git diff --check` 통과, 실제 작업은 한 파일만 변경, writer lock 없음.
+- 작업 뒤 doctor의 WORKSPACE_DIRTY는 보존한 결과를 검토하기 전 새 실행을 막는 정상 동작이다. 커밋·머지·배포하지 않았다. 로컬 단일 사용자/승인 프로필의 첫 작업 수용 결과이며 외부 회사 저장소·공용 운영·네이티브 패키지·SLA 검증은 아니다.
+
+## 2026-09-27 KST — 승인된 커밋과 로컬 병합 준비
+
+- 소유자가 기존 검증 결과의 커밋·머지를 명시적으로 승인했다. `feat/company-pilot`을 기존 개발 브랜치 `devlop`에 로컬 병합하며 push·PR·배포는 포함하지 않는다.
+- 커밋을 SSE fixture (`5f446711`), bounded workspace evidence (`aac52088`), 프로젝트 init/doctor (`9918b8e9`), App 시작 실패·증거·stale 처리 (`20464130`), 운영 문서로 나눴다. 각 구현과 직접 회귀를 함께 보존했다.
+- 이번 새 검사: SSE 12, Runtime 집중 회귀 233, SDK workflow 53, App controls 64 tests PASS. Runtime `npm run check:ci`와 App scoped typecheck/lint/format도 exit 0. 이전 실모델·UI·빌드 결과와 구별하며 새 유료 모델 실행은 하지 않았다.
+- `devlop`의 미추적 `.omo/`와 별도 first-task의 실모델 재현 diff·Run 기록은 보존한다. 동일 stale 수정의 재현 결과를 중복 병합하지 않는다. 자격 증명·개인 홈·스크린샷·임시 증거는 커밋에 넣지 않는다.
+- 병합 뒤에는 동일 tree인지 확인하고 대상 checkout의 정적 검사·오프라인 빌드 및 집중 App 검사를 실행한다. 최종 병합 hash와 실제 종료 결과는 외부 운영 인계 기록에 남긴다.
