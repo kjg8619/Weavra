@@ -3,7 +3,7 @@ import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
 import { stream as streamAnthropic } from "../src/api/anthropic-messages.ts";
 import { getModel } from "../src/compat.ts";
-import type { Context, ToolCall } from "../src/types.ts";
+import type { Context, Model, ToolCall } from "../src/types.ts";
 
 function createSseResponse(events: Array<{ event: string; data: string }>): Response {
 	const body = events.map(({ event, data }) => `event: ${event}\ndata: ${data}\n`).join("\n");
@@ -153,12 +153,27 @@ describe("Anthropic raw SSE parsing", () => {
 		expect(streaming).toBe(true);
 	});
 
-	it("omits the interleaved-thinking beta when thinking is disabled", async () => {
+	it.each([false, true])("sends the interleaved-thinking beta only when enabled (%s)", async (thinkingEnabled) => {
 		let betaFeatures: string[] | undefined;
+		let requests = 0;
+		// This transport test must not depend on a live provider catalog retaining a model ID.
+		const model = {
+			id: "interleaved-thinking-fixture",
+			name: "Interleaved thinking fixture",
+			api: "anthropic-messages",
+			provider: "openrouter",
+			baseUrl: "https://openrouter.ai/api",
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 8192,
+			maxTokens: 4096,
+		} satisfies Model<"anthropic-messages">;
 		const client = {
 			beta: {
 				messages: {
 					create: (params: { betas?: string[] }) => {
+						requests++;
 						betaFeatures = params.betas;
 						return { asResponse: async () => createSseResponse(minimalAnthropicEvents) };
 					},
@@ -166,13 +181,15 @@ describe("Anthropic raw SSE parsing", () => {
 			},
 		} as unknown as Anthropic;
 
-		await streamAnthropic(
-			getModel("openrouter", "anthropic/claude-3-haiku"),
+		const result = await streamAnthropic(
+			model,
 			{ messages: [{ role: "user", content: "Hello", timestamp: 1 }] },
-			{ client, thinkingEnabled: false },
+			{ client, thinkingEnabled },
 		).result();
 
-		expect(betaFeatures ?? []).not.toContain("interleaved-thinking-2025-05-14");
+		expect(result.stopReason).toBe("stop");
+		expect(requests).toBe(1);
+		expect((betaFeatures ?? []).includes("interleaved-thinking-2025-05-14")).toBe(thinkingEnabled);
 	});
 
 	it("passes managed beta features to injected clients", async () => {
