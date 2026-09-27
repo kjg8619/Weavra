@@ -254,7 +254,12 @@ export class StandardWorkflow {
 				taskContractDigest: taskContractDigest(this.options.taskContract),
 				...(this.options.recipe ? { recipe: this.options.recipe } : {}),
 			});
-			workspace = await GitWorkspace.open(this.options.cwd, agents.policy, signal);
+			workspace = await GitWorkspace.open(
+				this.options.cwd,
+				agents.policy,
+				signal,
+				this.options.config.workspace?.evidence.mode,
+			);
 			const lspConfig = this.options.config.code_intelligence?.lsp;
 			if (lspConfig?.enabled) this.lsp = await LspManager.create(workspace.cwd, lspConfig, agents.policy);
 			const lsp = this.lsp;

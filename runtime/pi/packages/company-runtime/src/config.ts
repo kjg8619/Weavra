@@ -128,6 +128,9 @@ export const RuntimeConfigSchema = Type.Object(
 				strict,
 			),
 		),
+		workspace: Type.Optional(
+			Type.Object({ evidence: Type.Object({ mode: Type.Literal("bounded-monorepo") }, strict) }, strict),
+		),
 		project: Type.Optional(
 			Type.Object(
 				{ instructions: Type.Object({ path: Type.String({ minLength: 1, maxLength: 4096 }) }, strict) },
@@ -329,6 +332,7 @@ export function parseRuntimeConfig(source: string) {
 		state: { enabled: true as const, directory: ".ai" as const },
 		risk: { approval_required: ["R3"] as ["R3"] },
 		files: { allowed_paths: allowedPaths },
+		...(value.workspace ? { workspace: structuredClone(value.workspace) } : {}),
 		verification: {
 			checks,
 			trust: { mode: value.verification?.trust?.mode ?? ("compatible" as const) },

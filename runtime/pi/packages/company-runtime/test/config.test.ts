@@ -48,6 +48,25 @@ describe("runtime config", () => {
 		expect(config.risk.approval_required).toEqual(["R3"]);
 		expect(config.files.allowed_paths).toEqual([]);
 		expect(config.verification.checks).toEqual([]);
+		expect(Object.hasOwn(config, "workspace")).toBe(false);
+	});
+
+	it("preserves the explicit bounded-monorepo evidence profile without numeric overrides", () => {
+		const workspace = { evidence: { mode: "bounded-monorepo" } };
+		expect(parseRuntimeConfig(JSON.stringify({ ...minimal, workspace })).workspace).toEqual(workspace);
+	});
+
+	it.each([
+		null,
+		{},
+		{ evidence: {} },
+		{ evidence: { mode: "default" } },
+		{ evidence: { mode: "unlimited" } },
+		{ evidence: { mode: true } },
+		{ evidence: { mode: "bounded-monorepo", maxFiles: 100000 } },
+		{ evidence: { mode: "bounded-monorepo" }, allowedPaths: ["."] },
+	])("rejects unsupported workspace evidence configuration: %j", (workspace) => {
+		expect(() => parseRuntimeConfig(JSON.stringify({ ...minimal, workspace }))).toThrow("Invalid runtime config");
 	});
 
 	it("V0.8A: accepts agents.max_parallel 1 to 4 for COMPLEX waves", () => {

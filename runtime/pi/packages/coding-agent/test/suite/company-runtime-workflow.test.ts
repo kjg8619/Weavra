@@ -6,7 +6,9 @@ import {
 	mkdirSync,
 	readFileSync,
 	realpathSync,
+	statSync,
 	symlinkSync,
+	utimesSync,
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -152,6 +154,20 @@ function checkpoint() {
 }
 function checkScript(source: string) {
 	writeFileSync(join(cwd, "scripts/check.mjs"), source);
+	checkpoint();
+}
+function boundedMonorepo() {
+	config = parseRuntimeConfig(
+		JSON.stringify({
+			...config,
+			workspace: { evidence: { mode: "bounded-monorepo" } },
+		}),
+	);
+	writeFileSync(join(cwd, ".ai/config.yaml"), JSON.stringify(config));
+	mkdirSync(join(cwd, "vendor"));
+	writeFileSync(join(cwd, "vendor/tool"), Buffer.alloc(25 * 1024 * 1024));
+	symlinkSync("/missing/vendor/skills", join(cwd, "vendor/skills"));
+	git("add", "--", "vendor");
 	checkpoint();
 }
 beforeEach(async () => {
@@ -406,6 +422,49 @@ describe("S4 STANDARD vertical slice: real Git/checks and independent faux SDK s
 		expect(result.error).toContain("diff");
 		expect(result.partialChanges).toBe(true);
 	});
+	it("completes an opt-in run with unchanged opaque files and a tracked dangling link", async () => {
+		boundedMonorepo();
+		harness.setResponses([edit(), handoff, review()]);
+		const result = await create().execute();
+		expect(result.error).toBeUndefined();
+		expect(result.run?.status).toBe("COMPLETED");
+		expect(result.run?.verification.map((check) => check.status)).toEqual(["PASS", "PASS"]);
+		expect(result.changedFiles).toEqual(["src/app.js"]);
+	});
+	it.each(["test", "complete"])("rejects a same-size opaque mutation at the %s completion boundary", async (step) => {
+		boundedMonorepo();
+		onEvent = (event) => {
+			if (event.type !== "StepStarted" || event.step.stepId !== step) return;
+			const target = join(cwd, "vendor/tool");
+			const stat = statSync(target);
+			const bytes = Buffer.alloc(stat.size);
+			bytes.write("OPAQUE_LATE_MUTATION", bytes.length - 100);
+			writeFileSync(target, bytes);
+			utimesSync(target, stat.atime, stat.mtime);
+		};
+		harness.setResponses([edit(), handoff, review()]);
+		const result = await create().execute();
+		// Before TEST, the verifier refuses unsupported evidence before spawning; COMPLETE rejects it in the Kernel.
+		expect(result.run?.status).toBe(step === "test" ? "FAILED" : "BLOCKED");
+		expect(result.run?.verification).toHaveLength(step === "test" ? 1 : 2);
+		expect(result.run?.verification.every((check) => check.status === "PASS")).toBe(true);
+		expect(result.changedFiles).toContain("vendor/tool");
+		expect(events.some((event) => event.type === "RunCompleted")).toBe(false);
+		expect(existsSync(join(cwd, ".ai/writer.lock"))).toBe(false);
+	});
+	it("records FAIL despite exit zero when a verifier mutates opaque evidence", async () => {
+		boundedMonorepo();
+		checkScript(
+			"import {readFileSync,writeFileSync,statSync,utimesSync} from 'node:fs'; const state=JSON.parse(readFileSync('.ai/state.json','utf8')); if(state.runs[0].phase==='TEST') { const stat=statSync('vendor/tool'); const bytes=Buffer.alloc(stat.size); bytes[bytes.length-1]=1; writeFileSync('vendor/tool',bytes); utimesSync('vendor/tool',stat.atime,stat.mtime); } console.log('CHECK_PASSED');",
+		);
+		harness.setResponses([edit(), handoff, review()]);
+		const result = await create().execute();
+		expect(result.run?.status).toBe("BLOCKED");
+		expect(result.run?.verification.map((check) => check.status)).toEqual(["PASS", "FAIL"]);
+		expect(result.run?.verification.at(-1)).toMatchObject({ exitCode: 0, stdout: "CHECK_PASSED\n" });
+		expect(result.changedFiles).toContain("vendor/tool");
+		expect(events.some((event) => event.type === "RunCompleted")).toBe(false);
+	});
 	it.each(["implement", "self-check", "review", "test", "complete"])(
 		"cancels at %s without COMPLETE or automatic rollback",
 		async (step) => {
@@ -592,17 +651,21 @@ describe("S4 STANDARD vertical slice: real Git/checks and independent faux SDK s
 			expect(await handlers.get("input")!({ type: "input" }, context)).toEqual({ action: "continue" });
 		},
 	);
-	it("denies attempts to rewrite a registered check script", async () => {
-		harness.setResponses([
-			fauxAssistantMessage(
-				fauxToolCall("runtime_write", { path: "scripts/check.mjs", content: "process.exit(0)" }),
-				{ stopReason: "toolUse" },
-			),
-		]);
-		const result = await create().execute();
-		expect(result.run?.status).toBe("FAILED");
-		expect(git("diff")).toBe("");
-	});
+	it.each(["default", "bounded-monorepo"])(
+		"denies attempts to rewrite a registered check script in %s mode",
+		async (mode) => {
+			if (mode === "bounded-monorepo") boundedMonorepo();
+			harness.setResponses([
+				fauxAssistantMessage(
+					fauxToolCall("runtime_write", { path: "scripts/check.mjs", content: "process.exit(0)" }),
+					{ stopReason: "toolUse" },
+				),
+			]);
+			const result = await create().execute();
+			expect(result.run?.status).toBe("FAILED");
+			expect(git("diff")).toBe("");
+		},
+	);
 	it("blocks duplicate project ownership while a live worker is running", async () => {
 		harness.setResponses([
 			async (_context, options) => {
