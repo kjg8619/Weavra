@@ -49,6 +49,7 @@ import { SettingsGroup } from "./SettingsGroup";
 import { SettingsSection } from "./settingsLayout";
 import { CapabilityInventory } from "./CapabilityInventory";
 import { ComplexExecutionView, ComplexPlanView } from "./WeavraComplex";
+import { WeavraPreflightFailure } from "./WeavraPreflightFailure";
 
 const observations = createEnvironmentWeavraControlStateAtoms(connectionAtomRuntime);
 const command = createEnvironmentWeavraControlCommand(connectionAtomRuntime);
@@ -954,10 +955,7 @@ export function WeavraControls({
           <p>{commandState.message}</p>
         </div>
         {state?.startFailure && (
-          <p className="text-sm text-destructive">
-            Runtime preflight did not create a Run. Inspect the trusted configuration and workspace;
-            no automatic retry was performed.
-          </p>
+          <WeavraPreflightFailure configuration={fresh ? state.snapshot.configuration : null} />
         )}
         {run && (
           <div className="space-y-2 rounded-md border border-border p-3 text-xs">
@@ -979,6 +977,12 @@ export function WeavraControls({
               · Writer present: {String(state?.snapshot.status.writerPresent ?? "UNKNOWN")}
             </p>
             <p>Partial workspace changes are never rolled back automatically.</p>
+            <a
+              href="#weavra-evidence"
+              className="inline-flex rounded-sm underline underline-offset-4 hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              Review acceptance and verification evidence
+            </a>
             {canCancel && (
               <Button size="sm" variant="outline" onClick={cancel}>
                 Cancel workflow

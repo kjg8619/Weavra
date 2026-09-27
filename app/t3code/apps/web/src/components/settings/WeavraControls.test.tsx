@@ -1,6 +1,6 @@
 import type * as ControlState from "@t3tools/client-runtime/state/weavraControl";
 import type * as React from "react";
-import type { ReactElement } from "react";
+import type { ComponentProps, ReactElement } from "react";
 import {
   EnvironmentId,
   ProjectId,
@@ -69,8 +69,10 @@ vi.mock("../ui/button", () => ({ Button: "button" }));
 vi.mock("../ui/textarea", () => ({ Textarea: "textarea" }));
 vi.mock("./SettingsGroup", () => ({ SettingsGroup: "div" }));
 vi.mock("./settingsLayout", () => ({ SettingsSection: "section" }));
+import { isValidElement } from "react";
 import { WeavraControls } from "./WeavraControls";
 import { ComplexExecutionView, ComplexPlanView } from "./WeavraComplex";
+import { WeavraPreflightFailure } from "./WeavraPreflightFailure";
 
 const environmentId = EnvironmentId.make("local-control");
 const projectId = ProjectId.make("control-project");
@@ -2611,5 +2613,78 @@ describe("V0.8C re-run of unfinished COMPLEX work", () => {
     expect(labelled(render(), "Loaded Planner proposal")).toBeNull();
     expect(labelled(render(), "Derived re-run draft")).not.toBeNull();
     expect(sentTypes()).toEqual(["workflow.derive", "planner.read", "workflow.derive"]);
+  });
+});
+
+describe("project context after preflight failure", () => {
+  function details() {
+    const panel = visitElements(render(), (node) => node.type === WeavraPreflightFailure);
+    if (!isValidElement<ComponentProps<typeof WeavraPreflightFailure>>(panel)) {
+      throw new Error("Missing preflight failure panel");
+    }
+    return WeavraPreflightFailure(panel.props);
+  }
+
+  it("shows current machine configuration values without starting another command", () => {
+    const base = state();
+    update({
+      startFailure: "START_FAILED",
+      snapshot: {
+        ...base.snapshot,
+        configuration: {
+          source: "project-config-not-frozen-run-config",
+          status: "configured",
+          registeredCheckCount: 7,
+          requiredCheckCount: 3,
+          modes: {
+            workflow: "adaptive",
+            mutation: "strict",
+            verifierTrust: "strict",
+            verifierSandbox: "required",
+            verificationRepair: "disabled",
+            taskContext: "bounded",
+            impact: "bounded",
+            documentation: "disabled",
+          },
+        },
+      },
+    });
+    expect(elements(details(), "dd").map((item) => text(item))).toEqual([
+      "configured",
+      "7",
+      "3",
+      "adaptive",
+      "strict",
+      "strict",
+      "required",
+      "disabled",
+      "bounded",
+      "bounded",
+      "disabled",
+    ]);
+    expect(data.invoke).not.toHaveBeenCalled();
+  });
+
+  it("keeps missing configuration distinct from zero registered checks", () => {
+    update({ startFailure: "START_FAILED" });
+    expect(elements(details(), "dd").map((item) => text(item))).toEqual([
+      "missing",
+      "UNKNOWN",
+      "UNKNOWN",
+    ]);
+  });
+
+  it("withholds cached configuration after the observation becomes stale", () => {
+    update({ startFailure: "START_FAILED" });
+    expect(elements(details(), "dd")).toHaveLength(3);
+    const current = data.observation;
+    if (!current) throw new Error("Missing observation fixture");
+    data.observation = { ...current, stale: true };
+    expect(elements(details(), "dd")).toHaveLength(0);
+    expect(data.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not show a failure panel when no start failed", () => {
+    expect(visitElements(render(), (node) => node.type === WeavraPreflightFailure)).toBeNull();
   });
 });

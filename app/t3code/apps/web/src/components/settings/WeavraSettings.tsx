@@ -199,8 +199,15 @@ export function WeavraSettings({
               </p>
             )}
           </div>
-          <div className="space-y-3 border-t border-border/50 pt-4">
-            <h3 className="text-sm font-medium">Evidence summary</h3>
+          <section
+            id="weavra-evidence"
+            aria-labelledby="weavra-evidence-heading"
+            tabIndex={-1}
+            className="space-y-3 border-t border-border/50 pt-4 focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <h3 id="weavra-evidence-heading" className="text-sm font-medium">
+              Evidence summary
+            </h3>
             {evidence ? (
               <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                 {[
@@ -248,26 +255,34 @@ export function WeavraSettings({
               Summary only. Prompts, reasoning, credentials, transcripts, source, documentation
               bodies, and raw tool output are not transported.
             </p>
-          </div>
+          </section>
           <div className="space-y-2 border-t border-border/50 pt-4 text-xs">
             <h3 className="text-sm font-medium">Project configuration summary</h3>
-            <p className="text-muted-foreground">
-              Current project configuration, not the frozen configuration of this Run.
-            </p>
-            <p>
-              Status: {unknown(snapshot?.data.configuration.status)} · Registered checks:{" "}
-              {unknown(snapshot?.data.configuration.registeredCheckCount)} · Required checks:{" "}
-              {unknown(snapshot?.data.configuration.requiredCheckCount)}
-            </p>
-            {snapshot?.data.configuration.modes && (
-              <dl className="grid grid-cols-2 gap-2">
-                {Object.entries(snapshot.data.configuration.modes).map(([label, value]) => (
-                  <div key={label}>
-                    <dt className="text-muted-foreground">{label}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))}
-              </dl>
+            {stale ? (
+              <p className="text-muted-foreground">
+                Current configuration is unavailable. Reconnect and wait for a fresh snapshot.
+              </p>
+            ) : (
+              <>
+                <p className="text-muted-foreground">
+                  Current project configuration, not the frozen configuration of this Run.
+                </p>
+                <p>
+                  Status: {unknown(snapshot?.data.configuration.status)} · Registered checks:{" "}
+                  {unknown(snapshot?.data.configuration.registeredCheckCount)} · Required checks:{" "}
+                  {unknown(snapshot?.data.configuration.requiredCheckCount)}
+                </p>
+                {snapshot?.data.configuration.modes && (
+                  <dl className="grid grid-cols-2 gap-2">
+                    {Object.entries(snapshot.data.configuration.modes).map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-muted-foreground">{label}</dt>
+                        <dd>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </>
             )}
           </div>
         </SettingsGroup>
