@@ -38,6 +38,8 @@ import {
   parseRemoteRefWithRemoteNames,
 } from "../git/remoteRefs.ts";
 import { ServerConfig } from "../config.ts";
+import { WorkspaceExecutionOwnership } from "../workspace/WorkspaceExecutionOwnership.ts";
+import { isReadOnlyGitCommand } from "../workspace/WorkspaceGitCommand.ts";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const gitProcesses = Semaphore.makeUnsafe(8);
@@ -820,6 +822,7 @@ const collectOutput = Effect.fnUntraced(function* (
 });
 
 export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* () {
+  const ownership = yield* WorkspaceExecutionOwnership;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const commandSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -958,7 +961,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     },
   );
 
-  const execute: GitVcsDriver.GitVcsDriver["Service"]["execute"] = (input) =>
+  const executeCommand: GitVcsDriver.GitVcsDriver["Service"]["execute"] = (input) =>
     executeRaw(input).pipe(
       withMetrics({
         counter: gitCommandsTotal,
@@ -980,6 +983,29 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         },
       }),
     );
+  const execute: GitVcsDriver.GitVcsDriver["Service"]["execute"] = (input) => {
+    const readOnly = isReadOnlyGitCommand(input.args);
+    const operation = executeCommand(
+      readOnly ? { ...input, env: { ...input.env, GIT_OPTIONAL_LOCKS: "0" } } : input,
+    );
+    return readOnly
+      ? operation
+      : ownership
+          .withOperation({ cwd: input.cwd, kind: "git", sharedGitMetadata: true }, operation)
+          .pipe(
+            Effect.catchTag("WorkspaceOwnershipError", (cause) =>
+              Effect.fail(
+                new GitCommandError({
+                  operation: input.operation,
+                  command: "git",
+                  cwd: input.cwd,
+                  detail: cause.message,
+                  cause,
+                }),
+              ),
+            ),
+          );
+  };
 
   const executeGit = (
     operation: string,
@@ -2356,25 +2382,53 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     });
     const indexExists = yield* fileSystem.exists(indexPath);
     if (indexExists) yield* fileSystem.copyFile(indexPath, tempIndexPath);
-    const env = { GIT_INDEX_FILE: tempIndexPath } satisfies NodeJS.ProcessEnv;
+    const objectDirectory = yield* runGitStdout("GitVcsDriver.review.objectsPath", cwd, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-path",
+      "objects",
+    ]);
+    const temporaryObjects = yield* fileSystem.makeTempDirectoryScoped({
+      prefix: "t3code-review-objects-",
+    });
+    yield* fileSystem.makeDirectory(path.join(temporaryObjects, "info"));
+    yield* fileSystem.writeFileString(
+      path.join(temporaryObjects, "info", "alternates"),
+      `${objectDirectory.trim()}\n`,
+    );
+    const env = {
+      GIT_INDEX_FILE: tempIndexPath,
+      GIT_OBJECT_DIRECTORY: temporaryObjects,
+      GIT_OPTIONAL_LOCKS: "0",
+    } satisfies NodeJS.ProcessEnv;
     const tempIndexConfig = [
       "-c",
       "core.splitIndex=false",
       "-c",
       "splitIndex.sharedIndexExpire=never",
+      "-c",
+      "core.fsmonitor=false",
+      "-c",
+      "core.untrackedCache=false",
     ];
+    // These private commands write only the scoped index/object directory. They
+    // must not pass through the checkout-mutation API or expose a public bypass.
+    const executeIndex = (operation: string, args: ReadonlyArray<string>, stdin?: string) =>
+      executeCommand({ operation, cwd, args, env, ...(stdin === undefined ? {} : { stdin }) });
     if (!indexExists) {
-      yield* executeGit("GitVcsDriver.review.emptyIndex", cwd, ["read-tree", "--empty"], { env });
+      yield* executeIndex("GitVcsDriver.review.emptyIndex", [
+        ...tempIndexConfig,
+        "read-tree",
+        "--empty",
+      ]);
     }
-    yield* executeGit(
-      "GitVcsDriver.readUnifiedWorkingTreeReviewDiff.expandSplitIndex",
-      cwd,
-      [...tempIndexConfig, "update-index", "--no-split-index"],
-      { env },
-    );
-    yield* executeGit(
+    yield* executeIndex("GitVcsDriver.readUnifiedWorkingTreeReviewDiff.expandSplitIndex", [
+      ...tempIndexConfig,
+      "update-index",
+      "--no-split-index",
+    ]);
+    yield* executeIndex(
       "GitVcsDriver.readUnifiedWorkingTreeReviewDiff.addUntracked",
-      cwd,
       [
         ...tempIndexConfig,
         "--literal-pathspecs",
@@ -2383,7 +2437,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         "--pathspec-from-file=-",
         "--pathspec-file-nul",
       ],
-      { env, stdin: `${pathsToAdd.join("\0")}\0` },
+      `${pathsToAdd.join("\0")}\0`,
     );
     return env;
   });

@@ -27,6 +27,10 @@ import * as Schema from "effect/Schema";
 
 import * as WorkspaceEntries from "./WorkspaceEntries.ts";
 import * as WorkspacePaths from "./WorkspacePaths.ts";
+import {
+  WorkspaceExecutionOwnership,
+  WorkspaceOwnershipError,
+} from "./WorkspaceExecutionOwnership.ts";
 
 const PROJECT_READ_FILE_MAX_BYTES = 1024 * 1024;
 
@@ -96,6 +100,7 @@ export class WorkspaceBinaryFileError extends Schema.TaggedError<WorkspaceBinary
 }
 
 export const WorkspaceFileSystemError = Schema.Union([
+  WorkspaceOwnershipError,
   WorkspaceFileSystemOperationError,
   WorkspaceFilePathEscapeError,
   WorkspacePathNotFileError,
@@ -138,6 +143,7 @@ export const make = Effect.gen(function* () {
   const path = yield* Path.Path;
   const workspacePaths = yield* WorkspacePaths.WorkspacePaths;
   const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
+  const ownership = yield* WorkspaceExecutionOwnership;
 
   /**
    * Resolves the file a read targets. Workspace-relative paths must stay inside the
@@ -310,34 +316,46 @@ export const make = Effect.gen(function* () {
       relativePath: input.relativePath,
     });
 
-    yield* fileSystem.makeDirectory(path.dirname(target.absolutePath), { recursive: true }).pipe(
-      Effect.mapError(
-        (cause) =>
-          new WorkspaceFileSystemOperationError({
-            workspaceRoot: input.cwd,
-            relativePath: input.relativePath,
-            resolvedPath: target.absolutePath,
-            operationPath: path.dirname(target.absolutePath),
-            operation: "make-directory",
-            cause,
-          }),
-      ),
+    return yield* ownership.withOperation(
+      {
+        cwd: input.cwd,
+        additionalPaths: [target.absolutePath],
+        kind: "write",
+        sharedMetadataTarget: target.absolutePath,
+      },
+      Effect.gen(function* () {
+        yield* fileSystem
+          .makeDirectory(path.dirname(target.absolutePath), { recursive: true })
+          .pipe(
+            Effect.mapError(
+              (cause) =>
+                new WorkspaceFileSystemOperationError({
+                  workspaceRoot: input.cwd,
+                  relativePath: input.relativePath,
+                  resolvedPath: target.absolutePath,
+                  operationPath: path.dirname(target.absolutePath),
+                  operation: "make-directory",
+                  cause,
+                }),
+            ),
+          );
+        yield* fileSystem.writeFileString(target.absolutePath, input.contents).pipe(
+          Effect.mapError(
+            (cause) =>
+              new WorkspaceFileSystemOperationError({
+                workspaceRoot: input.cwd,
+                relativePath: input.relativePath,
+                resolvedPath: target.absolutePath,
+                operationPath: target.absolutePath,
+                operation: "write-file",
+                cause,
+              }),
+          ),
+        );
+        yield* workspaceEntries.refresh(input.cwd);
+        return { relativePath: target.relativePath };
+      }),
     );
-    yield* fileSystem.writeFileString(target.absolutePath, input.contents).pipe(
-      Effect.mapError(
-        (cause) =>
-          new WorkspaceFileSystemOperationError({
-            workspaceRoot: input.cwd,
-            relativePath: input.relativePath,
-            resolvedPath: target.absolutePath,
-            operationPath: target.absolutePath,
-            operation: "write-file",
-            cause,
-          }),
-      ),
-    );
-    yield* workspaceEntries.refresh(input.cwd);
-    return { relativePath: target.relativePath };
   });
 
   return WorkspaceFileSystem.of({ readFile, writeFile });

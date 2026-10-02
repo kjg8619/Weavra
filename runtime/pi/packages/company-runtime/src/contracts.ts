@@ -1,4 +1,5 @@
-import { type Static, type TSchema, Type } from "typebox";
+import { createHash } from "node:crypto";
+import { Refine, type Static, type TSchema, Type } from "typebox";
 import { Check } from "typebox/value";
 import { BrowserVerificationEvidenceSchema, RegisteredBrowserCheckSchema } from "./browser-types.ts";
 import {
@@ -21,6 +22,228 @@ const text = Type.String({ minLength: 1, pattern: "\\S" });
 const counter = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
 const texts = Type.Array(text);
 const strict = { additionalProperties: false } as const;
+
+/** Optional problem-cycle data. Presence never enables execution or grants completion authority. */
+export const ANALYSIS_CONTEXT_MAX_BYTES = 8192;
+export const TaskIdentityIdSchema = Type.String({
+	pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+});
+const taskDigest = Type.String({ pattern: "^sha256:[0-9a-f]{64}$" });
+const taskIdentifier = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" });
+const taskPositive = Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER });
+// Match Effect's UTF-16 string-length bound as well as the JSON Schema code-point bound.
+const taskText = (maxLength: number) =>
+	Refine(Type.String({ minLength: 1, maxLength, pattern: "\\S" }), (value) => value.length <= maxLength);
+const taskPath = Refine(
+	taskText(256),
+	(value) =>
+		!/^[A-Za-z]:/.test(value) &&
+		!/[\\\u0000-\u001f\u007f]/.test(value) &&
+		value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== ".."),
+);
+const taskAbsolutePath = Refine(
+	taskText(4096),
+	(value) => /^(\/|[A-Za-z]:[\\/]|\\\\)/.test(value) && !/[\u0000-\u001f]/.test(value),
+);
+export const CheckoutIdentitySchema = Type.Object(
+	{
+		canonicalCwd: taskAbsolutePath,
+		repositoryRoot: taskAbsolutePath,
+		headCommit: Type.String({ pattern: "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" }),
+		workspaceDigest: taskDigest,
+	},
+	strict,
+);
+export type CheckoutIdentity = Static<typeof CheckoutIdentitySchema>;
+export const AnalysisContextSchema = Refine(
+	Type.Object(
+		{
+			version: Type.Literal(1),
+			packetVersion: taskPositive,
+			authority: Type.Literal("ADVISORY_ONLY"),
+			reviewedAt: counter,
+			symptom: taskText(1000),
+			observations: Type.Array(
+				Type.Object(
+					{
+						text: taskText(500),
+						provenance: Type.Enum(["MODEL", "USER", "HOST_OBSERVATION"]),
+						reference: Type.Union([
+							Type.Object({ kind: Type.Literal("source"), path: taskPath }, strict),
+							Type.Object({ kind: Type.Literal("message"), threadId: text, messageId: text }, strict),
+						]),
+					},
+					strict,
+				),
+				{ maxItems: 8 },
+			),
+			candidateCause: Type.Union([
+				Type.Object({ kind: Type.Literal("HYPOTHESIS"), text: taskText(1000) }, strict),
+				Type.Null(),
+			]),
+			uncertainties: Type.Array(taskText(250), { maxItems: 8 }),
+			sourceReferences: Type.Array(
+				Type.Object(
+					{
+						path: taskPath,
+						digest: taskDigest,
+						lines: Type.Optional(
+							Refine(
+								Type.Object({ start: taskPositive, end: taskPositive }, strict),
+								(lines) => lines.end >= lines.start,
+							),
+						),
+					},
+					strict,
+				),
+				{ maxItems: 8 },
+			),
+			constraints: Type.Array(taskText(250), { maxItems: 8 }),
+		},
+		strict,
+	),
+	(packet) =>
+		new TextEncoder().encode(JSON.stringify(packet)).byteLength <= ANALYSIS_CONTEXT_MAX_BYTES &&
+		new Set(packet.sourceReferences.map((source) => source.path)).size === packet.sourceReferences.length &&
+		packet.observations.every(
+			({ reference }) =>
+				reference.kind === "message" || packet.sourceReferences.some((source) => source.path === reference.path),
+		),
+);
+export type AnalysisContext = Static<typeof AnalysisContextSchema>;
+
+/** Sorted JSON keys; array order is meaningful. Mirrored by the App's stableStringify. */
+export function analysisContextDigest(packet: AnalysisContext): string {
+	validateContract(AnalysisContextSchema, packet);
+	const serialized = JSON.stringify({ domain: "weavra.analysis-context.v1", packet }, (_key, value: unknown) =>
+		value !== null && typeof value === "object" && !Array.isArray(value)
+			? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)))
+			: value,
+	);
+	return `sha256:${createHash("sha256").update(serialized).digest("hex")}`;
+}
+
+export const SymptomVerificationSchema = Type.Object(
+	{
+		criterionId: Type.String({ pattern: "^AC-[0-9]{3}$" }),
+		checkId: taskIdentifier,
+		registrationDigest: taskDigest,
+	},
+	strict,
+);
+export type SymptomVerification = Static<typeof SymptomVerificationSchema>;
+export const TaskPreparationSchema = Refine(
+	Type.Object(
+		{
+			taskId: TaskIdentityIdSchema,
+			environmentId: text,
+			projectId: text,
+			threadId: text,
+			checkout: CheckoutIdentitySchema,
+			analysisContext: AnalysisContextSchema,
+			symptomVerification: Type.Optional(
+				Type.Object({ criterionIndex: Type.Integer({ minimum: 1, maximum: 16 }), checkId: taskIdentifier }, strict),
+			),
+		},
+		strict,
+	),
+	(preparation) =>
+		preparation.analysisContext.observations.every(
+			({ reference }) => reference.kind !== "message" || reference.threadId === preparation.threadId,
+		),
+);
+export type TaskPreparation = Static<typeof TaskPreparationSchema>;
+export const TaskBindingSchema = Type.Object(
+	{
+		taskId: TaskIdentityIdSchema,
+		environmentId: text,
+		projectId: text,
+		threadId: text,
+		checkout: CheckoutIdentitySchema,
+		/** The Host-compiled Task Contract UUID, not a client-generated execution or Run ID. */
+		executionId: TaskIdentityIdSchema,
+		packetVersion: taskPositive,
+		advisoryDigest: taskDigest,
+		symptomVerification: Type.Optional(SymptomVerificationSchema),
+	},
+	strict,
+);
+export type TaskBinding = Static<typeof TaskBindingSchema>;
+export const TaskRunMetadataSchema = Refine(
+	Type.Object(
+		{
+			binding: TaskBindingSchema,
+			previewDigest: taskDigest,
+			configDigest: taskDigest,
+			confirmedProjectRevision: counter,
+			admittedProjectRevision: taskPositive,
+		},
+		strict,
+	),
+	(value) => value.admittedProjectRevision > value.confirmedProjectRevision,
+);
+export type TaskRunMetadata = Static<typeof TaskRunMetadataSchema>;
+export const AdmissionOutcomeSchema = Type.Union([
+	Type.Object({ status: Type.Literal("ACCEPTED") }, strict),
+	Type.Object({ status: Type.Literal("STARTED"), runId: taskIdentifier }, strict),
+	Type.Object(
+		{
+			status: Type.Literal("START_FAILED"),
+			reasonCode: Type.Enum(["MODEL_UNAVAILABLE", "INITIALIZATION_FAILED", "STALE_PREPARATION"]),
+		},
+		strict,
+	),
+	Type.Object({ status: Type.Literal("INTERRUPTED_BEFORE_START"), reasonCode: Type.Literal("OWNER_LOST") }, strict),
+]);
+export type AdmissionOutcome = Static<typeof AdmissionOutcomeSchema>;
+export const TaskAdmissionSchema = Refine(
+	Type.Object(
+		{
+			metadata: TaskRunMetadataSchema,
+			outcome: AdmissionOutcomeSchema,
+			acceptedAt: counter,
+			updatedAt: counter,
+			/** Runtime-owned resource knowledge, not part of the frozen execution binding. Absent is unproven. */
+			cleanup: Type.Optional(Type.Enum(["NOT_STARTED", "UNCONFIRMED", "CONFIRMED"])),
+		},
+		strict,
+	),
+	(value) => value.updatedAt >= value.acceptedAt,
+);
+export type TaskAdmission = Static<typeof TaskAdmissionSchema>;
+export const CanonicalRunStatusSchema = Type.Enum([
+	"CREATED",
+	"RUNNING",
+	"WAITING_APPROVAL",
+	"BLOCKED",
+	"FAILED",
+	"CANCELLED",
+	"INTERRUPTED",
+	"COMPLETED",
+]);
+export const TaskReceiptSchema = Type.Union([
+	Type.Object({ status: Type.Literal("UNKNOWN"), executionId: TaskIdentityIdSchema }, strict),
+	Refine(
+		Type.Object(
+			{
+				status: Type.Literal("FOUND"),
+				executionId: TaskIdentityIdSchema,
+				admission: TaskAdmissionSchema,
+				run: Type.Union([
+					Type.Object({ runId: taskIdentifier, status: CanonicalRunStatusSchema, revision: taskPositive }, strict),
+					Type.Null(),
+				]),
+			},
+			strict,
+		),
+		(receipt) =>
+			receipt.executionId === receipt.admission.metadata.binding.executionId &&
+			(receipt.admission.outcome.status === "STARTED"
+				? receipt.run?.runId === receipt.admission.outcome.runId
+				: receipt.run === null),
+	),
+]);
+export type TaskReceipt = Static<typeof TaskReceiptSchema>;
 
 export const STANDARD_STEP_IDS = ["implement", "self-check", "review", "test", "complete"] as const;
 export const QUICK_STEP_IDS = ["implement", "self-check", "test", "complete"] as const;
@@ -535,6 +758,8 @@ export const RunSchema = Type.Object(
 		tasks: Type.Array(TaskRecordSchema, { minItems: 1 }),
 		// Present for new live runs; absent on historical legacy runs.
 		taskContractDigest: Type.Optional(Type.String({ pattern: "^sha256:[0-9a-f]{64}$" })),
+		/** Frozen optional App association; absence remains unknown for historical/free Runs. */
+		taskBinding: Type.Optional(TaskRunMetadataSchema),
 		activeAgents: Type.Array(RoleSchema, { uniqueItems: true }),
 		completed: texts,
 		next: texts,

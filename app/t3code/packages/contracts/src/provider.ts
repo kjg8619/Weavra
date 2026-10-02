@@ -4,6 +4,7 @@ import {
   ApprovalRequestId,
   EventId,
   IsoDateTime,
+  NonNegativeInt,
   ProviderItemId,
   ThreadId,
   TurnId,
@@ -23,6 +24,7 @@ import {
   RuntimeMode,
 } from "./orchestration.ts";
 import { ProviderInstanceId, ProviderDriverKind } from "./providerInstance.ts";
+import { WeavraTaskId } from "./weavraTask.ts";
 
 const ProviderSessionStatus = Schema.Literals([
   "connecting",
@@ -31,6 +33,12 @@ const ProviderSessionStatus = Schema.Literals([
   "error",
   "closed",
 ]);
+
+export const ProviderControlledAnalysis = Schema.Struct({
+  taskId: WeavraTaskId,
+  generation: NonNegativeInt,
+});
+export type ProviderControlledAnalysis = typeof ProviderControlledAnalysis.Type;
 
 export const ProviderSession = Schema.Struct({
   provider: ProviderDriverKind,
@@ -44,6 +52,7 @@ export const ProviderSession = Schema.Struct({
   model: Schema.optional(TrimmedNonEmptyString),
   threadId: ThreadId,
   resumeCursor: Schema.optional(Schema.Unknown),
+  controlledAnalysis: Schema.optional(ProviderControlledAnalysis),
   activeTurnId: Schema.optional(TurnId),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -62,6 +71,7 @@ export const ProviderSessionStartInput = Schema.Struct({
   resumeCursor: Schema.optional(Schema.Unknown),
   approvalPolicy: Schema.optional(ProviderApprovalPolicy),
   sandboxMode: Schema.optional(ProviderSandboxMode),
+  controlledAnalysis: Schema.optional(ProviderControlledAnalysis),
   runtimeMode: RuntimeMode,
 });
 export type ProviderSessionStartInput = typeof ProviderSessionStartInput.Type;

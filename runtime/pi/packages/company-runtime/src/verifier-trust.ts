@@ -291,6 +291,35 @@ export function registrationDigestOf(input: {
 	)}`;
 }
 
+/** The same registration snapshot is used by reviewed task previews and verifier startup. */
+export function snapshotCheckTrust(
+	cwd: string,
+	input: {
+		check: RegisteredCheckLike;
+		executable: string;
+		configDigest: string;
+		trustMode: VerifierTrustMode;
+		environment: Readonly<Record<string, string>>;
+	},
+): VerifierTrustSnapshot {
+	const sources = snapshotVerifierSources(cwd, resolveVerifierTrustSources(cwd, input.check));
+	const executable = snapshotVerifierExecutable(input.executable);
+	const runtimeSources = input.check.kind === "browser" ? snapshotBrowserImplementation() : undefined;
+	return {
+		mode: input.trustMode,
+		registrationDigest: registrationDigestOf({
+			...input,
+			executable,
+			sources,
+			...(runtimeSources ? { runtimeSources } : {}),
+		}),
+		executableDigest: executableIdentityDigest(executable),
+		executable,
+		sources,
+		...(runtimeSources ? { runtimeSources } : {}),
+	};
+}
+
 /** Re-validates executable identity and every frozen source. Any change, deletion or recreation is stale. */
 export function validateVerifierTrust(
 	cwd: string,

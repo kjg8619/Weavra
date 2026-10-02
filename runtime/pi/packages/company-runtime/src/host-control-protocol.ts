@@ -1,4 +1,4 @@
-import { type Static, Type } from "typebox";
+import { Refine, type Static, Type } from "typebox";
 import type { BrowserCandidateSummary } from "./browser-registry.ts";
 import {
 	BrowserRegistrationRequestSchema,
@@ -13,8 +13,19 @@ import {
 	type ComplexExecution,
 	type ComplexPlan,
 } from "./complex-types.ts";
-import type { CheckResult, StepReference } from "./contracts.ts";
+import {
+	CheckoutIdentitySchema,
+	type CheckResult,
+	type StepReference,
+	type TaskBinding,
+	TaskIdentityIdSchema,
+	TaskPreparationSchema,
+	type TaskReceipt,
+	TaskReceiptSchema,
+	TaskRunMetadataSchema,
+} from "./contracts.ts";
 import type { HostBridgeIdentity, HostSnapshotSummary } from "./host-bridge-protocol.ts";
+import type { ModelRoute } from "./model-routing.ts";
 import type { ProjectFactsProjection } from "./project-fact-types.ts";
 
 /** Opt-in control transport. The existing read-only v1 endpoint and its capabilities are unchanged. */
@@ -48,6 +59,15 @@ export const HOST_PLANNER_COMMANDS = ["planner.start", "planner.cancel", "planne
  * advertised only through `rerunContractVersion`.
  */
 export const HOST_RERUN_COMMANDS = ["workflow.derive"] as const;
+/** Advertised by taskBinding/analysisContext, not the legacy strictly decoded commands tuple. */
+export const HOST_TASK_COMMANDS = ["workflow.receipt"] as const;
+/** Explicit mutation advertised only by taskRecovery. Never replay prepare or confirmation. */
+export const HOST_TASK_RECOVERY_COMMANDS = ["workflow.recover"] as const;
+/** Advertised only by evidenceDetails; older strict command tuples remain byte-for-byte unchanged. */
+export const HOST_EVIDENCE_COMMANDS = ["workflow.evidence"] as const;
+/** Advertised only by checkoutIdentity; older strict command tuples remain byte-for-byte unchanged. */
+export const HOST_CHECKOUT_COMMANDS = ["workflow.checkout"] as const;
+export const HOST_EVIDENCE_PAGE_RECORD_LIMIT = 50;
 const strict = { additionalProperties: false } as const;
 const identifier = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" });
 const counter = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
@@ -62,86 +82,200 @@ const acceptanceStatements = Type.Array(Type.String({ minLength: 1, maxLength: 5
 	minItems: 1,
 	maxItems: 16,
 });
-export const HostControlRequestSchema = Type.Union([
-	Type.Object({ ...envelope, type: Type.Literal("control.hello") }, strict),
-	Type.Object({ ...envelope, type: Type.Literal("control.snapshot") }, strict),
+/** Task-bound preparation requires explicit reviewed criteria and the complete bounded packet. */
+export const HostTaskPrepareRequestSchema = Refine(
+	Type.Object(
+		{ ...mutation, type: Type.Literal("workflow.prepare"), goal, acceptanceStatements, task: TaskPreparationSchema },
+		strict,
+	),
+	(request) =>
+		new TextEncoder().encode(JSON.stringify(request)).byteLength + 1 <= HOST_CONTROL_MAX_REQUEST_BYTES &&
+		(request.task.symptomVerification === undefined ||
+			request.task.symptomVerification.criterionIndex <= request.acceptanceStatements.length),
+);
+export type HostTaskPrepareRequest = Static<typeof HostTaskPrepareRequestSchema>;
+export const HostTaskReceiptRequestSchema = Type.Object(
+	{ ...envelope, type: Type.Literal("workflow.receipt"), executionId: TaskIdentityIdSchema },
+	strict,
+);
+export type HostTaskReceiptRequest = Static<typeof HostTaskReceiptRequestSchema>;
+export const HostTaskReceiptDataSchema = Type.Object(
+	{ kind: Type.Literal("task-receipt"), receipt: TaskReceiptSchema },
+	strict,
+);
+export type HostTaskReceiptData = Static<typeof HostTaskReceiptDataSchema>;
+export const HostTaskRecoveryRequestSchema = Type.Object(
+	{ ...mutation, type: Type.Literal("workflow.recover"), metadata: TaskRunMetadataSchema },
+	strict,
+);
+export type HostTaskRecoveryRequest = Static<typeof HostTaskRecoveryRequestSchema>;
+export const HostTaskRecoveryDataSchema = Type.Object(
+	{
+		kind: Type.Literal("task-recovery"),
+		receipt: TaskReceiptSchema,
+		disposition: Type.Enum(["RECOVERED", "ALREADY_SETTLED", "NOT_RECOVERED"]),
+		cleanup: Type.Enum(["CONFIRMED", "UNCONFIRMED"]),
+		reason: Type.Union([
+			Type.Null(),
+			Type.Enum([
+				"UNKNOWN_ADMISSION",
+				"METADATA_MISMATCH",
+				"STALE_PROJECT",
+				"OWNER_UNPROVEN",
+				"CONFLICTING_STATE",
+				"CLEANUP_UNCONFIRMED",
+			]),
+		]),
+	},
+	strict,
+);
+export type HostTaskRecoveryData = Static<typeof HostTaskRecoveryDataSchema>;
+export const HostCheckoutIdentityRequestSchema = Type.Object(
+	{ ...envelope, type: Type.Literal("workflow.checkout") },
+	strict,
+);
+export type HostCheckoutIdentityRequest = Static<typeof HostCheckoutIdentityRequestSchema>;
+export const HostCheckoutIdentityDataSchema = Type.Object(
+	{ kind: Type.Literal("checkout-identity"), checkout: CheckoutIdentitySchema },
+	strict,
+);
+export type HostCheckoutIdentityData = Static<typeof HostCheckoutIdentityDataSchema>;
+export const HostEvidenceCategorySchema = Type.Enum(["criteria", "checks", "changed-files", "trust-sources"]);
+export type HostEvidenceCategory = Static<typeof HostEvidenceCategorySchema>;
+export const HostEvidenceBindingSchema = Type.Object(
+	{
+		taskId: TaskIdentityIdSchema,
+		environmentId: Type.String(),
+		projectId: Type.String(),
+		threadId: Type.String(),
+		executionId: TaskIdentityIdSchema,
+		runId: identifier,
+		revision: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+		/** Null is allowed only on the first page so a receipt can bootstrap the immutable digest. */
+		diffDigest: Type.Union([Type.String({ pattern: "^[0-9a-f]{64}$" }), Type.Null()]),
+	},
+	strict,
+);
+export type HostEvidenceBinding = Static<typeof HostEvidenceBindingSchema>;
+export const HostEvidenceCursorSchema = Type.Object(
+	{
+		category: HostEvidenceCategorySchema,
+		index: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+	},
+	strict,
+);
+export type HostEvidenceCursor = Static<typeof HostEvidenceCursorSchema>;
+export const HostEvidenceDetailsRequestSchema = Refine(
 	Type.Object(
 		{
-			...mutation,
-			type: Type.Literal("facts.prepare"),
-			sourceRef: Type.String({ minLength: 1, maxLength: 256 }),
-			statement: Type.String({ minLength: 1, maxLength: 500 }),
+			...envelope,
+			type: Type.Literal("workflow.evidence"),
+			binding: HostEvidenceBindingSchema,
+			cursor: HostEvidenceCursorSchema,
 		},
 		strict,
 	),
-	Type.Object(
-		{ ...mutation, type: Type.Literal("facts.confirm"), previewId: identifier, previewDigest: digest },
-		strict,
-	),
-	Type.Object({ ...mutation, type: Type.Literal("browser.inspect") }, strict),
-	Type.Object(
-		{ ...mutation, type: Type.Literal("browser.prepare"), registration: BrowserRegistrationRequestSchema },
-		strict,
-	),
-	Type.Object(
-		{ ...mutation, type: Type.Literal("browser.confirm"), previewId: identifier, previewDigest: digest },
-		strict,
-	),
-	Type.Object(
-		{
-			...mutation,
-			type: Type.Literal("workflow.prepare"),
-			goal,
-			recipeId: Type.Optional(Type.String({ minLength: 1, maxLength: 64, pattern: "^[a-z0-9-]+$" })),
-			recipeInputs: Type.Optional(
-				Type.Record(Type.String({ pattern: "^[a-z0-9_]+$" }), Type.String({ maxLength: 2048 }), {
-					maxProperties: 16,
-				}),
+	(request) => request.binding.diffDigest !== null || request.cursor.index === 0,
+);
+export type HostEvidenceDetailsRequest = Static<typeof HostEvidenceDetailsRequestSchema>;
+export const HostControlRequestSchema = Refine(
+	Type.Union([
+		Type.Object({ ...envelope, type: Type.Literal("control.hello") }, strict),
+		Type.Object({ ...envelope, type: Type.Literal("control.snapshot") }, strict),
+		Type.Object(
+			{
+				...mutation,
+				type: Type.Literal("facts.prepare"),
+				sourceRef: Type.String({ minLength: 1, maxLength: 256 }),
+				statement: Type.String({ minLength: 1, maxLength: 500 }),
+			},
+			strict,
+		),
+		Type.Object(
+			{ ...mutation, type: Type.Literal("facts.confirm"), previewId: identifier, previewDigest: digest },
+			strict,
+		),
+		Type.Object({ ...mutation, type: Type.Literal("browser.inspect") }, strict),
+		Type.Object(
+			{ ...mutation, type: Type.Literal("browser.prepare"), registration: BrowserRegistrationRequestSchema },
+			strict,
+		),
+		Type.Object(
+			{ ...mutation, type: Type.Literal("browser.confirm"), previewId: identifier, previewDigest: digest },
+			strict,
+		),
+		Refine(
+			Type.Object(
+				{
+					...mutation,
+					type: Type.Literal("workflow.prepare"),
+					goal,
+					task: Type.Optional(TaskPreparationSchema),
+					recipeId: Type.Optional(Type.String({ minLength: 1, maxLength: 64, pattern: "^[a-z0-9-]+$" })),
+					recipeInputs: Type.Optional(
+						Type.Record(Type.String({ pattern: "^[a-z0-9_]+$" }), Type.String({ maxLength: 2048 }), {
+							maxProperties: 16,
+						}),
+					),
+					acceptanceStatements: Type.Optional(acceptanceStatements),
+					/** Structured COMPLEX proposal (§4); required for COMPLEX, rejected otherwise and with a recipe. */
+					complexDraft: Type.Optional(ComplexDraftSchema),
+				},
+				strict,
 			),
-			acceptanceStatements: Type.Optional(acceptanceStatements),
-			/** Structured COMPLEX proposal (§4); required for COMPLEX, rejected otherwise and with a recipe. */
-			complexDraft: Type.Optional(ComplexDraftSchema),
-		},
-		strict,
-	),
-	Type.Object(
-		{
-			...mutation,
-			type: Type.Literal("workflow.confirm"),
-			previewId: identifier,
-			previewDigest: digest,
-		},
-		strict,
-	),
-	Type.Object(
-		{ ...mutation, type: Type.Literal("workflow.cancel"), runId: identifier, expectedStateRevision: counter },
-		strict,
-	),
-	Type.Object(
-		{
-			...mutation,
-			type: Type.Literal("approval.resolve"),
-			runId: identifier,
-			expectedStateRevision: counter,
-			approvalId: identifier,
-			decision: Type.Enum(["approve", "reject"]),
-		},
-		strict,
-	),
-	Type.Object(
-		{
-			...mutation,
-			type: Type.Literal("planner.start"),
-			goal,
-			acceptanceStatements: Type.Optional(acceptanceStatements),
-		},
-		strict,
-	),
-	Type.Object({ ...mutation, type: Type.Literal("planner.cancel"), planId }, strict),
-	Type.Object({ ...mutation, type: Type.Literal("planner.read"), planId }, strict),
-	/** V0.8C (§6): derive a candidate re-run draft from the latest terminal COMPLEX Run. */
-	Type.Object({ ...mutation, type: Type.Literal("workflow.derive"), runId: identifier }, strict),
-]);
+			(request) =>
+				request.task === undefined ||
+				(request.recipeId === undefined &&
+					request.recipeInputs === undefined &&
+					request.complexDraft === undefined &&
+					request.acceptanceStatements !== undefined &&
+					(request.task.symptomVerification === undefined ||
+						request.task.symptomVerification.criterionIndex <= request.acceptanceStatements.length)),
+		),
+		HostTaskReceiptRequestSchema,
+		HostTaskRecoveryRequestSchema,
+		HostCheckoutIdentityRequestSchema,
+		HostEvidenceDetailsRequestSchema,
+		Type.Object(
+			{
+				...mutation,
+				type: Type.Literal("workflow.confirm"),
+				previewId: identifier,
+				previewDigest: digest,
+			},
+			strict,
+		),
+		Type.Object(
+			{ ...mutation, type: Type.Literal("workflow.cancel"), runId: identifier, expectedStateRevision: counter },
+			strict,
+		),
+		Type.Object(
+			{
+				...mutation,
+				type: Type.Literal("approval.resolve"),
+				runId: identifier,
+				expectedStateRevision: counter,
+				approvalId: identifier,
+				decision: Type.Enum(["approve", "reject"]),
+			},
+			strict,
+		),
+		Type.Object(
+			{
+				...mutation,
+				type: Type.Literal("planner.start"),
+				goal,
+				acceptanceStatements: Type.Optional(acceptanceStatements),
+			},
+			strict,
+		),
+		Type.Object({ ...mutation, type: Type.Literal("planner.cancel"), planId }, strict),
+		Type.Object({ ...mutation, type: Type.Literal("planner.read"), planId }, strict),
+		/** V0.8C (§6): derive a candidate re-run draft from the latest terminal COMPLEX Run. */
+		Type.Object({ ...mutation, type: Type.Literal("workflow.derive"), runId: identifier }, strict),
+	]),
+	(request) => new TextEncoder().encode(JSON.stringify(request)).byteLength + 1 <= HOST_CONTROL_MAX_REQUEST_BYTES,
+);
 export type HostControlRequest = Static<typeof HostControlRequestSchema>;
 export type HostControlMutation = Extract<HostControlRequest, { ownerId: string }>;
 export const HOST_CONTROL_ERROR_CODES = [
@@ -273,6 +407,9 @@ export interface HostPlannerStatus {
 }
 
 export interface HostControlPreview {
+	taskBinding?: TaskBinding;
+	/** Complete normalized configuration fingerprint for durable App confirmation intent. */
+	configDigest?: string;
 	previewId: string;
 	previewDigest: string;
 	ownerId: string;
@@ -287,6 +424,11 @@ export interface HostControlPreview {
 	acceptanceCriteria: { id: string; statement: string; checkIds: string[]; reviewRequired: boolean }[];
 	taskContractDigest: string;
 	recipe: { id: string; version: number; digest: string } | null;
+	/**
+	 * Exact bounded worker routes resolved from the same frozen normalized configuration as execution. Absent means
+	 * an older preview did not expose routing metadata; it is never permission, provider health or auth state.
+	 */
+	modelRoutes?: readonly ModelRoute[];
 	configuration: {
 		mutationMode: "compatible" | "strict";
 		verifierTrustMode: "compatible" | "strict";
@@ -401,8 +543,119 @@ export interface HostControlCapabilities {
 	plannerContractVersion?: typeof PLANNER_CONTRACT_VERSION;
 	/** V0.8C re-run contract (§6); absent (older Runtime) means `workflow.derive` does not exist on this connection. */
 	rerunContractVersion?: typeof RERUN_CONTRACT_VERSION;
+	/** Bound STANDARD prepare/confirm and read-only exact execution receipts. */
+	taskBinding?: 1;
+	taskRecovery?: 1;
+	analysisContext?: 1;
+	evidenceDetails?: 1;
+	checkoutIdentity?: 1;
+}
+export interface HostEvidenceSnapshotIdentity {
+	executionId: string;
+	runId: string;
+	revision: number;
+	diffDigest: string;
+}
+export interface HostEvidenceCompleteness {
+	criteria: { availability: "available" | "unavailable"; total: number | null };
+	checks: { availability: "available" | "unavailable"; total: number | null; required: number | null };
+	changedFiles: { availability: "available" | "unavailable"; total: number | null };
+	trustSources: {
+		availability: "available" | "partial" | "unavailable";
+		total: number | null;
+		checksWithoutTrust: number;
+	};
+	review: { availability: "available" | "unavailable" };
+}
+export interface HostEvidenceCriterionRecord {
+	category: "criteria";
+	index: number;
+	id: string;
+	statement: string;
+	status: string;
+	evidenceRefs: string[];
+}
+export interface HostEvidenceCheckRecord {
+	category: "checks";
+	index: number;
+	id: string;
+	kind: string;
+	revision: number;
+	attempt: number | null;
+	step: string;
+	diffDigest: string;
+	status: string;
+	required: boolean;
+	exitCode: number | null;
+	evidenceRefs: string[];
+	trust: {
+		mode: string;
+		status: string;
+		registrationDigest: string;
+		executableDigest: string;
+		sourceCount: number;
+	} | null;
+	sandbox: {
+		mode: string;
+		status: string;
+		backend: string;
+		backendVersion: string;
+		policyDigest: string;
+	} | null;
+}
+export interface HostEvidenceChangedFileRecord {
+	category: "changed-files";
+	index: number;
+	path: string;
+}
+export interface HostEvidenceTrustSourceRecord {
+	category: "trust-sources";
+	index: number;
+	checkIndex: number;
+	checkId: string;
+	sourceIndex: number;
+	path: string;
+	digest: string;
+}
+export type HostEvidenceRecord =
+	| HostEvidenceCriterionRecord
+	| HostEvidenceCheckRecord
+	| HostEvidenceChangedFileRecord
+	| HostEvidenceTrustSourceRecord;
+interface HostEvidenceDetailsBase {
+	snapshot: HostEvidenceSnapshotIdentity;
+	completeness: HostEvidenceCompleteness;
+	source: "inline" | "archive";
+	outcome: { status: string; terminal: boolean };
+	ownership: { writerPresent: boolean | null; cleanup: "confirmed" | "uncertain" | "UNKNOWN" };
+	codeRevision: number;
+	changedLines: number | null;
+	symptomVerification: TaskBinding["symptomVerification"] | null;
+	review: {
+		result: string;
+		independent: boolean;
+		revision: number;
+		diffDigest: string;
+		criteriaCount: number;
+	} | null;
+	cursor: HostEvidenceCursor;
+}
+export interface HostEvidenceDetailsPage extends HostEvidenceDetailsBase {
+	kind: "evidence-details";
+	records: HostEvidenceRecord[];
+	nextCursor: HostEvidenceCursor | null;
+}
+export interface HostEvidenceDetailsUnavailable extends HostEvidenceDetailsBase {
+	kind: "evidence-detail-unavailable";
+	reason: "CATEGORY_UNAVAILABLE" | "RECORD_TOO_LARGE";
+	recordIndex: number;
 }
 export type HostControlData =
+	| HostTaskReceiptData
+	| HostTaskRecoveryData
+	| HostCheckoutIdentityData
+	| HostEvidenceDetailsPage
+	| HostEvidenceDetailsUnavailable
 	| { kind: "capabilities"; capabilities: HostControlCapabilities }
 	| { kind: "snapshot"; state: HostControlState }
 	| { kind: "prepared"; preview: HostControlPreview }
@@ -416,6 +669,8 @@ export type HostControlData =
 			requestId: string;
 			command: "workflow.confirm" | "workflow.cancel" | "approval.resolve" | "planner.start" | "planner.cancel";
 			runId: string | null;
+			/** Present only on a task-bound confirm, after canonical ACCEPTED was saved. */
+			taskReceipt?: TaskReceipt;
 	  }
 	| {
 			kind: "planner-draft";

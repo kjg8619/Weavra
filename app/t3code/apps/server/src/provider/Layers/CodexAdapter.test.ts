@@ -17,6 +17,7 @@ import {
   type ProviderUserInputAnswers,
   ThreadId,
   TurnId,
+  WeavraTaskId,
 } from "@t3tools/contracts";
 import { createModelSelection } from "@t3tools/shared/model";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -71,6 +72,9 @@ class FakeCodexRuntime implements CodexSessionRuntimeShape {
       threadId: this.options.threadId,
       cwd: this.options.cwd,
       ...(this.options.model ? { model: this.options.model } : {}),
+      ...(this.options.controlledAnalysis !== undefined
+        ? { controlledAnalysis: this.options.controlledAnalysis }
+        : {}),
       createdAt: this.now,
       updatedAt: this.now,
     } satisfies ProviderSession),
@@ -556,6 +560,44 @@ sessionErrorLayer("CodexAdapterLive session errors", (it) => {
       const runtime = runtimeFactory.lastRuntime;
       NodeAssert.ok(runtime);
       NodeAssert.equal(runtime.options.launchArgs, "--strict-config --enable env-feature");
+    }).pipe(Effect.provide(layer));
+  });
+
+  it.effect("starts controlled analysis without an App MCP bridge", () => {
+    const runtimeFactory = makeRuntimeFactory();
+    const layer = Layer.effect(
+      CodexAdapter,
+      Effect.gen(function* () {
+        const codexConfig = decodeCodexSettings({});
+        return yield* makeCodexAdapter(codexConfig, {
+          makeRuntime: runtimeFactory.factory,
+        });
+      }),
+    ).pipe(
+      Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
+      Layer.provideMerge(ServerSettingsService.layerTest()),
+      Layer.provideMerge(providerSessionDirectoryTestLayer),
+      Layer.provideMerge(NodeServices.layer),
+    );
+
+    return Effect.gen(function* () {
+      const adapter = yield* CodexAdapter;
+      const controlledAnalysis = {
+        taskId: WeavraTaskId.make("11111111-1111-4111-8111-111111111111"),
+        generation: 7,
+      };
+      const session = yield* adapter.startSession({
+        provider: ProviderDriverKind.make("codex"),
+        threadId: asThreadId("sess-controlled-analysis"),
+        runtimeMode: "full-access",
+        controlledAnalysis,
+      });
+
+      const runtime = runtimeFactory.lastRuntime;
+      NodeAssert.ok(runtime);
+      NodeAssert.deepStrictEqual(runtime.options.controlledAnalysis, controlledAnalysis);
+      NodeAssert.equal(runtime.options.appServerArgs, undefined);
+      NodeAssert.deepStrictEqual(session.controlledAnalysis, controlledAnalysis);
     }).pipe(Effect.provide(layer));
   });
 

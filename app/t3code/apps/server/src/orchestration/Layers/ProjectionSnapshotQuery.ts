@@ -70,6 +70,7 @@ import {
 import { projectActivityPayload } from "../ActivityPayloadProjection.ts";
 import * as RepositoryIdentityResolver from "../../project/RepositoryIdentityResolver.ts";
 import { ORCHESTRATION_PROJECTOR_NAMES } from "./ProjectionPipeline.ts";
+import { listWeavraOwnership, listWeavraTasks } from "./WeavraTaskProjection.ts";
 import {
   ProjectionSnapshotQuery,
   type ProjectionEventReplayStats,
@@ -2061,6 +2062,8 @@ pending_approval_requests AS (
     sql
       .withTransaction(
         Effect.all([
+          listWeavraTasks.pipe(Effect.provideService(SqlClient.SqlClient, sql)),
+          listWeavraOwnership.pipe(Effect.provideService(SqlClient.SqlClient, sql)),
           listProjectRows(undefined).pipe(
             Effect.mapError(
               toPersistenceSqlOrDecodeError(
@@ -2146,6 +2149,8 @@ pending_approval_requests AS (
       .pipe(
         Effect.flatMap(
           ([
+            weavraTasks,
+            weavraOwnership,
             projectRows,
             threadRows,
             messageRows,
@@ -2353,6 +2358,8 @@ pending_approval_requests AS (
 
               const snapshot = {
                 snapshotSequence: computeSnapshotSequence(stateRows),
+                ...(weavraTasks.length === 0 ? {} : { weavraTasks }),
+                ...(weavraOwnership.length === 0 ? {} : { weavraOwnership }),
                 projects,
                 threads,
                 updatedAt: updatedAt ?? "1970-01-01T00:00:00.000Z",
@@ -2377,6 +2384,8 @@ pending_approval_requests AS (
     sql
       .withTransaction(
         Effect.all([
+          listWeavraTasks.pipe(Effect.provideService(SqlClient.SqlClient, sql)),
+          listWeavraOwnership.pipe(Effect.provideService(SqlClient.SqlClient, sql)),
           listProjectRows(undefined).pipe(
             Effect.mapError(
               toPersistenceSqlOrDecodeError(
@@ -2438,6 +2447,8 @@ pending_approval_requests AS (
       .pipe(
         Effect.flatMap(
           ([
+            weavraTasks,
+            weavraOwnership,
             projectRows,
             threadRows,
             proposedPlanRows,
@@ -2599,6 +2610,8 @@ pending_approval_requests AS (
 
               return {
                 snapshotSequence: computeSnapshotSequence(stateRows),
+                ...(weavraTasks.length === 0 ? {} : { weavraTasks }),
+                ...(weavraOwnership.length === 0 ? {} : { weavraOwnership }),
                 projects,
                 threads,
                 updatedAt: updatedAt ?? "1970-01-01T00:00:00.000Z",

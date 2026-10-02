@@ -8,6 +8,11 @@
  */
 import { withWorkspaceLease } from "../workspace/workspaceLease.ts";
 import {
+  WorkspaceExecutionOwnership,
+  type WorkspaceOperationToken,
+  type WorkspaceAdmission,
+} from "../workspace/WorkspaceExecutionOwnership.ts";
+import {
   DEFAULT_TERMINAL_ID,
   TerminalCwdError,
   TerminalCwdNotDirectoryError,
@@ -1423,6 +1428,16 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
 ) {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  const ownership = yield* WorkspaceExecutionOwnership;
+  const processOperations = new Map<PtyAdapter.PtyProcess, WorkspaceOperationToken>();
+  const releaseProcessOperation = (process: PtyAdapter.PtyProcess) =>
+    Effect.gen(function* () {
+      const token = processOperations.get(process);
+      if (token) {
+        yield* ownership.release(token);
+        processOperations.delete(process);
+      }
+    });
   const context = yield* Effect.context<never>();
   const runFork = Effect.runForkWith(context);
 
@@ -2083,6 +2098,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
       }
 
       yield* clearKillFiber(action.process);
+      if (action.process) yield* releaseProcessOperation(action.process);
       yield* unregisterTerminal({
         threadId: action.threadId,
         terminalId: action.terminalId,
@@ -2224,7 +2240,33 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
           Effect.gen(function* () {
             const shellCandidates = resolveShellCandidates(shellResolver, platform, baseEnv);
             const terminalEnv = createTerminalSpawnEnv(baseEnv, session.runtimeEnv);
-            const spawnResult = yield* trySpawn(shellCandidates, terminalEnv, session);
+            let transferred = false;
+            const spawnResult = yield* Effect.acquireUseRelease(
+              ownership
+                .acquireIndependent({
+                  cwd: session.cwd,
+                  kind: "terminal",
+                  threadId: session.threadId,
+                  additionalPaths: session.worktreePath ? [session.worktreePath] : [],
+                })
+                .pipe(
+                  Effect.mapError((cause) => new TerminalCwdStatError({ cwd: session.cwd, cause })),
+                ),
+              (token) =>
+                Effect.gen(function* () {
+                  const spawned = yield* trySpawn(shellCandidates, terminalEnv, session);
+                  processOperations.set(spawned.process, token);
+                  // This listener survives stopProcess's UI/session teardown. A requested kill
+                  // is not proof that a live PTY has stopped writing.
+                  const unsubscribe = spawned.process.onExit(() => {
+                    unsubscribe();
+                    runFork(releaseProcessOperation(spawned.process));
+                  });
+                  transferred = true;
+                  return spawned;
+                }),
+              (token) => (transferred ? Effect.void : ownership.release(token)),
+            );
             ptyProcess = spawnResult.process;
             startedShell = spawnResult.shellLabel;
 
@@ -2521,7 +2563,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     input: TerminalOpenInput,
   ) {
     const terminalId = input.terminalId;
-    yield* assertValidCwd(input.cwd);
 
     const sessionKey = toSessionKey(input.threadId, terminalId);
     const existing = yield* getSession(input.threadId, terminalId);
@@ -2642,69 +2683,113 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     return snapshot(liveSession);
   });
 
-  const openLocked = (input: TerminalOpenInput) =>
-    withWorkspaceLease(
-      path.resolve(input.worktreePath ?? input.cwd),
-      openWithWorkspaceLease(input),
+  const captureTerminalAdmission = (input: {
+    readonly cwd: string;
+    readonly worktreePath?: string | null | undefined;
+  }) =>
+    ownership.captureAdmission(input.cwd, input.worktreePath ? [input.worktreePath] : []).pipe(
+      Effect.mapError(
+        (cause) =>
+          new TerminalCwdStatError({
+            cwd: input.cwd,
+            cause: cause.reason === "unavailable" ? cause.cause : cause,
+          }),
+      ),
+    );
+
+  const openLocked = (input: TerminalOpenInput, admission?: WorkspaceAdmission) =>
+    assertValidCwd(input.cwd).pipe(
+      Effect.andThen(
+        ownership
+          .withFreshOperation(
+            {
+              cwd: input.cwd,
+              kind: "write",
+              threadId: input.threadId,
+              ...(admission ? { admission } : {}),
+              additionalPaths: input.worktreePath ? [input.worktreePath] : [],
+            },
+            withWorkspaceLease(
+              path.resolve(input.worktreePath ?? input.cwd),
+              openWithWorkspaceLease(input),
+            ),
+          )
+          .pipe(
+            Effect.catchTag("WorkspaceOwnershipError", (cause) =>
+              Effect.fail(new TerminalCwdStatError({ cwd: input.cwd, cause })),
+            ),
+          ),
+      ),
     );
 
   const open: TerminalManager["Service"]["open"] = (input) =>
-    withThreadLock(
-      input.threadId,
-      resolveLaunchInputEnvironment(input).pipe(Effect.flatMap(openLocked)),
+    captureTerminalAdmission(input).pipe(
+      Effect.flatMap((admission) =>
+        withThreadLock(
+          input.threadId,
+          resolveLaunchInputEnvironment(input).pipe(
+            Effect.flatMap((resolved) => openLocked(resolved, admission)),
+          ),
+        ),
+      ),
     );
 
   const openOrAttachForStream = (input: TerminalAttachInput) =>
-    withThreadLock(
-      input.threadId,
-      Effect.gen(function* () {
-        const terminalId = input.terminalId;
-        const existing = yield* getSession(input.threadId, terminalId);
+    Effect.gen(function* () {
+      const admission = input.cwd
+        ? yield* captureTerminalAdmission({ ...input, cwd: input.cwd })
+        : undefined;
+      return yield* withThreadLock(
+        input.threadId,
+        Effect.gen(function* () {
+          const terminalId = input.terminalId;
+          const existing = yield* getSession(input.threadId, terminalId);
 
-        if (Option.isNone(existing)) {
-          if (!input.cwd) {
-            return yield* new TerminalSessionLookupError({
-              threadId: input.threadId,
+          if (Option.isNone(existing)) {
+            if (!input.cwd) {
+              return yield* new TerminalSessionLookupError({
+                threadId: input.threadId,
+                terminalId,
+              });
+            }
+
+            const resolvedInput = yield* resolveLaunchInputEnvironment({
+              ...input,
               terminalId,
+              cwd: input.cwd,
             });
+            return yield* openLocked(resolvedInput, admission);
           }
 
-          const resolvedInput = yield* resolveLaunchInputEnvironment({
-            ...input,
-            terminalId,
-            cwd: input.cwd,
-          });
-          return yield* openLocked(resolvedInput);
-        }
+          const session = existing.value;
+          const targetCols = input.cols ?? session.cols;
+          const targetRows = input.rows ?? session.rows;
 
-        const session = existing.value;
-        const targetCols = input.cols ?? session.cols;
-        const targetRows = input.rows ?? session.rows;
+          if (!session.process && input.cwd && input.restartIfNotRunning === true) {
+            const resolvedInput = yield* resolveLaunchInputEnvironment({
+              ...input,
+              terminalId,
+              cwd: input.cwd,
+            });
+            return yield* openLocked(resolvedInput, admission);
+          }
 
-        if (!session.process && input.cwd && input.restartIfNotRunning === true) {
-          const resolvedInput = yield* resolveLaunchInputEnvironment({
-            ...input,
-            terminalId,
-            cwd: input.cwd,
-          });
-          return yield* openLocked(resolvedInput);
-        }
+          if (
+            session.process &&
+            session.status === "running" &&
+            (session.cols !== targetCols || session.rows !== targetRows)
+          ) {
+            const process = session.process;
+            yield* resizePtyProcess(session, process, targetCols, targetRows);
+            session.cols = targetCols;
+            session.rows = targetRows;
+            session.updatedAt = yield* nowIso;
+          }
 
-        if (
-          session.process &&
-          session.status === "running" &&
-          (session.cols !== targetCols || session.rows !== targetRows)
-        ) {
-          const process = session.process;
-          yield* resizePtyProcess(session, process, targetCols, targetRows);
-          session.cols = targetCols;
-          session.rows = targetRows;
-          session.updatedAt = yield* nowIso;
-        }
-
-        return snapshot(session);
-      }),
-    );
+          return snapshot(session);
+        }),
+      );
+    });
 
   const readAllTerminalMetadata = () =>
     readManagerState.pipe(
@@ -2886,16 +2971,30 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         terminalId,
       });
     }
-    yield* Effect.try({
-      try: () => process.write(input.data),
-      catch: (cause) =>
-        new TerminalWriteError({
-          threadId: input.threadId,
-          terminalId,
-          terminalPid: process.pid,
-          cause,
+    yield* ownership
+      .withFreshOperation(
+        {
+          cwd: session.cwd,
+          kind: "write",
+          threadId: session.threadId,
+          additionalPaths: session.worktreePath ? [session.worktreePath] : [],
+        },
+        Effect.try({
+          try: () => process.write(input.data),
+          catch: (cause) =>
+            new TerminalWriteError({
+              threadId: input.threadId,
+              terminalId,
+              terminalPid: process.pid,
+              cause,
+            }),
         }),
-    });
+      )
+      .pipe(
+        Effect.catchTag("WorkspaceOwnershipError", (cause) =>
+          Effect.fail(new TerminalCwdStatError({ cwd: session.cwd, cause })),
+        ),
+      );
   });
 
   const resizeLocked = Effect.fn("terminal.resize")(function* (input: TerminalResizeInput) {
@@ -3017,13 +3116,32 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     });
 
   const restart: TerminalManager["Service"]["restart"] = (input) =>
-    withThreadLock(
-      input.threadId,
-      resolveLaunchInputEnvironment(input).pipe(
-        Effect.flatMap((resolved) =>
-          withWorkspaceLease(
-            path.resolve(resolved.worktreePath ?? resolved.cwd),
-            restartResolved(resolved),
+    captureTerminalAdmission(input).pipe(
+      Effect.flatMap((admission) =>
+        withThreadLock(
+          input.threadId,
+          resolveLaunchInputEnvironment(input).pipe(
+            Effect.flatMap((resolved) =>
+              ownership
+                .withFreshOperation(
+                  {
+                    cwd: resolved.cwd,
+                    kind: "write",
+                    threadId: resolved.threadId,
+                    admission,
+                    additionalPaths: resolved.worktreePath ? [resolved.worktreePath] : [],
+                  },
+                  withWorkspaceLease(
+                    path.resolve(resolved.worktreePath ?? resolved.cwd),
+                    restartResolved(resolved),
+                  ),
+                )
+                .pipe(
+                  Effect.catchTag("WorkspaceOwnershipError", (cause) =>
+                    Effect.fail(new TerminalCwdStatError({ cwd: resolved.cwd, cause })),
+                  ),
+                ),
+            ),
           ),
         ),
       ),

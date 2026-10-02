@@ -40,12 +40,8 @@ import {
 	validateSandboxBackend,
 } from "./sandbox.ts";
 import {
-	executableIdentityDigest,
-	registrationDigestOf,
 	resolveVerifierTrustSources,
-	snapshotBrowserImplementation,
-	snapshotVerifierExecutable,
-	snapshotVerifierSources,
+	snapshotCheckTrust,
 	type VerifierTrustSnapshot,
 	validateVerifierTrust,
 	verifierTrustEvidence,
@@ -100,6 +96,7 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 		workspace: GitWorkspace,
 		lsp?: LspPort,
 		complexPlan?: ComplexPlan,
+		registrationConfigDigest?: string,
 	): Promise<RegisteredVerifier> {
 		config = structuredClone(config);
 		if (
@@ -141,25 +138,14 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 			const check = config.verification.checks[index];
 			const mode = check.kind === "browser" ? "strict" : trustMode;
 			try {
-				const sources = snapshotVerifierSources(workspace.cwd, resolveVerifierTrustSources(workspace.cwd, check));
-				const executable = snapshotVerifierExecutable(registration.executable);
-				const runtimeSources = check.kind === "browser" ? snapshotBrowserImplementation() : undefined;
-				return {
-					mode,
-					registrationDigest: registrationDigestOf({
-						check,
-						executable,
-						sources,
-						configDigest: policy.configDigest,
-						trustMode: mode,
-						environment: registration.env,
-						...(runtimeSources ? { runtimeSources } : {}),
-					}),
-					executableDigest: executableIdentityDigest(executable),
-					executable,
-					sources,
-					...(runtimeSources ? { runtimeSources } : {}),
-				};
+				return snapshotCheckTrust(workspace.cwd, {
+					check,
+					executable: registration.executable,
+					// Bound previews exist before a Run UUID. Policy still retains its separate per-Run digest.
+					configDigest: registrationConfigDigest ?? policy.configDigest,
+					trustMode: mode,
+					environment: registration.env,
+				});
 			} catch (error) {
 				if (mode === "strict") throw error;
 				return undefined;

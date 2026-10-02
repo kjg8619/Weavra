@@ -273,6 +273,7 @@ import {
 import { VcsError } from "./vcs.ts";
 import { WeavraObservation, WeavraObserveInput } from "./weavra.ts";
 import {
+  WeavraControlApproval,
   WeavraControlInput,
   WeavraControlObservation,
   WeavraControlObserveInput,
@@ -280,6 +281,28 @@ import {
   WeavraControlTransportError,
 } from "./weavraControl.ts";
 import { WeavraFitnessInput, WeavraFitnessResponse, WeavraFitnessError } from "./weavraFitness.ts";
+import {
+  WeavraTask,
+  WeavraTaskCreateInput,
+  WeavraTaskReadInput,
+  WeavraTaskScopeInput,
+} from "./weavraTask.ts";
+import {
+  WeavraTaskAnalyzeInput,
+  WeavraTaskFollowupInput,
+  WeavraTaskAbortInput,
+  WeavraTaskRecoverInput,
+  WeavraTaskConfirmInput,
+  WeavraTaskEvidenceInput,
+  WeavraTaskEvidenceResult,
+  WeavraTaskObservation,
+  WeavraTaskObserveInput,
+  WeavraTaskPrepareInput,
+  WeavraTaskReprepareInput,
+  WeavraTaskResolveApprovalInput,
+  WeavraTaskRpcError,
+  WeavraTaskRunInput,
+} from "./weavraTaskRpc.ts";
 
 export const WS_METHODS = {
   // Project registry methods
@@ -452,6 +475,22 @@ export const WS_METHODS = {
   weavraObserve: "weavra.observe",
   weavraControl: "weavra.control",
   weavraControlObserve: "weavra.controlObserve",
+  weavraTaskCreate: "weavra.taskCreate",
+  weavraTaskAnalyze: "weavra.taskAnalyze",
+  weavraTaskFollowup: "weavra.taskFollowup",
+  weavraTaskRead: "weavra.taskRead",
+  weavraTaskList: "weavra.taskList",
+  weavraTaskPrepare: "weavra.taskPrepare",
+  weavraTaskConfirm: "weavra.taskConfirm",
+  weavraTaskReconcile: "weavra.taskReconcile",
+  weavraTaskRecover: "weavra.taskRecover",
+  weavraTaskAbort: "weavra.taskAbort",
+  weavraTaskReprepare: "weavra.taskReprepare",
+  weavraTaskCancel: "weavra.taskCancel",
+  weavraTaskReadApproval: "weavra.taskReadApproval",
+  weavraTaskResolveApproval: "weavra.taskResolveApproval",
+  weavraTaskEvidence: "weavra.taskEvidence",
+  weavraTaskObserve: "weavra.taskObserve",
   weavraFitness: "weavra.fitness",
 } as const;
 
@@ -1414,6 +1453,105 @@ const WsWeavraControlObserveRpc = Rpc.make(WS_METHODS.weavraControlObserve, {
   stream: true,
 });
 
+const WeavraTaskRpcErrorSchema = Schema.Union([EnvironmentAuthorizationError, WeavraTaskRpcError]);
+
+const WsWeavraTaskCreateRpc = Rpc.make(WS_METHODS.weavraTaskCreate, {
+  payload: WeavraTaskCreateInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskAnalyzeRpc = Rpc.make(WS_METHODS.weavraTaskAnalyze, {
+  payload: WeavraTaskAnalyzeInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskFollowupRpc = Rpc.make(WS_METHODS.weavraTaskFollowup, {
+  payload: WeavraTaskFollowupInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+export const WeavraTaskReadRpc = Rpc.make(WS_METHODS.weavraTaskRead, {
+  payload: WeavraTaskReadInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskListRpc = Rpc.make(WS_METHODS.weavraTaskList, {
+  payload: WeavraTaskScopeInput,
+  success: Schema.Array(WeavraTask),
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskPrepareRpc = Rpc.make(WS_METHODS.weavraTaskPrepare, {
+  payload: WeavraTaskPrepareInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskConfirmRpc = Rpc.make(WS_METHODS.weavraTaskConfirm, {
+  payload: WeavraTaskConfirmInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskReconcileRpc = Rpc.make(WS_METHODS.weavraTaskReconcile, {
+  payload: WeavraTaskReadInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskRecoverRpc = Rpc.make(WS_METHODS.weavraTaskRecover, {
+  payload: WeavraTaskRecoverInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskAbortRpc = Rpc.make(WS_METHODS.weavraTaskAbort, {
+  payload: WeavraTaskAbortInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskReprepareRpc = Rpc.make(WS_METHODS.weavraTaskReprepare, {
+  payload: WeavraTaskReprepareInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskCancelRpc = Rpc.make(WS_METHODS.weavraTaskCancel, {
+  payload: WeavraTaskRunInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskReadApprovalRpc = Rpc.make(WS_METHODS.weavraTaskReadApproval, {
+  payload: WeavraTaskReadInput,
+  success: Schema.NullOr(WeavraControlApproval),
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskResolveApprovalRpc = Rpc.make(WS_METHODS.weavraTaskResolveApproval, {
+  payload: WeavraTaskResolveApprovalInput,
+  success: WeavraTask,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskEvidenceRpc = Rpc.make(WS_METHODS.weavraTaskEvidence, {
+  payload: WeavraTaskEvidenceInput,
+  success: WeavraTaskEvidenceResult,
+  error: WeavraTaskRpcErrorSchema,
+});
+
+const WsWeavraTaskObserveRpc = Rpc.make(WS_METHODS.weavraTaskObserve, {
+  payload: WeavraTaskObserveInput,
+  success: WeavraTaskObservation,
+  error: WeavraTaskRpcErrorSchema,
+  stream: true,
+});
+
 const WsWeavraFitnessRpc = Rpc.make(WS_METHODS.weavraFitness, {
   payload: WeavraFitnessInput,
   success: WeavraFitnessResponse,
@@ -1559,6 +1697,22 @@ export const WsRpcGroup = RpcGroup.make(
   WsWeavraObserveRpc,
   WsWeavraControlRpc,
   WsWeavraControlObserveRpc,
+  WsWeavraTaskCreateRpc,
+  WsWeavraTaskAnalyzeRpc,
+  WsWeavraTaskFollowupRpc,
+  WeavraTaskReadRpc,
+  WsWeavraTaskListRpc,
+  WsWeavraTaskPrepareRpc,
+  WsWeavraTaskConfirmRpc,
+  WsWeavraTaskReconcileRpc,
+  WsWeavraTaskRecoverRpc,
+  WsWeavraTaskAbortRpc,
+  WsWeavraTaskReprepareRpc,
+  WsWeavraTaskCancelRpc,
+  WsWeavraTaskReadApprovalRpc,
+  WsWeavraTaskResolveApprovalRpc,
+  WsWeavraTaskEvidenceRpc,
+  WsWeavraTaskObserveRpc,
   WsWeavraFitnessRpc,
   WsOrchestrationDispatchCommandRpc,
   WsOrchestrationGetWorkflowScriptRpc,

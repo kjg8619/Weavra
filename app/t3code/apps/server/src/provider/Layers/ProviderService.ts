@@ -23,6 +23,7 @@ import {
   type SnapShotAccessibility,
   type SnapShotAccessibilityNode,
   PROVIDER_SEND_TURN_MAX_INPUT_CHARS,
+  ProviderControlledAnalysis,
   ProviderSessionStartInput,
   ProviderStopSessionInput,
   ProviderUploadFeedbackInput,
@@ -32,6 +33,7 @@ import {
   type ProviderInstanceId,
   type ProviderDriverKind,
   type ProviderRuntimeEvent,
+  type ProviderControlledAnalysis as ProviderControlledAnalysisType,
   type ProviderSession,
   type ServerSettings as ServerSettingsValue,
 } from "@t3tools/contracts";
@@ -43,6 +45,8 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Scope from "effect/Scope";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -51,6 +55,7 @@ import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as SchemaIssue from "effect/SchemaIssue";
+import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
 import { appendUserInputAttachmentPaths } from "../userInputAttachments.ts";
@@ -71,6 +76,7 @@ import {
 } from "../../observability/Metrics.ts";
 import {
   ProviderAdapterRequestError,
+  type ProviderServiceError,
   type ProviderAdapterError,
   ProviderValidationError,
   ProviderWorkspaceMissingError,
@@ -86,7 +92,14 @@ import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
 import * as McpSessionRegistry from "../../mcp/McpSessionRegistry.ts";
 import * as ServerSettings from "../../serverSettings.ts";
 import * as ProjectionSnapshotQuery from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import {
+  WorkspaceExecutionOwnership,
+  WorkspaceOwnershipError,
+  type WorkspaceOperationToken,
+} from "../../workspace/WorkspaceExecutionOwnership.ts";
 const isModelSelection = Schema.is(ModelSelection);
+const isProviderControlledAnalysis = Schema.is(ProviderControlledAnalysis);
+const isOwnershipError = Schema.is(WorkspaceOwnershipError);
 const encodePromptJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
 interface SnapShotPromptAccessibilityNode {
@@ -393,6 +406,7 @@ function toRuntimePayloadFromSession(
     cwd: session.cwd ?? null,
     model: session.model ?? null,
     activeTurnId: session.activeTurnId ?? null,
+    controlledAnalysis: session.controlledAnalysis ?? null,
     lastError: session.lastError ?? null,
     ...(extra?.continueAfterServerUpdate !== undefined
       ? { continueAfterServerUpdate: extra.continueAfterServerUpdate }
@@ -403,6 +417,17 @@ function toRuntimePayloadFromSession(
       ? { lastRuntimeEventAt: extra.lastRuntimeEventAt }
       : {}),
   };
+}
+
+function readPersistedControlledAnalysis(
+  runtimePayload: ProviderSessionDirectory.ProviderRuntimeBinding["runtimePayload"],
+): ProviderControlledAnalysisType | undefined {
+  if (!runtimePayload || typeof runtimePayload !== "object" || Array.isArray(runtimePayload)) {
+    return undefined;
+  }
+  const raw =
+    "controlledAnalysis" in runtimePayload ? runtimePayload.controlledAnalysis : undefined;
+  return isProviderControlledAnalysis(raw) ? raw : undefined;
 }
 
 function readPersistedModelSelection(
@@ -486,6 +511,40 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     options?.issueMcpCredential ?? McpSessionRegistry.issueActiveMcpCredential;
   const fileSystem = yield* FileSystem.FileSystem;
   const pathService = yield* Path.Path;
+  const ownership = yield* WorkspaceExecutionOwnership;
+  const workspaceSessions = new Map<ThreadId, WorkspaceOperationToken>();
+  const workspaceAnalysis = new WeakMap<WorkspaceOperationToken, ProviderControlledAnalysisType>();
+  const workspaceStops = new Map<ThreadId, Deferred.Deferred<void, ProviderServiceError>>();
+  const workspaceScope = yield* Scope.Scope;
+  const workspaceAdmissions = new Map<ThreadId, Set<Deferred.Deferred<void>>>();
+  const workspaceSessionMutex = yield* Semaphore.make(1);
+  const trackSessionStartup = <A, E>(threadId: ThreadId, effect: Effect.Effect<A, E>) =>
+    Effect.acquireUseRelease(
+      Effect.gen(function* () {
+        const signal = yield* Deferred.make<void>();
+        return yield* Effect.suspend(() => {
+          if (workspaceStops.has(threadId) || !workspaceSessions.has(threadId))
+            return Effect.fail(
+              toValidationError(
+                "workspace.resume",
+                "The session stopped before recovery could begin.",
+              ),
+            );
+          const pending = workspaceAdmissions.get(threadId) ?? new Set<Deferred.Deferred<void>>();
+          pending.add(signal);
+          workspaceAdmissions.set(threadId, pending);
+          return Effect.succeed(signal);
+        });
+      }),
+      () => effect,
+      (signal) =>
+        Effect.gen(function* () {
+          yield* Deferred.succeed(signal, undefined);
+          const pending = workspaceAdmissions.get(threadId);
+          pending?.delete(signal);
+          if (pending?.size === 0) workspaceAdmissions.delete(threadId);
+        }),
+    );
   const runtimeEventPubSub = yield* PubSub.unbounded<ProviderRuntimeEvent>();
   const pendingCompactions = new Map<ThreadId, PendingCompaction>();
   const timedOutNativeCompactions = new Set<ThreadId>();
@@ -964,6 +1023,7 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
 
   const publishRuntimeEvent = (event: ProviderRuntimeEvent): Effect.Effect<void> =>
     Effect.succeed(event).pipe(
+      Effect.tap(ownership.retainProviderEvent),
       Effect.tap((canonicalEvent) =>
         canonicalEventLogger
           ? canonicalEventLogger.write(canonicalEvent, canonicalEvent.threadId)
@@ -1211,7 +1271,7 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
             },
             event,
           ),
-        ).pipe(Effect.forkScoped);
+        ).pipe(Effect.forkScoped({ startImmediately: true }));
       }
     }
     yield* Ref.set(subscribedAdapters, next);
@@ -1266,21 +1326,43 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         );
       }
 
-      const persistedCwd = readPersistedCwd(input.binding.runtimePayload);
+      const persistedCwd =
+        readPersistedCwd(input.binding.runtimePayload) ??
+        workspaceSessions.get(input.binding.threadId)?.cwd;
       const persistedModelSelection = readPersistedModelSelection(input.binding.runtimePayload);
+      if (readPersistedControlledAnalysis(input.binding.runtimePayload) !== undefined) {
+        return yield* toValidationError(
+          input.operation,
+          "Controlled analysis requires a fresh task-bound admission after restart.",
+        );
+      }
 
       yield* prepareMcpSession(input.binding.threadId, bindingInstanceId);
-      const resumed = yield* adapter
-        .startSession({
-          threadId: input.binding.threadId,
-          provider: input.binding.provider,
-          providerInstanceId: bindingInstanceId,
-          ...(persistedCwd ? { cwd: persistedCwd } : {}),
-          ...(persistedModelSelection ? { modelSelection: persistedModelSelection } : {}),
-          ...(hasResumeCursor ? { resumeCursor: input.binding.resumeCursor } : {}),
-          runtimeMode: input.binding.runtimeMode ?? "full-access",
-        })
-        .pipe(Effect.onError(() => clearMcpSession(input.binding.threadId)));
+      const resumed = yield* trackSessionStartup(
+        input.binding.threadId,
+        ownership
+          .withFreshOperation(
+            {
+              cwd: persistedCwd ?? serverConfig.cwd,
+              kind: "write",
+              threadId: input.binding.threadId,
+            },
+            adapter.startSession({
+              threadId: input.binding.threadId,
+              provider: input.binding.provider,
+              providerInstanceId: bindingInstanceId,
+              ...(persistedCwd ? { cwd: persistedCwd } : {}),
+              ...(persistedModelSelection ? { modelSelection: persistedModelSelection } : {}),
+              ...(hasResumeCursor ? { resumeCursor: input.binding.resumeCursor } : {}),
+              runtimeMode: input.binding.runtimeMode ?? "full-access",
+            }),
+          )
+          .pipe(
+            Effect.catchTag("WorkspaceOwnershipError", (cause) =>
+              Effect.fail(toValidationError(input.operation, cause.message)),
+            ),
+          ),
+      ).pipe(Effect.onError(() => clearMcpSession(input.binding.threadId)));
       if (resumed.provider !== adapter.provider) {
         yield* clearMcpSession(input.binding.threadId);
         return yield* toValidationError(
@@ -1327,11 +1409,17 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
 
     const hasRequestedSession = yield* adapter.hasSession(input.threadId);
     if (hasRequestedSession) {
+      const active = (yield* adapter.listSessions()).find(
+        (session) => session.threadId === input.threadId,
+      );
       return {
         adapter,
         instanceId,
         threadId: input.threadId,
         runtimeMode: binding.runtimeMode,
+        ...(active?.controlledAnalysis !== undefined
+          ? { controlledAnalysis: active.controlledAnalysis }
+          : {}),
         isActive: true,
       } as const;
     }
@@ -1342,6 +1430,11 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         instanceId,
         threadId: input.threadId,
         runtimeMode: binding.runtimeMode,
+        ...(readPersistedControlledAnalysis(binding.runtimePayload) !== undefined
+          ? {
+              controlledAnalysis: readPersistedControlledAnalysis(binding.runtimePayload),
+            }
+          : {}),
         isActive: false,
       } as const;
     }
@@ -1355,6 +1448,9 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
       instanceId,
       threadId: input.threadId,
       runtimeMode: recovered.session.runtimeMode,
+      ...(recovered.session.controlledAnalysis !== undefined
+        ? { controlledAnalysis: recovered.session.controlledAnalysis }
+        : {}),
       isActive: true,
     } as const;
   });
@@ -1428,6 +1524,25 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
           threadId,
           provider: resolvedProvider,
         };
+        const analysisAuthority = yield* ownership.analysisAuthority;
+        if (
+          input.controlledAnalysis !== undefined &&
+          (resolvedProvider !== "codex" ||
+            analysisAuthority === undefined ||
+            analysisAuthority.taskId !== input.controlledAnalysis.taskId ||
+            analysisAuthority.generation !== input.controlledAnalysis.generation)
+        ) {
+          return yield* toValidationError(
+            "ProviderService.startSession",
+            "Controlled analysis requires matching task-bound Codex authority.",
+          );
+        }
+        if (analysisAuthority !== undefined && input.controlledAnalysis === undefined) {
+          return yield* toValidationError(
+            "ProviderService.startSession",
+            "Task-bound analysis cannot start an unrestricted provider session.",
+          );
+        }
         if (!instanceInfo.enabled) {
           return yield* toValidationError(
             "ProviderService.startSession",
@@ -1457,7 +1572,8 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         }
         const effectiveResumeCursor =
           input.resumeCursor ??
-          (persistedBinding?.providerInstanceId === resolvedInstanceId
+          (input.controlledAnalysis === undefined &&
+          persistedBinding?.providerInstanceId === resolvedInstanceId
             ? persistedBinding.resumeCursor
             : undefined);
         const effectiveCwd =
@@ -1500,7 +1616,11 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         }
         const adapter = yield* registry.getByInstance(resolvedInstanceId);
         yield* clearTurnAnalyticsSession(resolvedInstanceId, threadId);
-        yield* prepareMcpSession(threadId, resolvedInstanceId);
+        if (input.controlledAnalysis === undefined) {
+          yield* prepareMcpSession(threadId, resolvedInstanceId);
+        } else {
+          yield* clearMcpSession(threadId);
+        }
         const session = yield* adapter
           .startSession({
             ...input,
@@ -1707,6 +1827,19 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
           allowRecovery: true,
         });
       }
+      const analysisAuthority = yield* ownership.analysisAuthority;
+      if (
+        routed.controlledAnalysis !== undefined
+          ? analysisAuthority === undefined ||
+            analysisAuthority.taskId !== routed.controlledAnalysis.taskId ||
+            analysisAuthority.generation !== routed.controlledAnalysis.generation
+          : analysisAuthority !== undefined
+      ) {
+        return yield* toValidationError(
+          "ProviderService.sendTurn",
+          "Provider session authority does not match the active controlled analysis.",
+        );
+      }
       metricProvider = routed.adapter.provider;
       metricModel = input.modelSelection?.model;
       yield* Effect.annotateCurrentSpan({
@@ -1718,7 +1851,8 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
       // an already-spawned agent process, so we keep the existing token valid
       // rather than issuing a new one: sessions that go a long time between
       // browser tool calls used to lose the toolkit outright.
-      yield* McpSessionRegistry.touchActiveMcpThread(input.threadId);
+      if (routed.controlledAnalysis === undefined)
+        yield* McpSessionRegistry.touchActiveMcpThread(input.threadId);
       const analyticsModelSelection =
         input.modelSelection?.instanceId === routed.instanceId ? input.modelSelection : undefined;
       const turn = yield* Effect.acquireUseRelease(
@@ -1756,6 +1890,9 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         ...(turn.resumeCursor !== undefined ? { resumeCursor: turn.resumeCursor } : {}),
         runtimePayload: {
           ...(input.modelSelection !== undefined ? { modelSelection: input.modelSelection } : {}),
+          ...(routed.controlledAnalysis !== undefined
+            ? { controlledAnalysis: routed.controlledAnalysis }
+            : {}),
           activeTurnId: turn.turnId,
           // Admission and marker consumption must survive the same restart.
           continueAfterServerUpdate: null,
@@ -1799,6 +1936,11 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         operation: "ProviderService.compactThread",
         allowRecovery: true,
       });
+      if (routed.controlledAnalysis !== undefined)
+        return yield* toValidationError(
+          "ProviderService.compactThread",
+          "Context compaction is unavailable during controlled analysis.",
+        );
       yield* Effect.annotateCurrentSpan({
         "provider.operation": "compact-thread",
         "provider.kind": routed.adapter.provider,
@@ -1967,6 +2109,15 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
           operation: "ProviderService.respondToRequest",
           allowRecovery: true,
         });
+        if (
+          routed.controlledAnalysis !== undefined &&
+          input.decision !== "decline" &&
+          input.decision !== "cancel"
+        )
+          return yield* toValidationError(
+            "ProviderService.respondToRequest",
+            "Controlled analysis approvals cannot grant additional authority.",
+          );
         metricProvider = routed.adapter.provider;
         yield* Effect.annotateCurrentSpan({
           "provider.operation": "respond-to-request",
@@ -2398,20 +2549,209 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     ),
   );
 
+  const ownershipError = (cause: WorkspaceOwnershipError) =>
+    new ProviderAdapterRequestError({
+      provider: "workspace",
+      method: "workspace.admission",
+      detail: cause.message,
+      cause,
+    });
+  const stopOwnedSessionNow: ProviderServiceMethod<"stopSession"> = (input) =>
+    Effect.gen(function* () {
+      for (const admission of workspaceAdmissions.get(input.threadId) ?? [])
+        yield* Deferred.await(admission);
+      const binding = yield* directory.getBinding(input.threadId);
+      if (Option.isSome(binding) || !workspaceSessions.has(input.threadId))
+        yield* stopSession(input);
+      // A failed instance switch may have left an older adapter alive. Its actual
+      // process must also stop; a directory status or the newest adapter is not proof.
+      for (const [, adapter] of yield* getAdapterEntries) {
+        if (yield* adapter.hasSession(input.threadId)) yield* adapter.stopSession(input.threadId);
+        if (yield* adapter.hasSession(input.threadId))
+          return yield* new ProviderAdapterRequestError({
+            provider: adapter.provider,
+            method: "workspace.stop",
+            detail: "The provider still owns a live session after cleanup.",
+          });
+      }
+      const token = workspaceSessions.get(input.threadId);
+      if (token) {
+        workspaceSessions.delete(input.threadId);
+        yield* ownership.release(token);
+      }
+    });
+  const stopOwnedSession: ProviderServiceMethod<"stopSession"> = (input) =>
+    Effect.uninterruptibleMask((restore) =>
+      Effect.gen(function* () {
+        let completion = workspaceStops.get(input.threadId);
+        if (!completion) {
+          const tokenAtStart = workspaceSessions.get(input.threadId);
+          completion = yield* Deferred.make<void, ProviderServiceError>();
+          workspaceStops.set(input.threadId, completion);
+          const shared = completion;
+          yield* Effect.uninterruptibleMask((restoreCleanup) =>
+            Effect.gen(function* () {
+              const exit = yield* Effect.exit(restoreCleanup(stopOwnedSessionNow(input)));
+              if (Exit.isSuccess(exit) || tokenAtStart === undefined)
+                workspaceStops.delete(input.threadId);
+              // A failed cleanup remains unresolved, even if the adapter already removed
+              // its session entry. Every caller observes the same cleanup disposition.
+              yield* Deferred.done(shared, exit);
+            }),
+          ).pipe(Effect.forkIn(workspaceScope));
+        }
+        return yield* restore(Deferred.await(completion));
+      }),
+    );
+  const withProviderAdmission = <A, E>(
+    threadId: ThreadId,
+    effect: (cwd: string) => Effect.Effect<A, E>,
+    options?: { readonly cwd?: string | undefined; readonly startup?: boolean },
+  ) =>
+    Effect.gen(function* () {
+      const binding = yield* directory.getBinding(threadId);
+      const persistedCwd = Option.isSome(binding)
+        ? readPersistedCwd(binding.value.runtimePayload)
+        : undefined;
+      const requestedCwd = options?.cwd ?? persistedCwd;
+      let cwd = requestedCwd ?? serverConfig.cwd;
+      if (Option.isSome(projectionQuery)) {
+        const targetError = (cause: unknown) =>
+          new ProviderAdapterRequestError({
+            provider: "workspace",
+            method: "workspace.admission",
+            detail: "The thread's selected checkout could not be resolved.",
+            cause,
+          });
+        const thread = yield* projectionQuery.value
+          .getThreadShellById(threadId)
+          .pipe(Effect.mapError(targetError));
+        if (Option.isSome(thread)) {
+          const project = yield* projectionQuery.value
+            .getProjectShellById(thread.value.projectId)
+            .pipe(Effect.mapError(targetError));
+          if (Option.isNone(project))
+            return yield* toValidationError(
+              "workspace.admission",
+              "The thread's project is unavailable.",
+            );
+          cwd = thread.value.worktreePath ?? project.value.workspaceRoot;
+          if (
+            requestedCwd !== undefined &&
+            (yield* ownership.canonicalize(cwd)) !== (yield* ownership.canonicalize(requestedCwd))
+          )
+            return yield* toValidationError(
+              "workspace.admission",
+              "The provider checkout no longer matches the thread's selected target.",
+            );
+        }
+      }
+      return yield* ownership.withFreshOperation(
+        { cwd, kind: "provider-admission", threadId },
+        Effect.gen(function* () {
+          const canonicalCwd = yield* ownership.canonicalize(cwd);
+          const analysisAuthority = yield* ownership.analysisAuthority;
+          const admission = yield* Deferred.make<void>();
+          const token = yield* workspaceSessionMutex.withPermit(
+            Effect.gen(function* () {
+              const stopping = workspaceStops.get(threadId);
+              if (stopping) yield* Deferred.await(stopping);
+              let token = workspaceSessions.get(threadId);
+              if (token && token.cwd !== canonicalCwd) {
+                yield* stopOwnedSession({ threadId });
+                token = undefined;
+              }
+              if (
+                token &&
+                (analysisAuthority === undefined
+                  ? workspaceAnalysis.has(token)
+                  : workspaceAnalysis.get(token)?.taskId !== analysisAuthority.taskId ||
+                    token.generation !== analysisAuthority.generation)
+              ) {
+                yield* stopOwnedSession({ threadId });
+                token = undefined;
+              }
+              if (!token) {
+                token = yield* ownership.acquireIndependent({ cwd, kind: "provider", threadId });
+                workspaceSessions.set(threadId, token);
+                if (analysisAuthority !== undefined)
+                  workspaceAnalysis.set(token, {
+                    taskId: analysisAuthority.taskId,
+                    generation: analysisAuthority.generation,
+                  });
+              }
+              if (options?.startup) {
+                const pending =
+                  workspaceAdmissions.get(threadId) ?? new Set<Deferred.Deferred<void>>();
+                pending.add(admission);
+                workspaceAdmissions.set(threadId, pending);
+              }
+              yield* ownership.registerProviderStop(
+                token,
+                stopOwnedSession({ threadId }).pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new WorkspaceOwnershipError({
+                        cwd,
+                        reason: "not-drained",
+                        detail: "Provider cleanup failed.",
+                        cause,
+                      }),
+                  ),
+                ),
+              );
+              return token;
+            }),
+          );
+          return yield* effect(cwd).pipe(
+            Effect.onError(() =>
+              Effect.gen(function* () {
+                if (workspaceStops.has(threadId)) return;
+                if ((workspaceAdmissions.get(threadId)?.size ?? 0) > 1) return;
+                if ((yield* listSessions()).some((session) => session.threadId === threadId))
+                  return;
+                const failed = workspaceSessions.get(threadId);
+                if (failed === token && !workspaceStops.has(threadId)) {
+                  workspaceSessions.delete(threadId);
+                  yield* ownership.release(failed);
+                }
+              }),
+            ),
+            Effect.ensuring(
+              Effect.gen(function* () {
+                yield* Deferred.succeed(admission, undefined);
+                const pending = workspaceAdmissions.get(threadId);
+                pending?.delete(admission);
+                if (pending?.size === 0) workspaceAdmissions.delete(threadId);
+              }),
+            ),
+          );
+        }),
+      );
+    }).pipe(Effect.mapError((cause) => (isOwnershipError(cause) ? ownershipError(cause) : cause)));
+
   return {
-    startSession,
-    sendTurn,
-    compactThread,
+    startSession: (threadId, input) =>
+      withProviderAdmission(threadId, (cwd) => startSession(threadId, { ...input, cwd }), {
+        cwd: input.cwd,
+        startup: true,
+      }),
+    sendTurn: (input) => withProviderAdmission(input.threadId, () => sendTurn(input)),
+    compactThread: (threadId, modelSelection, requestId) =>
+      withProviderAdmission(threadId, () => compactThread(threadId, modelSelection, requestId)),
     interruptTurn,
-    respondToRequest,
-    respondToUserInput,
-    stopSession,
+    respondToRequest: (input) =>
+      withProviderAdmission(input.threadId, () => respondToRequest(input)),
+    respondToUserInput: (input) =>
+      withProviderAdmission(input.threadId, () => respondToUserInput(input)),
+    stopSession: stopOwnedSession,
     listSessions,
     getCapabilities,
     getInstanceInfo,
     assertConversationRollbackSupported,
-    rollbackConversation,
-    uploadFeedback,
+    rollbackConversation: (input) =>
+      withProviderAdmission(input.threadId, () => rollbackConversation(input)),
+    uploadFeedback: (input) => withProviderAdmission(input.threadId, () => uploadFeedback(input)),
     // Each access creates a fresh PubSub subscription so that multiple
     // consumers (ProviderRuntimeIngestion, CheckpointReactor, etc.) each
     // independently receive all runtime events.

@@ -1,7 +1,13 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { it } from "@effect/vitest";
+import { it, assert } from "@effect/vitest";
 import {
   ProjectId,
+  EnvironmentId,
+  ThreadId,
+  WeavraExecutionId,
+  WeavraTaskId,
+  type WeavraCheckoutIdentityInput,
+  type WeavraEvidenceDetailsInput,
   type OrchestrationProjectShell,
   WEAVRA_CONTROL_COMMANDS,
   type WeavraBrowserCandidateSummary,
@@ -22,6 +28,7 @@ import {
   WeavraTaskContract,
 } from "@t3tools/contracts";
 import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
@@ -42,7 +49,10 @@ import {
   taskContractDigest,
 } from "./ComplexProjection.ts";
 import { plannerDraftConsistent, plannerStateConsistent } from "./PlannerProjection.ts";
-import { make } from "./RuntimeController.ts";
+import { make as makeController } from "./RuntimeController.ts";
+import * as OwnershipTest from "../workspace/WorkspaceExecutionOwnershipTest.ts";
+import { WorkspaceExecutionOwnership } from "../workspace/WorkspaceExecutionOwnership.ts";
+
 // Shared cross-side references: the Runtime lane keeps its own copies of the same fixtures.
 import reference from "./testFixtures/complexContractV1.json" with { type: "json" };
 import referenceV2 from "./testFixtures/complexContractV2.json" with { type: "json" };
@@ -104,20 +114,24 @@ const empty={status:{source:'durable-canonical-state',ownerObserved:false,state:
 let state={ownerId,nextRequestId:ownerId+':1',projectRevision:0,stateRevision:null,ownedRunId:null,busy:false,cancelling:false,startFailure:null,preview:null,browserPreview:null,factPreview:null,projectFacts:{status:'available',entries:[]},pendingApproval:null,snapshot:empty};
 if(mode==='orphan'){state.stateRevision=4;state.snapshot={...empty,status:{source:'durable-canonical-state',ownerObserved:false,state:'available',writerPresent:true,run:{runId:'orphan-run',status:'RUNNING',phase:'IMPLEMENT',workflow:'STANDARD',risk:'R1',executionMode:'EDIT',codeRevision:0,currentStep:{stepId:'implement',attempt:1},activeAgentCount:1,taskContractDigest:digest,createdAt:1,updatedAt:1}}};}
 if(existsSync('canonical.json')){const old=JSON.parse(readFileSync('canonical.json','utf8'));state={...old,ownerId,nextRequestId:ownerId+':1',ownedRunId:null,busy:false,cancelling:false,preview:null,browserPreview:null,factPreview:null,pendingApproval:null};delete state.planner;}
+if(mode==='invalid-confirm-no-run'&&launch>1){state.snapshot=empty;state.stateRevision=null;}
 // V0.8C re-run peer: workflow.derive answers with derived.json, else RERUN_NOT_APPLICABLE.
 const rerun=String(mode).startsWith('rerun');
+const evidence=String(mode).startsWith('evidence');
+const checkout=String(mode).startsWith('checkout');
 const complex=mode==='complex'?1:mode==='complex-v2'||rerun?2:0;
 // V0.8B Planner peer: planning state lives in this process only, keyed by a fresh planId per start.
 const planner=String(mode).startsWith('planner');
 let plans=0;
 const planIdOf=(n)=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
-const capabilities={authority:'Runtime/Kernel',control:'workflow-control-v1',ownerId,commands:['control.hello','control.snapshot','workflow.prepare','workflow.confirm','workflow.cancel','approval.resolve','browser.inspect','browser.prepare','browser.confirm','facts.prepare','facts.confirm'],maxRequestBytes:32768,maxResponseBytes:65536,resultLimit:64,previewTtlMs:300000,runtimeVersion:'0.85.1',readiness:mode==='not-setup'&&launch===1?'NOT_SETUP':'READY',...(complex?{complexContractVersion:complex}:{}),...(planner?{plannerContractVersion:1}:{}),...(rerun?{rerunContractVersion:1}:{}),recipes:[]};
+const capabilities={authority:'Runtime/Kernel',control:'workflow-control-v1',ownerId,commands:['control.hello','control.snapshot','workflow.prepare','workflow.confirm','workflow.cancel','approval.resolve','browser.inspect','browser.prepare','browser.confirm','facts.prepare','facts.confirm'],maxRequestBytes:32768,maxResponseBytes:65536,resultLimit:64,previewTtlMs:300000,runtimeVersion:'0.85.1',readiness:mode==='not-setup'&&launch===1?'NOT_SETUP':'READY',...(complex?{complexContractVersion:complex}:{}),...(planner?{plannerContractVersion:1}:{}),...(rerun?{rerunContractVersion:1}:{}),...(evidence?{evidenceDetails:1}:{}),...(checkout?{checkoutIdentity:1}:{}),recipes:[]};
 const reply=(request,data,error)=>({protocolVersion:1,type:'control_response',id:request.id,command:request.type,ownerId,runId:state.snapshot.status.run?.runId??null,stateRevision:state.stateRevision,projectRevision:state.projectRevision,eventId:null,timestamp:1000,success:!error,...(error?{error:{code:error}}:{data})});
 const save=()=>writeFileSync('canonical.json',JSON.stringify(state));
 for await(const line of createInterface({input:process.stdin})){
  const request=JSON.parse(line);let response;
  if(request.type==='control.hello')response=reply(request,{kind:'capabilities',capabilities});
  else if(request.type==='control.snapshot'){
+  if(mode==='bound-confirm'&&existsSync('disconnect')&&launch===1){process.stdout.write('{"invalid":true}\\n');continue;}
   if(mode==='broker'){
    if(existsSync('disconnect')&&launch===1)process.exit(0);
    const inventory=existsSync('broker.json')?JSON.parse(readFileSync('broker.json','utf8')):{schemaVersion:1,coverage:'RUNTIME_ACTION_TOOLS',ownerId,projectRevision:state.projectRevision,brokerEpoch:'12345678-1234-1234-1234-123456789abc',generation:1,status:'CURRENT',reason:'OBSERVED',observedAt:1,entries:[],total:0,omitted:0};
@@ -127,10 +141,19 @@ for await(const line of createInterface({input:process.stdin})){
   if(existsSync('planner-ready')&&state.planner?.status==='RUNNING')state.planner={...state.planner,status:'READY',finishedAt:1500,route:{alias:null,profile:'reasoning',provider:'loopback',model:'scripted'},usage:{invocations:1,reportedTokens:900},taskCount:2};
   if(existsSync('state-patch.json'))Object.assign(state,JSON.parse(readFileSync('state-patch.json','utf8')));
   if(existsSync('settle')&&state.busy){state.snapshot.status.run.status=state.cancelling?'CANCELLED':existsSync('decision')&&readFileSync('decision','utf8')==='reject'?'BLOCKED':'COMPLETED';state.snapshot.status.run.phase='COMPLETE';state.snapshot.status.writerPresent=false;state.busy=false;state.cancelling=false;state.pendingApproval=null;state.projectRevision++;state.stateRevision++;save();}
+  if((String(mode).startsWith('invalid-confirm')||mode==='bound-confirm')&&existsSync('cleanup')&&state.snapshot.status.run?.activeAgentCount){state.snapshot.status.run.activeAgentCount=0;state.snapshot.status.run.status='INTERRUPTED';state.snapshot.status.writerPresent=false;state.busy=false;state.cancelling=false;state.stateRevision++;save();}
   response=reply(request,{kind:'snapshot',state});
  }else{
   appendFileSync('requests',request.type+'\\n');
-  if(receipts.has(request.id)){const old=receipts.get(request.id);response=old.line===line?old.response:reply(request,null,'REQUEST_ID_REUSED');}
+  if(request.type==='workflow.checkout'){
+   const root=process.cwd();
+   response={...reply(request,{kind:'checkout-identity',checkout:{canonicalCwd:mode==='checkout-wrong'?'/other':root,repositoryRoot:root,headCommit:'a'.repeat(40),workspaceDigest:digest}}),runId:null,stateRevision:null,projectRevision:null};
+  }else if(request.type==='workflow.evidence'){
+   if(String(mode).startsWith('evidence-error-')){process.stdout.write(JSON.stringify({...reply(request,null,String(mode).slice('evidence-error-'.length)),runId:null,stateRevision:null})+'\\n');continue;}
+   const snapshot={executionId:mode==='evidence-wrong'?'99999999-9999-4999-8999-999999999999':request.binding.executionId,runId:request.binding.runId,revision:request.binding.revision,diffDigest:'a'.repeat(64)};
+   const data={kind:'evidence-details',snapshot,completeness:{criteria:{availability:'available',total:1},checks:{availability:'available',total:0,required:0},changedFiles:{availability:'available',total:0},trustSources:{availability:'available',total:0,checksWithoutTrust:0},review:{availability:'unavailable'}},source:'archive',outcome:{status:'COMPLETED',terminal:true},ownership:{writerPresent:false,cleanup:'UNKNOWN'},codeRevision:0,changedLines:0,symptomVerification:null,review:null,cursor:request.cursor,records:[],nextCursor:null};
+   response={...reply(request,data),runId:request.binding.runId,stateRevision:request.binding.revision};
+  }else if(receipts.has(request.id)){const old=receipts.get(request.id);response=old.line===line?old.response:reply(request,null,'REQUEST_ID_REUSED');}
   else if(request.ownerId!==ownerId)response=reply(request,null,'OWNER_CHANGED');
   else if(request.expectedProjectRevision!==state.projectRevision)response=reply(request,null,'STALE_PROJECT');
   else{
@@ -176,6 +199,7 @@ for await(const line of createInterface({input:process.stdin})){
     if(mode==='approval')state.pendingApproval={approvalId:'approval-1',runId:'run-1',stateRevision:1,projectRevision:state.projectRevision,risk:'R3',operation:'delete-file',role:'Developer',step:{stepId:'implement',attempt:0},path:'src/old.js',bytes:4,preconditionDigest:'b'.repeat(64),expiresAt:9999999999999,explanation:'Delete one tracked file'};
     save();writeFileSync('confirm-received','yes');
     if(mode==='exit-confirm'&&launch===1)process.exit(0);
+    if(String(mode).startsWith('invalid-confirm')&&launch===1){process.stdout.write('{"invalid":true}\\n');continue;}
     if(mode==='delay-confirm')while(!existsSync('release'))await new Promise(r=>setTimeout(r,5));
     response=reply(request,{kind:'accepted',requestId:request.id,command:request.type,runId:null});
    }else{
@@ -212,7 +236,14 @@ function next(
 }
 const connected = (queue: Queue.Queue<WeavraControlObservation>) =>
   next(queue, (value) => value.status === "CONNECTED" && !value.stale);
-const setup = Effect.fn("test.control.setup")(function* (mode = "normal") {
+const setup = Effect.fn("test.control.setup")(function* (
+  mode = "normal",
+  decorate?: (
+    ownership: ReturnType<typeof WorkspaceExecutionOwnership.of>,
+    fs: FileSystem.FileSystem,
+    root: string,
+  ) => { ownership: ReturnType<typeof WorkspaceExecutionOwnership.of>; fs: FileSystem.FileSystem },
+) {
   const fs = yield* FileSystem.FileSystem;
   const root = yield* fs.makeTempDirectoryScoped({ prefix: "weavra-control-owner-" });
   const executable = writeFakeCli({
@@ -222,7 +253,11 @@ const setup = Effect.fn("test.control.setup")(function* (mode = "normal") {
     env: { MODE: mode },
   });
   let selected: OrchestrationProjectShell | undefined = project(root);
-  const controller = yield* make().pipe(
+  const ownership = yield* Effect.service(WorkspaceExecutionOwnership).pipe(OwnershipTest.provide);
+  const services = decorate?.(ownership, fs, root) ?? { ownership, fs };
+  const controller = yield* makeController().pipe(
+    Effect.provideService(WorkspaceExecutionOwnership, services.ownership),
+    Effect.provideService(FileSystem.FileSystem, services.fs),
     Effect.provide(
       Layer.mock(ProjectionSnapshotQuery)({
         getProjectShellById: (id) =>
@@ -248,6 +283,7 @@ const setup = Effect.fn("test.control.setup")(function* (mode = "normal") {
     fs,
     root,
     controller,
+    ownership,
     queue,
     consumer,
     initial,
@@ -364,6 +400,41 @@ it.effect("returns Runtime duplicate and stale decisions without a second start"
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
+it.effect("replays a completed confirmation without retaining a new control lease", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup();
+    const started = yield* start(fixture);
+    const run = started.state.snapshot.status.run;
+    assert.ok(run);
+    yield* fixture.fs.writeFileString(
+      `${fixture.root}/state-patch.json`,
+      encodeJson({
+        snapshot: {
+          ...started.state.snapshot,
+          status: { ...started.state.snapshot.status, run: { ...run, activeAgentCount: 0 } },
+        },
+      }),
+    );
+    yield* fixture.fs.writeFileString(`${fixture.root}/settle`, "finish");
+    yield* TestClock.adjust("2 seconds");
+    yield* next(fixture.queue, (value) => value.state?.snapshot.status.run?.status === "COMPLETED");
+    yield* fixture.fs.remove(`${fixture.root}/state-patch.json`);
+    expect(
+      (yield* fixture.ownership.activeOperations).filter((op) => op.kind === "control"),
+    ).toHaveLength(0);
+    const before = yield* fixture.fs.readFileString(`${fixture.root}/canonical.json`);
+
+    const replay = yield* fixture.controller.command({ projectId, request: started.request });
+
+    expect(replay).toEqual(started.response);
+    expect(
+      (yield* fixture.ownership.activeOperations).filter((op) => op.kind === "control"),
+    ).toHaveLength(0);
+    expect(yield* fixture.fs.readFileString(`${fixture.root}/canonical.json`)).toBe(before);
+    expect(yield* Queue.take(fixture.queue)).toMatchObject({ status: "CONNECTED", stale: false });
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
 it.effect("cancel acknowledgement leaves RUNNING and writer present until canonical cleanup", () =>
   Effect.gen(function* () {
     const fixture = yield* setup();
@@ -466,7 +537,19 @@ it.effect("process loss after acceptance reconnects observation without replayin
     expect(lost).toMatchObject({ _tag: "Failure", failure: { code: "TRANSPORT_CLOSED" } });
     yield* next(fixture.queue, (value) => value.stale && value.status === "DISCONNECTED");
     yield* TestClock.adjust("5 seconds");
-    const fresh = (yield* connected(fixture.queue)).state!;
+    const observation = yield* next(
+      fixture.queue,
+      (value) => value.state?.ownerId === "owner-2" && value.observedAt !== null,
+    );
+    expect(observation).toMatchObject({
+      status: "ERROR",
+      stale: true,
+      errorCode: "STATE_UNAVAILABLE",
+    });
+    expect(
+      (yield* fixture.ownership.activeOperations).filter((op) => op.kind === "control"),
+    ).toHaveLength(1);
+    const fresh = observation.state!;
     expect(fresh).toMatchObject({
       ownerId: "owner-2",
       ownedRunId: null,
@@ -487,10 +570,15 @@ it.effect("process loss after acceptance reconnects observation without replayin
       previewId: "preview",
       previewDigest: `sha256:${"a".repeat(64)}`,
     };
-    expect(yield* fixture.controller.command({ projectId, request: old })).toMatchObject({
-      success: false,
-      error: { code: "OWNER_CHANGED" },
+    expect(
+      yield* fixture.controller.command({ projectId, request: old }).pipe(Effect.result),
+    ).toMatchObject({
+      _tag: "Failure",
+      failure: { code: "STATE_UNAVAILABLE" },
     });
+    expect(
+      (yield* requestLog(fixture)).filter((command) => command === "workflow.confirm"),
+    ).toHaveLength(1);
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
@@ -634,6 +722,133 @@ it.effect("rejects a browser preview bound to a different candidate", () =>
     expect(yield* fixture.fs.exists(`${fixture.root}/browser-check.json`)).toBe(false);
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
+
+const evidenceInput: WeavraEvidenceDetailsInput = {
+  projectId,
+  request: {
+    protocolVersion: 1,
+    id: "evidence:1",
+    type: "workflow.evidence",
+    binding: {
+      taskId: WeavraTaskId.make("11111111-1111-4111-8111-111111111111"),
+      environmentId: EnvironmentId.make("environment"),
+      projectId,
+      threadId: ThreadId.make("thread"),
+      executionId: WeavraExecutionId.make("22222222-2222-4222-8222-222222222222"),
+      runId: "bound-run",
+      revision: 7,
+      diffDigest: null,
+    },
+    cursor: { category: "checks", index: 0 },
+  },
+};
+
+const checkoutInput: WeavraCheckoutIdentityInput = {
+  projectId,
+  request: {
+    protocolVersion: 1,
+    id: "checkout:1",
+    type: "workflow.checkout",
+  },
+};
+
+it.effect("forwards checkout identity only after explicit capability advertisement", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("checkout");
+    const root = yield* fixture.fs.realPath(fixture.root);
+    expect(yield* fixture.controller.checkout(checkoutInput)).toMatchObject({
+      success: true,
+      runId: null,
+      stateRevision: null,
+      projectRevision: null,
+      data: {
+        kind: "checkout-identity",
+        checkout: { canonicalCwd: root, repositoryRoot: root },
+      },
+    });
+    expect(yield* fixture.fs.readFileString(`${fixture.root}/requests`)).toBe(
+      "workflow.checkout\n",
+    );
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("does not send checkout capture to a legacy Runtime without the capability", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup();
+    expect(yield* fixture.controller.checkout(checkoutInput).pipe(Effect.result)).toMatchObject({
+      _tag: "Failure",
+      failure: { code: "INCOMPATIBLE_CAPABILITIES" },
+    });
+    expect(yield* fixture.fs.exists(`${fixture.root}/requests`)).toBe(false);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("rejects checkout identity for a different trusted root", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("checkout-wrong");
+    expect(yield* fixture.controller.checkout(checkoutInput).pipe(Effect.result)).toMatchObject({
+      _tag: "Failure",
+      failure: { code: "INVALID_PAYLOAD" },
+    });
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("forwards read-only evidence only after explicit capability advertisement", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("evidence");
+    const response = yield* fixture.controller.evidence(evidenceInput);
+    expect(response).toMatchObject({
+      success: true,
+      runId: evidenceInput.request.binding.runId,
+      stateRevision: evidenceInput.request.binding.revision,
+      data: {
+        kind: "evidence-details",
+        snapshot: {
+          executionId: evidenceInput.request.binding.executionId,
+          diffDigest: "a".repeat(64),
+        },
+      },
+    });
+    expect(yield* fixture.fs.readFileString(`${fixture.root}/requests`)).toBe(
+      "workflow.evidence\n",
+    );
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("does not send evidence to a legacy Runtime without the capability", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup();
+    expect(yield* fixture.controller.evidence(evidenceInput).pipe(Effect.result)).toMatchObject({
+      _tag: "Failure",
+      failure: { code: "INCOMPATIBLE_CAPABILITIES" },
+    });
+    expect(yield* fixture.fs.exists(`${fixture.root}/requests`)).toBe(false);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("rejects evidence pages for a different immutable execution binding", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("evidence-wrong");
+    expect(yield* fixture.controller.evidence(evidenceInput).pipe(Effect.result)).toMatchObject({
+      _tag: "Failure",
+      failure: { code: "INVALID_PAYLOAD" },
+    });
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+for (const code of ["STALE_RUN", "RUN_NOT_FOUND", "RUN_NOT_OWNED"] as const) {
+  it.effect(`preserves Host evidence failure ${code} with null Run identity`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup(`evidence-error-${code}`);
+      expect(yield* fixture.controller.evidence(evidenceInput)).toMatchObject({
+        success: false,
+        runId: null,
+        stateRevision: null,
+        error: { code },
+      });
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
 
 for (const patch of [
   { generation: 0, status: "UNKNOWN", reason: "CONFIG_UNAVAILABLE", observedAt: null, total: null },
@@ -2679,3 +2894,223 @@ for (const [label, request] of [
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 }
+
+it.effect(
+  "reconciles an acknowledged Runtime Run across entry replacement only after cleanup",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup("bound-confirm");
+      const initial = fixture.initial.state;
+      assert.ok(initial);
+      const prepared = yield* fixture.controller.command({
+        projectId,
+        request: { ...fields(initial), type: "workflow.prepare", goal: "Fixture" },
+      });
+      assert.ok(prepared.success && prepared.data.kind === "prepared");
+      const planned = (yield* connected(fixture.queue)).state;
+      assert.ok(planned);
+      yield* fixture.fs.makeDirectory(`${fixture.root}/.ai`);
+      yield* fixture.fs.writeFileString(`${fixture.root}/.ai/writer.lock`, "held");
+      const acknowledged = yield* fixture.controller
+        .command({
+          projectId,
+          request: {
+            ...fields(planned),
+            type: "workflow.confirm",
+            previewId: prepared.data.preview.previewId,
+            previewDigest: prepared.data.preview.previewDigest,
+          },
+        })
+        .pipe(Effect.result);
+      expect(acknowledged).toMatchObject({
+        _tag: "Success",
+        success: { success: true, runId: "run-1" },
+      });
+      yield* fixture.fs.writeFileString(`${fixture.root}/disconnect`, "replace acknowledged owner");
+      yield* fixture.controller.observe(projectId).pipe(Stream.runDrain, Effect.forkScoped);
+      yield* next(fixture.queue, (value) => value.errorCode === "INVALID_PAYLOAD");
+      // Both the requested refresh and the retiring owner publish the fatal error.
+      // Waiting for both observes retirement, not merely a failed snapshot exchange.
+      yield* next(fixture.queue, (value) => value.errorCode === "INVALID_PAYLOAD");
+      expect(
+        (yield* fixture.ownership.activeOperations).filter((op) => op.kind === "control"),
+      ).toHaveLength(1);
+
+      yield* fixture.fs.writeFileString(`${fixture.root}/cleanup`, "all workers disposed");
+      const second = yield* Queue.unbounded<WeavraControlObservation>();
+      yield* fixture.controller.observe(projectId).pipe(
+        Stream.runForEach((value) => Queue.offer(second, value)),
+        Effect.forkScoped({ startImmediately: true }),
+      );
+      yield* connected(second);
+      // Canonical idle alone is insufficient while the physical writer is unresolved.
+      expect(
+        (yield* fixture.ownership.activeOperations).filter((op) => op.kind === "control"),
+      ).toHaveLength(1);
+      yield* fixture.fs.remove(`${fixture.root}/.ai/writer.lock`);
+
+      const reconciled = yield* Queue.unbounded<WeavraControlObservation>();
+      yield* fixture.controller.observe(projectId).pipe(
+        Stream.runForEach((value) => Queue.offer(reconciled, value)),
+        Effect.forkScoped({ startImmediately: true }),
+      );
+      yield* connected(reconciled);
+      expect(
+        (yield* fixture.ownership.activeOperations).filter((op) => op.kind === "control"),
+      ).toHaveLength(0);
+      const commands = yield* fixture.fs.readFileString(`${fixture.root}/requests`);
+      expect(commands.split("\n").filter((command) => command === "workflow.confirm")).toHaveLength(
+        1,
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+for (const mode of ["invalid-confirm", "invalid-confirm-no-run"] as const) {
+  it.effect(
+    `retains unidentified confirmation across unrelated replacement cleanup (${mode})`,
+    () =>
+      Effect.gen(function* () {
+        const fixture = yield* setup(mode);
+        const initial = fixture.initial.state!;
+        const prepared = yield* fixture.controller.command({
+          projectId,
+          request: { ...fields(initial), type: "workflow.prepare", goal: "Fixture" },
+        });
+        assert.ok(prepared.success && prepared.data.kind === "prepared");
+        const planned = (yield* connected(fixture.queue)).state!;
+        const result = yield* fixture.controller
+          .command({
+            projectId,
+            request: {
+              ...fields(planned),
+              type: "workflow.confirm",
+              previewId: prepared.data.preview.previewId,
+              previewDigest: prepared.data.preview.previewDigest,
+            },
+          })
+          .pipe(Effect.result);
+        expect(result._tag).toBe("Failure");
+        yield* next(fixture.queue, (value) => value.errorCode === "INVALID_PAYLOAD");
+        yield* fixture.fs.writeFileString(
+          `${fixture.root}/cleanup`,
+          "unrelated replacement is idle",
+        );
+        const replacement = yield* Queue.unbounded<WeavraControlObservation>();
+        yield* fixture.controller.observe(projectId).pipe(
+          Stream.runForEach((value) => Queue.offer(replacement, value)),
+          Effect.forkScoped,
+        );
+        const observed = yield* next(
+          replacement,
+          (value) => value.state?.ownerId === "owner-2" && value.observedAt !== null,
+        );
+        expect(observed.state?.snapshot.status.writerPresent).toBe(false);
+        expect(observed.state?.snapshot.status.run?.activeAgentCount ?? 0).toBe(0);
+        if (mode === "invalid-confirm-no-run")
+          expect(observed.state?.snapshot.status.run).toBeNull();
+        expect(yield* fixture.fs.exists(`${fixture.root}/.ai/writer.lock`)).toBe(false);
+        expect(
+          (yield* fixture.ownership.activeOperations).filter((op) => op.kind === "control"),
+        ).toHaveLength(1);
+        expect(observed).toMatchObject({
+          status: "ERROR",
+          stale: true,
+          errorCode: "STATE_UNAVAILABLE",
+        });
+        expect(
+          (yield* requestLog(fixture)).filter((command) => command === "workflow.confirm"),
+        ).toHaveLength(1);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
+it.effect("serializes concurrent first confirmation lease creation without orphaning tokens", () =>
+  Effect.gen(function* () {
+    const acquired = yield* Deferred.make<void>();
+    const resume = yield* Deferred.make<void>();
+    const secondEntered = yield* Deferred.make<void>();
+    let acquisitionCalls = 0;
+    let confirmations = 0;
+    const fixture = yield* setup("bound-confirm", (ownership, fs, root) => ({
+      // Once the real guard admits the second body, validation is synchronous up to
+      // lease acquisition (or its lock). The Deferred signal is not a timing guess.
+      fs: {
+        ...fs,
+        realPath: (value) => (value === root ? Effect.succeed(root) : fs.realPath(value)),
+      },
+      ownership: {
+        ...ownership,
+        acquireIndependent: (input) => {
+          if (input.kind === "control") acquisitionCalls++;
+          return ownership
+            .acquireIndependent(input)
+            .pipe(
+              Effect.tap(() =>
+                input.kind === "control"
+                  ? Deferred.succeed(acquired, undefined).pipe(
+                      Effect.andThen(Deferred.await(resume)),
+                    )
+                  : Effect.void,
+              ),
+            );
+        },
+        withControlOperation: (cwd, request, run) =>
+          ownership.withControlOperation(cwd, request, (task) =>
+            Effect.gen(function* () {
+              const ordinal = request.type === "workflow.confirm" ? ++confirmations : 0;
+              const fiber = yield* run(task).pipe(Effect.forkScoped({ startImmediately: true }));
+              if (ordinal === 2) yield* Deferred.succeed(secondEntered, undefined);
+              return yield* Fiber.join(fiber);
+            }).pipe(Effect.scoped),
+          ),
+      },
+    }));
+    const prepared = yield* fixture.controller.command({
+      projectId,
+      request: { ...fields(fixture.initial.state!), type: "workflow.prepare", goal: "Fixture" },
+    });
+    assert.ok(prepared.success && prepared.data.kind === "prepared");
+    const planned = (yield* connected(fixture.queue)).state!;
+    const request = {
+      ...fields(planned),
+      type: "workflow.confirm" as const,
+      previewId: prepared.data.preview.previewId,
+      previewDigest: prepared.data.preview.previewDigest,
+    };
+    const first = yield* fixture.controller
+      .command({ projectId, request })
+      .pipe(Effect.result, Effect.forkScoped);
+    yield* Deferred.await(acquired);
+    const second = yield* fixture.controller
+      .command({
+        projectId,
+        request: { ...request, id: `${request.id}-concurrent` },
+      })
+      .pipe(Effect.result, Effect.forkScoped);
+    yield* Effect.gen(function* () {
+      yield* Deferred.await(secondEntered);
+      expect(acquisitionCalls).toBe(1);
+    }).pipe(Effect.ensuring(Deferred.succeed(resume, undefined)));
+    expect(yield* Fiber.join(first)).toMatchObject({ _tag: "Success", success: { success: true } });
+    expect(yield* Fiber.join(second)).toMatchObject({
+      _tag: "Failure",
+      failure: { code: "STATE_UNAVAILABLE" },
+    });
+    expect(
+      (yield* fixture.ownership.activeOperations).filter((op) => op.kind === "control"),
+    ).toHaveLength(1);
+    yield* fixture.fs.writeFileString(`${fixture.root}/cleanup`, "bound execution cleanup");
+    const cleaned = yield* Queue.unbounded<WeavraControlObservation>();
+    yield* fixture.controller.observe(projectId).pipe(
+      Stream.runForEach((value) => Queue.offer(cleaned, value)),
+      Effect.forkScoped,
+    );
+    yield* connected(cleaned);
+    expect(
+      (yield* fixture.ownership.activeOperations).filter((op) => op.kind === "control"),
+    ).toHaveLength(0);
+    expect(
+      (yield* requestLog(fixture)).filter((command) => command === "workflow.confirm"),
+    ).toHaveLength(1);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);

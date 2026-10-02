@@ -31,7 +31,7 @@ import {
 import * as CheckpointStore from "../../checkpointing/CheckpointStore.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { CheckpointReactor, type CheckpointReactorShape } from "../Services/CheckpointReactor.ts";
-import { forkParked } from "../../serverActivation.ts";
+import { forkParked, ServerActivation } from "../../serverActivation.ts";
 import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
 import { RuntimeReceiptBus } from "../Services/RuntimeReceiptBus.ts";
@@ -40,6 +40,7 @@ import type { OrchestrationDispatchError } from "../Errors.ts";
 import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
 import * as WorkspaceEntries from "../../workspace/WorkspaceEntries.ts";
 import * as PullRequestService from "../../pullRequest/PullRequestService.ts";
+import { WorkspaceExecutionOwnership } from "../../workspace/WorkspaceExecutionOwnership.ts";
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
 
@@ -78,6 +79,7 @@ function checkpointStatusFromRuntime(status: string | undefined): "ready" | "mis
 }
 
 const make = Effect.gen(function* () {
+  const ownership = yield* WorkspaceExecutionOwnership;
   const crypto = yield* Crypto.Crypto;
   const randomUUID = crypto.randomUUIDv4;
   const serverEventId = randomUUID.pipe(Effect.map(EventId.make));
@@ -94,8 +96,11 @@ const make = Effect.gen(function* () {
   const vcsStatusBroadcaster = yield* VcsStatusBroadcaster;
   const pullRequests = yield* PullRequestService.PullRequestService;
   const queuedEntryRefreshes = new Set<string>();
-  const entryRefreshWorker = yield* makeDrainableWorker((cwd: string) =>
-    Effect.sync(() => queuedEntryRefreshes.delete(cwd)).pipe(
+  const entryRefreshWorker = yield* makeDrainableWorker((effect: Effect.Effect<void>) => effect);
+  const refreshWorkspaceEntries = Effect.fn("refreshWorkspaceEntries")(function* (cwd: string) {
+    if (queuedEntryRefreshes.has(cwd)) return;
+    queuedEntryRefreshes.add(cwd);
+    const refresh = Effect.sync(() => queuedEntryRefreshes.delete(cwd)).pipe(
       Effect.andThen(workspaceEntries.refresh(cwd)),
       Effect.catchCause((cause) =>
         Cause.hasInterruptsOnly(cause)
@@ -104,12 +109,10 @@ const make = Effect.gen(function* () {
               cwd,
             }),
       ),
-    ),
-  );
-  const refreshWorkspaceEntries = Effect.fn("refreshWorkspaceEntries")(function* (cwd: string) {
-    if (queuedEntryRefreshes.has(cwd)) return;
-    queuedEntryRefreshes.add(cwd);
-    yield* entryRefreshWorker.enqueue(cwd);
+    );
+    yield* entryRefreshWorker.enqueue(
+      yield* ownership.bind(refresh).pipe(Effect.map((bound) => bound.pipe(Effect.orDie))),
+    );
   });
 
   const startedTurns = new Map<ThreadId, TurnId>();
@@ -640,18 +643,23 @@ const make = Effect.gen(function* () {
   // Refreshing git status ends in a remote PR lookup under the vcs status
   // write lock. Run it on its own worker so file capture for this turn (and
   // checkpoints for other threads) never wait behind that network call.
-  const statusRefreshWorker = yield* makeDrainableWorker(
-    (event: Extract<ProviderRuntimeEvent, { type: "turn.completed" }>) =>
-      refreshLocalGitStatusFromTurnCompletion(event).pipe(
-        Effect.catchCause((cause) =>
-          Cause.hasInterruptsOnly(cause)
-            ? Effect.failCause(cause)
-            : Effect.logWarning("failed to refresh git status after turn completion", {
-                threadId: event.threadId,
-              }),
-        ),
+  const statusRefreshWorker = yield* makeDrainableWorker((effect: Effect.Effect<void>) => effect);
+  const enqueueStatusRefresh = Effect.fn("enqueueStatusRefresh")(function* (
+    event: Extract<ProviderRuntimeEvent, { type: "turn.completed" }>,
+  ) {
+    const refresh = refreshLocalGitStatusFromTurnCompletion(event).pipe(
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Effect.logWarning("failed to refresh git status after turn completion", {
+              threadId: event.threadId,
+            }),
       ),
-  );
+    );
+    yield* statusRefreshWorker.enqueue(
+      yield* ownership.bind(refresh).pipe(Effect.map((bound) => bound.pipe(Effect.orDie))),
+    );
+  });
 
   const ensurePreTurnBaselineFromDomainTurnStart = Effect.fn(
     "ensurePreTurnBaselineFromDomainTurnStart",
@@ -968,7 +976,7 @@ const make = Effect.gen(function* () {
       const isTrackedTurn = sameId(startedTurnId, turnId);
       if (isTrackedTurn) startedTurns.delete(event.threadId);
       if (event.type === "turn.completed") {
-        yield* statusRefreshWorker.enqueue(event);
+        yield* enqueueStatusRefresh(event);
       }
       if (
         turnId !== null &&
@@ -1012,8 +1020,47 @@ const make = Effect.gen(function* () {
   > =>
     input.source === "domain" ? processDomainEvent(input.event) : processRuntimeEvent(input.event);
 
+  const processGuardedInput = (input: ReactorInput) =>
+    Effect.gen(function* () {
+      if (
+        (input.source === "domain" && input.event.metadata.controlledAnalysis !== undefined) ||
+        (input.source === "runtime" &&
+          (yield* providerService.listSessions()).some(
+            (session) =>
+              session.threadId === input.event.threadId && session.controlledAnalysis !== undefined,
+          ))
+      )
+        return;
+      const threadId =
+        input.source === "runtime"
+          ? input.event.threadId
+          : "threadId" in input.event.payload
+            ? input.event.payload.threadId
+            : undefined;
+      if (threadId === undefined) return yield* processInput(input);
+      const thread = yield* resolveThreadDetail(threadId);
+      if (!thread) return yield* processInput(input);
+      const projects = yield* resolveThreadProjects(thread.projectId);
+      const target = resolveThreadWorkspaceCwd({ thread, projects });
+      const session = yield* resolveSessionRuntimeForThread(threadId);
+      const cwd = Option.isSome(session) ? session.value.cwd : target;
+      if (!cwd) return yield* processInput(input);
+      return yield* ownership.withOperation(
+        {
+          cwd,
+          kind: "checkpoint",
+          threadId,
+          additionalPaths: target ? [target] : [],
+          ...(input.source === "domain" ? { eventSequence: input.event.sequence } : {}),
+        },
+        processInput(input),
+      );
+    });
   const processInputSafely = (input: ReactorInput) =>
-    processInput(input).pipe(
+    (input.source === "runtime"
+      ? ownership.withProviderEvent("checkpoint", input.event, processGuardedInput(input))
+      : processGuardedInput(input)
+    ).pipe(
       Effect.catchCause((cause) => {
         if (Cause.hasInterruptsOnly(cause)) {
           return Effect.failCause(cause);
@@ -1027,10 +1074,21 @@ const make = Effect.gen(function* () {
     );
 
   const worker = yield* makeDrainableWorker(processInputSafely);
+  yield* ownership.registerEventConsumer("checkpoint", [
+    "turn.started",
+    "turn.completed",
+    "turn.aborted",
+    "session.exited",
+  ]);
+  const drain = worker.drain.pipe(
+    Effect.andThen(statusRefreshWorker.drain),
+    Effect.andThen(entryRefreshWorker.drain),
+  );
 
   const start: CheckpointReactorShape["start"] = Effect.fn("start")(function* () {
+    const domainEvents = yield* orchestrationEngine.subscribeDomainEvents;
     yield* forkParked(
-      Stream.runForEach(orchestrationEngine.streamDomainEvents, (event) => {
+      Stream.runForEach(domainEvents, (event) => {
         if (
           event.type !== "thread.turn-start-requested" &&
           event.type !== "thread.message-sent" &&
@@ -1042,27 +1100,25 @@ const make = Effect.gen(function* () {
       }),
     );
 
-    yield* forkParked(
-      Stream.runForEach(providerService.streamEvents, (event) => {
-        if (
-          event.type !== "turn.started" &&
-          event.type !== "turn.completed" &&
-          event.type !== "turn.aborted" &&
-          event.type !== "session.exited"
-        ) {
-          return Effect.void;
-        }
-        return worker.enqueue({ source: "runtime", event });
-      }),
-    );
+    const activation = yield* ServerActivation;
+    yield* Stream.runForEach(providerService.streamEvents, (event) => {
+      if (
+        event.type !== "turn.started" &&
+        event.type !== "turn.completed" &&
+        event.type !== "turn.aborted" &&
+        event.type !== "session.exited"
+      ) {
+        return Effect.void;
+      }
+      return (activation ?? Effect.void).pipe(
+        Effect.andThen(worker.enqueue({ source: "runtime", event })),
+      );
+    }).pipe(Effect.forkScoped({ startImmediately: true }));
   });
 
   return {
     start,
-    drain: worker.drain.pipe(
-      Effect.andThen(statusRefreshWorker.drain),
-      Effect.andThen(entryRefreshWorker.drain),
-    ),
+    drain,
   } satisfies CheckpointReactorShape;
 });
 

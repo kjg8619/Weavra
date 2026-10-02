@@ -34,6 +34,10 @@ import * as VcsProjectConfig from "../src/vcs/VcsProjectConfig.ts";
 import * as GitVcsDriver from "../src/vcs/GitVcsDriver.ts";
 import * as ProcessRunner from "../src/processRunner.ts";
 import * as ServerConfig from "../src/config.ts";
+import * as WorkspaceOwnership from "../src/workspace/WorkspaceExecutionOwnership.ts";
+import * as ServerEnvironment from "../src/environment/ServerEnvironment.ts";
+import * as ServerSecretStore from "../src/auth/ServerSecretStore.ts";
+import { layerConfig as PersistenceLayer } from "../src/persistence/Layers/Sqlite.ts";
 
 const { values } = NodeUtil.parseArgs({
   options: {
@@ -164,6 +168,13 @@ await Effect.runPromise(
           Layer.provide(FetchHttpClient.layer),
         ),
       ).pipe(
+        Layer.provide(
+          WorkspaceOwnership.layer.pipe(
+            Layer.provide(ProcessRunner.layer),
+            Layer.provide(PersistenceLayer),
+            Layer.provide(ServerEnvironment.layer.pipe(Layer.provide(ServerSecretStore.layer))),
+          ),
+        ),
         Layer.provideMerge(
           ServerConfig.layerTest(process.cwd(), { prefix: "t3-title-evaluation-state-" }),
         ),

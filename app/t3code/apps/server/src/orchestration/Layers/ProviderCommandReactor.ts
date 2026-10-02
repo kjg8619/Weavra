@@ -1,10 +1,12 @@
 import { withWorkspaceLease } from "../../workspace/workspaceLease.ts";
+import { WorkspaceExecutionOwnership } from "../../workspace/WorkspaceExecutionOwnership.ts";
 import {
   type ChatAttachment,
   CommandId,
   EventId,
   type ModelSelection,
   type OrchestrationEvent,
+  type ProviderControlledAnalysis,
   ProviderDriverKind,
   type ProjectId,
   type OrchestrationSession,
@@ -222,6 +224,7 @@ const make = Effect.gen(function* () {
   const vcsStatusBroadcaster = yield* VcsStatusBroadcaster;
   const textGeneration = yield* TextGeneration;
   const serverSettingsService = yield* ServerSettingsService;
+  const ownership = yield* WorkspaceExecutionOwnership;
   /** Environment settings with the thread's project overrides applied. */
   const projectSettingsForThread = Effect.fnUntraced(function* (threadId: ThreadId) {
     const settings = yield* serverSettingsService.getSettings;
@@ -565,6 +568,7 @@ const make = Effect.gen(function* () {
     options?: {
       readonly modelSelection?: ModelSelection;
       readonly pendingTurnStart?: boolean;
+      readonly controlledAnalysis?: ProviderControlledAnalysis;
     },
   ) {
     const thread = yield* resolveThreadShell(threadId);
@@ -716,6 +720,9 @@ const make = Effect.gen(function* () {
           ...(thread.title ? { title: thread.title } : {}),
           modelSelection: desiredModelSelection,
           ...(input?.resumeCursor !== undefined ? { resumeCursor: input.resumeCursor } : {}),
+          ...(options?.controlledAnalysis !== undefined
+            ? { controlledAnalysis: options.controlledAnalysis }
+            : {}),
           runtimeMode: desiredRuntimeMode,
         })
         .pipe(Effect.tap(() => refreshWorkspaceSnapshot));
@@ -762,6 +769,9 @@ const make = Effect.gen(function* () {
       const instanceChanged =
         requestedModelSelection !== undefined &&
         activeSession?.providerInstanceId !== requestedModelSelection.instanceId;
+      const controlledAnalysisChanged =
+        activeSession?.controlledAnalysis?.taskId !== options?.controlledAnalysis?.taskId ||
+        activeSession?.controlledAnalysis?.generation !== options?.controlledAnalysis?.generation;
       const shouldRestartForModelChange = modelChanged && sessionModelSwitch === "unsupported";
       const previousModelSelection = threadModelSelections.get(threadId);
       const shouldRestartForModelSelectionChange =
@@ -773,6 +783,7 @@ const make = Effect.gen(function* () {
         !runtimeModeChanged &&
         !cwdChanged &&
         !instanceChanged &&
+        !controlledAnalysisChanged &&
         !shouldRestartForModelChange &&
         !shouldRestartForModelSelectionChange
       ) {
@@ -780,9 +791,10 @@ const make = Effect.gen(function* () {
         return existingSessionThreadId;
       }
 
-      const resumeCursor = shouldRestartForModelChange
-        ? undefined
-        : (activeSession?.resumeCursor ?? undefined);
+      const resumeCursor =
+        shouldRestartForModelChange || controlledAnalysisChanged
+          ? undefined
+          : (activeSession?.resumeCursor ?? undefined);
       yield* Effect.logInfo("provider command reactor restarting provider session", {
         threadId,
         existingSessionThreadId,
@@ -798,6 +810,7 @@ const make = Effect.gen(function* () {
         cwdChanged,
         modelChanged,
         instanceChanged,
+        controlledAnalysisChanged,
         shouldRestartForModelChange,
         shouldRestartForModelSelectionChange,
         hasResumeCursor: resumeCursor !== undefined,
@@ -829,6 +842,7 @@ const make = Effect.gen(function* () {
     readonly modelSelection?: ModelSelection;
     readonly interactionMode?: "default" | "plan";
     readonly createdAt: string;
+    readonly controlledAnalysis?: ProviderControlledAnalysis;
   }) {
     const thread = yield* resolveThreadShell(input.threadId);
     if (!thread) {
@@ -839,6 +853,9 @@ const make = Effect.gen(function* () {
     yield* ensureSessionForThread(input.threadId, input.createdAt, {
       ...(input.modelSelection !== undefined ? { modelSelection: input.modelSelection } : {}),
       pendingTurnStart: true,
+      ...(input.controlledAnalysis !== undefined
+        ? { controlledAnalysis: input.controlledAnalysis }
+        : {}),
     });
     if (input.modelSelection !== undefined) {
       threadModelSelections.set(input.threadId, input.modelSelection);
@@ -1215,6 +1232,24 @@ const make = Effect.gen(function* () {
     if (!thread) {
       return;
     }
+    const analysisAuthority =
+      event.payload.controlledAnalysis === undefined
+        ? undefined
+        : yield* ownership.analysisAuthority;
+    if (event.payload.controlledAnalysis !== undefined && analysisAuthority === undefined) {
+      return yield* new ProviderAdapterRequestError({
+        provider: "codex",
+        method: "thread.turn.start",
+        detail: "Controlled analysis authority is unavailable.",
+      });
+    }
+    const controlledAnalysis =
+      analysisAuthority === undefined
+        ? undefined
+        : {
+            taskId: analysisAuthority.taskId,
+            generation: analysisAuthority.generation,
+          };
     const turnStart = yield* projectionSnapshotQuery.getTurnStartMessage({
       threadId: thread.id,
       messageId: event.payload.messageId,
@@ -1276,61 +1311,66 @@ const make = Effect.gen(function* () {
         ),
       );
 
-    const authCommandHandled = yield* Effect.gen(function* () {
-      // Native account commands belong to the thread's existing provider session.
-      const instanceId =
-        thread.session?.providerInstanceId ??
-        event.payload.modelSelection?.instanceId ??
-        thread.modelSelection.instanceId;
-      const handled = yield* providerAuthService.tryHandlePromptCommand({
-        instanceId,
-        text: message.text,
-        hasAttachments: (message.attachments?.length ?? 0) > 0,
-      });
-      if (!handled) {
-        return false;
-      }
+    const authCommandHandled =
+      controlledAnalysis !== undefined
+        ? false
+        : yield* Effect.gen(function* () {
+            // Native account commands belong to the thread's existing provider session.
+            const instanceId =
+              thread.session?.providerInstanceId ??
+              event.payload.modelSelection?.instanceId ??
+              thread.modelSelection.instanceId;
+            const handled = yield* providerAuthService.tryHandlePromptCommand({
+              instanceId,
+              text: message.text,
+              hasAttachments: (message.attachments?.length ?? 0) > 0,
+            });
+            if (!handled) {
+              return false;
+            }
 
-      const instanceInfo = yield* providerService.getInstanceInfo(instanceId);
-      yield* setThreadSession({
-        threadId: thread.id,
-        session: {
-          threadId: thread.id,
-          status: "stopped",
-          providerName: instanceInfo.driverKind,
-          providerInstanceId: instanceId,
-          runtimeMode: thread.runtimeMode,
-          activeTurnId: null,
-          lastError: null,
-          updatedAt: event.payload.createdAt,
-        },
-        createdAt: event.payload.createdAt,
-      });
-      yield* orchestrationEngine.dispatch({
-        type: "thread.activity.append",
-        commandId: yield* serverCommandId("provider-sign-out"),
-        threadId: thread.id,
-        activity: {
-          id: yield* serverEventId(),
-          tone: "info",
-          kind: "provider.auth.signed-out",
-          summary: "Provider signed out",
-          payload: { providerInstanceId: instanceId },
-          turnId: null,
-          createdAt: event.payload.createdAt,
-        },
-        createdAt: event.payload.createdAt,
-      });
-      return true;
-    }).pipe(Effect.catchCause((cause) => recoverTurnStartFailure(cause).pipe(Effect.as(true))));
+            const instanceInfo = yield* providerService.getInstanceInfo(instanceId);
+            yield* setThreadSession({
+              threadId: thread.id,
+              session: {
+                threadId: thread.id,
+                status: "stopped",
+                providerName: instanceInfo.driverKind,
+                providerInstanceId: instanceId,
+                runtimeMode: thread.runtimeMode,
+                activeTurnId: null,
+                lastError: null,
+                updatedAt: event.payload.createdAt,
+              },
+              createdAt: event.payload.createdAt,
+            });
+            yield* orchestrationEngine.dispatch({
+              type: "thread.activity.append",
+              commandId: yield* serverCommandId("provider-sign-out"),
+              threadId: thread.id,
+              activity: {
+                id: yield* serverEventId(),
+                tone: "info",
+                kind: "provider.auth.signed-out",
+                summary: "Provider signed out",
+                payload: { providerInstanceId: instanceId },
+                turnId: null,
+                createdAt: event.payload.createdAt,
+              },
+              createdAt: event.payload.createdAt,
+            });
+            return true;
+          }).pipe(
+            Effect.catchCause((cause) => recoverTurnStartFailure(cause).pipe(Effect.as(true))),
+          );
     if (authCommandHandled) {
       return;
     }
 
-    yield* ensureThreadWorktree(thread);
+    if (controlledAnalysis === undefined) yield* ensureThreadWorktree(thread);
 
-    const isCompactCommand = isCompactCommandMessage(message);
-    if (!hasOtherUserMessages && !isCompactCommand) {
+    const isCompactCommand = controlledAnalysis === undefined && isCompactCommandMessage(message);
+    if (controlledAnalysis === undefined && !hasOtherUserMessages && !isCompactCommand) {
       const project = yield* resolveProject(thread.projectId);
       const generationCwd =
         resolveThreadWorkspaceCwd({
@@ -1343,12 +1383,16 @@ const make = Effect.gen(function* () {
         ...(event.payload.titleSeed !== undefined ? { titleSeed: event.payload.titleSeed } : {}),
       };
 
-      yield* maybeGenerateAndRenameWorktreeBranchForFirstTurn({
-        threadId: event.payload.threadId,
-        branch: thread.branch,
-        worktreePath: thread.worktreePath,
-        ...generationInput,
-      }).pipe(Effect.forkScoped);
+      yield* ownership
+        .bind(
+          maybeGenerateAndRenameWorktreeBranchForFirstTurn({
+            threadId: event.payload.threadId,
+            branch: thread.branch,
+            worktreePath: thread.worktreePath,
+            ...generationInput,
+          }),
+        )
+        .pipe(Effect.flatMap((work) => Effect.forkScoped(work)));
 
       if (
         thread.titleState?.source !== "manual" &&
@@ -1429,40 +1473,43 @@ const make = Effect.gen(function* () {
       const clearCompacting = Effect.sync(
         () => void compactingThreadIds.delete(event.payload.threadId),
       );
-      yield* Effect.gen(function* () {
-        yield* ensureSessionForThread(
-          event.payload.threadId,
-          event.payload.createdAt,
-          event.payload.modelSelection !== undefined
-            ? { modelSelection: event.payload.modelSelection, pendingTurnStart: true }
-            : { pendingTurnStart: true },
-        );
-        compactionSessionEnsured = true;
-        if (event.payload.modelSelection !== undefined) {
-          threadModelSelections.set(event.payload.threadId, event.payload.modelSelection);
-        }
-        yield* providerService.compactThread(
-          event.payload.threadId,
-          event.payload.modelSelection,
-          event.payload.messageId,
-        );
-      }).pipe(
-        Effect.andThen(restoreCompaction(event.payload.threadId, true)),
-        Effect.andThen(clearCompacting),
-        Effect.andThen(resumeTurnsAfterCompaction(event.payload.threadId)),
-        Effect.catchCause((cause) =>
-          recoverCompactionFailure(cause).pipe(
-            Effect.ensuring(clearCompacting),
-            Effect.andThen(
-              cancelTurnsAfterCompaction(
-                event.payload.threadId,
-                "Context compaction failed. Send this message again to continue.",
+      yield* ownership
+        .bind(
+          Effect.gen(function* () {
+            yield* ensureSessionForThread(
+              event.payload.threadId,
+              event.payload.createdAt,
+              event.payload.modelSelection !== undefined
+                ? { modelSelection: event.payload.modelSelection, pendingTurnStart: true }
+                : { pendingTurnStart: true },
+            );
+            compactionSessionEnsured = true;
+            if (event.payload.modelSelection !== undefined) {
+              threadModelSelections.set(event.payload.threadId, event.payload.modelSelection);
+            }
+            yield* providerService.compactThread(
+              event.payload.threadId,
+              event.payload.modelSelection,
+              event.payload.messageId,
+            );
+          }).pipe(
+            Effect.andThen(restoreCompaction(event.payload.threadId, true)),
+            Effect.andThen(clearCompacting),
+            Effect.andThen(resumeTurnsAfterCompaction(event.payload.threadId)),
+            Effect.catchCause((cause) =>
+              recoverCompactionFailure(cause).pipe(
+                Effect.ensuring(clearCompacting),
+                Effect.andThen(
+                  cancelTurnsAfterCompaction(
+                    event.payload.threadId,
+                    "Context compaction failed. Send this message again to continue.",
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        Effect.forkScoped,
-      );
+        )
+        .pipe(Effect.flatMap((work) => Effect.forkScoped(work)));
       return;
     }
     if (
@@ -1485,7 +1532,8 @@ const make = Effect.gen(function* () {
       ...(event.payload.modelSelection !== undefined
         ? { modelSelection: event.payload.modelSelection }
         : {}),
-      interactionMode: event.payload.interactionMode,
+      interactionMode: controlledAnalysis === undefined ? event.payload.interactionMode : "plan",
+      ...(controlledAnalysis !== undefined ? { controlledAnalysis } : {}),
       createdAt: event.payload.createdAt,
     }).pipe(
       Effect.map(Option.some),
@@ -1501,10 +1549,13 @@ const make = Effect.gen(function* () {
       .pipe(Effect.asVoid, Effect.catchCause(recoverTurnStartFailure));
     // The forked send settles `sent` from here on, so drop the entry the post-processing hook uses.
     if (resumed && event.commandId !== null) resumedTurnStarts.delete(event.commandId);
-    yield* send.pipe(
-      Effect.ensuring(resumed ? Deferred.succeed(resumed.sent, undefined) : Effect.void),
-      Effect.forkScoped,
-    );
+    yield* ownership
+      .bind(
+        send.pipe(
+          Effect.ensuring(resumed ? Deferred.succeed(resumed.sent, undefined) : Effect.void),
+        ),
+      )
+      .pipe(Effect.flatMap((work) => Effect.forkScoped(work)));
   });
 
   const processTurnInterruptRequested = Effect.fn("processTurnInterruptRequested")(function* (
@@ -1797,16 +1848,29 @@ const make = Effect.gen(function* () {
           event.occurredAt,
           cachedModelSelection !== undefined ? { modelSelection: cachedModelSelection } : {},
         );
-        yield* thread.worktreePath
-          ? withWorkspaceLease(path.resolve(thread.worktreePath), resume)
-          : resume;
+        const project = yield* resolveProject(thread.projectId);
+        const cwd = thread.worktreePath ?? project?.workspaceRoot;
+        if (cwd)
+          yield* ownership.withFreshOperation(
+            { cwd, kind: "write", threadId: thread.id },
+            thread.worktreePath ? withWorkspaceLease(path.resolve(cwd), resume) : resume,
+          );
         return;
       }
       case "thread.turn-start-requested": {
         const thread = yield* resolveThreadShell(event.payload.threadId);
-        yield* thread?.worktreePath
-          ? withWorkspaceLease(path.resolve(thread.worktreePath), processTurnStartRequested(event))
-          : processTurnStartRequested(event);
+        if (!thread) return;
+        const project = yield* resolveProject(thread.projectId);
+        const cwd = thread.worktreePath ?? project?.workspaceRoot;
+        if (cwd && event.payload.controlledAnalysis !== undefined) {
+          yield* processTurnStartRequested(event);
+        } else if (cwd)
+          yield* ownership.withFreshOperation(
+            { cwd, kind: "write", threadId: thread.id },
+            thread.worktreePath
+              ? withWorkspaceLease(path.resolve(cwd), processTurnStartRequested(event))
+              : processTurnStartRequested(event),
+          );
         return;
       }
       case "thread.turn-interrupt-requested":
@@ -1843,7 +1907,44 @@ const make = Effect.gen(function* () {
   });
 
   const processDomainEventSafely = (event: ProviderIntentEvent) =>
-    processDomainEvent(event).pipe(
+    Effect.gen(function* () {
+      if (
+        event.type === "thread.turn-start-requested" ||
+        event.type === "thread.runtime-mode-set" ||
+        event.type === "thread.approval-response-requested" ||
+        event.type === "thread.user-input-response-requested"
+      ) {
+        if (event.type === "thread.turn-start-requested" && event.payload.controlledAnalysis) {
+          return yield* ownership.withTaskAnalysis(
+            event.payload.controlledAnalysis.taskId,
+            event.payload.controlledAnalysis.expectedRevision,
+            processDomainEvent(event),
+          );
+        }
+        if (
+          event.type === "thread.approval-response-requested" ||
+          event.type === "thread.user-input-response-requested"
+        ) {
+          const task = yield* ownership.activeAnalysisForThread(event.payload.threadId);
+          if (task !== undefined)
+            return yield* ownership.withTaskAnalysis(
+              task.id,
+              task.revision,
+              processDomainEvent(event),
+            );
+        }
+        const thread = yield* resolveThreadShell(event.payload.threadId);
+        if (!thread) return;
+        const project = yield* resolveProject(thread.projectId);
+        const cwd = thread.worktreePath ?? project?.workspaceRoot;
+        if (!cwd) return;
+        return yield* ownership.withFreshOperation(
+          { cwd, kind: "write", threadId: thread.id, eventSequence: event.sequence },
+          processDomainEvent(event),
+        );
+      }
+      return yield* processDomainEvent(event);
+    }).pipe(
       // A replay that returned before forking its send still holds its entry; settle it so
       // the compaction queue moves on. Forked sends drop the entry first and settle it themselves.
       Effect.ensuring(

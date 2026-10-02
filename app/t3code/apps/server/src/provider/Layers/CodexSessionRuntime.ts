@@ -7,6 +7,7 @@ import {
   type ProviderInstanceId,
   type ProviderApprovalDecision,
   type ProviderApprovalOption,
+  type ProviderControlledAnalysis,
   type ProviderEvent,
   type ProviderInteractionMode,
   type ProviderRequestKind,
@@ -37,7 +38,7 @@ import * as CodexRpc from "effect-codex-app-server/rpc";
 import * as EffectCodexSchema from "effect-codex-app-server/schema";
 
 import { buildCodexInitializeParams } from "./CodexProvider.ts";
-import { codexSessionAppServerArgs } from "./codexLaunchArgs.ts";
+import { codexSessionAppServerArgs, controlledAnalysisConfigIssue } from "./codexLaunchArgs.ts";
 import { expandHomePath } from "../../pathExpansion.ts";
 import {
   buildCodexDeveloperInstructions,
@@ -178,6 +179,7 @@ export interface CodexSessionRuntimeOptions {
   readonly model?: string;
   readonly serviceTier?: CodexServiceTier | undefined;
   readonly resumeCursor?: CodexResumeCursor;
+  readonly controlledAnalysis?: ProviderControlledAnalysis;
   readonly appServerArgs?: ReadonlyArray<string>;
   /** Capabilities the session's `t3-code` MCP credential grants; drives the prompt blocks. */
   readonly mcpCapabilities?: ReadonlySet<string>;
@@ -237,6 +239,7 @@ export type CodexSessionRuntimeError =
   | CodexSessionRuntimePendingApprovalNotFoundError
   | CodexSessionRuntimePendingUserInputNotFoundError
   | CodexSessionRuntimeInvalidUserInputAnswersError
+  | CodexSessionRuntimeApprovalEscalationDeniedError
   | CodexSessionRuntimeThreadIdMissingError;
 
 export class CodexSessionRuntimePendingApprovalNotFoundError extends Schema.TaggedError<CodexSessionRuntimePendingApprovalNotFoundError>()(
@@ -269,6 +272,17 @@ export class CodexSessionRuntimeInvalidUserInputAnswersError extends Schema.Tagg
 ) {
   override get message(): string {
     return `Invalid Codex user input answers for question '${this.questionId}'`;
+  }
+}
+
+export class CodexSessionRuntimeApprovalEscalationDeniedError extends Schema.TaggedError<CodexSessionRuntimeApprovalEscalationDeniedError>()(
+  "CodexSessionRuntimeApprovalEscalationDeniedError",
+  {
+    requestId: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Controlled analysis cannot approve Codex request: ${this.requestId}`;
   }
 }
 
@@ -506,13 +520,28 @@ function readResumeCursorThreadId(
   return isCodexResumeCursorSchema(resumeCursor) ? resumeCursor.threadId : undefined;
 }
 
-function runtimeModeToThreadConfig(input: RuntimeMode): {
+function runtimeModeToThreadConfig(
+  input: RuntimeMode,
+  controlledAnalysis = false,
+): {
   readonly approvalPolicy: EffectCodexSchema.V2ThreadStartParams__AskForApproval;
   readonly sandbox: EffectCodexSchema.V2ThreadStartParams__SandboxMode;
-  // Always explicit: omitting the field on resume keeps the thread's previous
-  // reviewer, which would leave auto_review sticky after switching modes.
   readonly approvalsReviewer: EffectCodexSchema.V2ThreadStartParams__ApprovalsReviewer;
 } {
+  if (controlledAnalysis)
+    return {
+      approvalPolicy: {
+        granular: {
+          mcp_elicitations: false,
+          request_permissions: false,
+          rules: false,
+          sandbox_approval: false,
+          skill_approval: false,
+        },
+      },
+      sandbox: "read-only",
+      approvalsReviewer: "user",
+    };
   switch (input) {
     case "approval-required":
       return {
@@ -547,8 +576,9 @@ function buildThreadStartParams(input: {
   readonly runtimeMode: RuntimeMode;
   readonly model: string | undefined;
   readonly serviceTier: CodexServiceTier | undefined;
+  readonly controlledAnalysis?: boolean;
 }): EffectCodexSchema.V2ThreadStartParams {
-  const config = runtimeModeToThreadConfig(input.runtimeMode);
+  const config = runtimeModeToThreadConfig(input.runtimeMode, input.controlledAnalysis);
   return {
     cwd: input.cwd,
     approvalPolicy: config.approvalPolicy,
@@ -561,7 +591,9 @@ function buildThreadStartParams(input: {
 
 function runtimeModeToTurnSandboxPolicy(
   input: RuntimeMode,
+  controlledAnalysis = false,
 ): EffectCodexSchema.V2TurnStartParams__SandboxPolicy {
+  if (controlledAnalysis) return { type: "readOnly", networkAccess: false };
   switch (input) {
     case "approval-required":
       return {
@@ -623,6 +655,7 @@ export function buildTurnStartParams(input: {
   readonly interactionMode?: ProviderInteractionMode;
   /** Defaults to true so callers that predate the agent-access gate are unchanged. */
   readonly browserToolsAvailable?: boolean | T3CodeToolAvailability;
+  readonly controlledAnalysis?: boolean;
 }): Effect.Effect<
   CodexTurnStartParamsWithCollaborationMode,
   CodexErrors.CodexAppServerProtocolParseError
@@ -638,7 +671,7 @@ export function buildTurnStartParams(input: {
     turnInput.push(attachment);
   }
 
-  const config = runtimeModeToThreadConfig(input.runtimeMode);
+  const config = runtimeModeToThreadConfig(input.runtimeMode, input.controlledAnalysis);
   const collaborationMode = buildCodexCollaborationMode({
     ...(input.interactionMode ? { interactionMode: input.interactionMode } : {}),
     ...(input.model ? { model: input.model } : {}),
@@ -651,7 +684,7 @@ export function buildTurnStartParams(input: {
     input: turnInput,
     approvalPolicy: config.approvalPolicy,
     approvalsReviewer: config.approvalsReviewer,
-    sandboxPolicy: runtimeModeToTurnSandboxPolicy(input.runtimeMode),
+    sandboxPolicy: runtimeModeToTurnSandboxPolicy(input.runtimeMode, input.controlledAnalysis),
     ...(input.model ? { model: input.model } : {}),
     ...(input.serviceTier ? { serviceTier: input.serviceTier } : {}),
     ...(input.effort ? { effort: input.effort } : {}),
@@ -728,6 +761,7 @@ export const openCodexThread = (input: {
   readonly requestedModel: string | undefined;
   readonly serviceTier: CodexServiceTier | undefined;
   readonly resumeThreadId: string | undefined;
+  readonly controlledAnalysis?: boolean;
 }): Effect.Effect<typeof CodexThreadResumeMetadata.Type, CodexErrors.CodexAppServerError> => {
   const resumeThreadId = input.resumeThreadId;
   const startParams = buildThreadStartParams({
@@ -735,6 +769,9 @@ export const openCodexThread = (input: {
     runtimeMode: input.runtimeMode,
     model: input.requestedModel,
     serviceTier: input.serviceTier,
+    ...(input.controlledAnalysis !== undefined
+      ? { controlledAnalysis: input.controlledAnalysis }
+      : {}),
   });
 
   if (resumeThreadId === undefined) {
@@ -1319,7 +1356,18 @@ export const makeCodexSessionRuntime = (
       ...(resolvedHomePath ? { CODEX_HOME: resolvedHomePath } : {}),
     };
     const extendEnv = options.environment === undefined;
-    const appServerArgs = codexSessionAppServerArgs(options.appServerArgs, options.launchArgs);
+    const appServerArgs = yield* Effect.try({
+      try: () =>
+        codexSessionAppServerArgs(
+          options.appServerArgs,
+          options.launchArgs,
+          options.controlledAnalysis !== undefined,
+        ),
+      catch: () =>
+        CodexErrors.CodexAppServerRequestError.invalidParams(
+          "Controlled analysis cannot establish a safe Codex launch configuration.",
+        ),
+    });
     const spawnCommand = yield* resolveSpawnCommand(options.binaryPath, appServerArgs, {
       env,
       extendEnv,
@@ -1352,6 +1400,15 @@ export const makeCodexSessionRuntime = (
     const client = yield* Effect.service(CodexClient.CodexAppServerClient).pipe(
       Effect.provide(clientContext),
     );
+    const verifyAnalysisTools = Effect.gen(function* () {
+      if (options.controlledAnalysis === undefined) return;
+      const response = yield* client.request("config/read", {
+        cwd: options.cwd,
+        includeLayers: true,
+      });
+      const issue = controlledAnalysisConfigIssue(response.config);
+      if (issue !== null) return yield* CodexErrors.CodexAppServerRequestError.invalidParams(issue);
+    });
     const serverNotifications = yield* Queue.unbounded<CodexServerNotification>();
     const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
     const randomUUIDv4 = (purpose: CodexErrors.CodexAppServerIdentifierPurpose) =>
@@ -2345,6 +2402,16 @@ export const makeCodexSessionRuntime = (
       }),
     );
 
+    if (options.controlledAnalysis !== undefined) {
+      yield* client.handleServerRequest("item/tool/call", () =>
+        Effect.succeed({
+          success: false,
+          contentItems: [
+            { type: "inputText", text: "Controlled analysis cannot invoke external tools." },
+          ],
+        }),
+      );
+    }
     yield* client.handleUnknownServerRequest((method) =>
       Effect.fail(CodexErrors.CodexAppServerRequestError.methodNotFound(method)),
     );
@@ -2433,6 +2500,14 @@ export const makeCodexSessionRuntime = (
       yield* emitSessionEvent("session/connecting", "Starting Codex App Server session.");
       yield* client.request("initialize", buildCodexInitializeParams());
       yield* client.notify("initialized", undefined);
+      if (
+        options.controlledAnalysis !== undefined &&
+        readResumeCursorThreadId(options.resumeCursor)
+      )
+        return yield* CodexErrors.CodexAppServerRequestError.invalidParams(
+          "Controlled analysis cannot resume a thread with unverified external-tool provenance.",
+        );
+      yield* verifyAnalysisTools;
 
       const requestedModel = normalizeCodexModelSlug(options.model);
 
@@ -2443,6 +2518,7 @@ export const makeCodexSessionRuntime = (
         cwd: options.cwd,
         requestedModel,
         serviceTier: options.serviceTier,
+        controlledAnalysis: options.controlledAnalysis !== undefined,
         resumeThreadId: readResumeCursorThreadId(options.resumeCursor),
       });
 
@@ -2453,6 +2529,9 @@ export const makeCodexSessionRuntime = (
         cwd: opened.cwd,
         model: opened.model,
         resumeCursor: { threadId: providerThreadId },
+        ...(options.controlledAnalysis !== undefined
+          ? { controlledAnalysis: options.controlledAnalysis }
+          : {}),
         updatedAt: yield* nowIso,
       } satisfies ProviderSession;
       yield* Ref.set(sessionRef, session);
@@ -2500,8 +2579,12 @@ export const makeCodexSessionRuntime = (
       }),
       sendTurn: (input) =>
         Effect.gen(function* () {
+          yield* verifyAnalysisTools.pipe(Effect.onError(() => close));
           const providerThreadId = yield* readProviderThreadId;
-          if (hasConfiguredMcpServer(options.appServerArgs)) {
+          if (
+            options.controlledAnalysis === undefined &&
+            hasConfiguredMcpServer(options.appServerArgs)
+          ) {
             yield* client.request("config/mcpServer/reload", undefined).pipe(
               Effect.catch((cause) =>
                 Effect.logWarning("Failed to refresh Codex MCP tool catalog before turn.", {
@@ -2529,6 +2612,7 @@ export const makeCodexSessionRuntime = (
               options.appServerArgs,
               options.mcpCapabilities,
             ),
+            controlledAnalysis: options.controlledAnalysis !== undefined,
           });
           const rawResponse = yield* client.raw.request("turn/start", params);
           const response = yield* decodeV2TurnStartResponse(rawResponse).pipe(
@@ -2627,6 +2711,12 @@ export const makeCodexSessionRuntime = (
         }),
       respondToRequest: (requestId, decision) =>
         Effect.gen(function* () {
+          if (
+            options.controlledAnalysis !== undefined &&
+            decision !== "decline" &&
+            decision !== "cancel"
+          )
+            return yield* new CodexSessionRuntimeApprovalEscalationDeniedError({ requestId });
           const pending = (yield* Ref.get(pendingApprovalsRef)).get(requestId);
           if (!pending) {
             return yield* new CodexSessionRuntimePendingApprovalNotFoundError({

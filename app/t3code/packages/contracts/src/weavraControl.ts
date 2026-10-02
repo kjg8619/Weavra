@@ -2,6 +2,16 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { ProjectId } from "./baseSchemas.ts";
 import {
+  WeavraCheckoutIdentity,
+  WeavraExecutionId,
+  WeavraPreparedModelRoute,
+  WeavraSymptomVerification,
+  WeavraTaskBinding,
+  WeavraTaskPreparation,
+  WeavraTaskReceipt,
+  WeavraTaskRunMetadata,
+} from "./weavraTask.ts";
+import {
   WeavraConnectionStatus,
   WeavraErrorCode,
   WeavraRunSummary,
@@ -702,7 +712,115 @@ const acceptanceStatements = Schema.Array(
   Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500), Schema.isPattern(/\S/)),
 ).check(Schema.isMinLength(1), Schema.isMaxLength(16));
 
+/** Supported only after the Runtime advertises taskBinding and analysisContext. */
+export const WeavraTaskPrepareRequest = Schema.Struct({
+  ...mutation,
+  type: Schema.Literal("workflow.prepare"),
+  goal,
+  acceptanceStatements,
+  task: WeavraTaskPreparation,
+})
+  .check(
+    Schema.makeFilter(
+      (request) =>
+        jsonBytes(request) + 1 <= WEAVRA_CONTROL_MAX_REQUEST_BYTES &&
+        (request.task.symptomVerification === undefined ||
+          request.task.symptomVerification.criterionIndex <= request.acceptanceStatements.length),
+    ),
+  )
+  .pipe(closedRpcInput);
+export type WeavraTaskPrepareRequest = typeof WeavraTaskPrepareRequest.Type;
+export const WeavraTaskReceiptRequest = Schema.Struct({
+  ...envelope,
+  type: Schema.Literal("workflow.receipt"),
+  executionId: WeavraExecutionId,
+}).pipe(closedRpcInput);
+export type WeavraTaskReceiptRequest = typeof WeavraTaskReceiptRequest.Type;
+export const WeavraTaskReceiptData = Schema.Struct({
+  kind: Schema.Literal("task-receipt"),
+  receipt: WeavraTaskReceipt,
+}).pipe(closedRpcInput);
+export type WeavraTaskReceiptData = typeof WeavraTaskReceiptData.Type;
+export const WeavraTaskRecoveryRequest = Schema.Struct({
+  ...mutation,
+  type: Schema.Literal("workflow.recover"),
+  metadata: WeavraTaskRunMetadata,
+}).pipe(closedRpcInput);
+export type WeavraTaskRecoveryRequest = typeof WeavraTaskRecoveryRequest.Type;
+export const WeavraTaskRecoveryData = Schema.Struct({
+  kind: Schema.Literal("task-recovery"),
+  receipt: WeavraTaskReceipt,
+  disposition: Schema.Literals(["RECOVERED", "ALREADY_SETTLED", "NOT_RECOVERED"]),
+  cleanup: Schema.Literals(["CONFIRMED", "UNCONFIRMED"]),
+  reason: Schema.NullOr(
+    Schema.Literals([
+      "UNKNOWN_ADMISSION",
+      "METADATA_MISMATCH",
+      "STALE_PROJECT",
+      "OWNER_UNPROVEN",
+      "CONFLICTING_STATE",
+      "CLEANUP_UNCONFIRMED",
+    ]),
+  ),
+}).pipe(closedRpcInput);
+export type WeavraTaskRecoveryData = typeof WeavraTaskRecoveryData.Type;
+export const WeavraCheckoutIdentityRequest = Schema.Struct({
+  ...envelope,
+  type: Schema.Literal("workflow.checkout"),
+}).pipe(closedRpcInput);
+export type WeavraCheckoutIdentityRequest = typeof WeavraCheckoutIdentityRequest.Type;
+export const WeavraCheckoutIdentityData = Schema.Struct({
+  kind: Schema.Literal("checkout-identity"),
+  checkout: WeavraCheckoutIdentity,
+}).pipe(closedRpcInput);
+export type WeavraCheckoutIdentityData = typeof WeavraCheckoutIdentityData.Type;
+export const WEAVRA_EVIDENCE_PAGE_RECORD_LIMIT = 50;
+const evidenceIdentity = Schema.String.check(Schema.isPattern(/\S/));
+const evidenceUuid = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
+);
+const evidenceTaskId = evidenceUuid.pipe(Schema.brand("WeavraTaskId"));
+const evidenceEnvironmentId = evidenceIdentity.pipe(Schema.brand("EnvironmentId"));
+const evidenceProjectId = evidenceIdentity.pipe(Schema.brand("ProjectId"));
+const evidenceThreadId = evidenceIdentity.pipe(Schema.brand("ThreadId"));
+export const WeavraEvidenceCategory = Schema.Literals([
+  "criteria",
+  "checks",
+  "changed-files",
+  "trust-sources",
+]);
+export const WeavraEvidenceBinding = Schema.Struct({
+  taskId: evidenceTaskId,
+  environmentId: evidenceEnvironmentId,
+  projectId: evidenceProjectId,
+  threadId: evidenceThreadId,
+  executionId: WeavraExecutionId,
+  runId: identifier,
+  revision: oneBasedIndex,
+  diffDigest: Schema.NullOr(workspaceDigest),
+});
+export type WeavraEvidenceBinding = typeof WeavraEvidenceBinding.Type;
+export const WeavraEvidenceCursor = Schema.Struct({
+  category: WeavraEvidenceCategory,
+  index: counter,
+});
+export type WeavraEvidenceCursor = typeof WeavraEvidenceCursor.Type;
+export const WeavraEvidenceDetailsRequest = Schema.Struct({
+  ...envelope,
+  type: Schema.Literal("workflow.evidence"),
+  binding: WeavraEvidenceBinding,
+  cursor: WeavraEvidenceCursor,
+})
+  .check(
+    Schema.makeFilter(
+      (request) => request.binding.diffDigest !== null || request.cursor.index === 0,
+    ),
+  )
+  .pipe(closedRpcInput);
+export type WeavraEvidenceDetailsRequest = typeof WeavraEvidenceDetailsRequest.Type;
+
 export const WeavraControlMutation = Schema.Union([
+  WeavraTaskRecoveryRequest,
   Schema.Struct({
     ...mutation,
     type: Schema.Literal("facts.prepare"),
@@ -731,6 +849,7 @@ export const WeavraControlMutation = Schema.Union([
     ...mutation,
     type: Schema.Literal("workflow.prepare"),
     goal,
+    task: Schema.optionalKey(WeavraTaskPreparation),
     recipeId: Schema.optionalKey(Schema.String.check(Schema.isPattern(/^[a-z0-9-]{1,64}$/))),
     recipeInputs: Schema.optionalKey(
       Schema.Record(
@@ -746,6 +865,17 @@ export const WeavraControlMutation = Schema.Union([
       (request) =>
         request.complexDraft === undefined ||
         (request.recipeId === undefined && request.recipeInputs === undefined),
+    ),
+    Schema.makeFilter(
+      (request) =>
+        request.task === undefined ||
+        (request.recipeId === undefined &&
+          request.recipeInputs === undefined &&
+          request.complexDraft === undefined &&
+          request.acceptanceStatements !== undefined &&
+          (request.task.symptomVerification === undefined ||
+            request.task.symptomVerification.criterionIndex <=
+              request.acceptanceStatements.length)),
     ),
   ),
   Schema.Struct({
@@ -787,8 +917,13 @@ export type WeavraControlMutation = typeof WeavraControlMutation.Type;
 export const WeavraControlRequest = Schema.Union([
   Schema.Struct({ ...envelope, type: Schema.Literal("control.hello") }),
   Schema.Struct({ ...envelope, type: Schema.Literal("control.snapshot") }),
+  WeavraTaskReceiptRequest,
+  WeavraCheckoutIdentityRequest,
+  WeavraEvidenceDetailsRequest,
   WeavraControlMutation,
-]);
+])
+  .check(Schema.makeFilter((request) => jsonBytes(request) + 1 <= WEAVRA_CONTROL_MAX_REQUEST_BYTES))
+  .pipe(closedRpcInput);
 export type WeavraControlRequest = typeof WeavraControlRequest.Type;
 
 export const WeavraControlErrorCode = Schema.Literals([
@@ -842,6 +977,8 @@ export const WeavraControlErrorCode = Schema.Literals([
 export type WeavraControlErrorCode = typeof WeavraControlErrorCode.Type;
 
 export const WeavraControlPreview = Schema.Struct({
+  taskBinding: Schema.optionalKey(WeavraTaskBinding),
+  configDigest: Schema.optionalKey(digest),
   previewId: identifier,
   previewDigest: digest,
   ownerId: identifier,
@@ -869,6 +1006,10 @@ export const WeavraControlPreview = Schema.Struct({
   ).check(Schema.isMaxLength(WEAVRA_CONTROL_MAX_RESPONSE_BYTES)),
   taskContractDigest: digest,
   recipe: Schema.NullOr(Schema.Struct({ id: identifier, version: counter, digest })),
+  // Absent means a legacy Runtime did not expose route metadata; consumers must show it as unavailable.
+  modelRoutes: Schema.optionalKey(
+    Schema.Array(WeavraPreparedModelRoute).check(Schema.isMinLength(1), Schema.isMaxLength(2)),
+  ),
   configuration: Schema.Struct({
     mutationMode: Schema.Literals(["compatible", "strict"]),
     verifierTrustMode: Schema.Literals(["compatible", "strict"]),
@@ -879,9 +1020,16 @@ export const WeavraControlPreview = Schema.Struct({
   }),
   complexPlan: Schema.optionalKey(WeavraComplexPlan),
 }).check(
-  // Required iff COMPLEX, forbidden otherwise.
+  // A plan is required iff COMPLEX. Routes, when available, exactly match the workflow's executable roles.
   Schema.makeFilter(
-    (preview) => (preview.workflow === "COMPLEX") === (preview.complexPlan !== undefined),
+    (preview) =>
+      (preview.workflow === "COMPLEX") === (preview.complexPlan !== undefined) &&
+      (preview.modelRoutes === undefined ||
+        (preview.workflow === "QUICK"
+          ? preview.modelRoutes.length === 1 && preview.modelRoutes[0]?.role === "Executor"
+          : preview.modelRoutes.length === 2 &&
+            preview.modelRoutes[0]?.role === "Developer" &&
+            preview.modelRoutes[1]?.role === "Reviewer")),
   ),
 );
 export type WeavraControlPreview = typeof WeavraControlPreview.Type;
@@ -1108,6 +1256,12 @@ export const WeavraControlCapabilities = Schema.Struct({
   // V0.8C: absent means re-run derivation (`workflow.derive`) does not exist on this connection.
   // Advertisement is not readiness or permission, and the `commands` tuple stays unchanged.
   rerunContractVersion: Schema.optionalKey(Schema.Literal(1)),
+  // Bound STANDARD prepare/confirm plus read-only exact receipts. Absence means unsupported.
+  taskBinding: Schema.optionalKey(Schema.Literal(1)),
+  taskRecovery: Schema.optionalKey(Schema.Literal(1)),
+  analysisContext: Schema.optionalKey(Schema.Literal(1)),
+  evidenceDetails: Schema.optionalKey(Schema.Literal(1)),
+  checkoutIdentity: Schema.optionalKey(Schema.Literal(1)),
   recipes: Schema.Array(
     Schema.Struct({
       id: identifier,
@@ -1118,6 +1272,189 @@ export const WeavraControlCapabilities = Schema.Struct({
   ).check(Schema.isMaxLength(WEAVRA_CONTROL_MAX_RESPONSE_BYTES)),
 });
 export type WeavraControlCapabilities = typeof WeavraControlCapabilities.Type;
+
+const evidenceAvailability = Schema.Literals(["available", "unavailable"]);
+export const WeavraEvidenceSnapshotIdentity = Schema.Struct({
+  executionId: WeavraExecutionId,
+  runId: identifier,
+  revision: oneBasedIndex,
+  diffDigest: workspaceDigest,
+});
+export const WeavraEvidenceCompleteness = Schema.Struct({
+  criteria: Schema.Struct({
+    availability: evidenceAvailability,
+    total: Schema.NullOr(counter),
+  }),
+  checks: Schema.Struct({
+    availability: evidenceAvailability,
+    total: Schema.NullOr(counter),
+    required: Schema.NullOr(counter),
+  }),
+  changedFiles: Schema.Struct({
+    availability: evidenceAvailability,
+    total: Schema.NullOr(counter),
+  }),
+  trustSources: Schema.Struct({
+    availability: Schema.Literals(["available", "partial", "unavailable"]),
+    total: Schema.NullOr(counter),
+    checksWithoutTrust: counter,
+  }),
+  review: Schema.Struct({ availability: evidenceAvailability }),
+}).check(
+  Schema.makeFilter(
+    (value) =>
+      [value.criteria, value.checks, value.changedFiles, value.trustSources].every((category) =>
+        category.availability === "unavailable" ? category.total === null : category.total !== null,
+      ) &&
+      (value.checks.availability === "unavailable"
+        ? value.checks.required === null
+        : value.checks.required !== null &&
+          value.checks.total !== null &&
+          value.checks.required <= value.checks.total),
+  ),
+);
+const evidencePageBase = {
+  snapshot: WeavraEvidenceSnapshotIdentity,
+  completeness: WeavraEvidenceCompleteness,
+  source: Schema.Literals(["inline", "archive"]),
+  outcome: Schema.Struct({ status: boundedText, terminal: Schema.Boolean }),
+  ownership: Schema.Struct({
+    writerPresent: Schema.NullOr(Schema.Boolean),
+    cleanup: Schema.Literals(["confirmed", "uncertain", "UNKNOWN"]),
+  }),
+  codeRevision: counter,
+  changedLines: Schema.NullOr(counter),
+  symptomVerification: Schema.NullOr(WeavraSymptomVerification),
+  review: Schema.NullOr(
+    Schema.Struct({
+      result: Schema.Literals(["PASS", "REVISE", "BLOCK"]),
+      independent: Schema.Boolean,
+      revision: counter,
+      diffDigest: boundedText,
+      criteriaCount: counter,
+    }),
+  ),
+  cursor: WeavraEvidenceCursor,
+};
+const evidenceCriterionRecord = Schema.Struct({
+  category: Schema.Literal("criteria"),
+  index: counter,
+  id: identifier,
+  statement: boundedText,
+  status: Schema.Literals(["MET", "UNMET", "UNVERIFIED", "UNKNOWN"]),
+  evidenceRefs: Schema.Array(boundedText),
+});
+const evidenceCheckRecord = Schema.Struct({
+  category: Schema.Literal("checks"),
+  index: counter,
+  id: boundedText,
+  kind: boundedText,
+  revision: counter,
+  attempt: Schema.NullOr(oneBasedIndex),
+  step: boundedText,
+  diffDigest: boundedText,
+  status: Schema.Literals(["PASS", "FAIL", "SKIPPED", "UNAVAILABLE"]),
+  required: Schema.Boolean,
+  exitCode: Schema.NullOr(Schema.Int),
+  evidenceRefs: Schema.Array(boundedText),
+  trust: Schema.NullOr(
+    Schema.Struct({
+      mode: Schema.Literals(["compatible", "strict"]),
+      status: Schema.Literals(["VERIFIED", "UNVERIFIED", "STALE", "UNKNOWN"]),
+      registrationDigest: digest,
+      executableDigest: digest,
+      sourceCount: counter,
+    }),
+  ),
+  sandbox: Schema.NullOr(
+    Schema.Struct({
+      mode: Schema.Literals(["disabled", "required"]),
+      status: Schema.Literals(["ENFORCED", "UNAVAILABLE", "STALE", "UNKNOWN"]),
+      backend: boundedText,
+      backendVersion: boundedText,
+      policyDigest: digest,
+    }),
+  ),
+});
+const evidenceChangedFileRecord = Schema.Struct({
+  category: Schema.Literal("changed-files"),
+  index: counter,
+  path: boundedText,
+});
+const evidenceTrustSourceRecord = Schema.Struct({
+  category: Schema.Literal("trust-sources"),
+  index: counter,
+  checkIndex: counter,
+  checkId: boundedText,
+  sourceIndex: counter,
+  path: boundedText,
+  digest,
+});
+export const WeavraEvidenceRecord = Schema.Union([
+  evidenceCriterionRecord,
+  evidenceCheckRecord,
+  evidenceChangedFileRecord,
+  evidenceTrustSourceRecord,
+]);
+export type WeavraEvidenceRecord = typeof WeavraEvidenceRecord.Type;
+export const WeavraEvidenceDetailsPage = Schema.Struct({
+  kind: Schema.Literal("evidence-details"),
+  ...evidencePageBase,
+  records: Schema.Array(WeavraEvidenceRecord).check(
+    Schema.isMaxLength(WEAVRA_EVIDENCE_PAGE_RECORD_LIMIT),
+  ),
+  nextCursor: Schema.NullOr(WeavraEvidenceCursor),
+}).check(
+  Schema.makeFilter((page) => {
+    const category = {
+      criteria: page.completeness.criteria,
+      checks: page.completeness.checks,
+      "changed-files": page.completeness.changedFiles,
+      "trust-sources": page.completeness.trustSources,
+    }[page.cursor.category];
+    const end = page.cursor.index + page.records.length;
+    return (
+      category.availability !== "unavailable" &&
+      category.total !== null &&
+      end <= category.total &&
+      (category.total === 0
+        ? page.cursor.index === 0 && page.records.length === 0
+        : page.cursor.index < category.total && page.records.length > 0) &&
+      page.records.every(
+        (record, offset) =>
+          record.category === page.cursor.category && record.index === page.cursor.index + offset,
+      ) &&
+      (end === category.total
+        ? page.nextCursor === null
+        : page.nextCursor?.category === page.cursor.category && page.nextCursor.index === end)
+    );
+  }),
+);
+export type WeavraEvidenceDetailsPage = typeof WeavraEvidenceDetailsPage.Type;
+export const WeavraEvidenceDetailsUnavailable = Schema.Struct({
+  kind: Schema.Literal("evidence-detail-unavailable"),
+  ...evidencePageBase,
+  reason: Schema.Literals(["CATEGORY_UNAVAILABLE", "RECORD_TOO_LARGE"]),
+  recordIndex: counter,
+}).check(
+  Schema.makeFilter((page) => {
+    const category = {
+      criteria: page.completeness.criteria,
+      checks: page.completeness.checks,
+      "changed-files": page.completeness.changedFiles,
+      "trust-sources": page.completeness.trustSources,
+    }[page.cursor.category];
+    return (
+      page.recordIndex === page.cursor.index &&
+      (page.reason === "CATEGORY_UNAVAILABLE"
+        ? category.availability === "unavailable" && category.total === null
+        : category.availability !== "unavailable" &&
+          category.total !== null &&
+          page.recordIndex < category.total)
+    );
+  }),
+);
+export type WeavraEvidenceDetailsUnavailable = typeof WeavraEvidenceDetailsUnavailable.Type;
 
 // V0.8C explicit re-run wire contract (docs/architecture/COMPLEX_RERUN.md §4–§6), duplicated from
 // the Runtime wire shapes and never imported across build roots. A derived draft is candidate data:
@@ -1198,6 +1535,11 @@ export const WeavraDerivedDraft = Schema.Struct({
 export type WeavraDerivedDraft = typeof WeavraDerivedDraft.Type;
 
 const controlData = Schema.Union([
+  WeavraTaskReceiptData,
+  WeavraTaskRecoveryData,
+  WeavraCheckoutIdentityData,
+  WeavraEvidenceDetailsPage,
+  WeavraEvidenceDetailsUnavailable,
   Schema.Struct({ kind: Schema.Literal("capabilities"), capabilities: WeavraControlCapabilities }),
   Schema.Struct({ kind: Schema.Literal("snapshot"), state: WeavraControlState }),
   Schema.Struct({ kind: Schema.Literal("prepared"), preview: WeavraControlPreview }),
@@ -1220,6 +1562,7 @@ const controlData = Schema.Union([
       "planner.cancel",
     ]),
     runId: Schema.NullOr(identifier),
+    taskReceipt: Schema.optionalKey(WeavraTaskReceipt),
   }).check(
     // Planning never creates or names a Run.
     Schema.makeFilter((data) => !data.command.startsWith("planner.") || data.runId === null),
@@ -1263,6 +1606,12 @@ export const WeavraControlResponse = Schema.Union([
         response.data.kind !== "derived-draft" ||
         jsonBytes(response) + 1 <= WEAVRA_RERUN_MAX_DERIVED_RESPONSE_BYTES,
     ),
+    Schema.makeFilter(
+      (response) =>
+        (response.data.kind !== "evidence-details" &&
+          response.data.kind !== "evidence-detail-unavailable") ||
+        jsonBytes(response) + 1 <= WEAVRA_CONTROL_MAX_RESPONSE_BYTES,
+    ),
   ),
   Schema.Struct({
     ...responseEnvelope,
@@ -1295,6 +1644,27 @@ export const WeavraControlInput = Schema.Struct({
   )
   .pipe(closedRpcInput);
 export type WeavraControlInput = typeof WeavraControlInput.Type;
+
+export const WeavraCheckoutIdentityInput = Schema.Struct({
+  projectId: ProjectId,
+  request: WeavraCheckoutIdentityRequest,
+}).pipe(closedRpcInput);
+export type WeavraCheckoutIdentityInput = typeof WeavraCheckoutIdentityInput.Type;
+
+export const WeavraEvidenceDetailsInput = Schema.Struct({
+  projectId: ProjectId,
+  request: WeavraEvidenceDetailsRequest,
+})
+  .check(
+    Schema.makeFilter(
+      (input) =>
+        input.projectId === input.request.binding.projectId &&
+        requestEncoder.encode(JSON.stringify(input.request)).byteLength + 1 <=
+          WEAVRA_CONTROL_MAX_REQUEST_BYTES,
+    ),
+  )
+  .pipe(closedRpcInput);
+export type WeavraEvidenceDetailsInput = typeof WeavraEvidenceDetailsInput.Type;
 
 export const WeavraControlObserveInput = Schema.Struct({ projectId: ProjectId }).pipe(
   closedRpcInput,

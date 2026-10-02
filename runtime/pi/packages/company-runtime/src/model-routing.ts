@@ -1,6 +1,11 @@
 import type { RuntimeConfig } from "./config.ts";
 import type { Workflow } from "./contracts.ts";
 
+/** A selected worker model/provider/auth is unavailable; unrelated initialization failures stay distinct. */
+export class WorkerModelUnavailableError extends Error {
+	override name = "WorkerModelUnavailableError";
+}
+
 /**
  * Model intent profiles (#5): a thin alias layer over `models.profiles`. Every worker role has one alias, and
  * `models.intents` may point that alias at another configured profile; otherwise the role's default profile applies.

@@ -142,6 +142,7 @@ import { type LegendListRef } from "@legendapp/list/react";
 import {
   CHAT_TIMELINE_ANCHOR_OFFSET,
   getAnchoredTurnMetrics,
+  getTimelineContentFooterHeight,
   readTimelinePosition,
   timelineContentOverflowsViewport,
   type TimelineScrollMode,
@@ -363,6 +364,9 @@ import {
 } from "../state/entities";
 import { environmentShell } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
+import { WeavraTaskCard } from "./chat/WeavraTaskCard";
+import { WeavraTaskResults } from "./chat/WeavraTaskResult";
+import { useWeavraTask } from "./chat/useWeavraTask";
 import { createPageScrollController, type PageScrollKey } from "./chat/pageScrollController";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
@@ -2599,6 +2603,32 @@ export default function ChatView(props: ChatViewProps) {
     providers: providerStatuses,
   });
   const pullRequestsCapabilityKnown = serverConfig !== null;
+  const controlledTaskScope = useMemo(
+    () =>
+      isServerThread && activeThread
+        ? {
+            environmentId: activeThread.environmentId,
+            projectId: activeThread.projectId,
+            threadId: activeThread.id,
+          }
+        : null,
+    [isServerThread, activeThread?.environmentId, activeThread?.projectId, activeThread?.id],
+  );
+  const controlledTasksSupported = serverConfig?.environment.capabilities.weavraTasks === true;
+  const controlledAnalysisSupported =
+    serverConfig?.environment.capabilities.weavraTaskAnalysis === "codex-read-only-v1";
+  const controlledProvider =
+    providerStatuses.find(
+      (provider) => provider.instanceId === activeThread?.modelSelection.instanceId,
+    )?.driver ?? null;
+  const controlledTask = useWeavraTask({
+    scope: controlledTaskScope,
+    environmentId,
+    supported: controlledTasksSupported,
+    analysisSupported: controlledAnalysisSupported,
+    recoverySupported: serverConfig?.environment.capabilities.weavraTaskRecovery === 1,
+    connected: activeEnvironmentConnectionPhase === "connected",
+  });
   const supportsPullRequests = serverConfig?.environment.capabilities.pullRequests === true;
   const attachmentEnvironmentConfig = environmentById.get(environmentId)?.serverConfig ?? null;
   const attachmentUploadsCapabilityKnown = attachmentEnvironmentConfig !== null;
@@ -3259,6 +3289,19 @@ export default function ChatView(props: ChatViewProps) {
     isCompacting ||
     awaitingBootstrapTurn;
   const isPreparingWorktree = isLocallyPreparingWorktree || awaitingBootstrapTurn;
+  const controlledSendReason =
+    controlledTask.route === "blocked"
+      ? "Synchronize the controlled task and verify operate access before sending."
+      : controlledTask.route === "analysis" &&
+          (!controlledAnalysisSupported || controlledProvider !== "codex")
+        ? "This selected provider does not support controlled read-only analysis. No fallback is allowed."
+        : controlledTask.route === "analysis" && isWorking
+          ? "Wait for the current read-only analysis to finish."
+          : composerHasNonPromptContent
+            ? "Controlled messages are text-only. Stop the unconfirmed task to remove existing attachments or context."
+            : !controlledAnalysisSupported && controlledTask.route === "followup"
+              ? "This environment does not advertise the task message API."
+              : null;
   const activeWorkStartedAt = deriveActiveWorkStartedAt(
     activeLatestTurn,
     activeThread?.session ?? null,
@@ -5348,6 +5391,9 @@ export default function ChatView(props: ChatViewProps) {
       timelineContentOverflowsViewport((list ?? legendListRef.current)?.getState(), {
         composerInset: composerTimelineInset,
         anchorOffset: CHAT_TIMELINE_ANCHOR_OFFSET,
+        contentFooterHeight: getTimelineContentFooterHeight(
+          (list ?? legendListRef.current)?.getScrollableNode(),
+        ),
       }),
     [composerTimelineInset],
   );
@@ -7281,6 +7327,29 @@ export default function ChatView(props: ChatViewProps) {
     queuedMessage?: QueuedComposerMessage,
   ) => {
     e?.preventDefault();
+    if (controlledTaskScope && controlledTask.route !== "free") {
+      if (queuedMessage || directAnnotation || submissionIntent !== "foreground") {
+        controlledTask.setError(
+          "Controlled tasks do not dispatch queued messages, annotations or background turns. Use an explicit text-only send.",
+        );
+        return;
+      }
+      if (controlledSendReason || controlledTask.busy || composerHasNonPromptContent) {
+        controlledTask.setError(controlledSendReason ?? "Wait for the current task request.");
+        return;
+      }
+      const text = promptRef.current;
+      if (!text.trim() || !composerRef.current?.validateProviderInput(text)) return;
+      const sent =
+        controlledTask.route === "analysis"
+          ? await controlledTask.analyze(text)
+          : await controlledTask.followup(text);
+      if (sent && promptRef.current === text) {
+        promptRef.current = "";
+        setComposerDraftPrompt(composerDraftTarget, "");
+      }
+      return;
+    }
     // Typed out in full rather than picked from the menu. Attachments or contexts
     // mean the user is sending a prompt, so those go through as usual.
     if (
@@ -8622,6 +8691,7 @@ export default function ChatView(props: ChatViewProps) {
   // leaves the message queued. Re-run when any of them clear so a due message
   // does not wait for an unrelated phase change.
   const queueSendGate =
+    controlledTask.route !== "free" ||
     activeEnvironmentUnavailable ||
     !clientSettingsHydrated ||
     isRevertingCheckpoint ||
@@ -9413,6 +9483,7 @@ export default function ChatView(props: ChatViewProps) {
   // feedback upload in between. What remains inside `onSend` are the checks
   // that need the user to change something, and those should not auto retry.
   const workLocallyResendReady =
+    controlledTask.route === "free" &&
     workLocallyResendDraftId !== null &&
     workLocallyResendDraftId === draftId &&
     isLocalDraftThread &&
@@ -9876,6 +9947,32 @@ export default function ChatView(props: ChatViewProps) {
             <div className="relative flex min-h-0 flex-1 flex-col bg-background">
               {/* Messages — LegendList handles virtualization and scrolling internally */}
               <MessagesTimeline
+                controlledTaskCard={
+                  controlledTaskScope && !paintOnlyDisplayedTimeline ? (
+                    <div key={JSON.stringify(controlledTaskScope)} className="min-w-0">
+                      <WeavraTaskCard
+                        controller={controlledTask}
+                        scope={controlledTaskScope}
+                        supported={controlledTasksSupported}
+                        analysisSupported={controlledAnalysisSupported}
+                        connected={activeEnvironmentConnectionPhase === "connected"}
+                        messages={timelineMessages}
+                        provider={controlledProvider}
+                        entryBlockedReason={
+                          queuedMessages.length > 0
+                            ? "Remove queued messages before starting a controlled task."
+                            : composerHasNonPromptContent
+                              ? "Remove attachments and context before starting a controlled task."
+                              : null
+                        }
+                      />
+                      <WeavraTaskResults
+                        controller={controlledTask}
+                        connected={activeEnvironmentConnectionPhase === "connected"}
+                      />
+                    </div>
+                  ) : null
+                }
                 citationRequest={paintOnlyDisplayedTimeline ? null : citationRequest}
                 citationHistoryLoading={threadDetailLoading}
                 {...(!paintOnlyDisplayedTimeline
@@ -10035,6 +10132,15 @@ export default function ChatView(props: ChatViewProps) {
                       <ComposerSurface.Host>
                         <div ref={attachDraftHeroComposerAnchorRef} className="relative z-10">
                           <ChatComposer
+                            controlledTask={
+                              controlledTaskScope && controlledTask.route !== "free"
+                                ? {
+                                    mode: controlledTask.route,
+                                    busy: controlledTask.busy,
+                                    disabledReason: controlledSendReason,
+                                  }
+                                : undefined
+                            }
                             multipleModelSelections={multipleModelSelections}
                             supportsMultipleModels={
                               serverConfig?.environment.capabilities.requiredWorktreeBootstrap ===

@@ -1,3 +1,4 @@
+import type { AnalysisContext } from "./contracts.ts";
 import type { PolicyContext, PolicyPathInspector } from "./policy.ts";
 import type { AgentExecutionRequest, AgentExecutionResult, AgentExecutor } from "./ports.ts";
 import { buildTaskContextPack, type TaskContextMode, type TaskContextPack } from "./task-context.ts";
@@ -15,6 +16,8 @@ export interface TaskContextExecutorOptions {
 	paths: PolicyPathInspector;
 	protectedPaths: readonly string[];
 	verifierSources: readonly string[];
+	/** Paths are seeds only. The builder re-reads current bytes under the same Policy on every invocation. */
+	analysisContext?: AnalysisContext;
 }
 
 /** Host-derived seeds per role: Developer gets scope + prior review issues, Reviewer gets scope + evidence. */
@@ -47,7 +50,10 @@ export async function buildRequestTaskContext(
 	return await buildTaskContextPack({
 		cwd: options.cwd,
 		mode: "bounded",
-		seedPaths: taskContextSeeds(request),
+		seedPaths: [
+			...taskContextSeeds(request),
+			...(options.analysisContext?.sourceReferences.map((source) => source.path) ?? []),
+		],
 		taskText: taskContextTaskText(request),
 		paths: options.paths,
 		policy: options.policy,

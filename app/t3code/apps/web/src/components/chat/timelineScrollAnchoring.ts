@@ -40,28 +40,39 @@ export function getRowBottom(state: TimelineListMeasurementState, index: number)
 }
 
 /**
- * Whether the timeline's real rows extend past the viewport left above the
+ * Whether the timeline's real rows and content footer extend past the viewport above the
  * composer. The list's own content length includes the composer inset
  * spacer, so this measures from the last row instead. Unknown row geometry
  * or an unmeasured viewport counts as fitting.
  */
 export function timelineContentOverflowsViewport(
   state: TimelineListMeasurementState | undefined,
-  input: { readonly composerInset: number; readonly anchorOffset: number },
+  input: {
+    readonly composerInset: number;
+    readonly anchorOffset: number;
+    readonly contentFooterHeight?: number;
+  },
 ): boolean {
-  if (!state || !state.data || state.data.length === 0) {
+  if (!state || !state.data) {
     return false;
   }
   const scrollLength = state.scrollLength;
   if (typeof scrollLength !== "number" || !Number.isFinite(scrollLength) || scrollLength <= 0) {
     return false;
   }
-  const lastBottom = getRowBottom(state, state.data.length - 1);
+  const lastBottom = state.data.length === 0 ? 0 : getRowBottom(state, state.data.length - 1);
   if (lastBottom === null) {
     return false;
   }
   const visibleScrollLength = Math.max(0, scrollLength - input.composerInset - input.anchorOffset);
-  return lastBottom > visibleScrollLength;
+  return lastBottom + (input.contentFooterHeight ?? 0) > visibleScrollLength;
+}
+
+export function getTimelineContentFooterHeight(viewport: HTMLElement | null | undefined): number {
+  return (
+    viewport?.querySelector<HTMLElement>("[data-timeline-content-footer]")?.getBoundingClientRect()
+      .height ?? 0
+  );
 }
 
 export function getAnchoredTurnMetrics({

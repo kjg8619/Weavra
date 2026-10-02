@@ -17,6 +17,8 @@ import {
   WeavraComplexPlan,
   WeavraComplexPlanV1,
   WeavraComplexPlanV2,
+  WeavraCheckoutIdentityInput,
+  WeavraCheckoutIdentityRequest,
   WeavraControlCapabilities,
   WeavraControlApproval,
   WeavraControlInput,
@@ -25,18 +27,27 @@ import {
   WeavraControlRequest,
   WeavraControlResponse,
   WeavraControlState,
+  WeavraEvidenceDetailsInput,
+  WeavraEvidenceDetailsRequest,
   WEAVRA_PLANNER_MAX_DRAFT_RESPONSE_BYTES,
   WeavraPlannerStatus,
   type WeavraRegisteredBrowserCheck,
   WEAVRA_RERUN_MAX_DERIVED_RESPONSE_BYTES,
   WeavraDerivedDraft,
   WeavraRerunLeftovers,
+  WeavraTaskPrepareRequest,
+  WeavraTaskReceiptRequest,
 } from "./weavraControl.ts";
 
 const decodeRpc = Schema.decodeUnknownSync(WeavraControlInput);
 const decodeObserve = Schema.decodeUnknownSync(WeavraControlObserveInput);
 const decodeWire = Schema.decodeUnknownSync(WeavraControlRequest, { onExcessProperty: "error" });
 const decodeApproval = Schema.decodeUnknownSync(WeavraControlApproval);
+const decodeCheckoutRequest = Schema.decodeUnknownSync(WeavraCheckoutIdentityRequest);
+const decodeCheckoutInput = Schema.decodeUnknownSync(WeavraCheckoutIdentityInput);
+const decodeCheckoutResponse = Schema.decodeUnknownSync(WeavraControlResponse, {
+  onExcessProperty: "error",
+});
 const request = {
   protocolVersion: 1,
   id: "owner:1",
@@ -45,6 +56,485 @@ const request = {
   type: "workflow.prepare",
   goal: "Fix app bug",
 };
+
+describe("capability-gated task wire contracts", () => {
+  const context = {
+    version: 1,
+    packetVersion: 1,
+    authority: "ADVISORY_ONLY",
+    reviewedAt: 100,
+    symptom: "Observed failure",
+    observations: [],
+    candidateCause: null,
+    uncertainties: [],
+    sourceReferences: [],
+    constraints: [],
+  };
+  const taskRequest = {
+    ...request,
+    acceptanceStatements: ["The symptom is absent"],
+    task: {
+      taskId: "11111111-1111-4111-8111-111111111111",
+      environmentId: "environment",
+      projectId: "project",
+      threadId: "thread",
+      checkout: {
+        canonicalCwd: "/project",
+        repositoryRoot: "/project",
+        headCommit: "a".repeat(40),
+        workspaceDigest: `sha256:${"a".repeat(64)}`,
+      },
+      analysisContext: context,
+      symptomVerification: { criterionIndex: 1, checkId: "symptom" },
+    },
+  };
+  const decodeTaskPrepare = Schema.decodeUnknownSync(WeavraTaskPrepareRequest);
+  const decodeTaskReceiptRequest = Schema.decodeUnknownSync(WeavraTaskReceiptRequest);
+  it("accepts preparation without relaxing its reviewed task bounds", () => {
+    expect(decodeTaskPrepare(taskRequest)).toEqual(taskRequest);
+    expect(decodeRpc({ projectId: "project", request: taskRequest }).request).toEqual(taskRequest);
+    expect(decodeWire(taskRequest)).toEqual(taskRequest);
+    expect(() =>
+      decodeTaskPrepare({
+        ...taskRequest,
+        task: {
+          ...taskRequest.task,
+          symptomVerification: { criterionIndex: 2, checkId: "symptom" },
+        },
+      }),
+    ).toThrow();
+  });
+  it("bounds the whole multibyte preparation envelope", () => {
+    const oversized = {
+      ...taskRequest,
+      goal: "한".repeat(2048),
+      acceptanceStatements: Array.from({ length: 16 }, () => "한".repeat(500)),
+      task: { ...taskRequest.task, analysisContext: { ...context, symptom: "한".repeat(1000) } },
+    };
+    expect(new TextEncoder().encode(JSON.stringify(oversized)).byteLength).toBeGreaterThan(32768);
+    expect(() => decodeTaskPrepare(oversized)).toThrow();
+  });
+  it("preserves bound identities before comparing references and counting wire bytes", () => {
+    const padded = {
+      ...taskRequest,
+      task: {
+        ...taskRequest.task,
+        environmentId: " environment ",
+        projectId: " project ",
+        threadId: " thread ",
+        analysisContext: {
+          ...context,
+          observations: [
+            {
+              text: "Visible input",
+              provenance: "USER",
+              reference: { kind: "message", threadId: " thread ", messageId: " message " },
+            },
+          ],
+        },
+      },
+    };
+    expect(decodeWire(padded)).toEqual(padded);
+    expect(() =>
+      decodeWire({
+        ...padded,
+        task: { ...padded.task, environmentId: " ".repeat(32768) + "environment" },
+      }),
+    ).toThrow();
+  });
+  it("accepts a read-only receipt request without mutation authority", () => {
+    const receipt = {
+      protocolVersion: 1,
+      id: "read:1",
+      type: "workflow.receipt",
+      executionId: "22222222-2222-4222-8222-222222222222",
+    };
+    expect(decodeTaskReceiptRequest(receipt)).toEqual(receipt);
+    expect(decodeWire(receipt)).toEqual(receipt);
+    expect(() => decodeTaskReceiptRequest({ ...receipt, status: "COMPLETED" })).toThrow();
+  });
+  it("round-trips task-bound recovery and preserves unconfirmed cleanup", () => {
+    const digest = `sha256:${"a".repeat(64)}`;
+    const executionId = "22222222-2222-4222-8222-222222222222";
+    const metadata = {
+      binding: {
+        taskId: taskRequest.task.taskId,
+        environmentId: "environment",
+        projectId: "project",
+        threadId: "thread",
+        checkout: taskRequest.task.checkout,
+        executionId,
+        packetVersion: 1,
+        advisoryDigest: digest,
+      },
+      previewDigest: digest,
+      configDigest: digest,
+      confirmedProjectRevision: 0,
+      admittedProjectRevision: 1,
+    };
+    const recovery = {
+      protocolVersion: 1,
+      id: "owner:2",
+      ownerId: "owner",
+      expectedProjectRevision: 2,
+      type: "workflow.recover",
+      metadata,
+    };
+    expect(decodeWire(recovery)).toEqual(recovery);
+    expect(() => decodeWire({ ...recovery, executionId })).toThrow();
+    const response = {
+      protocolVersion: 1,
+      type: "control_response",
+      id: recovery.id,
+      ownerId: "owner",
+      command: recovery.type,
+      runId: null,
+      stateRevision: null,
+      projectRevision: 3,
+      eventId: null,
+      timestamp: 101,
+      success: true,
+      data: {
+        kind: "task-recovery",
+        receipt: {
+          status: "FOUND",
+          executionId,
+          admission: {
+            metadata,
+            outcome: { status: "INTERRUPTED_BEFORE_START", reasonCode: "OWNER_LOST" },
+            acceptedAt: 100,
+            updatedAt: 101,
+            cleanup: "UNCONFIRMED",
+          },
+          run: null,
+        },
+        disposition: "RECOVERED",
+        cleanup: "UNCONFIRMED",
+        reason: "CLEANUP_UNCONFIRMED",
+      },
+    };
+    expect(decodeCheckoutResponse(response)).toEqual(response);
+    expect(() =>
+      decodeCheckoutResponse({ ...response, data: { ...response.data, reason: "ignore lock" } }),
+    ).toThrow();
+  });
+  it("round-trips checkout capture without client path or mutation authority", () => {
+    const checkoutRequest = {
+      protocolVersion: 1,
+      id: "read:checkout",
+      type: "workflow.checkout",
+    } as const;
+    const checkout = taskRequest.task.checkout;
+    expect(decodeCheckoutRequest(checkoutRequest)).toEqual(checkoutRequest);
+    expect(decodeCheckoutInput({ projectId: "project", request: checkoutRequest })).toEqual({
+      projectId: "project",
+      request: checkoutRequest,
+    });
+    expect(decodeWire(checkoutRequest)).toEqual(checkoutRequest);
+    for (const field of [{ cwd: "/other" }, { ownerId: "owner" }, { expectedProjectRevision: 0 }]) {
+      expect(() =>
+        decodeCheckoutRequest({
+          ...checkoutRequest,
+          ...field,
+        }),
+      ).toThrow();
+    }
+    const response = {
+      protocolVersion: 1,
+      type: "control_response",
+      id: checkoutRequest.id,
+      ownerId: "owner",
+      command: checkoutRequest.type,
+      runId: null,
+      stateRevision: null,
+      projectRevision: null,
+      eventId: null,
+      timestamp: 100,
+      success: true,
+      data: { kind: "checkout-identity", checkout },
+    } as const;
+    expect(decodeCheckoutResponse(response)).toEqual(response);
+  });
+  it("round-trips durable acceptance and exact read-only receipts", () => {
+    const executionId = "22222222-2222-4222-8222-222222222222";
+    const hash = `sha256:${"a".repeat(64)}`;
+    const receipt = {
+      status: "FOUND",
+      executionId,
+      admission: {
+        metadata: {
+          binding: {
+            taskId: taskRequest.task.taskId,
+            environmentId: " environment ",
+            projectId: " project ",
+            threadId: " thread ",
+            checkout: taskRequest.task.checkout,
+            executionId,
+            packetVersion: 1,
+            advisoryDigest: hash,
+          },
+          previewDigest: hash,
+          configDigest: hash,
+          confirmedProjectRevision: 0,
+          admittedProjectRevision: 1,
+        },
+        outcome: { status: "ACCEPTED" },
+        acceptedAt: 100,
+        updatedAt: 100,
+      },
+      run: null,
+    };
+    const envelope = {
+      protocolVersion: 1,
+      type: "control_response",
+      id: "owner:2",
+      ownerId: "owner",
+      command: "workflow.confirm",
+      runId: null,
+      stateRevision: null,
+      projectRevision: 1,
+      eventId: null,
+      timestamp: 100,
+      success: true,
+    };
+    const decode = Schema.decodeUnknownSync(WeavraControlResponse, { onExcessProperty: "error" });
+    const accepted = {
+      ...envelope,
+      data: {
+        kind: "accepted",
+        requestId: "owner:2",
+        command: "workflow.confirm",
+        runId: null,
+        taskReceipt: receipt,
+      },
+    };
+    expect(decode(accepted)).toEqual(accepted);
+    const read = {
+      ...envelope,
+      command: "workflow.receipt",
+      data: { kind: "task-receipt", receipt },
+    };
+    expect(decode(read)).toEqual(read);
+    const unknown = {
+      ...read,
+      data: { kind: "task-receipt", receipt: { status: "UNKNOWN", executionId } },
+    };
+    expect(decode(unknown)).toEqual(unknown);
+  });
+});
+
+describe("capability-gated evidence detail wire contracts", () => {
+  const evidenceBinding = {
+    taskId: "11111111-1111-4111-8111-111111111111",
+    environmentId: "environment",
+    projectId: "project",
+    threadId: "thread",
+    executionId: "22222222-2222-4222-8222-222222222222",
+    runId: "run",
+    revision: 7,
+    diffDigest: null,
+  };
+  const evidenceRequest = {
+    protocolVersion: 1,
+    id: "read:2",
+    type: "workflow.evidence",
+    binding: evidenceBinding,
+    cursor: { category: "checks", index: 0 },
+  } as const;
+  const decodeEvidenceRequest = Schema.decodeUnknownSync(WeavraEvidenceDetailsRequest);
+  const decodeEvidenceInput = Schema.decodeUnknownSync(WeavraEvidenceDetailsInput);
+  const responseBase = {
+    protocolVersion: 1,
+    type: "control_response",
+    id: evidenceRequest.id,
+    command: evidenceRequest.type,
+    ownerId: "owner",
+    runId: evidenceBinding.runId,
+    stateRevision: evidenceBinding.revision,
+    projectRevision: 9,
+    eventId: null,
+    timestamp: 100,
+    success: true,
+  } as const;
+  const snapshot = {
+    executionId: evidenceBinding.executionId,
+    runId: evidenceBinding.runId,
+    revision: evidenceBinding.revision,
+    diffDigest: "a".repeat(64),
+  };
+  const completeness = {
+    criteria: { availability: "available", total: 1 },
+    checks: { availability: "available", total: 1, required: 1 },
+    changedFiles: { availability: "available", total: 1 },
+    trustSources: { availability: "available", total: 64, checksWithoutTrust: 0 },
+    review: { availability: "available" },
+  } as const;
+  const pageBase = {
+    snapshot,
+    completeness,
+    source: "archive",
+    outcome: { status: "COMPLETED", terminal: true },
+    ownership: { writerPresent: false, cleanup: "UNKNOWN" },
+    codeRevision: 1,
+    changedLines: 4,
+    symptomVerification: {
+      criterionId: "AC-001",
+      checkId: "symptom",
+      registrationDigest: `sha256:${"b".repeat(64)}`,
+    },
+    review: {
+      result: "PASS",
+      independent: true,
+      revision: 1,
+      diffDigest: "a".repeat(64),
+      criteriaCount: 1,
+    },
+    cursor: evidenceRequest.cursor,
+  } as const;
+  const check = {
+    category: "checks",
+    index: 0,
+    id: "symptom",
+    kind: "test",
+    revision: 1,
+    attempt: 2,
+    step: "test",
+    diffDigest: "b".repeat(64),
+    status: "PASS",
+    required: true,
+    exitCode: 0,
+    evidenceRefs: ["check:test:1:symptom"],
+    trust: {
+      mode: "strict",
+      status: "VERIFIED",
+      registrationDigest: `sha256:${"b".repeat(64)}`,
+      executableDigest: `sha256:${"c".repeat(64)}`,
+      sourceCount: 64,
+    },
+    sandbox: null,
+  } as const;
+  const decodeResponse = Schema.decodeUnknownSync(WeavraControlResponse, {
+    onExcessProperty: "error",
+  });
+
+  it("accepts a closed read-only request and binds the outer project identity", () => {
+    expect(decodeEvidenceRequest(evidenceRequest)).toEqual(evidenceRequest);
+    expect(decodeWire(evidenceRequest)).toEqual(evidenceRequest);
+    expect(decodeEvidenceInput({ projectId: "project", request: evidenceRequest }).request).toEqual(
+      evidenceRequest,
+    );
+    expect(() => decodeEvidenceInput({ projectId: "foreign", request: evidenceRequest })).toThrow();
+    expect(() =>
+      decodeEvidenceRequest({
+        ...evidenceRequest,
+        cursor: { category: "checks", index: 1 },
+      }),
+    ).toThrow();
+    expect(() => decodeEvidenceRequest({ ...evidenceRequest, complete: true })).toThrow();
+  });
+
+  it("decodes bounded pages without carrying trust sources inside a check row", () => {
+    const response = {
+      ...responseBase,
+      data: {
+        kind: "evidence-details",
+        ...pageBase,
+        records: [check],
+        nextCursor: null,
+      },
+    };
+    expect(decodeResponse(response)).toEqual(response);
+    expect(JSON.stringify(response.data.records)).not.toContain("source-00.mjs");
+    expect(() =>
+      decodeResponse({
+        ...response,
+        data: { ...response.data, records: Array.from({ length: 51 }, () => ({ ...check })) },
+      }),
+    ).toThrow();
+  });
+
+  it("rejects nonprogressing, miscategorized and contradictory evidence pages", () => {
+    const data = { kind: "evidence-details", ...pageBase, records: [check], nextCursor: null };
+    for (const patch of [
+      { records: [], nextCursor: { category: "checks", index: 0 } },
+      { nextCursor: { category: "checks", index: 0 } },
+      { nextCursor: { category: "checks", index: 1 } },
+      { nextCursor: { category: "criteria", index: 1 } },
+      { records: [{ category: "changed-files", index: 0, path: "src/value.ts" }] },
+      { records: [{ ...check, index: 1 }] },
+      {
+        completeness: {
+          ...completeness,
+          checks: { availability: "available", total: 2, required: 1 },
+        },
+      },
+      {
+        completeness: {
+          ...completeness,
+          checks: { availability: "unavailable", total: null, required: null },
+        },
+      },
+    ]) {
+      expect(() => decodeResponse({ ...responseBase, data: { ...data, ...patch } })).toThrow();
+    }
+  });
+
+  it("decodes separately paged trust sources and explicit unavailable details", () => {
+    const trustPage = {
+      ...responseBase,
+      data: {
+        kind: "evidence-details",
+        ...pageBase,
+        cursor: { category: "trust-sources", index: 0 },
+        records: Array.from({ length: 50 }, (_, index) => ({
+          category: "trust-sources",
+          index,
+          checkIndex: 0,
+          checkId: "symptom",
+          sourceIndex: index,
+          path: `checks/source-${index}.mjs`,
+          digest: `sha256:${"d".repeat(64)}`,
+        })),
+        nextCursor: { category: "trust-sources", index: 50 },
+      },
+    };
+    expect(decodeResponse(trustPage)).toEqual(trustPage);
+    const unavailable = {
+      ...responseBase,
+      data: {
+        kind: "evidence-detail-unavailable",
+        ...pageBase,
+        cursor: { category: "criteria", index: 0 },
+        reason: "RECORD_TOO_LARGE",
+        recordIndex: 0,
+      },
+    };
+    expect(decodeResponse(unavailable)).toEqual(unavailable);
+  });
+
+  it("rejects an evidence response whose complete multibyte envelope exceeds the budget", () => {
+    const oversized = {
+      ...responseBase,
+      data: {
+        kind: "evidence-details",
+        ...pageBase,
+        cursor: { category: "changed-files", index: 0 },
+        records: [
+          {
+            category: "changed-files",
+            index: 0,
+            path: "한".repeat(30_000),
+          },
+        ],
+        nextCursor: null,
+      },
+    };
+    expect(new TextEncoder().encode(JSON.stringify(oversized)).byteLength + 1).toBeGreaterThan(
+      65_536,
+    );
+    expect(() => decodeResponse(oversized)).toThrow();
+  });
+});
 
 const browserDigest = `sha256:${"a".repeat(64)}`;
 const registration = {
@@ -967,6 +1457,58 @@ describe("COMPLEX contract v1 wire shapes", () => {
     expect(() => decodePreview({ ...complexPreview, complexPlan: null })).toThrow();
     expect(() => decodePreview({ ...complexPreview, workflow: "PARALLEL" })).toThrow();
     expect(decodePreview({ ...withoutPlan, workflow: "STANDARD" }).workflow).toBe("STANDARD");
+  });
+  it("decodes exact bounded model routes while keeping legacy previews explicitly unavailable", () => {
+    const standardRoutes = [
+      {
+        role: "Developer",
+        intent: "standard",
+        source: "config",
+        profile: "creative",
+        provider: "provider-a",
+        model: "implementation-model",
+      },
+      {
+        role: "Reviewer",
+        intent: "review",
+        source: "default",
+        profile: "reasoning",
+        provider: "provider-b",
+        model: "review-model",
+      },
+    ] as const;
+    expect(decodePreview({ ...complexPreview, modelRoutes: standardRoutes }).modelRoutes).toEqual(
+      standardRoutes,
+    );
+    expect(decodePreview(complexPreview).modelRoutes).toBeUndefined();
+    const { complexPlan: _plan, ...withoutPlan } = complexPreview;
+    const executorRoute = {
+      role: "Executor",
+      intent: "simple",
+      source: "config",
+      profile: "fast",
+      provider: "provider-a",
+      model: "quick-model",
+    } as const;
+    expect(
+      decodePreview({ ...withoutPlan, workflow: "QUICK", modelRoutes: [executorRoute] })
+        .modelRoutes,
+    ).toEqual([executorRoute]);
+    for (const modelRoutes of [
+      [],
+      [standardRoutes[0]],
+      [standardRoutes[1], standardRoutes[0]],
+      [executorRoute, executorRoute, executorRoute],
+      [{ ...standardRoutes[0], role: "Planner" }],
+      [{ ...standardRoutes[0], intent: "simple" }, standardRoutes[1]],
+      [{ ...standardRoutes[0], source: "fallback" }, standardRoutes[1]],
+      [{ ...standardRoutes[0], profile: "unknown" }, standardRoutes[1]],
+      [{ ...standardRoutes[0], provider: " " }, standardRoutes[1]],
+      [{ ...standardRoutes[0], model: "" }, standardRoutes[1]],
+      [{ ...standardRoutes[0], provider: "x".repeat(65_537) }, standardRoutes[1]],
+    ]) {
+      expect(() => decodePreview({ ...complexPreview, modelRoutes })).toThrow();
+    }
   });
   it("enforces plan identity, order, edges, sorting, exclusivity and limits", () => {
     expect(decodePlan(complexPlan)).toEqual(complexPlan);

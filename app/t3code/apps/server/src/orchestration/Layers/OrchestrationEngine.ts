@@ -5,7 +5,8 @@ import type {
   ProjectId,
   ThreadId,
 } from "@t3tools/contracts";
-import { OrchestrationCommand } from "@t3tools/contracts";
+import { OrchestrationCommand, WeavraTaskSetCommand } from "@t3tools/contracts";
+import { stableStringify } from "@t3tools/shared/relaySigning";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Crypto from "effect/Crypto";
@@ -53,6 +54,8 @@ const isOrchestrationCommandPreviouslyRejectedError = Schema.is(
   OrchestrationCommandPreviouslyRejectedError,
 );
 const isOrchestrationCommandIdConflictError = Schema.is(OrchestrationCommandIdConflictError);
+const decodeTaskCommand = Schema.decodeUnknownEffect(WeavraTaskSetCommand);
+const taskCommandEncoder = new TextEncoder();
 
 interface CommandEnvelope {
   command: OrchestrationCommand;
@@ -111,6 +114,7 @@ const makeOrchestrationEngine = Effect.gen(function* () {
   const processEnvelope = (envelope: CommandEnvelope): Effect.Effect<void> => {
     const dispatchStartSequence = commandReadModel.snapshotSequence;
     let processingStartedAtMs = 0;
+    let taskFingerprint: string | undefined;
     const aggregateRef = commandToAggregateRef(envelope.command);
     const baseMetricAttributes = {
       commandType: envelope.command.type,
@@ -141,6 +145,21 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           "orchestration.aggregate_id": aggregateRef.aggregateId,
         });
 
+        if (envelope.command.type === "thread.weavra-task.set") {
+          const bytes = yield* crypto
+            .digest("SHA-256", taskCommandEncoder.encode(stableStringify(envelope.command)))
+            .pipe(
+              Effect.mapError(
+                (cause) =>
+                  new OrchestrationCommandInvariantError({
+                    commandType: envelope.command.type,
+                    detail: "Task command fingerprint unavailable.",
+                    cause,
+                  }),
+              ),
+            );
+          taskFingerprint = `sha256:${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+        }
         const existingReceipt = yield* commandReceiptRepository.getByCommandId({
           commandId: envelope.command.commandId,
         });
@@ -150,7 +169,8 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           // work that never happened.
           if (
             existingReceipt.value.aggregateKind !== aggregateRef.aggregateKind ||
-            existingReceipt.value.aggregateId !== aggregateRef.aggregateId
+            existingReceipt.value.aggregateId !== aggregateRef.aggregateId ||
+            existingReceipt.value.taskFingerprint !== taskFingerprint
           ) {
             return yield* new OrchestrationCommandIdConflictError({
               commandId: envelope.command.commandId,
@@ -301,6 +321,7 @@ const makeOrchestrationEngine = Effect.gen(function* () {
                 resultSequence: lastSavedEvent.sequence,
                 status: "accepted",
                 error: null,
+                ...(taskFingerprint === undefined ? {} : { taskFingerprint }),
               });
 
               return {
@@ -399,6 +420,7 @@ const makeOrchestrationEngine = Effect.gen(function* () {
                   resultSequence: commandReadModel.snapshotSequence,
                   status: "rejected",
                   error: error.message,
+                  ...(taskFingerprint === undefined ? {} : { taskFingerprint }),
                 })
                 .pipe(Effect.catch(() => Effect.void));
             }
@@ -437,9 +459,22 @@ const makeOrchestrationEngine = Effect.gen(function* () {
 
   const dispatch: OrchestrationEngineShape["dispatch"] = (command, options) =>
     Effect.gen(function* () {
+      const validated =
+        command.type === "thread.weavra-task.set"
+          ? yield* decodeTaskCommand(command).pipe(
+              Effect.mapError(
+                (cause) =>
+                  new OrchestrationCommandInvariantError({
+                    commandType: command.type,
+                    detail: "Invalid task command.",
+                    cause,
+                  }),
+              ),
+            )
+          : command;
       const result = yield* Deferred.make<{ sequence: number }, OrchestrationDispatchError>();
       yield* Queue.offer(commandQueue, {
-        command,
+        command: validated,
         origin: options?.origin,
         result,
         startedAtMs: yield* Clock.currentTimeMillis,

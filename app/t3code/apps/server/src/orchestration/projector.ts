@@ -332,6 +332,35 @@ export function projectEvent(
   };
 
   switch (event.type) {
+    case "thread.weavra-task-set": {
+      const task = event.payload.task;
+      const tasks = nextBase.weavraTasks ?? [];
+      const ownership = {
+        environmentId: task.environmentId,
+        canonicalCwd: task.checkout.canonicalCwd,
+        generation: task.ownership.generation,
+        taskId: task.ownership.state === "released" ? null : task.id,
+        state: task.ownership.state,
+        pendingExecutionId:
+          task.ownership.state === "released"
+            ? null
+            : (task.execution?.binding.executionId ?? null),
+      };
+      return Effect.succeed({
+        ...nextBase,
+        weavraTasks: tasks.some((entry) => entry.id === task.id)
+          ? tasks.map((entry) => (entry.id === task.id ? task : entry))
+          : [...tasks, task],
+        weavraOwnership: [
+          ...(nextBase.weavraOwnership ?? []).filter(
+            (entry) =>
+              entry.environmentId !== ownership.environmentId ||
+              entry.canonicalCwd !== ownership.canonicalCwd,
+          ),
+          ownership,
+        ],
+      });
+    }
     case "project.created":
       return decodeForEvent(ProjectCreatedPayload, event.payload, event.type, "payload").pipe(
         Effect.map((payload) => {

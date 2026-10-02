@@ -35,6 +35,7 @@ import * as Settings from "./serverSettings.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as GitVcsDriver from "./vcs/GitVcsDriver.ts";
 import { withWorkspaceLease } from "./workspace/workspaceLease.ts";
+import { WorkspaceExecutionOwnership } from "./workspace/WorkspaceExecutionOwnership.ts";
 
 export class StorageCleanup extends Context.Service<
   StorageCleanup,
@@ -117,6 +118,7 @@ export const make = Effect.gen(function* () {
   const terminals = yield* TerminalManager.TerminalManager;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  const ownership = yield* WorkspaceExecutionOwnership;
   const liveTerminals = new Map<string, Map<string, TerminalSummary>>();
   const noteTerminal = (terminal: TerminalSummary) => {
     const threadTerminals =
@@ -358,7 +360,16 @@ export const make = Effect.gen(function* () {
         // from that branch when the thread is resumed.
         yield* Effect.logInfo("storage cleanup removed worktree", { threadId: thread.id });
       }).pipe(
-        (effect) => withWorkspaceLease(worktreePath, effect),
+        (effect) =>
+          ownership.withOperation(
+            {
+              cwd: project.workspaceRoot,
+              kind: "git",
+              sharedGitMetadata: true,
+              additionalPaths: [worktreePath],
+            },
+            withWorkspaceLease(worktreePath, effect),
+          ),
         Effect.catch((error) =>
           Effect.logDebug("storage cleanup skipped worktree", { threadId: thread.id, error }),
         ),

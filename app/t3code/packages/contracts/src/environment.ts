@@ -177,6 +177,11 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   desktopAppUpdate: Schema.optionalKey(Schema.Boolean),
   weavraReadOnly: Schema.optionalKey(Schema.Boolean),
   weavraControl: Schema.optionalKey(Schema.Boolean),
+  /** Server exposes authenticated thread-bound task coordination RPCs. */
+  weavraTasks: Schema.optionalKey(Schema.Boolean),
+  weavraTaskRecovery: Schema.optionalKey(Schema.Literal(1)),
+  /** Controlled task analysis is available only for the existing Codex instance. */
+  weavraTaskAnalysis: Schema.optionalKey(Schema.Literal("codex-read-only-v1")),
   weavraFitness: Schema.optionalKey(Schema.Boolean),
 });
 export type ExecutionEnvironmentCapabilities = typeof ExecutionEnvironmentCapabilities.Type;

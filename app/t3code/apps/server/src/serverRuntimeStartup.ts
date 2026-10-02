@@ -44,6 +44,7 @@ import * as ServerSettings from "./serverSettings.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
+import * as WeavraTaskCoordinator from "./weavra/TaskCoordinator.ts";
 import * as ProviderService from "./provider/Services/ProviderService.ts";
 import * as ProviderSessionDirectory from "./provider/Services/ProviderSessionDirectory.ts";
 import * as ProviderSessionReaper from "./provider/Services/ProviderSessionReaper.ts";
@@ -912,6 +913,7 @@ export const make = (options?: StartupOptions) =>
     const providerSessionDirectory = yield* ProviderSessionDirectory.ProviderSessionDirectory;
     const crypto = yield* Crypto.Crypto;
     const launcher = yield* ServiceLauncherClient.ServiceLauncherClient;
+    const taskCoordinator = yield* WeavraTaskCoordinator.TaskCoordinator;
 
     const commandGate = yield* makeCommandGate;
     const httpListening = yield* Deferred.make<void>();
@@ -962,6 +964,26 @@ export const make = (options?: StartupOptions) =>
       );
 
       yield* Effect.logDebug("startup phase: parking orchestration roots at activation");
+      yield* runStartupPhase(
+        "weavra-tasks.reconcile",
+        taskCoordinator.reconcileAll.pipe(
+          Effect.flatMap((results) =>
+            Effect.forEach(
+              results,
+              ({ taskId, result }) =>
+                result._tag === "Failure"
+                  ? Effect.logWarning("controlled task startup reconciliation failed", {
+                      taskId,
+                      cause: result.failure,
+                    })
+                  : Effect.logDebug("controlled task startup reconciliation completed", {
+                      taskId,
+                    }),
+              { discard: true },
+            ),
+          ),
+        ),
+      );
       yield* runStartupPhase(
         "reactors.start",
         Effect.gen(function* () {

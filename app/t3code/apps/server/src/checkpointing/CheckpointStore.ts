@@ -17,10 +17,16 @@ import { VcsUnsupportedOperationError, type CheckpointRef } from "@t3tools/contr
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 
 import type { CheckpointStoreError } from "./Errors.ts";
 import type { VcsCheckpointOps } from "../vcs/VcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
+import {
+  WorkspaceExecutionOwnership,
+  WorkspaceOwnershipError,
+} from "../workspace/WorkspaceExecutionOwnership.ts";
+const isOwnershipError = Schema.is(WorkspaceOwnershipError);
 
 export interface CaptureCheckpointInput {
   readonly cwd: string;
@@ -101,6 +107,19 @@ export class CheckpointStore extends Context.Service<
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
   const vcsRegistry = yield* VcsDriverRegistry.VcsDriverRegistry;
+  const ownership = yield* WorkspaceExecutionOwnership;
+  const mutate = <A, E>(cwd: string, effect: Effect.Effect<A, E>, sharedGitMetadata = false) =>
+    ownership.withOperation({ cwd, kind: "checkpoint", sharedGitMetadata }, effect).pipe(
+      Effect.mapError((cause) =>
+        isOwnershipError(cause)
+          ? new VcsUnsupportedOperationError({
+              operation: "CheckpointStore.ownership",
+              kind: "git",
+              detail: cause.message,
+            })
+          : cause,
+      ),
+    );
 
   const resolveCheckpoints = Effect.fn("CheckpointStore.resolveCheckpoints")(function* (
     operation: string,
@@ -162,11 +181,11 @@ export const make = Effect.gen(function* () {
 
   return CheckpointStore.of({
     isGitRepository,
-    captureCheckpoint,
+    captureCheckpoint: (input) => mutate(input.cwd, captureCheckpoint(input), true),
     hasCheckpointRef,
-    restoreCheckpoint,
+    restoreCheckpoint: (input) => mutate(input.cwd, restoreCheckpoint(input)),
     diffCheckpoints,
-    deleteCheckpointRefs,
+    deleteCheckpointRefs: (input) => mutate(input.cwd, deleteCheckpointRefs(input), true),
   });
 });
 

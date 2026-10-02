@@ -160,6 +160,7 @@ import { useProject, useThread } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
 import {
   CHAT_TIMELINE_ANCHOR_OFFSET,
+  getTimelineContentFooterHeight,
   readTimelinePosition,
   rememberTimelinePosition,
   timelineContentOverflowsViewport,
@@ -428,6 +429,7 @@ interface MessagesTimelineProps {
    * projection and list extraData — do not remount on this value.
    */
   displayThreadKey?: string;
+  controlledTaskCard?: ReactNode;
   onOpenTurnDiff: (turnId: TurnId, filePath?: string) => void;
   supportsConversationRollback: boolean;
   onRevertToTurnCount: (targetTurnCount: number, messageId: MessageId) => void;
@@ -497,6 +499,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   turnDiffSummaries,
   routeThreadKey,
   displayThreadKey,
+  controlledTaskCard,
   onOpenTurnDiff,
   supportsConversationRollback,
   onRevertToTurnCount,
@@ -978,17 +981,30 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     return config ? { ...config, onReady: handleAnchorReady } : undefined;
   }, [anchorMessageId, handleAnchorReady, rows]);
   const timelineListFooter = useMemo(
-    () => <TimelineListFooter composerInset={anchoredEndSpace ? 0 : contentInsetEndAdjustment} />,
-    [anchoredEndSpace, contentInsetEndAdjustment],
+    () => (
+      <>
+        {controlledTaskCard ? (
+          <div data-timeline-content-footer className="mx-auto w-full min-w-0 max-w-3xl">
+            {controlledTaskCard}
+          </div>
+        ) : null}
+        <TimelineListFooter composerInset={anchoredEndSpace ? 0 : contentInsetEndAdjustment} />
+      </>
+    ),
+    [anchoredEndSpace, contentInsetEndAdjustment, controlledTaskCard],
   );
 
+  const hasContentFooter = Boolean(controlledTaskCard);
   const measureContentOverflow = useCallback(
     () =>
       timelineContentOverflowsViewport(listRef.current?.getState?.(), {
         composerInset: contentInsetEndAdjustment,
         anchorOffset: CHAT_TIMELINE_ANCHOR_OFFSET,
+        contentFooterHeight: hasContentFooter
+          ? getTimelineContentFooterHeight(listRef.current?.getScrollableNode())
+          : 0,
       }),
-    [contentInsetEndAdjustment, listRef],
+    [contentInsetEndAdjustment, hasContentFooter, listRef],
   );
   // LegendList lays rows out from layout effects, so a read on the next frame
   // sees the settled positions. One frame is shared across bursts of size
@@ -1248,7 +1264,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     [],
   );
 
-  if (rows.length === 0 && !isWorking) {
+  if (rows.length === 0 && !isWorking && !controlledTaskCard) {
     if (hideEmptyPlaceholder) {
       // Occupy the pane with the theme surface so a thread switch cannot
       // punch a hole through to the window chrome (white in light mode).

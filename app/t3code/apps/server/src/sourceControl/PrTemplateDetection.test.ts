@@ -10,6 +10,7 @@ import { ServerConfig } from "../config.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import { detectPrTemplate } from "./PrTemplateDetection.ts";
+import * as OwnershipTest from "../workspace/WorkspaceExecutionOwnershipTest.ts";
 import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
 
 const SINGLE_TEMPLATE_PATHS = [
@@ -28,6 +29,7 @@ const TEMPLATE_DIRECTORIES = [
 ] as const;
 
 const PrTemplateDetectionTestLayer = GitVcsDriver.layer.pipe(
+  Layer.provide(OwnershipTest.layer),
   Layer.provide(
     ServerConfig.layerTest(process.cwd(), {
       prefix: "t3-pr-template-test-",

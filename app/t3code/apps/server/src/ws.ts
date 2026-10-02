@@ -76,6 +76,7 @@ import {
   type PullRequestRef,
   WS_METHODS,
   WsRpcGroup,
+  WeavraTaskRpcError,
   WORKTREE_SETUP_ACTIVITY_KIND,
   worktreeSetupActivityId,
   type WorktreeSetupSnapshot,
@@ -156,6 +157,7 @@ import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 import * as UsageService from "./usage/UsageService.ts";
 import * as WeavraRuntimeObserver from "./weavra/RuntimeObserver.ts";
 import * as WeavraRuntimeController from "./weavra/RuntimeController.ts";
+import * as WeavraTaskCoordinator from "./weavra/TaskCoordinator.ts";
 import * as TraceDiagnostics from "./diagnostics/TraceDiagnostics.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import { listLinkedPullRequestThreads } from "./pullRequest/linkedThreads.ts";
@@ -178,6 +180,7 @@ import * as SessionStore from "./auth/SessionStore.ts";
 import { failEnvironmentAuthInvalid, failEnvironmentInternal } from "./auth/http.ts";
 import * as RelayClient from "@t3tools/shared/relayClient";
 const isOrchestrationDispatchCommandError = Schema.is(OrchestrationDispatchCommandError);
+const isTaskCoordinatorError = Schema.is(WeavraTaskCoordinator.TaskCoordinatorError);
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
 const CONFIG_DISCOVERY_TIMEOUT = Duration.seconds(5);
@@ -304,6 +307,8 @@ function projectFileFailureContext(
   switch (error._tag) {
     case "WorkspacePathOutsideRootError":
       return { failure: "workspace_path_outside_root" };
+    case "WorkspaceOwnershipError":
+      return { failure: "operation_failed" };
     case "WorkspaceFileSystemOperationError":
       return {
         failure: "operation_failed",
@@ -667,6 +672,7 @@ const makeWsRpcLayer = (
       const resourceTelemetry = yield* ResourceTelemetry.ResourceTelemetry;
       const runtimeObserver = yield* WeavraRuntimeObserver.RuntimeObserver;
       const runtimeController = yield* WeavraRuntimeController.RuntimeController;
+      const taskCoordinator = yield* WeavraTaskCoordinator.TaskCoordinator;
       const usage = yield* UsageService.UsageService;
       const relayClient = yield* RelayClient.RelayClient;
       const authorizationError = (requiredScope: AuthEnvironmentScope) =>
@@ -737,6 +743,12 @@ const makeWsRpcLayer = (
       const serverEventId = randomUUID.pipe(Effect.map(EventId.make));
       const serverCommandId = (tag: string) =>
         randomUUID.pipe(Effect.map((uuid) => CommandId.make(`server:${tag}:${uuid}`)));
+      const toTaskRpcError = (cause: unknown) =>
+        new WeavraTaskRpcError({
+          code: isTaskCoordinatorError(cause) ? cause.code : "INTERNAL_ERROR",
+        });
+      const taskRpc = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+        effect.pipe(Effect.mapError(toTaskRpcError));
 
       const loadAuthAccessSnapshot = () =>
         Effect.all({
@@ -3713,6 +3725,149 @@ const makeWsRpcLayer = (
             WS_METHODS.weavraControlObserve,
             runtimeController.observe(input.projectId),
             { "rpc.aggregate": "weavra" },
+          ),
+        [WS_METHODS.weavraTaskCreate]: (input) =>
+          observeRpcEffect(WS_METHODS.weavraTaskCreate, taskRpc(taskCoordinator.create(input)), {
+            "rpc.aggregate": "weavra-task",
+          }),
+        [WS_METHODS.weavraTaskAnalyze]: (input) =>
+          observeRpcEffect(WS_METHODS.weavraTaskAnalyze, taskRpc(taskCoordinator.analyze(input)), {
+            "rpc.aggregate": "weavra-task",
+          }),
+        [WS_METHODS.weavraTaskFollowup]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskFollowup,
+            taskRpc(taskCoordinator.followup(input)),
+            {
+              "rpc.aggregate": "weavra-task",
+            },
+          ),
+        [WS_METHODS.weavraTaskRead]: (input) =>
+          observeRpcEffect(WS_METHODS.weavraTaskRead, taskRpc(taskCoordinator.read(input)), {
+            "rpc.aggregate": "weavra-task",
+          }),
+        [WS_METHODS.weavraTaskList]: (input) =>
+          observeRpcEffect(WS_METHODS.weavraTaskList, taskRpc(taskCoordinator.list(input)), {
+            "rpc.aggregate": "weavra-task",
+          }),
+        [WS_METHODS.weavraTaskPrepare]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskPrepare,
+            taskRpc(taskCoordinator.prepare(input.task, input.draft, input.expectedRevision)),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskConfirm]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskConfirm,
+            taskRpc(taskCoordinator.confirm(input.task, input.commandId, input.expectedRevision)),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskReconcile]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskReconcile,
+            taskRpc(taskCoordinator.reconcile(input)),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskRecover]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskRecover,
+            taskRpc(taskCoordinator.recover(input.task, input.expectedRevision)),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskAbort]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskAbort,
+            taskRpc(taskCoordinator.abortUnconfirmed(input.task, input.expectedRevision)),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskReprepare]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskReprepare,
+            taskRpc(
+              taskCoordinator.reprepare(
+                input.task,
+                input.commandId,
+                input.draft,
+                input.expectedRevision,
+              ),
+            ),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskCancel]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskCancel,
+            taskRpc(
+              taskCoordinator.cancel(input.task, {
+                expectedRunId: input.expectedRunId,
+                expectedStateRevision: input.expectedStateRevision,
+              }),
+            ),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskReadApproval]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskReadApproval,
+            taskRpc(taskCoordinator.readApproval(input)),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskResolveApproval]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskResolveApproval,
+            taskRpc(
+              taskCoordinator.resolveApproval(input.task, {
+                expectedRunId: input.expectedRunId,
+                expectedStateRevision: input.expectedStateRevision,
+                approvalId: input.approvalId,
+                decision: input.decision,
+              }),
+            ),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskEvidence]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskEvidence,
+            taskRpc(
+              taskCoordinator.evidence(input.task, {
+                revision: input.revision,
+                diffDigest: input.diffDigest,
+                cursor: input.cursor,
+              }),
+            ),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskObserve]: (input) =>
+          observeRpcStreamEffect(
+            WS_METHODS.weavraTaskObserve,
+            Effect.gen(function* () {
+              const live = yield* orchestrationEngine.subscribeDomainEvents;
+              const task = yield* taskRpc(taskCoordinator.read(input));
+              const isSelectedTaskEvent = (
+                event: OrchestrationEvent,
+              ): event is Extract<
+                OrchestrationEvent,
+                { readonly type: "thread.weavra-task-set" }
+              > =>
+                event.type === "thread.weavra-task-set" &&
+                event.payload.task.environmentId === input.environmentId &&
+                event.payload.task.projectId === input.projectId &&
+                event.payload.task.threadId === input.threadId &&
+                event.payload.task.id === input.taskId;
+              const updates = live.pipe(
+                Stream.filter(isSelectedTaskEvent),
+                Stream.map((event) => ({
+                  kind: "update" as const,
+                  task: event.payload.task,
+                })),
+              );
+              return Stream.concat(
+                Stream.make(
+                  { kind: "snapshot" as const, task },
+                  { kind: "synchronized" as const, task },
+                ),
+                updates,
+              );
+            }),
+            { "rpc.aggregate": "weavra-task" },
           ),
       });
     }),

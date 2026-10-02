@@ -31,6 +31,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as OwnershipTest from "../../workspace/WorkspaceExecutionOwnershipTest.ts";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
@@ -344,6 +345,7 @@ describe("ProviderRuntimeIngestion", () => {
       Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
       Layer.provideMerge(NodeServices.layer),
       Layer.provideMerge(Layer.succeed(Tracer.Tracer, sqlCounter.tracer)),
+      Layer.provide(OwnershipTest.layer),
     );
     const testRuntime = ManagedRuntime.make(layer);
     runtime = testRuntime;

@@ -17,6 +17,7 @@ const decodeResponse = Schema.decodeUnknownEffect(WeavraControlResponse, {
   onExcessProperty: "error",
 });
 const decodeJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
+const encodeJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 const decodeVersion = Schema.decodeUnknownEffect(Schema.Struct({ protocolVersion: Schema.Finite }));
 const isControlError = Schema.is(WeavraControlTransportError);
 const encodeRequest = Schema.encodeEffect(Schema.fromJsonString(WeavraControlRequest), {
@@ -116,6 +117,8 @@ export const openControlTransport = Effect.fn("weavra.openControlTransport")(fun
     Effect.forkScoped,
   );
   const exchange = Effect.fn("weavra.controlExchange")(function* (request: WeavraControlRequest) {
+    if (Buffer.byteLength(`${encodeJson(request)}\n`) > WEAVRA_CONTROL_MAX_REQUEST_BYTES)
+      return yield* new WeavraControlTransportError({ code: "OVERSIZED_PAYLOAD" });
     const encoded = yield* encodeRequest(request).pipe(
       Effect.mapError(() => new WeavraControlTransportError({ code: "INVALID_PAYLOAD" })),
     );
@@ -137,7 +140,14 @@ export const openControlTransport = Effect.fn("weavra.openControlTransport")(fun
         // a matching retry waits on the same receipt rather than writing another mutation.
         return yield* Effect.raceFirst(Deferred.await(result), Deferred.await(failed)).pipe(
           Effect.timeoutOrElse({
-            duration: Duration.seconds(10),
+            // Preparation and confirmation also revalidate the bounded 60-second checkout capture.
+            duration: Duration.seconds(
+              request.type === "workflow.checkout" ||
+                request.type === "workflow.prepare" ||
+                request.type === "workflow.confirm"
+                ? 70
+                : 10,
+            ),
             orElse: () => Effect.fail(new WeavraControlTransportError({ code: "REQUEST_TIMEOUT" })),
           }),
         );

@@ -7,7 +7,15 @@ import { classifyRequest, type RiskOverride, selectWorkflow } from "./classifica
 import { assertComplexPlanBinding, complexClaimsDenial, complexPlanLimits } from "./complex-plan.ts";
 import type { ComplexPlan } from "./complex-types.ts";
 import type { RuntimeConfig } from "./config.ts";
-import type { QuickScope, R3Scope, Run, TaskContract } from "./contracts.ts";
+import {
+	type AnalysisContext,
+	analysisContextDigest,
+	type QuickScope,
+	type R3Scope,
+	type Run,
+	type TaskContract,
+	type TaskRunMetadata,
+} from "./contracts.ts";
 import { taskContractDigest } from "./criterion-evidence.ts";
 import type { RuntimeEventSink } from "./events.ts";
 import {
@@ -20,6 +28,7 @@ import { CompanyKernel } from "./kernel.ts";
 import { LspManager } from "./lsp/manager.ts";
 import { serializedLspPort } from "./lsp/serial.ts";
 import type { LspServerStatus } from "./lsp/types.ts";
+import { WorkerModelUnavailableError } from "./model-routing.ts";
 import { formatRunView, type ObservationState } from "./observations.ts";
 import type { PolicyContext } from "./policy.ts";
 import { FilePolicyPathInspector } from "./policy-paths.ts";
@@ -62,12 +71,18 @@ export interface WorkflowOptions {
 	approval?: ApprovalPort;
 	approvalTimeoutMs?: number;
 	/** Trusted Host freshness fence; guarded starts never recover an interrupted Run. */
-	startGuard?: (store: FileStateStore) => Promise<void>;
+	startGuard?: (store: FileStateStore, taskLifecycleAdvance?: 0 | 1) => Promise<void>;
 	/**
 	 * Host-confirmed frozen COMPLEX plan (V0.7B), required iff the selected workflow is COMPLEX. It is revalidated
 	 * against the live checkout, Policy and registrations before any Run exists; it never grants permission.
 	 */
 	complexPlan?: ComplexPlan;
+	/** Ownership transfers at execute(): this exact store is never released and reacquired before Run creation. */
+	taskAdmission?: {
+		store: FileStateStore;
+		metadata: TaskRunMetadata;
+		analysisContext: AnalysisContext;
+	};
 }
 export interface WorkflowReport {
 	run?: Run;
@@ -104,6 +119,15 @@ export class StandardWorkflow {
 			...(options.recipe ? { recipe: structuredClone(options.recipe) } : {}),
 			...(options.riskOverride ? { riskOverride: structuredClone(options.riskOverride) } : {}),
 			...(options.complexPlan ? { complexPlan: structuredClone(options.complexPlan) } : {}),
+			...(options.taskAdmission
+				? {
+						taskAdmission: {
+							store: options.taskAdmission.store,
+							metadata: structuredClone(options.taskAdmission.metadata),
+							analysisContext: structuredClone(options.taskAdmission.analysisContext),
+						},
+					}
+				: {}),
 		};
 	}
 	get snapshot(): Run | undefined {
@@ -139,11 +163,15 @@ export class StandardWorkflow {
 		const signal = this.options.signal
 			? AbortSignal.any([this.controller.signal, this.options.signal])
 			: this.controller.signal;
-		let store: FileStateStore | undefined;
+		let store: FileStateStore | undefined = this.options.taskAdmission?.store;
+		this.store = store;
 		let verifier: RegisteredVerifier | undefined;
 		let workspace: GitWorkspace | undefined;
 		let executor: AgentExecutor | undefined;
 		let cleanupUncertain = false;
+		let taskLifecycleAdvance: 0 | 1 = 0;
+		let startFailureReason: "INITIALIZATION_FAILED" | "STALE_PREPARATION" | "MODEL_UNAVAILABLE" =
+			"INITIALIZATION_FAILED";
 		try {
 			signal.throwIfAborted();
 			if (process.platform === "win32")
@@ -177,6 +205,21 @@ export class StandardWorkflow {
 					"Execution request needs clarification or conflicts with the READ_ONLY contract; start a new explicit run",
 				);
 			const selection = selectWorkflow(classification, configuredWorkflow);
+			const admission = this.options.taskAdmission;
+			if (
+				admission &&
+				(selection.workflow !== "STANDARD" ||
+					admission.metadata.binding.executionId !== this.options.taskContract.id ||
+					analysisContextDigest(admission.analysisContext) !== admission.metadata.binding.advisoryDigest ||
+					admission.analysisContext.packetVersion !== admission.metadata.binding.packetVersion ||
+					admission.store.projectPath !== admission.metadata.binding.checkout.canonicalCwd ||
+					!admission.store.snapshot.taskAdmissions?.some(
+						(entry) =>
+							entry.outcome.status === "ACCEPTED" &&
+							JSON.stringify(entry.metadata) === JSON.stringify(admission.metadata),
+					))
+			)
+				throw new Error("Workflow does not own the exact accepted task admission");
 			// COMPLEX runs only a Host-confirmed plan and a plan never runs another workflow: no silent downgrade.
 			if ((selection.workflow === "COMPLEX") !== (complexPlan !== undefined))
 				throw new Error(
@@ -211,13 +254,40 @@ export class StandardWorkflow {
 					throw new Error("COMPLEX plan limits differ from the current configuration; prepare a new plan");
 			}
 			const r2RunId = classification.risk === "R2" ? runId : undefined;
-			store = await FileStateStore.open(this.options.cwd, {
+			store ??= await FileStateStore.open(this.options.cwd, {
 				events: this.options.events,
 				...(this.options.startGuard ? { recoverInterrupted: false } : {}),
 			});
 			this.store = store;
-			await this.options.startGuard?.(store);
-			let agents = await this.options.createAgents(store, quickScope, r2RunId, r3Scope, contract);
+			try {
+				await store.assertWritable();
+				if (admission) {
+					const cleanup = store.snapshot.taskAdmissions?.find(
+						(entry) => entry.metadata.binding.executionId === admission.metadata.binding.executionId,
+					)?.cleanup;
+					if (cleanup === "UNCONFIRMED" || cleanup === "CONFIRMED") {
+						cleanupUncertain = true;
+						throw new Error("An entered task admission cannot be executed again");
+					}
+					if (cleanup === "NOT_STARTED") {
+						// Before the first Host startGuard (which itself can run Git), agents, Git workspace or LSP.
+						// Model construction has already disabled command-valued credentials for controlled tasks.
+						await store.markTaskCleanup(admission.metadata, "UNCONFIRMED");
+						taskLifecycleAdvance = 1;
+					}
+				}
+				await this.options.startGuard?.(store, taskLifecycleAdvance);
+			} catch (error) {
+				startFailureReason = "STALE_PREPARATION";
+				throw error;
+			}
+			let agents: Awaited<ReturnType<WorkflowOptions["createAgents"]>>;
+			try {
+				agents = await this.options.createAgents(store, quickScope, r2RunId, r3Scope, contract);
+			} catch (error) {
+				if (error instanceof WorkerModelUnavailableError) startFailureReason = "MODEL_UNAVAILABLE";
+				throw error;
+			}
 			executor = agents.executor;
 			const configuredInstruction = this.options.config.project?.instructions.path;
 			if ((agents.policy.projectInstruction?.path ?? undefined) !== configuredInstruction)
@@ -297,6 +367,7 @@ export class StandardWorkflow {
 					...agents,
 					executor: withTaskContext(agents.executor, {
 						mode: "bounded",
+						...(admission ? { analysisContext: admission.analysisContext } : {}),
 						cwd: contextWorkspace.cwd,
 						policy: agents.policy,
 						paths: await FilePolicyPathInspector.open(contextWorkspace.cwd),
@@ -318,7 +389,21 @@ export class StandardWorkflow {
 				workspace,
 				lsp,
 				complexPlan,
+				admission?.metadata.configDigest,
 			);
+			const symptom = admission?.metadata.binding.symptomVerification;
+			if (
+				symptom &&
+				!verifier.trustRequirements.some(
+					(check) =>
+						check.id === symptom.checkId &&
+						check.required &&
+						check.trustRegistrationDigest === symptom.registrationDigest,
+				)
+			) {
+				startFailureReason = "STALE_PREPARATION";
+				throw new Error("Symptom registration differs from the confirmed preview");
+			}
 			// Opt-in Developer feedback through the same frozen verifier; results never reach the Kernel.
 			// COMPLEX has none: an unaccounted advisory side effect would break the expected-image ledger.
 			const advisoryChecks =
@@ -326,13 +411,20 @@ export class StandardWorkflow {
 			const settledVerifier = verifier;
 			const settledWorkspace = workspace;
 			signal.throwIfAborted();
-			await this.options.startGuard?.(store);
+			try {
+				await store.assertWritable();
+				await this.options.startGuard?.(store, taskLifecycleAdvance);
+			} catch (error) {
+				startFailureReason = "STALE_PREPARATION";
+				throw error;
+			}
 			this.kernel = await CompanyKernel.create(
 				{
 					runId,
 					executionMode: contract.mode,
 					projectInstruction: agents.policy.projectInstruction ?? null,
 					task: this.options.taskContract,
+					...(admission ? { taskBinding: admission.metadata } : {}),
 					// COMPLEX budget and revision limits are the frozen plan limits, derived by the Kernel.
 					...(() => {
 						const budget = complexPlan ? undefined : budgetLimitsFromConfig(this.options.config.budget);
@@ -468,6 +560,33 @@ export class StandardWorkflow {
 				executor?.safeToRelease === false ||
 				verifier?.safeToRelease === false ||
 				workspace?.safeToRelease === false;
+			const pending =
+				this.options.taskAdmission &&
+				store?.snapshot.taskAdmissions?.find(
+					(entry) =>
+						entry.metadata.binding.executionId === this.options.taskAdmission?.metadata.binding.executionId,
+				);
+			// Initial state.json may have committed before its projection failed. Preserve the orphan's recovery proof.
+			cleanupUncertain ||= pending?.outcome.status === "STARTED" && this.snapshot === undefined;
+			if (
+				pending?.outcome.status === "ACCEPTED" &&
+				store &&
+				(pending.cleanup === undefined || pending.cleanup === "NOT_STARTED" || taskLifecycleAdvance === 1)
+			) {
+				try {
+					await store.saveTaskAdmission(
+						{
+							...pending,
+							outcome: { status: "START_FAILED", reasonCode: startFailureReason },
+							updatedAt: Math.max(Date.now(), pending.updatedAt),
+						},
+						store.snapshot.revision,
+					);
+				} catch {
+					// An unrecorded outcome is not a failed admission. Keep the writer for explicit owner recovery.
+					cleanupUncertain = true;
+				}
+			}
 			if (this.snapshot?.status === "COMPLETED" && !cleanupUncertain) {
 				// Completion already captured live evidence after all workers/checks stopped.
 				// Do not start another Git process after committing the terminal outcome.
@@ -483,6 +602,8 @@ export class StandardWorkflow {
 			}
 			if (!cleanupUncertain) {
 				try {
+					if (store && this.options.taskAdmission && pending?.cleanup !== undefined)
+						await store.markTaskCleanup(this.options.taskAdmission.metadata, "CONFIRMED");
 					await store?.close();
 				} catch {
 					this.reportValue.error = "Lock cleanup failed; inspect owner before another run";

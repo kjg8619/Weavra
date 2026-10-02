@@ -72,6 +72,9 @@ export interface CreateModelRuntimeOptions {
 	modelsStorePath?: string;
 	/** Allow create() to refresh model catalogs over the network. Defaults to false. */
 	allowModelNetwork?: boolean;
+	/** Disable shell-valued credentials/configuration in the default store and composed providers for this instance.
+	 * This is not a sandbox for caller-provided credential stores or arbitrary native/extension provider code. */
+	allowCredentialCommands?: boolean;
 	/** Timeout for the create-time network model refresh. */
 	modelRefreshTimeoutMs?: number;
 	/** Optional explicit catalog service; omitted uses bundled/provider-owned catalogs only. */
@@ -138,6 +141,7 @@ export class ModelRuntime implements Models {
 	private readonly compositionErrors = new Map<string, string>();
 	private readonly modelsPath: string | undefined;
 	private readonly modelNetworkEnabled: boolean;
+	private readonly allowCredentialCommands: boolean;
 	private config: ModelConfig;
 	private snapshot: ModelRuntimeSnapshot = {
 		all: [],
@@ -159,11 +163,13 @@ export class ModelRuntime implements Models {
 		modelsStore: ModelsStore,
 		providers: readonly Provider[],
 		modelNetworkEnabled: boolean,
+		allowCredentialCommands: boolean,
 	) {
 		this.credentials = credentials;
 		this.config = config;
 		this.modelsPath = modelsPath;
 		this.modelNetworkEnabled = modelNetworkEnabled;
+		this.allowCredentialCommands = allowCredentialCommands;
 		this.defaultBuiltins = new Map(providers.map((provider) => [provider.id, provider]));
 		for (const [providerId, provider] of this.defaultBuiltins) this.builtins.set(providerId, provider);
 		this.models = createModels({ credentials, modelsStore });
@@ -171,7 +177,10 @@ export class ModelRuntime implements Models {
 	}
 
 	static async create(options: CreateModelRuntimeOptions = {}): Promise<ModelRuntime> {
-		const credentials = new RuntimeCredentials(options.credentials ?? DefaultAuthStorage.create(options.authPath));
+		const credentials = new RuntimeCredentials(
+			options.credentials ??
+				DefaultAuthStorage.create(options.authPath, { allowCredentialCommands: options.allowCredentialCommands }),
+		);
 		const modelsPath =
 			options.modelsPath === null ? undefined : (options.modelsPath ?? join(getAgentDir(), "models.json"));
 		const config = await ModelConfig.load(modelsPath);
@@ -195,6 +204,7 @@ export class ModelRuntime implements Models {
 			modelsStore,
 			providers,
 			process.env.PI_OFFLINE === undefined,
+			options.allowCredentialCommands !== false,
 		);
 		runtime.configureRadiusProviders();
 		runtime.rebuildProviders();
@@ -258,7 +268,9 @@ export class ModelRuntime implements Models {
 			return;
 		}
 		try {
-			this.models.setProvider(composeModelProvider(providerId, base, this.config, extension));
+			this.models.setProvider(
+				composeModelProvider(providerId, base, this.config, extension, this.allowCredentialCommands),
+			);
 			this.compositionErrors.delete(providerId);
 		} catch (error) {
 			this.compositionErrors.set(providerId, error instanceof Error ? error.message : String(error));
@@ -453,6 +465,7 @@ export class ModelRuntime implements Models {
 			model,
 			this.config.getProvider(model.provider),
 			this.extensionProviders.get(model.provider),
+			this.allowCredentialCommands,
 		);
 	}
 
@@ -482,6 +495,7 @@ export class ModelRuntime implements Models {
 			this.config.getProvider(providerOrModel.provider),
 			this.extensionProviders.get(providerOrModel.provider),
 			{ ...(resolution.env ?? {}), ...(overrides.env ?? {}) },
+			this.allowCredentialCommands,
 		);
 		return {
 			...resolution,

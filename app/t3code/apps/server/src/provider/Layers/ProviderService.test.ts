@@ -27,6 +27,7 @@ import {
   ProviderSessionStartInput,
   ThreadId,
   TurnId,
+  WeavraTask,
 } from "@t3tools/contracts";
 import {
   expandAssistantCitationsForProvider,
@@ -42,6 +43,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Queue from "effect/Queue";
 import * as Metric from "effect/Metric";
 import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
@@ -64,7 +66,23 @@ import type { ProviderAdapterShape } from "../Services/ProviderAdapter.ts";
 import * as ProviderAdapterRegistry from "../Services/ProviderAdapterRegistry.ts";
 import * as ProviderService from "../Services/ProviderService.ts";
 import * as ProviderSessionDirectory from "../Services/ProviderSessionDirectory.ts";
-import { makeProviderServiceLive } from "./ProviderService.ts";
+import { makeProviderServiceLive as makeProviderLayer } from "./ProviderService.ts";
+import * as OwnershipTest from "../../workspace/WorkspaceExecutionOwnershipTest.ts";
+import { WorkspaceExecutionOwnership } from "../../workspace/WorkspaceExecutionOwnership.ts";
+
+const decodeControlledTask = Schema.decodeUnknownEffect(WeavraTask);
+
+const makeProviderServiceLive = (options?: Parameters<typeof makeProviderLayer>[0]) =>
+  makeProviderLayer(options).pipe(
+    Layer.provideMerge(
+      Layer.fresh(
+        OwnershipTest.baseLayer.pipe(
+          Layer.provideMerge(SqlitePersistenceMemory),
+          Layer.provide(NodeServices.layer),
+        ),
+      ),
+    ),
+  );
 import * as ProviderEventLoggers from "./ProviderEventLoggers.ts";
 import { ProviderSessionDirectoryLive } from "./ProviderSessionDirectory.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -142,6 +160,7 @@ function makeFakeCodexAdapter(
 ) {
   const sessions = new Map<ThreadId, ProviderSession>();
   const runtimeEventPubSub = Effect.runSync(PubSub.unbounded<ProviderRuntimeEvent>());
+  let sendObserver: Deferred.Deferred<void> | undefined;
 
   const startSession = vi.fn((input: ProviderSessionStartInput) =>
     Effect.sync(() => {
@@ -179,9 +198,14 @@ function makeFakeCodexAdapter(
         );
       }
 
-      return Effect.succeed({
-        threadId: input.threadId,
-        turnId: TurnId.make(`turn-${String(input.threadId)}`),
+      return Effect.gen(function* () {
+        const observer = sendObserver;
+        sendObserver = undefined;
+        if (observer) yield* Deferred.succeed(observer, undefined);
+        return {
+          threadId: input.threadId,
+          turnId: TurnId.make(`turn-${String(input.threadId)}`),
+        };
       });
     },
   );
@@ -318,6 +342,11 @@ function makeFakeCodexAdapter(
 
   return {
     adapter,
+    observeNextSend: Effect.gen(function* () {
+      const observer = yield* Deferred.make<void>();
+      sendObserver = observer;
+      return Deferred.await(observer);
+    }),
     emit,
     updateSession,
     startSession,
@@ -401,6 +430,12 @@ function makeStaticInstanceRegistry(
 
 const advanceTestClock = (ms: number) =>
   TestClock.adjust(`${ms} millis`).pipe(Effect.andThen(Effect.yieldNow));
+const observeRuntimeEvent = (events: Stream.Stream<ProviderRuntimeEvent>, eventId: string) =>
+  events.pipe(
+    Stream.filter((event) => event.eventId === eventId),
+    Stream.runHead,
+    Effect.forkChild({ startImmediately: true }),
+  );
 
 const hasMetricSnapshot = (
   snapshots: ReadonlyArray<Metric.Metric.Snapshot>,
@@ -1061,10 +1096,11 @@ declaredCompaction.layer("ProviderService declared compaction", (it) => {
         Stream.runHead,
         Effect.forkChild({ startImmediately: true }),
       );
+      const sent = yield* customSlashCompaction.observeNextSend;
       const compactFiber = yield* provider
         .compactThread(threadId, modelSelection, requestId)
         .pipe(Effect.forkChild);
-      yield* advanceTestClock(50);
+      yield* sent;
       customSlashCompaction.emit({
         type: "turn.completed",
         eventId: asEventId("custom-slash-completed"),
@@ -1846,13 +1882,18 @@ routing.layer("ProviderServiceLive routing", (it) => {
       const compactedEventFiber = yield* provider.streamEvents.pipe(
         Stream.filter((event) => event.type === "thread.state.changed"),
         Stream.runHead,
-        Effect.forkChild,
+        Effect.forkChild({ startImmediately: true }),
       );
       const requestId = MessageId.make("message-compact-cursor");
+      const sent = yield* routing.cursor.observeNextSend;
       const compactFiber = yield* provider
         .compactThread(threadId, undefined, requestId)
         .pipe(Effect.forkChild);
-      yield* advanceTestClock(50);
+      yield* sent;
+      const stale = yield* observeRuntimeEvent(
+        provider.streamEvents,
+        "evt-cursor-stale-turn-completed",
+      );
       routing.cursor.emit({
         type: "turn.completed",
         eventId: asEventId("evt-cursor-stale-turn-completed"),
@@ -1862,7 +1903,7 @@ routing.layer("ProviderServiceLive routing", (it) => {
         turnId: asTurnId("turn-before-compaction"),
         payload: { state: "completed" },
       });
-      yield* Effect.yieldNow;
+      yield* Fiber.join(stale);
       assert.equal(compactFiber.pollUnsafe(), undefined);
       routing.cursor.emit({
         type: "turn.completed",
@@ -1882,6 +1923,7 @@ routing.layer("ProviderServiceLive routing", (it) => {
       }
 
       const observedEvents = yield* Ref.make<Array<ProviderRuntimeEvent>>([]);
+      const observedCompacted = yield* Deferred.make<void>();
       const observedEventsFiber = yield* provider.streamEvents.pipe(
         Stream.filter(
           (event) =>
@@ -1889,14 +1931,19 @@ routing.layer("ProviderServiceLive routing", (it) => {
             event.type === "thread.state.changed" &&
             event.payload.state === "compacted",
         ),
-        Stream.runForEach((event) => Ref.update(observedEvents, (events) => [...events, event])),
-        Effect.forkChild,
+        Stream.runForEach((event) =>
+          Ref.update(observedEvents, (events) => [...events, event]).pipe(
+            Effect.andThen(Deferred.succeed(observedCompacted, undefined)),
+          ),
+        ),
+        Effect.forkChild({ startImmediately: true }),
       );
       const observedRequestId = MessageId.make("message-observed-compact-cursor");
+      const observedSent = yield* routing.cursor.observeNextSend;
       const observedCompactFiber = yield* provider
         .compactThread(threadId, undefined, observedRequestId)
         .pipe(Effect.forkChild);
-      yield* advanceTestClock(50);
+      yield* observedSent;
       routing.cursor.emit({
         type: "thread.state.changed",
         eventId: asEventId("evt-cursor-provider-compacted"),
@@ -1916,7 +1963,7 @@ routing.layer("ProviderServiceLive routing", (it) => {
         payload: { state: "completed" },
       });
       yield* Fiber.join(observedCompactFiber);
-      yield* Effect.yieldNow;
+      yield* Deferred.await(observedCompacted);
       const observed = yield* Ref.get(observedEvents);
       assert.equal(observed.length, 1);
       assert.equal(observed[0]?.requestId, String(observedRequestId));
@@ -1926,7 +1973,7 @@ routing.layer("ProviderServiceLive routing", (it) => {
       const failedStartEventFiber = yield* provider.streamEvents.pipe(
         Stream.filter((event) => event.eventId === failedStartEventId),
         Stream.runHead,
-        Effect.forkChild,
+        Effect.forkChild({ startImmediately: true }),
       );
       routing.cursor.sendTurn.mockImplementationOnce((input) =>
         Effect.gen(function* () {
@@ -1939,7 +1986,6 @@ routing.layer("ProviderServiceLive routing", (it) => {
             turnId: asTurnId("turn-cursor-failed-compact-start"),
             payload: { state: "failed" },
           });
-          yield* Effect.yieldNow;
           return yield* new ProviderAdapterRequestError({
             provider: String(CURSOR_DRIVER),
             method: "turn/start",
@@ -1965,16 +2011,20 @@ routing.layer("ProviderServiceLive routing", (it) => {
         runtimeMode: "full-access",
       });
       routing.codex.compactThread.mockClear();
-      routing.codex.compactThread.mockImplementationOnce(() => Effect.never);
+      const enteredNative = yield* Deferred.make<void>();
+      routing.codex.compactThread.mockImplementationOnce(() =>
+        Deferred.succeed(enteredNative, undefined).pipe(Effect.andThen(Effect.never)),
+      );
 
       const resultFiber = yield* provider
         .compactThread(threadId)
         .pipe(Effect.result, Effect.forkChild);
-      yield* advanceTestClock(50);
+      yield* Deferred.await(enteredNative);
       const concurrent = yield* provider.compactThread(threadId).pipe(Effect.result);
       assert.equal(concurrent._tag, "Failure");
       assert.equal(routing.codex.compactThread.mock.calls.length, 1);
 
+      const stale = yield* observeRuntimeEvent(provider.streamEvents, "evt-stale-provider-compact");
       routing.cursor.emit({
         type: "thread.state.changed",
         eventId: asEventId("evt-stale-provider-compact"),
@@ -1983,7 +2033,7 @@ routing.layer("ProviderServiceLive routing", (it) => {
         threadId,
         payload: { state: "compacted" },
       });
-      yield* Effect.yieldNow;
+      yield* Fiber.join(stale);
       assert.equal(resultFiber.pollUnsafe(), undefined);
 
       yield* advanceTestClock(600_001);
@@ -1997,6 +2047,7 @@ routing.layer("ProviderServiceLive routing", (it) => {
       assert.equal(blockedRetry._tag, "Failure");
       assert.equal(routing.codex.compactThread.mock.calls.length, 1);
 
+      const late = yield* observeRuntimeEvent(provider.streamEvents, "evt-native-compact-late");
       routing.codex.emit({
         type: "thread.state.changed",
         eventId: asEventId("evt-native-compact-late"),
@@ -2005,15 +2056,18 @@ routing.layer("ProviderServiceLive routing", (it) => {
         threadId,
         payload: { state: "compacted" },
       });
-      yield* Effect.yieldNow;
+      yield* Fiber.join(late);
       yield* provider.compactThread(threadId);
       assert.equal(routing.codex.compactThread.mock.calls.length, 2);
 
-      routing.codex.compactThread.mockImplementationOnce(() => Effect.void);
+      const enteredStopping = yield* Deferred.make<void>();
+      routing.codex.compactThread.mockImplementationOnce(() =>
+        Deferred.succeed(enteredStopping, undefined).pipe(Effect.asVoid),
+      );
       const stoppedResultFiber = yield* provider
         .compactThread(threadId)
         .pipe(Effect.result, Effect.forkChild);
-      yield* advanceTestClock(50);
+      yield* Deferred.await(enteredStopping);
       yield* provider.stopSession({ threadId });
       const stoppedResult = yield* Fiber.join(stoppedResultFiber);
       assert.equal(stoppedResult._tag, "Failure");
@@ -2041,21 +2095,26 @@ routing.layer("ProviderServiceLive routing", (it) => {
         runtimeMode: "full-access",
       });
 
+      const sent = yield* routing.cursor.observeNextSend;
       const resultFiber = yield* provider
         .compactThread(threadId)
         .pipe(Effect.result, Effect.forkChild);
+      yield* sent;
       yield* advanceTestClock(600_001);
       const result = yield* Fiber.join(resultFiber);
       assert.equal(result._tag, "Failure");
 
+      const retrySent = yield* Deferred.make<void>();
       routing.cursor.sendTurn.mockImplementationOnce((input) =>
-        Effect.succeed({
-          threadId: input.threadId,
-          turnId: asTurnId("turn-compact-fallback-retry"),
-        }),
+        Deferred.succeed(retrySent, undefined).pipe(
+          Effect.as({
+            threadId: input.threadId,
+            turnId: asTurnId("turn-compact-fallback-retry"),
+          }),
+        ),
       );
       const retryFiber = yield* provider.compactThread(threadId).pipe(Effect.forkChild);
-      yield* advanceTestClock(50);
+      yield* Deferred.await(retrySent);
       routing.cursor.emit({
         type: "turn.completed",
         eventId: asEventId("evt-compact-fallback-retry-completed"),
@@ -4977,7 +5036,18 @@ describe("agent browser access", () => {
         getEventReplayStats: () => Effect.die("unused"),
         getActiveProjectByWorkspaceRoot: () => Effect.die("unused"),
         getProjectShells: () => Effect.die("unused"),
-        getProjectShellById: () => Effect.die("unused"),
+        getProjectShellById: () =>
+          Effect.succeed(
+            Option.some({
+              id: projectId,
+              title: "Browser access test",
+              workspaceRoot: process.cwd(),
+              defaultModelSelection: null,
+              scripts: [],
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            }),
+          ),
         getFirstActiveThreadIdByProjectId: () => Effect.die("unused"),
         getThreadCheckpointContext: () => Effect.die("unused"),
         getFullThreadDiffContext: () => Effect.die("unused"),
@@ -5148,5 +5218,178 @@ describe("agent browser access", () => {
       );
       assert.deepEqual(issued, [{ threadId, capabilities: ["preview", "pull-requests"] }]);
     }).pipe(Effect.provide(NodeServices.layer)),
+  );
+});
+
+const stopBindings = new Map<ThreadId, ProviderSessionDirectory.ProviderRuntimeBinding>();
+const sharedStopFixture = makeProviderServiceLayer({
+  directory: {
+    upsert: (binding) =>
+      Effect.sync(() => {
+        stopBindings.set(binding.threadId, { ...stopBindings.get(binding.threadId), ...binding });
+      }),
+    recordImportedTranscript: () => Effect.die("Unused import"),
+    getProvider: () => Effect.succeed(CODEX_DRIVER),
+    getBinding: (threadId) => Effect.sync(() => Option.fromNullishOr(stopBindings.get(threadId))),
+    listThreadIds: () => Effect.sync(() => [...stopBindings.keys()]),
+    listBindings: () =>
+      Effect.sync(() =>
+        [...stopBindings.values()].map((binding) => ({
+          ...binding,
+          lastSeenAt: "2026-09-27T00:00:00.000Z",
+        })),
+      ),
+  },
+});
+const controlledTransitionFixture = makeProviderServiceLayer();
+controlledTransitionFixture.layer("controlled and free provider transitions", (it) => {
+  it.effect("keeps free provider actions alive after a controlled checkout was released", () =>
+    Effect.gen(function* () {
+      const provider = yield* ProviderService.ProviderService;
+      const ownership = yield* WorkspaceExecutionOwnership;
+      const sql = yield* SqlClient.SqlClient;
+      const threadId = asThreadId("released-generation-free-turns");
+      const cwd = yield* ownership.canonicalize(fixtureCwd("released-generation"));
+      yield* sql`INSERT INTO workspace_execution_ownership
+        (environment_id, canonical_cwd, generation, task_id, state, pending_execution_id)
+        VALUES (${ownership.environmentId}, ${cwd}, 9, NULL, 'released', NULL)`;
+      yield* provider.startSession(threadId, {
+        providerInstanceId: codexInstanceId,
+        threadId,
+        cwd,
+        runtimeMode: "full-access",
+      });
+      const stops = controlledTransitionFixture.codex.stopSession.mock.calls.length;
+      yield* provider.sendTurn({ threadId, continuation: true });
+      yield* provider.sendTurn({ threadId, continuation: true });
+      yield* provider.compactThread(threadId);
+      yield* provider.respondToRequest({
+        threadId,
+        requestId: asRequestId("released-approval"),
+        decision: "accept",
+      });
+      yield* provider.respondToUserInput({
+        threadId,
+        requestId: asRequestId("released-question"),
+        answers: { choice: "continue" },
+      });
+      assert.equal(controlledTransitionFixture.codex.stopSession.mock.calls.length, stops);
+      assert.isTrue(yield* controlledTransitionFixture.codex.hasSession(threadId));
+      yield* provider.stopSession({ threadId });
+    }),
+  );
+
+  it.effect(
+    "starts controlled analysis fresh instead of inheriting free-session resume state",
+    () =>
+      Effect.gen(function* () {
+        const provider = yield* ProviderService.ProviderService;
+        const ownership = yield* WorkspaceExecutionOwnership;
+        const sql = yield* SqlClient.SqlClient;
+        const threadId = asThreadId("free-to-controlled");
+        const cwd = yield* ownership.canonicalize(fixtureCwd("free-to-controlled"));
+        yield* provider.startSession(threadId, {
+          providerInstanceId: codexInstanceId,
+          threadId,
+          cwd,
+          runtimeMode: "full-access",
+        });
+        const task = yield* decodeControlledTask({
+          id: "c3333333-3333-4333-8333-333333333333",
+          environmentId: ownership.environmentId,
+          projectId: "controlled-project",
+          threadId,
+          target: { workspaceRoot: cwd, worktreePath: null },
+          checkout: {
+            canonicalCwd: cwd,
+            repositoryRoot: cwd,
+            headCommit: "a".repeat(40),
+            workspaceDigest: `sha256:${"a".repeat(64)}`,
+          },
+          phase: "analysis",
+          revision: 1,
+          context: null,
+          execution: null,
+          ownership: { generation: 1, state: "analysis" },
+          createdAt: "2026-09-30T00:00:00.000Z",
+          updatedAt: "2026-09-30T00:00:00.000Z",
+        });
+        yield* sql`INSERT INTO projection_weavra_tasks
+        (task_id,environment_id,project_id,thread_id,canonical_cwd,phase,ownership_state,revision,generation,task_json)
+        VALUES (${task.id},${task.environmentId},${task.projectId},${threadId},${cwd},'analysis','analysis',1,1,${encodeJson(task)})`;
+        yield* sql`INSERT INTO workspace_execution_ownership
+        (environment_id,canonical_cwd,generation,task_id,state,pending_execution_id)
+        VALUES (${task.environmentId},${cwd},1,${task.id},'analysis',NULL)`;
+        yield* provider
+          .startSession(threadId, {
+            providerInstanceId: codexInstanceId,
+            threadId,
+            cwd,
+            runtimeMode: "approval-required",
+            controlledAnalysis: { taskId: task.id, generation: 1 },
+          })
+          .pipe(
+            Effect.provideService(ownership.analysisAuthority, {
+              taskId: task.id,
+              generation: 1,
+              expectedRevision: 1,
+            }),
+          );
+        assert.equal(
+          controlledTransitionFixture.codex.startSession.mock.calls.at(-1)?.[0].resumeCursor,
+          undefined,
+        );
+        yield* provider.stopSession({ threadId });
+      }),
+  );
+});
+
+sharedStopFixture.layer("shared provider stop completion", (it) => {
+  it.effect("keeps a concurrent stop and its ownership token behind actual cleanup", () =>
+    Effect.gen(function* () {
+      const provider = yield* ProviderService.ProviderService;
+      const ownership = yield* WorkspaceExecutionOwnership;
+      const threadId = asThreadId("shared-stop");
+      yield* provider.startSession(threadId, {
+        providerInstanceId: codexInstanceId,
+        threadId,
+        runtimeMode: "full-access",
+      });
+      const entered = yield* Deferred.make<void>();
+      const finish = yield* Deferred.make<void>();
+      const order = yield* Queue.unbounded<string>();
+      const originalStop = sharedStopFixture.codex.stopSession.getMockImplementation();
+      assert.ok(originalStop);
+      sharedStopFixture.codex.stopSession.mockImplementationOnce((id) =>
+        originalStop(id).pipe(
+          Effect.andThen(Deferred.succeed(entered, undefined)),
+          Effect.andThen(Deferred.await(finish)),
+        ),
+      );
+      const first = yield* provider.stopSession({ threadId }).pipe(Effect.forkChild);
+      yield* Deferred.await(entered);
+      assert.isFalse(yield* sharedStopFixture.codex.hasSession(threadId));
+
+      // All dependencies after hasSession are synchronous in this fixture. The
+      // startImmediately fork therefore either completes or reaches the cleanup barrier.
+      const second = yield* provider
+        .stopSession({ threadId })
+        .pipe(
+          Effect.andThen(Queue.offer(order, "second-complete")),
+          Effect.forkChild({ startImmediately: true }),
+        );
+      yield* Queue.offer(order, "second-requested");
+      assert.equal(yield* Queue.take(order), "second-requested");
+      assert.equal(
+        (yield* ownership.activeOperations).filter((op) => op.kind === "provider").length,
+        1,
+      );
+
+      yield* Fiber.interrupt(first);
+      yield* Deferred.succeed(finish, undefined);
+      yield* Fiber.join(second);
+      assert.equal(yield* Queue.take(order), "second-complete");
+      assert.equal((yield* ownership.activeOperations).length, 0);
+    }),
   );
 });

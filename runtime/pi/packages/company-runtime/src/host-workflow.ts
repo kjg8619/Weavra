@@ -2,12 +2,13 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { PiAgentExecutor } from "./agent-runner.ts";
+import type { PreparedAnalysisContext } from "./analysis-context.ts";
 import { isSupportedR3Goal } from "./approval.ts";
 import { classifyRequest, type RiskOverride, selectWorkflow } from "./classification.ts";
 import { type ComplexClaimInspector, compileComplexPlan, parseComplexDraft } from "./complex-plan.ts";
 import type { ComplexDraft, ComplexPlan } from "./complex-types.ts";
 import type { RuntimeConfig } from "./config.ts";
-import type { Risk, TaskContract, Workflow } from "./contracts.ts";
+import type { Risk, TaskBinding, TaskContract, Workflow } from "./contracts.ts";
 import { type ExecutionMode, proposeExecutionMode } from "./execution-contract.ts";
 import { HostWorkflowError } from "./host-workflow-error.ts";
 import { workflowModelRoutes } from "./model-routing.ts";
@@ -59,6 +60,12 @@ export interface HostWorkflowPlan extends HostWorkflowDraft {
 	/** Present iff workflow is COMPLEX: the immutable Host-compiled plan bound to `taskContract`. */
 	complexPlan?: ComplexPlan;
 	preview: PlanPreview;
+	/** Host-captured reviewed input. Never supplied by a worker or inferred from a prior conversation. */
+	task?: {
+		binding: TaskBinding;
+		analysis: PreparedAnalysisContext;
+		assertCurrent: () => void;
+	};
 }
 
 /** Deterministic Host-side planning only; no models, workers, checks or writer are created. */
@@ -277,6 +284,7 @@ export interface CreateHostWorkflowOptions {
 	approvalTimeoutMs?: number;
 	createModels?: (signal: AbortSignal) => Promise<ModelRuntime>;
 	startGuard?: WorkflowOptions["startGuard"];
+	taskAdmission?: WorkflowOptions["taskAdmission"];
 }
 
 /**
@@ -286,6 +294,8 @@ export interface CreateHostWorkflowOptions {
 export async function createHostWorkflow(options: CreateHostWorkflowOptions): Promise<StandardWorkflow> {
 	const { cwd, agentDir, signal } = options;
 	signal.throwIfAborted();
+	if ((options.plan.task !== undefined) !== (options.taskAdmission !== undefined))
+		throw new HostWorkflowError("INVALID_REQUEST", "A bound task requires its already-owned durable admission");
 	if ((options.plan.workflow === "COMPLEX") !== (options.plan.complexPlan !== undefined))
 		throw new HostWorkflowError(
 			options.plan.workflow === "COMPLEX" ? "UNSUPPORTED_WORKFLOW" : "INVALID_REQUEST",
@@ -305,6 +315,7 @@ export async function createHostWorkflow(options: CreateHostWorkflowOptions): Pr
 				authPath: join(agentDir, "auth.json"),
 				modelsPath: join(agentDir, "models.json"),
 				allowModelNetwork: false,
+				...(options.taskAdmission ? { allowCredentialCommands: false } : {}),
 				signal,
 			});
 	return new StandardWorkflow({
@@ -321,6 +332,7 @@ export async function createHostWorkflow(options: CreateHostWorkflowOptions): Pr
 		approval: options.approval,
 		approvalTimeoutMs: options.approvalTimeoutMs,
 		startGuard: options.startGuard,
+		...(options.taskAdmission ? { taskAdmission: options.taskAdmission } : {}),
 		createAgents: async (store, quickScope, r2RunId, r3Scope, executionContract) => {
 			const executor = await PiAgentExecutor.create({
 				executionContract,
@@ -337,6 +349,15 @@ export async function createHostWorkflow(options: CreateHostWorkflowOptions): Pr
 				maxConcurrentWorkers: complexPlan?.limits.maxParallel ?? 1,
 				// The user-confirmed per-run model choice only; it changes no contract, Policy or authority.
 				...(deep ? { deep: true } : {}),
+				...(options.plan.task
+					? {
+							reviewedAnalysis: {
+								binding: options.plan.task.binding,
+								packet: options.plan.task.analysis.packet,
+								assertCurrent: options.plan.task.assertCurrent,
+							},
+						}
+					: {}),
 			});
 			return { executor, policy: executor.policyContext };
 		},

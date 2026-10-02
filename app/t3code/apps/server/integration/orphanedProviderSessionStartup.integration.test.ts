@@ -45,6 +45,7 @@ import * as ServerRuntimeStartup from "../src/serverRuntimeStartup.ts";
 import * as ServerSettings from "../src/serverSettings.ts";
 import * as AnalyticsService from "../src/telemetry/AnalyticsService.ts";
 import * as GitVcsDriver from "../src/vcs/GitVcsDriver.ts";
+import * as WeavraTaskCoordinator from "../src/weavra/TaskCoordinator.ts";
 
 const providerInstanceId = ProviderInstanceId.make("codex");
 const projectId = ProjectId.make("project-startup-orphan");
@@ -110,6 +111,9 @@ const startupDependencies = Layer.mergeAll(
     }),
   ),
   AnalyticsService.layerTest,
+  Layer.mock(WeavraTaskCoordinator.TaskCoordinator)({
+    reconcileAll: Effect.succeed([]),
+  }),
   Layer.mock(GitVcsDriver.GitVcsDriver)({}),
   Layer.succeed(ProviderService.ProviderService, {
     startSession: () => Effect.die("unused"),

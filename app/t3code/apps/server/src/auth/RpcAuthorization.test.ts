@@ -20,6 +20,28 @@ describe("RPC authorization scopes", () => {
       AuthOrchestrationOperateScope,
     );
     expect(requiredScopeForRpcMethod(WS_METHODS.weavraControl)).toBe(AuthOrchestrationOperateScope);
+    for (const method of [
+      WS_METHODS.weavraTaskRead,
+      WS_METHODS.weavraTaskList,
+      WS_METHODS.weavraTaskReadApproval,
+      WS_METHODS.weavraTaskEvidence,
+      WS_METHODS.weavraTaskObserve,
+    ]) {
+      expect(requiredScopeForRpcMethod(method)).toBe(AuthOrchestrationReadScope);
+    }
+    for (const method of [
+      WS_METHODS.weavraTaskCreate,
+      WS_METHODS.weavraTaskPrepare,
+      WS_METHODS.weavraTaskConfirm,
+      WS_METHODS.weavraTaskReconcile,
+      WS_METHODS.weavraTaskRecover,
+      WS_METHODS.weavraTaskAbort,
+      WS_METHODS.weavraTaskReprepare,
+      WS_METHODS.weavraTaskCancel,
+      WS_METHODS.weavraTaskResolveApproval,
+    ]) {
+      expect(requiredScopeForRpcMethod(method)).toBe(AuthOrchestrationOperateScope);
+    }
   });
 
   it("authorizes background policy reporting and observation deliberately", () => {

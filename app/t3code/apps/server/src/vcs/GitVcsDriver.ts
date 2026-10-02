@@ -38,6 +38,7 @@ import {
 } from "./GitVcsDriverCore.ts";
 import * as VcsDriver from "./VcsDriver.ts";
 import * as VcsProcess from "./VcsProcess.ts";
+import { WorkspaceExecutionOwnership } from "../workspace/WorkspaceExecutionOwnership.ts";
 
 export interface ExecuteGitInput {
   readonly operation: string;
@@ -1217,7 +1218,58 @@ export const makeVcsDriver = Effect.gen(function* () {
 
 export const make = Effect.gen(function* () {
   const git = yield* makeGitVcsDriverCore();
-  return GitVcsDriver.of(git);
+  const ownership = yield* WorkspaceExecutionOwnership;
+  const mutate = <A>(
+    input: { readonly cwd: string; readonly path?: string | null },
+    effect: Effect.Effect<A, GitCommandError>,
+  ) =>
+    ownership
+      .withOperation(
+        {
+          cwd: input.cwd,
+          kind: "git",
+          sharedGitMetadata: true,
+          additionalPaths: input.path ? [input.path] : [],
+        },
+        effect,
+      )
+      .pipe(
+        Effect.catchTag("WorkspaceOwnershipError", (cause) =>
+          Effect.fail(
+            new GitCommandError({
+              operation: "GitVcsDriver.ownership",
+              command: "git",
+              cwd: input.cwd,
+              detail: cause.message,
+              cause,
+            }),
+          ),
+        ),
+      );
+  return GitVcsDriver.of({
+    ...git,
+    createWorktree: (input, options) => mutate(input, git.createWorktree(input, options)),
+    removeWorktree: (input) => mutate(input, git.removeWorktree(input)),
+    pullCurrentBranch: (cwd) => mutate({ cwd }, git.pullCurrentBranch(cwd)),
+    commit: (cwd, subject, body, options) =>
+      mutate({ cwd }, git.commit(cwd, subject, body, options)),
+    pushCurrentBranch: (cwd, branch, options) =>
+      mutate({ cwd }, git.pushCurrentBranch(cwd, branch, options)),
+    fetchPullRequestBranch: (input) => mutate(input, git.fetchPullRequestBranch(input)),
+    fetchPullRequestHeadCommit: (input) => mutate(input, git.fetchPullRequestHeadCommit(input)),
+    refreshCheckedOutBranch: (input) => mutate(input, git.refreshCheckedOutBranch(input)),
+    ensureRemote: (input) => mutate(input, git.ensureRemote(input)),
+    fetchRemote: (input) => mutate(input, git.fetchRemote(input)),
+    resolveRemoteTrackingCommit: (input) => mutate(input, git.resolveRemoteTrackingCommit(input)),
+    fetchRemoteBranch: (input) => mutate(input, git.fetchRemoteBranch(input)),
+    fetchRemoteTrackingBranch: (input) => mutate(input, git.fetchRemoteTrackingBranch(input)),
+    setBranchUpstream: (input) => mutate(input, git.setBranchUpstream(input)),
+    pruneWorktrees: (input) => mutate(input, git.pruneWorktrees(input)),
+    renameBranch: (input) => mutate(input, git.renameBranch(input)),
+    createRef: (input) => mutate(input, git.createRef(input)),
+    switchRef: (input) => mutate(input, git.switchRef(input)),
+    initRepo: (input) => mutate(input, git.initRepo(input)),
+  });
 });
 
 export const vcsLayer = Layer.effect(VcsDriver.VcsDriver, makeVcsDriver);

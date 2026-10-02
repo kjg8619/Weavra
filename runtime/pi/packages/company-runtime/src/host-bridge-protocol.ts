@@ -121,6 +121,8 @@ export interface HostBridgeCapabilities {
 	observationMode: "runtime-events" | "snapshots-only";
 	/** Local doctor checks only; never a claim of Provider authentication or readiness. */
 	readiness: "READY" | "NOT_SETUP" | "CONFIG_INVALID";
+	/** Reserved read-only detail contract; absent until bounded evidence projection is implemented. */
+	evidenceDetails?: 1;
 }
 export const HOST_BRIDGE_CAPABILITIES = Object.freeze({
 	readOnly: true,

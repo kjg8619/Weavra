@@ -1,5 +1,10 @@
 import {
   type ProjectId,
+  type ThreadId,
+  type WeavraTaskReceiptRequest,
+  type WeavraCheckoutIdentityInput,
+  type WeavraEvidenceDetailsInput,
+  type WeavraTask,
   type WeavraControlCapabilities,
   type WeavraControlInput,
   type WeavraControlObservation,
@@ -7,6 +12,7 @@ import {
   type WeavraControlState,
   WeavraControlTransportError,
   WeavraCapabilityInventory,
+  WeavraTaskRunMetadata,
   WEAVRA_CONTROL_MAX_REQUEST_BYTES,
   WEAVRA_CONTROL_MAX_RESPONSE_BYTES,
 } from "@t3tools/contracts";
@@ -32,15 +38,37 @@ import { subscribeBeforeSnapshotWithoutMutex } from "../utils/subscribeBeforeSna
 import { complexPreviewConsistent, complexStateConsistent } from "./ComplexProjection.ts";
 import { type ControlTransport, openControlTransport } from "./ControlTransport.ts";
 import { plannerDraftConsistent, plannerStateConsistent } from "./PlannerProjection.ts";
+import {
+  WorkspaceExecutionOwnership,
+  type WorkspaceOperationToken,
+} from "../workspace/WorkspaceExecutionOwnership.ts";
 
 const sameInventory = Schema.toEquivalence(WeavraCapabilityInventory);
+const sameTaskMetadata = Schema.toEquivalence(WeavraTaskRunMetadata);
 
 export class RuntimeController extends Context.Service<
   RuntimeController,
   {
-    readonly observe: (projectId: ProjectId) => Stream.Stream<WeavraControlObservation>;
+    readonly observe: (
+      projectId: ProjectId,
+      threadId?: ThreadId,
+    ) => Stream.Stream<WeavraControlObservation>;
     readonly command: (
       input: WeavraControlInput,
+      threadId?: ThreadId,
+    ) => Effect.Effect<WeavraControlResponse, WeavraControlTransportError>;
+    readonly checkout: (
+      input: WeavraCheckoutIdentityInput,
+      threadId?: ThreadId,
+    ) => Effect.Effect<WeavraControlResponse, WeavraControlTransportError>;
+    readonly evidence: (
+      input: WeavraEvidenceDetailsInput,
+      threadId?: ThreadId,
+    ) => Effect.Effect<WeavraControlResponse, WeavraControlTransportError>;
+    readonly receipt: (
+      projectId: ProjectId,
+      threadId: ThreadId,
+      request: WeavraTaskReceiptRequest,
     ) => Effect.Effect<WeavraControlResponse, WeavraControlTransportError>;
   }
 >()("t3/weavra/RuntimeController") {}
@@ -54,6 +82,7 @@ const initial: WeavraControlObservation = {
 };
 interface Entry {
   projectId: ProjectId;
+  projectRoot: string;
   root: string;
   latest: WeavraControlObservation;
   changes: PubSub.PubSub<WeavraControlObservation>;
@@ -66,6 +95,16 @@ interface Entry {
   retiredInventoryEpochs: Set<string>;
   /** The transport, and so the Host, that this server forwarded a `planner.start` to. */
   plannerStartedOn?: ControlTransport;
+}
+interface RuntimeOperation {
+  readonly token: WorkspaceOperationToken;
+  readonly ownerId: string;
+  readonly confirmation: Extract<WeavraControlInput["request"], { type: "workflow.confirm" }>;
+  readonly previousRunId: string | null;
+  readonly previousOwnedRunId: string | null;
+  outcome: "unacknowledged" | "accepted" | "rejected";
+  runId: string | null;
+  settled: boolean;
 }
 function consistent(
   response: WeavraControlResponse,
@@ -131,9 +170,20 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
   const path = yield* Path.Path;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const environment = yield* HostProcessEnvironment;
+  const ownership = yield* WorkspaceExecutionOwnership;
   const serviceScope = yield* Scope.Scope;
   const mutex = yield* Semaphore.make(1);
   const entries = new Map<string, Entry>();
+  // Entries/transports are replaceable; unresolved physical executions are not.
+  const runtimeOperations = new Map<string, RuntimeOperation>();
+  const runtimeAdmissionLocks = new Map<string, Semaphore.Semaphore>();
+  const completedConfirmations = new Set<string>();
+  const confirmationKey = (
+    root: string,
+    ownerId: string,
+    request: RuntimeOperation["confirmation"],
+  ) =>
+    JSON.stringify([root, ownerId, request.ownerId, request.id, request.expectedProjectRevision]);
   const executable = environment.T3_WEAVRA_EXECUTABLE;
   const childEnv: Record<string, string> = {};
   for (const key of [
@@ -162,8 +212,46 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
         Effect.mapError(() => new WeavraControlTransportError({ code: "PROJECT_UNAVAILABLE" })),
       );
   });
+  const threadSelections = new Map<
+    ThreadId,
+    {
+      projectId: ProjectId;
+      target: { workspaceRoot: string; worktreePath: string | null };
+      canonicalCwd: string;
+      repositoryRoot: string;
+    }
+  >();
+  // Thread selectors are server-only. RPC clients still cannot choose a process cwd.
+  const targetRoot = Effect.fn("weavra.controlTargetRoot")(function* (
+    projectId: ProjectId,
+    threadId?: ThreadId,
+  ) {
+    if (threadId === undefined) return yield* projectRoot(projectId);
+    const selected = yield* ownership.resolveTarget(threadId).pipe(
+      Effect.provideService(ProjectionSnapshotQuery, query),
+      Effect.mapError(() => new WeavraControlTransportError({ code: "PROJECT_CHANGED" })),
+    );
+    const previous = threadSelections.get(threadId);
+    if (
+      selected.projectId !== projectId ||
+      (previous !== undefined &&
+        (previous.projectId !== selected.projectId ||
+          previous.canonicalCwd !== selected.canonicalCwd ||
+          previous.repositoryRoot !== selected.repositoryRoot ||
+          previous.target.workspaceRoot !== selected.target.workspaceRoot ||
+          previous.target.worktreePath !== selected.target.worktreePath))
+    )
+      return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
+    threadSelections.set(threadId, selected);
+    return selected.canonicalCwd;
+  });
   const validate = Effect.fn("weavra.validateControlProject")(function* (entry: Entry) {
-    if ((yield* projectRoot(entry.projectId)) !== entry.root)
+    if ((yield* projectRoot(entry.projectId)) !== entry.projectRoot)
+      return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
+    const currentRoot = yield* fs
+      .realPath(entry.root)
+      .pipe(Effect.mapError(() => new WeavraControlTransportError({ code: "PROJECT_CHANGED" })));
+    if (currentRoot !== entry.root)
       return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
   });
   const publish = Effect.fn("weavra.publishControl")(function* (
@@ -241,6 +329,8 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
     };
     const refresh = Effect.fn("weavra.refreshControlSnapshot")(function* () {
       yield* validate(entry);
+      const runtimeOperation = runtimeOperations.get(entry.root);
+      const mayReconcile = runtimeOperation?.settled === true;
       const response = yield* bridge.exchange({
         protocolVersion: 1,
         id: `t3-snapshot-${++sequence}`,
@@ -263,12 +353,83 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
         !acceptsInventory(response.data.state)
       )
         return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
+      const state = response.data.state;
+      const run = state.snapshot.status.run;
+      if (
+        runtimeOperation?.outcome === "accepted" &&
+        runtimeOperation.runId === null &&
+        state.ownerId === runtimeOperation.ownerId &&
+        state.ownedRunId !== null &&
+        state.ownedRunId !== runtimeOperation.previousOwnedRunId &&
+        state.ownedRunId === run?.runId
+      ) {
+        // Only this acknowledged confirmation can start a new Run on this Host.
+        // A replacement Host's canonical Run (or noRun) cannot establish that link.
+        runtimeOperation.runId = state.ownedRunId;
+      }
+      const associated =
+        runtimeOperation !== undefined &&
+        (runtimeOperation.runId !== null
+          ? run?.runId === runtimeOperation.runId
+          : state.ownerId === runtimeOperation.ownerId &&
+            (run?.runId ?? null) === runtimeOperation.previousRunId &&
+            (runtimeOperation.outcome === "rejected" ||
+              (runtimeOperation.outcome === "accepted" && state.startFailure !== null)));
+      if (
+        runtimeOperation !== undefined &&
+        mayReconcile &&
+        runtimeOperation.settled &&
+        associated &&
+        runtimeOperations.get(entry.root) === runtimeOperation &&
+        !state.busy &&
+        !state.cancelling &&
+        !state.snapshot.status.writerPresent &&
+        (run?.activeAgentCount ?? 0) === 0 &&
+        (run === null ||
+          ["COMPLETED", "CANCELLED", "FAILED", "BLOCKED", "INTERRUPTED"].includes(run.status)) &&
+        !(yield* fs
+          .exists(`${entry.root}/.ai/writer.lock`)
+          .pipe(
+            Effect.mapError(() => new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" })),
+          ))
+      ) {
+        // A retired observation cannot release a later confirmation's operation.
+        if (runtimeOperation.settled && runtimeOperations.get(entry.root) === runtimeOperation) {
+          yield* ownership.release(runtimeOperation.token).pipe(
+            Effect.andThen(
+              Effect.sync(() => {
+                if (runtimeOperation.outcome === "accepted")
+                  completedConfirmations.add(
+                    confirmationKey(
+                      entry.root,
+                      runtimeOperation.ownerId,
+                      runtimeOperation.confirmation,
+                    ),
+                  );
+                runtimeOperations.delete(entry.root);
+              }),
+            ),
+            Effect.uninterruptible,
+          );
+        }
+      }
+      const unresolved =
+        runtimeOperation !== undefined &&
+        runtimeOperations.get(entry.root) === runtimeOperation &&
+        runtimeOperation.settled &&
+        !associated &&
+        !(
+          runtimeOperation.outcome === "accepted" &&
+          state.ownerId === runtimeOperation.ownerId &&
+          state.busy
+        );
+      // A fresh observation is published only after its cleanup reconciliation.
       yield* publish(entry, {
-        status: "CONNECTED",
+        status: unresolved ? "ERROR" : "CONNECTED",
         state: response.data.state,
-        stale: false,
+        stale: unresolved,
         observedAt: yield* Clock.currentTimeMillis,
-        errorCode: null,
+        errorCode: unresolved ? "STATE_UNAVAILABLE" : null,
       });
     }, refreshMutex.withPermits(1));
     entry.bridge = bridge;
@@ -319,7 +480,10 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
       yield* Effect.sleep(Duration.seconds(5));
     }
   });
-  const acquire = Effect.fn("weavra.acquireControlOwner")(function* (projectId: ProjectId) {
+  const acquire = Effect.fn("weavra.acquireControlOwner")(function* (
+    projectId: ProjectId,
+    threadId?: ThreadId,
+  ) {
     if (environment.T3_WEAVRA_CONTROL !== "1")
       return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
     if (!executable) return yield* new WeavraControlTransportError({ code: "NOT_INSTALLED" });
@@ -330,7 +494,8 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
       return yield* new WeavraControlTransportError({ code: "NOT_INSTALLED" });
     if (binary.value.type !== "File" || (binary.value.mode & 0o111) === 0)
       return yield* new WeavraControlTransportError({ code: "INVALID_EXECUTABLE" });
-    const root = yield* projectRoot(projectId);
+    const root = yield* targetRoot(projectId, threadId);
+    const selectedProjectRoot = yield* projectRoot(projectId);
     return yield* mutex.withPermits(1)(
       Effect.gen(function* () {
         const existing = entries.get(root);
@@ -355,6 +520,7 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
         const scope = yield* Scope.fork(serviceScope);
         const entry: Entry = {
           projectId,
+          projectRoot: selectedProjectRoot,
           root,
           scope,
           latest: initial,
@@ -381,10 +547,10 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
     );
   });
   return RuntimeController.of({
-    observe: (projectId) =>
+    observe: (projectId, threadId) =>
       Stream.unwrap(
         Effect.gen(function* () {
-          const result = yield* acquire(projectId).pipe(Effect.result);
+          const result = yield* acquire(projectId, threadId).pipe(Effect.result);
           if (result._tag === "Failure")
             return Stream.make({
               ...initial,
@@ -406,13 +572,32 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
           return Stream.concat(
             Stream.make({ ...subscription.latest, stale: true }),
             subscription.changes,
+          ).pipe(
+            Stream.mapEffect((observation) =>
+              Effect.gen(function* () {
+                if ((yield* targetRoot(projectId, threadId)) !== entry.root)
+                  return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
+                return observation;
+              }).pipe(
+                Effect.catch((error) =>
+                  Effect.succeed({
+                    ...initial,
+                    status: "ERROR",
+                    errorCode: error.code,
+                  } satisfies WeavraControlObservation),
+                ),
+              ),
+            ),
           );
         }),
       ),
-    command: Effect.fn("weavra.controlCommand")(function* (input: WeavraControlInput) {
+    command: Effect.fn("weavra.controlCommand")(function* (
+      input: WeavraControlInput,
+      threadId?: ThreadId,
+    ) {
       if (environment.T3_WEAVRA_CONTROL !== "1")
         return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
-      const root = yield* projectRoot(input.projectId);
+      const root = yield* targetRoot(input.projectId, threadId);
       const entry = entries.get(root);
       if (
         !entry ||
@@ -421,7 +606,12 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
         !entry.refresh ||
         entry.latest.stale
       )
-        return yield* new WeavraControlTransportError({ code: "TRANSPORT_CLOSED" });
+        return yield* new WeavraControlTransportError({
+          code:
+            entry?.latest.errorCode === "STATE_UNAVAILABLE"
+              ? "STATE_UNAVAILABLE"
+              : "TRANSPORT_CLOSED",
+        });
       if (entry.pending >= 8)
         return yield* new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" });
       const capabilities = entry.latest.capabilities;
@@ -435,6 +625,10 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
       // same holds for re-run derivation without `rerunContractVersion: 1`.
       if (
         !capabilities ||
+        (input.request.type === "workflow.recover" && capabilities.taskRecovery !== 1) ||
+        (input.request.type === "workflow.prepare" &&
+          input.request.task !== undefined &&
+          (capabilities.taskBinding !== 1 || capabilities.analysisContext !== 1)) ||
         (input.request.type === "workflow.prepare" &&
           input.request.complexDraft !== undefined &&
           capabilities.complexContractVersion === undefined) ||
@@ -445,64 +639,227 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
       const bridge = entry.bridge;
       const refresh = entry.refresh;
       entry.pending++;
-      const operation = Effect.gen(function* () {
-        yield* validate(entry);
-        // From here on this Host may report planner state (§7.3), even if the reply is lost.
-        if (input.request.type === "planner.start") entry.plannerStartedOn = bridge;
-        const response = yield* bridge.exchange(input.request);
-        yield* validate(entry);
-        if (response.ownerId !== entry.latest.capabilities?.ownerId)
-          return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
-        if (response.success) {
-          const request = input.request;
-          const data = response.data;
-          const valid =
-            request.type === "workflow.prepare"
-              ? data.kind === "prepared" &&
-                data.preview.ownerId === request.ownerId &&
-                data.preview.projectRevision === request.expectedProjectRevision &&
-                // COMPLEX requires the draft, and a draft is never silently downgraded.
-                (data.preview.workflow === "COMPLEX") === (request.complexDraft !== undefined) &&
-                complexPreviewConsistent(data.preview, capabilities.complexContractVersion)
-              : request.type === "browser.inspect"
-                ? data.kind === "browser-state"
-                : request.type === "browser.prepare"
-                  ? data.kind === "browser-prepared" &&
+      const operation = (task: WeavraTask | undefined) =>
+        Effect.gen(function* () {
+          yield* validate(entry);
+          if ((yield* targetRoot(input.projectId, threadId)) !== root)
+            return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
+          let runtimeOperation: RuntimeOperation | undefined;
+          if (input.request.type === "workflow.confirm" && task === undefined) {
+            let admissionLock = runtimeAdmissionLocks.get(root);
+            if (!admissionLock) {
+              admissionLock = Semaphore.makeUnsafe(1);
+              runtimeAdmissionLocks.set(root, admissionLock);
+            }
+            const confirmation = { ...input.request };
+            runtimeOperation = yield* admissionLock.withPermits(1)(
+              Effect.gen(function* () {
+                // Runtime still checks the fingerprint and owns the replay response.
+                if (
+                  completedConfirmations.has(
+                    confirmationKey(root, capabilities.ownerId, confirmation),
+                  )
+                )
+                  return undefined;
+                const existing = runtimeOperations.get(root);
+                if (existing) {
+                  // Runtime owns duplicate/conflicting-payload decisions for an
+                  // acknowledged request. Its replay must not rebind the lease.
+                  if (
+                    existing.outcome === "accepted" &&
+                    existing.settled &&
+                    existing.ownerId === capabilities.ownerId &&
+                    existing.confirmation.ownerId === confirmation.ownerId &&
+                    existing.confirmation.id === confirmation.id &&
+                    existing.confirmation.expectedProjectRevision ===
+                      confirmation.expectedProjectRevision
+                  )
+                    return undefined;
+                  return yield* new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" });
+                }
+                const token = yield* ownership
+                  .acquireIndependent({ cwd: root, kind: "control" })
+                  .pipe(
+                    Effect.mapError(
+                      () => new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" }),
+                    ),
+                  );
+                const admitted: RuntimeOperation = {
+                  token,
+                  ownerId: capabilities.ownerId,
+                  confirmation,
+                  previousRunId: entry.latest.state?.snapshot.status.run?.runId ?? null,
+                  previousOwnedRunId: entry.latest.state?.ownedRunId ?? null,
+                  outcome: "unacknowledged",
+                  runId: null,
+                  settled: false,
+                };
+                runtimeOperations.set(root, admitted);
+                return admitted;
+              }).pipe(Effect.uninterruptible),
+            );
+          }
+          // From here on this Host may report planner state (§7.3), even if the reply is lost.
+          if (input.request.type === "planner.start") entry.plannerStartedOn = bridge;
+          const response = yield* bridge.exchange(input.request).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                if (runtimeOperation) runtimeOperation.settled = true;
+              }),
+            ),
+          );
+          yield* validate(entry);
+          if ((yield* targetRoot(input.projectId, threadId)) !== root)
+            return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
+          if (
+            response.ownerId !== entry.latest.capabilities?.ownerId ||
+            (input.request.type === "workflow.recover" &&
+              (entry.bridge !== bridge ||
+                response.id !== input.request.id ||
+                response.command !== input.request.type))
+          )
+            return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
+          if (response.success) {
+            const request = input.request;
+            const data = response.data;
+            const valid =
+              request.type === "workflow.recover"
+                ? data.kind === "task-recovery" &&
+                  data.receipt.executionId === request.metadata.binding.executionId &&
+                  (data.receipt.status === "UNKNOWN"
+                    ? data.disposition === "NOT_RECOVERED" && data.cleanup === "UNCONFIRMED"
+                    : sameTaskMetadata(data.receipt.admission.metadata, request.metadata)) &&
+                  (data.disposition === "NOT_RECOVERED" ||
+                    (data.receipt.status === "FOUND" &&
+                      (data.cleanup === "CONFIRMED"
+                        ? ["NOT_STARTED", "CONFIRMED"].includes(
+                            data.receipt.admission.cleanup ?? "",
+                          )
+                        : data.receipt.admission.cleanup === "UNCONFIRMED")))
+                : request.type === "workflow.prepare"
+                  ? data.kind === "prepared" &&
                     data.preview.ownerId === request.ownerId &&
                     data.preview.projectRevision === request.expectedProjectRevision &&
-                    data.preview.candidate.candidateId === request.registration.candidateId &&
-                    data.preview.candidate.candidateDigest ===
-                      request.registration.expectedCandidateDigest &&
-                    data.preview.check.checkId === request.registration.checkId
-                  : request.type === "browser.confirm"
-                    ? data.kind === "browser-registered"
-                    : request.type === "facts.prepare"
-                      ? data.kind === "fact-prepared" &&
+                    // COMPLEX requires the draft, and a draft is never silently downgraded.
+                    (data.preview.workflow === "COMPLEX") ===
+                      (request.complexDraft !== undefined) &&
+                    complexPreviewConsistent(data.preview, capabilities.complexContractVersion)
+                  : request.type === "browser.inspect"
+                    ? data.kind === "browser-state"
+                    : request.type === "browser.prepare"
+                      ? data.kind === "browser-prepared" &&
                         data.preview.ownerId === request.ownerId &&
                         data.preview.projectRevision === request.expectedProjectRevision &&
-                        data.preview.sourceRef === request.sourceRef &&
-                        data.preview.statement === request.statement
-                      : request.type === "facts.confirm"
-                        ? data.kind === "fact-confirmed"
-                        : request.type === "planner.read"
-                          ? // Exactly the requested proposal, with only Planner-shaped claims.
-                            data.kind === "planner-draft" &&
-                            data.planId === request.planId &&
-                            plannerDraftConsistent(data.draft)
-                          : request.type === "workflow.derive"
-                            ? // The candidate draft of exactly the requested Run (COMPLEX_RERUN.md
-                              // §4): `create` and `modify` claims only, never a deletion.
-                              data.kind === "derived-draft" &&
-                              data.runId === request.runId &&
-                              data.draft.tasks.every((task) =>
-                                task.ownership.every((claim) => claim.operation !== "delete"),
-                              )
-                            : data.kind === "accepted" &&
-                              data.command === request.type &&
-                              data.requestId === request.id;
-          if (!valid) return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
-        }
-        yield* refresh.pipe(Effect.catch((error) => unavailable(entry, error)));
+                        data.preview.candidate.candidateId === request.registration.candidateId &&
+                        data.preview.candidate.candidateDigest ===
+                          request.registration.expectedCandidateDigest &&
+                        data.preview.check.checkId === request.registration.checkId
+                      : request.type === "browser.confirm"
+                        ? data.kind === "browser-registered"
+                        : request.type === "facts.prepare"
+                          ? data.kind === "fact-prepared" &&
+                            data.preview.ownerId === request.ownerId &&
+                            data.preview.projectRevision === request.expectedProjectRevision &&
+                            data.preview.sourceRef === request.sourceRef &&
+                            data.preview.statement === request.statement
+                          : request.type === "facts.confirm"
+                            ? data.kind === "fact-confirmed"
+                            : request.type === "planner.read"
+                              ? // Exactly the requested proposal, with only Planner-shaped claims.
+                                data.kind === "planner-draft" &&
+                                data.planId === request.planId &&
+                                plannerDraftConsistent(data.draft)
+                              : request.type === "workflow.derive"
+                                ? // The candidate draft of exactly the requested Run (COMPLEX_RERUN.md
+                                  // §4): `create` and `modify` claims only, never a deletion.
+                                  data.kind === "derived-draft" &&
+                                  data.runId === request.runId &&
+                                  data.draft.tasks.every((task) =>
+                                    task.ownership.every((claim) => claim.operation !== "delete"),
+                                  )
+                                : data.kind === "accepted" &&
+                                  data.command === request.type &&
+                                  data.requestId === request.id;
+            if (!valid) return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
+          }
+          if (runtimeOperation) {
+            if (
+              response.ownerId !== runtimeOperation.ownerId ||
+              response.id !== runtimeOperation.confirmation.id ||
+              response.command !== runtimeOperation.confirmation.type
+            )
+              return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
+            runtimeOperation.outcome = response.success ? "accepted" : "rejected";
+            if (response.success && response.data.kind === "accepted")
+              runtimeOperation.runId = response.data.runId;
+          }
+          yield* refresh.pipe(Effect.catch((error) => unavailable(entry, error)));
+          return response;
+        });
+      // A disconnected caller stops waiting, not the server-owned command or Runtime execution.
+      const readOnly =
+        input.request.type === "planner.read" ||
+        input.request.type === "browser.inspect" ||
+        input.request.type === "workflow.derive";
+      const guarded = readOnly
+        ? operation(undefined)
+        : ownership
+            .withControlOperation(root, input.request, operation)
+            .pipe(
+              Effect.catchTag("WorkspaceOwnershipError", () =>
+                Effect.fail(new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" })),
+              ),
+            );
+      const fiber = yield* guarded.pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            entry.pending--;
+          }),
+        ),
+        Effect.forkIn(entry.scope),
+      );
+      return yield* Fiber.join(fiber);
+    }),
+    checkout: Effect.fn("weavra.controlCheckout")(function* (
+      input: WeavraCheckoutIdentityInput,
+      threadId?: ThreadId,
+    ) {
+      if (environment.T3_WEAVRA_CONTROL !== "1")
+        return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
+      const root = yield* targetRoot(input.projectId, threadId);
+      const entry = entries.get(root);
+      if (
+        !entry ||
+        entry.projectId !== input.projectId ||
+        !entry.bridge ||
+        entry.latest.stale ||
+        entry.latest.capabilities?.checkoutIdentity !== 1
+      )
+        return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
+      if (entry.pending >= 8)
+        return yield* new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" });
+      const bridge = entry.bridge;
+      entry.pending++;
+      const operation = Effect.gen(function* () {
+        yield* validate(entry);
+        if ((yield* targetRoot(input.projectId, threadId)) !== root)
+          return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
+        const response = yield* bridge.exchange(input.request);
+        yield* validate(entry);
+        if ((yield* targetRoot(input.projectId, threadId)) !== root)
+          return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
+        if (entry.bridge !== bridge || response.ownerId !== entry.latest.capabilities?.ownerId)
+          return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
+        if (
+          response.success &&
+          (response.runId !== null ||
+            response.stateRevision !== null ||
+            response.projectRevision !== null ||
+            response.data.kind !== "checkout-identity" ||
+            response.data.checkout.canonicalCwd !== root ||
+            response.data.checkout.repositoryRoot !== root)
+        )
+          return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
         return response;
       }).pipe(
         Effect.ensuring(
@@ -511,7 +868,108 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
           }),
         ),
       );
-      // A disconnected caller stops waiting, not the server-owned command or Runtime execution.
+      const fiber = yield* operation.pipe(Effect.forkIn(entry.scope));
+      return yield* Fiber.join(fiber);
+    }),
+    receipt: Effect.fn("weavra.controlReceipt")(function* (
+      projectId: ProjectId,
+      threadId: ThreadId,
+      request: WeavraTaskReceiptRequest,
+    ) {
+      const root = yield* targetRoot(projectId, threadId);
+      const entry = entries.get(root);
+      if (
+        environment.T3_WEAVRA_CONTROL !== "1" ||
+        !entry ||
+        entry.projectId !== projectId ||
+        !entry.bridge ||
+        entry.latest.stale ||
+        entry.latest.capabilities?.taskBinding !== 1
+      )
+        return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
+      if (entry.pending >= 8)
+        return yield* new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" });
+      const bridge = entry.bridge;
+      entry.pending++;
+      const operation = Effect.gen(function* () {
+        yield* validate(entry);
+        if ((yield* targetRoot(projectId, threadId)) !== root)
+          return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
+        const response = yield* bridge.exchange(request);
+        yield* validate(entry);
+        if (
+          (yield* targetRoot(projectId, threadId)) !== root ||
+          entry.bridge !== bridge ||
+          response.ownerId !== entry.latest.capabilities?.ownerId ||
+          (response.success &&
+            (response.data.kind !== "task-receipt" ||
+              response.data.receipt.executionId !== request.executionId))
+        )
+          return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
+        return response;
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            entry.pending--;
+          }),
+        ),
+      );
+      return yield* Fiber.join(yield* operation.pipe(Effect.forkIn(entry.scope)));
+    }),
+    evidence: Effect.fn("weavra.controlEvidence")(function* (
+      input: WeavraEvidenceDetailsInput,
+      threadId?: ThreadId,
+    ) {
+      if (environment.T3_WEAVRA_CONTROL !== "1")
+        return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
+      const root = yield* targetRoot(input.projectId, threadId);
+      const entry = entries.get(root);
+      if (
+        !entry ||
+        entry.projectId !== input.projectId ||
+        !entry.bridge ||
+        entry.latest.stale ||
+        entry.latest.capabilities?.evidenceDetails !== 1
+      )
+        return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
+      if (entry.pending >= 8)
+        return yield* new WeavraControlTransportError({ code: "STATE_UNAVAILABLE" });
+      const bridge = entry.bridge;
+      entry.pending++;
+      const operation = Effect.gen(function* () {
+        yield* validate(entry);
+        if ((yield* targetRoot(input.projectId, threadId)) !== root)
+          return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
+        const response = yield* bridge.exchange(input.request);
+        yield* validate(entry);
+        if ((yield* targetRoot(input.projectId, threadId)) !== root)
+          return yield* new WeavraControlTransportError({ code: "PROJECT_CHANGED" });
+        if (entry.bridge !== bridge || response.ownerId !== entry.latest.capabilities?.ownerId)
+          return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
+        if (response.success) {
+          const data = response.data;
+          if (
+            response.runId !== input.request.binding.runId ||
+            response.stateRevision !== input.request.binding.revision ||
+            (data.kind !== "evidence-details" && data.kind !== "evidence-detail-unavailable") ||
+            data.snapshot.executionId !== input.request.binding.executionId ||
+            data.snapshot.runId !== input.request.binding.runId ||
+            data.snapshot.revision !== input.request.binding.revision ||
+            (input.request.binding.diffDigest !== null &&
+              data.snapshot.diffDigest !== input.request.binding.diffDigest) ||
+            data.cursor.category !== input.request.cursor.category ||
+            data.cursor.index !== input.request.cursor.index
+          )
+            return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
+        }
+        return response;
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            entry.pending--;
+          }),
+        ),
+      );
       const fiber = yield* operation.pipe(Effect.forkIn(entry.scope));
       return yield* Fiber.join(fiber);
     }),

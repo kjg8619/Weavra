@@ -142,9 +142,14 @@ export function isConfigValueConfigured(config: string, env?: Record<string, str
  * - In non-command values, "$$" escapes a literal "$" and "$!" escapes a literal "!"
  * - Otherwise treats the value as a literal
  */
-export function resolveConfigValue(config: string, env?: Record<string, string>): string | undefined {
+export function resolveConfigValue(
+	config: string,
+	env?: Record<string, string>,
+	allowCommands = true,
+): string | undefined {
 	const reference = parseConfigValueReference(config);
 	if (reference.type === "command") {
+		if (!allowCommands) throw new Error("Command-valued credential configuration is disabled");
 		return executeCommand(reference.config);
 	}
 	return resolveTemplate(reference.parts, env);
@@ -218,16 +223,26 @@ function executeCommand(commandConfig: string): string | undefined {
 /**
  * Resolve all header values using the same resolution logic as API keys.
  */
-export function resolveConfigValueUncached(config: string, env?: Record<string, string>): string | undefined {
+export function resolveConfigValueUncached(
+	config: string,
+	env?: Record<string, string>,
+	allowCommands = true,
+): string | undefined {
 	const reference = parseConfigValueReference(config);
 	if (reference.type === "command") {
+		if (!allowCommands) throw new Error("Command-valued credential configuration is disabled");
 		return executeCommandUncached(reference.config);
 	}
 	return resolveTemplate(reference.parts, env);
 }
 
-export function resolveConfigValueOrThrow(config: string, description: string, env?: Record<string, string>): string {
-	const resolvedValue = resolveConfigValueUncached(config, env);
+export function resolveConfigValueOrThrow(
+	config: string,
+	description: string,
+	env?: Record<string, string>,
+	allowCommands = true,
+): string {
+	const resolvedValue = resolveConfigValueUncached(config, env, allowCommands);
 	if (resolvedValue !== undefined) {
 		return resolvedValue;
 	}
@@ -272,11 +287,12 @@ export function resolveHeadersOrThrow(
 	headers: Record<string, string> | undefined,
 	description: string,
 	env?: Record<string, string>,
+	allowCommands = true,
 ): Record<string, string> | undefined {
 	if (!headers) return undefined;
 	const resolved: Record<string, string> = {};
 	for (const [key, value] of Object.entries(headers)) {
-		resolved[key] = resolveConfigValueOrThrow(value, `${description} header "${key}"`, env);
+		resolved[key] = resolveConfigValueOrThrow(value, `${description} header "${key}"`, env, allowCommands);
 	}
 	return Object.keys(resolved).length > 0 ? resolved : undefined;
 }

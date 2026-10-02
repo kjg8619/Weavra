@@ -60,6 +60,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -80,6 +81,7 @@ import {
   replaceTextRange,
 } from "../../composer-logic";
 import { DISCONNECTED_COMPOSER_PLACEHOLDER } from "../../composerPlaceholder";
+import { Textarea } from "../ui/textarea";
 import { listContinuationForEnter, listIndentForTab } from "../../composer-list-continuation";
 import {
   deriveComposerSendState,
@@ -1287,6 +1289,9 @@ export interface ChatComposerHandle {
 // --------------------------------------------------------------------------
 
 export interface ChatComposerProps {
+  controlledTask?:
+    | { mode: "analysis" | "followup" | "blocked"; busy: boolean; disabledReason: string | null }
+    | undefined;
   composerDraftTarget: ScopedThreadRef | DraftId;
   environmentId: EnvironmentId;
   attachmentUploadsCapabilityKnown: boolean;
@@ -1478,6 +1483,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     isSendBusy,
     isRevertingCheckpoint = false,
     sendDisabledReason: externalSendDisabledReason,
+    controlledTask,
     isPreparingWorktree,
     environmentUnavailable,
     activePendingApproval,
@@ -1576,6 +1582,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   attachmentTargetKeyRef.current = attachmentTargetKey;
   const questionPreparations = useQuestionAttachmentPreparation((state) => state.counts);
   const prompt = composerDraft.prompt;
+  const controlledMessageId = useId();
   const composerImages = attachmentDraft.images;
   const composerFiles = attachmentDraft.files;
   // A question answer has no chips: its files live in the question draft and show in the
@@ -6045,6 +6052,62 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
   // Render
   // ------------------------------------------------------------------
+  if (controlledTask) {
+    const disabled = controlledTask.busy || controlledTask.disabledReason !== null;
+    const send = (event: { preventDefault: () => void }) => {
+      event.preventDefault();
+      if (!disabled && promptRef.current.trim()) void onSend(event, "foreground");
+    };
+    return (
+      <form
+        ref={composerFormRef}
+        onSubmit={send}
+        className="relative z-10 space-y-3 rounded-[22px] p-4"
+      >
+        <label htmlFor={controlledMessageId} className="block text-sm font-medium">
+          {controlledTask.mode === "analysis"
+            ? "Read-only analysis request"
+            : controlledTask.mode === "blocked"
+              ? "Controlled task message"
+              : "Save a follow-up"}
+        </label>
+        <Textarea
+          id={controlledMessageId}
+          value={prompt}
+          maxLength={PROVIDER_SEND_TURN_MAX_INPUT_CHARS}
+          disabled={controlledTask.busy}
+          aria-describedby={`${controlledMessageId}-help`}
+          onChange={(event) => {
+            promptRef.current = event.target.value;
+            setPrompt(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (
+              event.key === "Enter" &&
+              (event.ctrlKey || event.metaKey) &&
+              !event.nativeEvent.isComposing
+            )
+              send(event);
+          }}
+        />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p id={`${controlledMessageId}-help`} className="min-w-0 text-xs text-muted-foreground">
+            {controlledTask.disabledReason ??
+              (controlledTask.mode === "analysis"
+                ? "Codex read-only; no attachments or tool context. Ctrl/⌘ Enter to send."
+                : "Saved in this conversation only. No provider turn, terminal or automatic next Run. Ctrl/⌘ Enter to save.")}
+          </p>
+          <Button type="submit" disabled={disabled || !prompt.trim()}>
+            {controlledTask.busy
+              ? "Saving…"
+              : controlledTask.mode === "analysis"
+                ? "Send analysis request"
+                : "Save follow-up"}
+          </Button>
+        </div>
+      </form>
+    );
+  }
   return (
     <form
       ref={composerFormRef}

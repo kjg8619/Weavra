@@ -67,6 +67,7 @@ import {
 	type StepReference,
 	type TaskContract,
 	TaskContractSchema,
+	type TaskRunMetadata,
 	type VerificationRepairAttempt,
 	type VerificationResult,
 	VerificationResultSchema,
@@ -102,6 +103,8 @@ export interface CreateRunRequest {
 	runId: string;
 	/** Host-confirmed, frozen Task Contract. Legacy runs are read-only and cannot be created here. */
 	task: TaskContract;
+	/** Canonical Host admission metadata; initial save atomically associates it with this Run. */
+	taskBinding?: TaskRunMetadata;
 	/** Optional bounded budget from the trusted Host config; absent means no configured budget. */
 	budget?: BudgetLimits;
 	/** Host-captured provenance snapshot; the Kernel only stores it. */
@@ -925,6 +928,7 @@ export class CompanyKernel {
 			risk: request.classification.risk,
 			currentTask: request.task.id,
 			tasks: [request.task],
+			...(request.taskBinding ? { taskBinding: request.taskBinding } : {}),
 			taskContractDigest: taskContractDigest(request.task),
 			activeAgents: [],
 			completed: [],

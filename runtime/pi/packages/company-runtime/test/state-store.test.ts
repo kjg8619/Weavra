@@ -4,7 +4,8 @@ import { mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } f
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { PolicyDecision, Run } from "../src/contracts.ts";
+import type { PolicyDecision, Run, TaskAdmission, TaskRunMetadata } from "../src/contracts.ts";
+import { taskContractDigest } from "../src/criterion-evidence.ts";
 import type { RuntimeEvent } from "../src/events.ts";
 import { readHostObservation } from "../src/host-bridge-projections.ts";
 import { CompanyKernel } from "../src/kernel.ts";
@@ -505,6 +506,203 @@ describe("stale writer lock recovery", () => {
 	});
 });
 
+describe("task admission persistence", () => {
+	function admissionFor(store: FileStateStore): TaskAdmission {
+		const digest = `sha256:${"a".repeat(64)}`;
+		return {
+			metadata: {
+				binding: {
+					taskId: "11111111-1111-4111-8111-111111111111",
+					environmentId: "environment",
+					projectId: "project",
+					threadId: "thread",
+					checkout: {
+						canonicalCwd: store.projectPath,
+						repositoryRoot: store.projectPath,
+						headCommit: "a".repeat(40),
+						workspaceDigest: digest,
+					},
+					executionId: "22222222-2222-4222-8222-222222222222",
+					packetVersion: 1,
+					advisoryDigest: digest,
+				},
+				previewDigest: digest,
+				configDigest: digest,
+				confirmedProjectRevision: store.snapshot.revision,
+				admittedProjectRevision: store.snapshot.revision + 1,
+			},
+			outcome: { status: "ACCEPTED" },
+			acceptedAt: 100,
+			updatedAt: 100,
+		};
+	}
+
+	it("retains unresolved admissions and dirty unrelated files without inventing a Run on reload", async () => {
+		const store = await openStore();
+		const admission = admissionFor(store);
+		await writeFile(join(root, "unrelated-dirty.txt"), "keep exactly");
+		await store.saveTaskAdmission(admission, 0);
+		await store.close();
+		const before = await readFile(join(root, ".ai/state.json"), "utf8");
+		expect(await FileStateStore.readTaskReceipt(root, admission.metadata.binding.executionId)).toEqual({
+			status: "FOUND",
+			executionId: admission.metadata.binding.executionId,
+			admission,
+			run: null,
+		});
+		expect(await readFile(join(root, ".ai/state.json"), "utf8")).toBe(before);
+		const reopened = await openStore();
+		expect(reopened.snapshot.taskAdmissions).toEqual([admission]);
+		expect(reopened.snapshot.runs).toEqual([]);
+		expect(await readFile(join(root, "unrelated-dirty.txt"), "utf8")).toBe("keep exactly");
+	});
+
+	it.each([
+		["state.json", "rename"],
+		["tasks.json", "rename"],
+		["writer.lock", "write"],
+		["writer.lock", "sync"],
+		["writer.lock", "rename"],
+	] as const)("preserves dead-owner proof when recovery fails at %s %s", async (failedFile, failedStep) => {
+		const store = await openStore();
+		const admission = admissionFor(store);
+		await store.saveTaskAdmission(admission, 0);
+		await store.close();
+		const pid = deadPid();
+		await writeLock({
+			schemaVersion: 1,
+			projectPath: await realpath(root),
+			token: "dead",
+			pid,
+			hostname: hostname(),
+		});
+		await expect(
+			openStore({
+				beforeAtomicStep: (file, step) => {
+					if (file === failedFile && step === failedStep) throw new Error("Recovery write failed");
+				},
+			}),
+		).rejects.toBeInstanceOf(StateStoreError);
+		expect(await FileStateStore.recoverDeadOwner(root)).toEqual({ pid });
+		expect(await FileStateStore.readTaskReceipt(root, admission.metadata.binding.executionId)).toMatchObject({
+			admission: { outcome: { status: "INTERRUPTED_BEFORE_START", reasonCode: "OWNER_LOST" } },
+			run: null,
+		});
+		expect(await readdir(join(root, ".ai"))).not.toContain("writer.lock");
+	});
+
+	it.each(["START_FAILED", "INTERRUPTED_BEFORE_START"] as const)(
+		"persists %s without a Run and never reaccepts or repeats an identical settlement",
+		async (status) => {
+			const store = await openStore();
+			const admission = admissionFor(store);
+			await store.saveTaskAdmission(admission, 0);
+			const settled: TaskAdmission = {
+				...admission,
+				outcome:
+					status === "START_FAILED"
+						? { status, reasonCode: "INITIALIZATION_FAILED" }
+						: { status, reasonCode: "OWNER_LOST" },
+				updatedAt: 101,
+			};
+			await store.saveTaskAdmission(settled, 1);
+			const before = await readFile(join(root, ".ai/state.json"), "utf8");
+			expect(await store.saveTaskAdmission(settled, 1)).toEqual(settled);
+			expect(await store.saveTaskAdmission(admission, 0)).toEqual(settled);
+			expect(await readFile(join(root, ".ai/state.json"), "utf8")).toBe(before);
+			expect(store.snapshot.runs).toEqual([]);
+		},
+	);
+
+	it.each(["checkout", "packet", "thread", "revision"] as const)(
+		"rejects a conflicting %s without rewriting the accepted admission",
+		async (field) => {
+			const store = await openStore();
+			const admission = admissionFor(store);
+			await store.saveTaskAdmission(admission, 0);
+			const before = await readFile(join(root, ".ai/state.json"), "utf8");
+			const changed = structuredClone(admission);
+			switch (field) {
+				case "checkout":
+					changed.metadata.binding.checkout.canonicalCwd = "/other";
+					break;
+				case "packet":
+					changed.metadata.binding.packetVersion = 2;
+					break;
+				case "thread":
+					changed.metadata.binding.threadId = "other-thread";
+					break;
+				case "revision":
+					changed.outcome = { status: "START_FAILED", reasonCode: "INITIALIZATION_FAILED" };
+					break;
+			}
+			await expect(store.saveTaskAdmission(changed, 0)).rejects.toBeInstanceOf(StateStoreError);
+			expect(await readFile(join(root, ".ai/state.json"), "utf8")).toBe(before);
+		},
+	);
+
+	it("atomically binds the initial Run and preserves it through repeated owner-loss recovery", async () => {
+		const store = await openStore();
+		const legacy = await kernel(store, "legacy");
+		await store.save({ ...legacy.snapshot, revision: 2, status: "CANCELLED" });
+		const admission = admissionFor(store);
+		await store.saveTaskAdmission(admission, store.snapshot.revision);
+		const task = testContract("Fix bug", { taskId: admission.metadata.binding.executionId });
+		const run: Run = {
+			...legacy.snapshot,
+			runId: "bound",
+			revision: 1,
+			currentTask: task.id,
+			tasks: [task],
+			taskContractDigest: taskContractDigest(task),
+			taskBinding: admission.metadata,
+		};
+		await store.save(run);
+		const persisted = await json("state.json");
+		expect(persisted.taskAdmissions[0].outcome).toEqual({ status: "STARTED", runId: "bound" });
+		expect(persisted.runs[1].taskBinding).toEqual(admission.metadata);
+		await store.close();
+		const recovered = await openStore({ now: () => 200 });
+		expect((await recovered.load("bound"))?.status).toBe("INTERRUPTED");
+		expect((await recovered.load("bound"))?.taskBinding).toEqual(admission.metadata);
+		await recovered.close();
+		const before = await readFile(join(root, ".ai/state.json"), "utf8");
+		await (await openStore()).close();
+		expect(await readFile(join(root, ".ai/state.json"), "utf8")).toBe(before);
+	});
+
+	it("rejects changing frozen Run task metadata even with a fresh Run revision", async () => {
+		const store = await openStore();
+		const legacy = await kernel(store, "legacy");
+		await store.save({ ...legacy.snapshot, revision: 2, status: "CANCELLED" });
+		const admission = admissionFor(store);
+		await store.saveTaskAdmission(admission, store.snapshot.revision);
+		const task = testContract("Fix bug", { taskId: admission.metadata.binding.executionId });
+		const run: Run = {
+			...legacy.snapshot,
+			runId: "bound",
+			revision: 1,
+			currentTask: task.id,
+			tasks: [task],
+			taskContractDigest: taskContractDigest(task),
+			taskBinding: admission.metadata,
+		};
+		await store.save(run);
+		const before = await readFile(join(root, ".ai/state.json"), "utf8");
+		await expect(
+			store.save({
+				...run,
+				revision: 2,
+				taskBinding: {
+					...admission.metadata,
+					binding: { ...admission.metadata.binding, advisoryDigest: `sha256:${"b".repeat(64)}` },
+				},
+			}),
+		).rejects.toMatchObject({ stage: "task binding is immutable" });
+		expect(await readFile(join(root, ".ai/state.json"), "utf8")).toBe(before);
+	});
+});
+
 describe("terminal-run archive", () => {
 	async function terminalRuns(store: FileStateStore, count: number) {
 		for (let index = 0; index < count; index++) {
@@ -517,6 +715,90 @@ describe("terminal-run archive", () => {
 	}
 	const archiveText = (runId: string) => readFile(join(root, ".ai/runs", `${runId}.json`), "utf8");
 	const digest = (text: string) => `sha256:${createHash("sha256").update(text).digest("hex")}`;
+
+	it("round-trips frozen task metadata through admission, archive crash and read-only lookup", async () => {
+		const first = await openStore();
+		const legacy = await kernel(first, "legacy");
+		await legacy.start();
+		await legacy.stop("CANCELLED", "Fixture");
+		const executionId = "22222222-2222-4222-8222-222222222222";
+		const metadata: TaskRunMetadata = {
+			binding: {
+				taskId: "11111111-1111-4111-8111-111111111111",
+				environmentId: "environment",
+				projectId: "project",
+				threadId: "thread",
+				checkout: {
+					canonicalCwd: await realpath(root),
+					repositoryRoot: await realpath(root),
+					headCommit: "a".repeat(40),
+					workspaceDigest: digest("workspace"),
+				},
+				executionId,
+				packetVersion: 3,
+				advisoryDigest: digest("reviewed packet"),
+				symptomVerification: { criterionId: "AC-001", checkId: "regression", registrationDigest: digest("check") },
+			},
+			previewDigest: digest("preview"),
+			configDigest: digest("config"),
+			confirmedProjectRevision: first.snapshot.revision,
+			admittedProjectRevision: first.snapshot.revision + 1,
+		};
+		const admission: TaskAdmission = { metadata, outcome: { status: "ACCEPTED" }, acceptedAt: 100, updatedAt: 100 };
+		await first.saveTaskAdmission(admission, first.snapshot.revision);
+		const admittedRevision = first.snapshot.revision;
+		expect(await first.saveTaskAdmission(admission, metadata.confirmedProjectRevision)).toEqual(admission);
+		expect(first.snapshot.revision).toBe(admittedRevision);
+		const task = testContract("Fix bug", { taskId: executionId, statements: ["Regression covered"] });
+		const run: Run = {
+			...legacy.snapshot,
+			runId: "bound-run",
+			revision: 1,
+			status: "CREATED",
+			currentTask: executionId,
+			tasks: [task],
+			taskContractDigest: taskContractDigest(task),
+			taskBinding: metadata,
+		};
+		await first.save(run);
+		expect(first.snapshot.taskAdmissions?.[0]?.outcome).toEqual({ status: "STARTED", runId: "bound-run" });
+		await first.save({ ...run, revision: 2, status: "CANCELLED" });
+		await terminalRuns(first, INLINE_TERMINAL_RUNS);
+		await first.close();
+		await expect(
+			openStore({
+				beforeAtomicStep: (file, step) => {
+					if (file === "state.json" && step === "rename") throw new Error("crash");
+				},
+			}),
+		).rejects.toThrow();
+		const written = await archiveText("bound-run");
+		await (await openStore()).close();
+		expect(await archiveText("bound-run")).toBe(written);
+		expect((await FileStateStore.readArchivedRun(root, "bound-run"))?.run.taskBinding).toEqual(metadata);
+		const before = await readFile(join(root, ".ai/state.json"), "utf8");
+		const receipt = await FileStateStore.readTaskReceipt(root, executionId);
+		expect(receipt).toMatchObject({
+			status: "FOUND",
+			executionId,
+			admission: { metadata, outcome: { status: "STARTED", runId: "bound-run" } },
+			run: { runId: "bound-run", status: "CANCELLED", revision: 2 },
+		});
+		expect(await readFile(join(root, ".ai/state.json"), "utf8")).toBe(before);
+		expect((await readdir(join(root, ".ai"))).includes("writer.lock")).toBe(false);
+		console.log(
+			"TASK_RUNTIME_QA",
+			JSON.stringify({
+				executionId,
+				taskId: metadata.binding.taskId,
+				archivedRun: "bound-run",
+				packetVersion: 3,
+				symptomCheck: "regression",
+				status: "CANCELLED",
+				readOnly: true,
+			}),
+		);
+	});
 
 	it("moves terminal runs beyond the inline limit, with their actions, behind a digest index", async () => {
 		const first = await openStore();

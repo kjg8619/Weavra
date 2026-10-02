@@ -19,6 +19,7 @@ import {
   ProviderEventLoggers,
 } from "../src/provider/Layers/ProviderEventLoggers.ts";
 import { makeProviderServiceLive } from "../src/provider/Layers/ProviderService.ts";
+import * as OwnershipTest from "../src/workspace/WorkspaceExecutionOwnershipTest.ts";
 import {
   ProviderService,
   type ProviderServiceShape,
@@ -98,9 +99,10 @@ const makeIntegrationFixture = (options?: { readonly analytics?: Layer.Layer<Ana
       ServerSettingsService.layerTest(DEFAULT_SERVER_SETTINGS),
       options?.analytics ?? AnalyticsService.layerTest,
       Layer.succeed(ProviderEventLoggers, NoOpProviderEventLoggers),
-    ).pipe(Layer.provide(SqlitePersistenceMemory));
+    ).pipe(Layer.provideMerge(SqlitePersistenceMemory));
 
     const layer = makeProviderServiceLive().pipe(
+      Layer.provide(OwnershipTest.baseLayer),
       Layer.provide(NodeServices.layer),
       Layer.provide(shared),
     );
@@ -120,10 +122,9 @@ const collectEventsDuring = <A, E, R>(
   Effect.gen(function* () {
     const queue = yield* Queue.unbounded<ProviderRuntimeEvent>();
     yield* Stream.runForEach(stream, (event) => Queue.offer(queue, event).pipe(Effect.asVoid)).pipe(
-      Effect.forkScoped,
+      Effect.forkScoped({ startImmediately: true }),
     );
 
-    yield* Effect.sleep("50 millis");
     yield* action;
 
     return yield* Effect.forEach(

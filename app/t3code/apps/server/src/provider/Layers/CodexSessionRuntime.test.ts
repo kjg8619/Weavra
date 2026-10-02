@@ -352,6 +352,34 @@ describe("buildTurnStartParams", () => {
       ],
     });
   });
+
+  it.effect("forces non-escalatable read-only policy for controlled analysis turns", () =>
+    Effect.gen(function* () {
+      const params = yield* buildTurnStartParams({
+        threadId: "provider-thread-1",
+        runtimeMode: "full-access",
+        prompt: "Analyze only",
+        interactionMode: "plan",
+        controlledAnalysis: true,
+      });
+
+      NodeAssert.deepStrictEqual(params.approvalPolicy, {
+        granular: {
+          mcp_elicitations: false,
+          request_permissions: false,
+          rules: false,
+          sandbox_approval: false,
+          skill_approval: false,
+        },
+      });
+      NodeAssert.deepStrictEqual(params.sandboxPolicy, {
+        type: "readOnly",
+        networkAccess: false,
+      });
+      NodeAssert.equal(params.approvalsReviewer, "user");
+      NodeAssert.equal(params.collaborationMode?.mode, "plan");
+    }),
+  );
 });
 
 describe("Codex MCP elicitation approvals", () => {
@@ -887,6 +915,62 @@ describe("isRecoverableThreadResumeError", () => {
 });
 
 describe("openCodexThread", () => {
+  it.effect("uses controlled read-only policy for start and resume", () =>
+    Effect.gen(function* () {
+      const calls: Array<{ readonly method: string; readonly payload: unknown }> = [];
+      const client = {
+        request: (
+          method: "thread/start",
+          payload: CodexRpc.ClientRequestParamsByMethod["thread/start"],
+        ) => {
+          calls.push({ method, payload });
+          return Effect.succeed(makeThreadOpenResponse("fresh-thread"));
+        },
+        raw: {
+          request: (
+            method: "thread/resume",
+            payload: CodexRpc.ClientRequestParamsByMethod["thread/resume"],
+          ) => {
+            calls.push({ method, payload });
+            return Effect.succeed(makeThreadOpenResponse("saved-thread"));
+          },
+        },
+      };
+      const common = {
+        client,
+        threadId: ThreadId.make("thread-1"),
+        runtimeMode: "full-access" as const,
+        cwd: "/tmp/project",
+        requestedModel: "gpt-5.3-codex",
+        serviceTier: undefined,
+        controlledAnalysis: true,
+      };
+
+      yield* openCodexThread({ ...common, resumeThreadId: undefined });
+      yield* openCodexThread({ ...common, resumeThreadId: "saved-thread" });
+
+      for (const call of calls) {
+        NodeAssert.deepStrictEqual(call.payload, {
+          ...(call.method === "thread/resume" ? { threadId: "saved-thread" } : {}),
+          cwd: "/tmp/project",
+          model: "gpt-5.3-codex",
+          approvalPolicy: {
+            granular: {
+              mcp_elicitations: false,
+              request_permissions: false,
+              rules: false,
+              sandbox_approval: false,
+              skill_approval: false,
+            },
+          },
+          sandbox: "read-only",
+          approvalsReviewer: "user",
+          ...(call.method === "thread/resume" ? { excludeTurns: true } : {}),
+        });
+      }
+    }),
+  );
+
   it.effect("resumes metadata when historical turns contain unknown error values", () =>
     Effect.gen(function* () {
       const response = makeThreadOpenResponse("saved-thread");

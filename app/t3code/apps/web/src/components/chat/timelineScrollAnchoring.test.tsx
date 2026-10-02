@@ -56,6 +56,20 @@ describe("timelineContentOverflowsViewport", () => {
       ),
     ).toBe(false);
   });
+
+  it("counts real footer content when short messages otherwise fit", () => {
+    const state = buildState({ positions: [0, 90], sizes: [90, 90] });
+    expect(timelineContentOverflowsViewport(state, { ...inset, contentFooterHeight: 1200 })).toBe(
+      true,
+    );
+  });
+
+  it("counts real footer content before the first message", () => {
+    const state = buildState({ positions: [], sizes: [] });
+    expect(timelineContentOverflowsViewport(state, { ...inset, contentFooterHeight: 1200 })).toBe(
+      true,
+    );
+  });
 });
 
 describe("timeline scroll anchoring", () => {

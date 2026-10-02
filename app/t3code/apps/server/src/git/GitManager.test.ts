@@ -9,6 +9,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as OwnershipTest from "../workspace/WorkspaceExecutionOwnershipTest.ts";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as PlatformError from "effect/PlatformError";
@@ -705,6 +706,7 @@ function makeManager(input?: {
 
   return GitManager.make.pipe(
     Effect.provide(managerLayer),
+    OwnershipTest.provide,
     Effect.map((manager) => ({ manager, ghCalls })),
   );
 }
@@ -712,6 +714,7 @@ function makeManager(input?: {
 const asThreadId = (threadId: string) => threadId as ThreadId;
 
 const GitManagerTestLayer = GitVcsDriver.layer.pipe(
+  Layer.provide(OwnershipTest.layer),
   Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-git-manager-test-" })),
   Layer.provideMerge(VcsProcess.layer),
   Layer.provideMerge(NodeServices.layer),

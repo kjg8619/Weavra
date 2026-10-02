@@ -19,6 +19,7 @@ import * as ServerConfig from "../config.ts";
 import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import * as GitVcsDriver from "./GitVcsDriver.ts";
+import * as OwnershipTest from "../workspace/WorkspaceExecutionOwnershipTest.ts";
 import type * as VcsDriver from "./VcsDriver.ts";
 import * as VcsDriverRegistry from "./VcsDriverRegistry.ts";
 import * as VcsProcess from "./VcsProcess.ts";
@@ -28,6 +29,7 @@ const ServerConfigLayer = ServerConfig.layerTest(process.cwd(), {
   prefix: "t3-git-vcs-contract-",
 });
 const GitContractLayer = Layer.mergeAll(GitVcsDriver.vcsLayer, GitVcsDriver.layer).pipe(
+  Layer.provide(OwnershipTest.layer),
   Layer.provide(ServerConfigLayer),
   Layer.provideMerge(VcsProcess.layer),
   Layer.provideMerge(NodeServices.layer),
@@ -56,6 +58,7 @@ const makeCaptureStore = Effect.fn("test.makeCaptureStore")(function* (
   if (repository === null) return yield* Effect.die("Expected a test Git repository");
   const handle = { kind: repository.kind, repository, driver };
   return yield* CheckpointStore.make.pipe(
+    OwnershipTest.provide,
     Effect.provideService(VcsDriverRegistry.VcsDriverRegistry, {
       get: () => Effect.succeed(driver),
       detect: () => Effect.succeed(handle),

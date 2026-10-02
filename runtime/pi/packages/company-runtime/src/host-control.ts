@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Check } from "typebox/value";
 import runtimePackage from "../package.json" with { type: "json" };
+import { prepareAnalysisContext, prepareSymptomVerification } from "./analysis-context.ts";
+import { readAnchoredSource } from "./anchored-files.ts";
 import { validBrowserCheckEvidence } from "./browser-evidence.ts";
 import {
 	BrowserRegistrationError,
@@ -24,10 +26,23 @@ import {
 	type ComplexDraft,
 	type ComplexExecution,
 } from "./complex-types.ts";
-import { loadRuntimeConfig, type RuntimeConfig } from "./config.ts";
-import type { ApprovalDecision, ApprovalRequest, Run } from "./contracts.ts";
+import { loadRuntimeConfig, parseRuntimeConfig, type RuntimeConfig } from "./config.ts";
+import {
+	type ApprovalDecision,
+	type ApprovalRequest,
+	analysisContextDigest,
+	type CheckoutIdentity,
+	type Run,
+	type TaskAdmission,
+	type TaskBinding,
+} from "./contracts.ts";
 import { taskContractDigest } from "./criterion-evidence.ts";
 import type { RuntimeEventSink } from "./events.ts";
+import {
+	EvidenceDetailsCursorError,
+	EvidenceDetailsResponseTooLargeError,
+	projectHostEvidenceDetails,
+} from "./evidence-details.ts";
 import type { HostBridgeConnection } from "./host-bridge.ts";
 import {
 	projectHostConfiguration,
@@ -37,17 +52,22 @@ import {
 } from "./host-bridge-projections.ts";
 import type { HostBridgeIdentity, HostSnapshotSummary } from "./host-bridge-protocol.ts";
 import {
+	HOST_CHECKOUT_COMMANDS,
 	HOST_CONTROL_COMMANDS,
 	HOST_CONTROL_MAX_REQUEST_BYTES,
 	HOST_CONTROL_MAX_RESPONSE_BYTES,
 	HOST_CONTROL_PREVIEW_TTL_MS,
 	HOST_CONTROL_RESULT_LIMIT,
+	HOST_EVIDENCE_COMMANDS,
 	HOST_PLANNER_COMMANDS,
 	HOST_PLANNER_DRAFT_MAX_RESPONSE_BYTES,
 	HOST_RERUN_COMMANDS,
 	HOST_RERUN_DRAFT_MAX_RESPONSE_BYTES,
+	HOST_TASK_COMMANDS,
+	HOST_TASK_RECOVERY_COMMANDS,
 	type HostBrowserPreview,
 	type HostBrowserState,
+	type HostCheckoutIdentityRequest,
 	type HostControlApproval,
 	type HostControlCapabilities,
 	type HostControlData,
@@ -57,6 +77,7 @@ import {
 	type HostControlRequest,
 	HostControlRequestSchema,
 	type HostControlResponse,
+	type HostEvidenceDetailsRequest,
 	type HostFactPreview,
 	type HostPlannerFailureCode,
 	type HostPlannerStatus,
@@ -96,7 +117,7 @@ import {
 import { FileStateStore } from "./state-store.ts";
 import { listTaskRecipes, recipeInputTemplate } from "./task-recipes.ts";
 import type { StandardWorkflow } from "./workflow.ts";
-import { readCleanStartBlockers } from "./workspace.ts";
+import { readCheckoutIdentity, readCleanStartBlockers } from "./workspace.ts";
 
 class ControlError extends Error {
 	readonly code: HostControlErrorCode;
@@ -117,6 +138,20 @@ function fingerprint(value: unknown): string {
 }
 function isActive(run: Run | undefined): boolean {
 	return !!run && ["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(run.status);
+}
+function taskPreviewDigest(
+	request: Extract<HostControlMutation, { type: "workflow.prepare" }>,
+	binding: TaskBinding,
+	configDigest: string,
+): string {
+	return fingerprint({
+		domain: "weavra.task-preview.v1",
+		task: request.task,
+		goal: request.goal,
+		acceptanceStatements: request.acceptanceStatements,
+		binding,
+		configDigest,
+	});
 }
 type Prepared = {
 	plan: ReturnType<typeof finalizeHostWorkflowPlan>;
@@ -273,6 +308,23 @@ export class HostControlBridge {
 		if ((snapshot.state?.revision ?? 0) !== expected) throw new ControlError("STALE_PROJECT");
 		if (snapshot.writerPresent) throw new ControlError("WRITER_PRESENT");
 		if (snapshot.state?.runs.some(isActive)) throw new ControlError("ACTIVE_RUN");
+		if (snapshot.state?.taskAdmissions?.some((entry) => entry.outcome.status === "ACCEPTED"))
+			throw new ControlError("ACTIVE_RUN");
+	}
+	private async assertTaskCheckout(binding: TaskBinding, config: RuntimeConfig, signal?: AbortSignal): Promise<void> {
+		try {
+			const current = await readCheckoutIdentity(
+				this.root.path,
+				{
+					allowedPaths: config.files.allowed_paths,
+					evidenceMode: config.workspace?.evidence.mode,
+				},
+				signal,
+			);
+			if (fingerprint(current) !== fingerprint(binding.checkout)) throw new Error("Changed checkout");
+		} catch {
+			throw new ControlError("PROJECT_CHANGED");
+		}
 	}
 	/**
 	 * `workflow.prepare` only; snapshots and confirm never recover. When this Host is idle, the project is exactly the
@@ -282,11 +334,15 @@ export class HostControlBridge {
 	 * nothing; the client re-reads and prepares at the recovered revision. Any other lock and every failure leave the
 	 * project unchanged for the idle checks to refuse exactly as before.
 	 */
-	private async recoverDeadOwner(expected: number): Promise<void> {
-		if (this.execution) return;
+	private async recoverDeadOwner(expected: number): Promise<boolean> {
+		if (this.execution) return false;
 		const snapshot = await this.canonical();
-		if ((snapshot.state?.revision ?? 0) !== expected || !snapshot.writerPresent) return;
-		await FileStateStore.recoverDeadOwner(this.root.path, { events: this.options.events }).catch(() => {});
+		if ((snapshot.state?.revision ?? 0) !== expected || !snapshot.writerPresent) return false;
+		return (
+			(await FileStateStore.recoverDeadOwner(this.root.path, { events: this.options.events }).catch(
+				() => undefined,
+			)) !== undefined
+		);
 	}
 	private async currentRun(request: Extract<HostControlMutation, { expectedStateRevision: number }>): Promise<Run> {
 		const snapshot = await this.canonical();
@@ -723,6 +779,47 @@ export class HostControlBridge {
 			draft.workflow === "COMPLEX"
 				? await finalizeComplexHostWorkflowPlan(draft, statements, { cwd: this.root.path })
 				: finalizeHostWorkflowPlan(draft, statements);
+		if (request.task) {
+			if (plan.workflow !== "STANDARD") throw new ControlError("UNSUPPORTED_WORKFLOW");
+			const preparation = structuredClone(request.task);
+			const analysis = await prepareAnalysisContext(this.root.path, config, preparation.analysisContext);
+			const configDigest = fingerprint(config);
+			const symptom = preparation.symptomVerification
+				? await prepareSymptomVerification({
+						cwd: this.root.path,
+						config,
+						contract: plan.taskContract,
+						configDigest,
+						proposal: preparation.symptomVerification,
+					})
+				: undefined;
+			const binding: TaskBinding = {
+				taskId: preparation.taskId,
+				environmentId: preparation.environmentId,
+				projectId: preparation.projectId,
+				threadId: preparation.threadId,
+				checkout: preparation.checkout,
+				executionId: plan.taskContract.id,
+				packetVersion: analysis.packet.packetVersion,
+				advisoryDigest: analysisContextDigest(analysis.packet),
+				...(symptom ? { symptomVerification: symptom.binding } : {}),
+			};
+			await this.assertTaskCheckout(binding, config);
+			plan.task = {
+				binding,
+				analysis,
+				assertCurrent: () => {
+					if (
+						fingerprint(parseRuntimeConfig(readAnchoredSource(this.root.path, ".ai/config.yaml").text)) !==
+						configDigest
+					)
+						throw new HostWorkflowError("CONFIG_CHANGED", "The confirmed configuration changed");
+					analysis.assertCurrent();
+					symptom?.assertCurrent();
+				},
+			};
+			plan.task.assertCurrent();
+		}
 		const fields = {
 			previewId: randomUUID(),
 			ownerId: this.ownerId,
@@ -742,6 +839,8 @@ export class HostControlBridge {
 			})),
 			taskContractDigest: taskContractDigest(plan.taskContract),
 			recipe: plan.recipe ?? null,
+			// Resolved from plan.config, the same frozen normalized configuration createHostWorkflow executes.
+			modelRoutes: plan.preview.modelRoutes.map((route) => ({ ...route })),
 			configuration: {
 				mutationMode: config.mutation.mode,
 				verifierTrustMode: config.verification.trust.mode,
@@ -752,10 +851,13 @@ export class HostControlBridge {
 			},
 			// Absent (not null) for QUICK/STANDARD; the preview digest below covers the complete plan.
 			...(plan.complexPlan ? { complexPlan: plan.complexPlan } : {}),
+			...(plan.task ? { taskBinding: plan.task.binding, configDigest: fingerprint(config) } : {}),
 		};
 		const preview: HostControlPreview = {
 			...fields,
-			previewDigest: fingerprint({ fields, config, root: this.root, contract: plan.taskContract }),
+			previewDigest: plan.task
+				? taskPreviewDigest(request, plan.task.binding, fingerprint(config))
+				: fingerprint({ fields, config, root: this.root, contract: plan.taskContract }),
 		};
 		const response = this.success(request, { kind: "prepared", preview });
 		if (Buffer.byteLength(JSON.stringify(response)) + 1 > HOST_CONTROL_MAX_RESPONSE_BYTES)
@@ -823,8 +925,129 @@ export class HostControlBridge {
 			throw new ControlError("RESPONSE_TOO_LARGE");
 		return response;
 	}
+	/** Exact bound Run evidence only. No writer, recovery, check execution, repair or canonical mutation. */
+	private async evidence(request: HostEvidenceDetailsRequest): Promise<HostControlResponse> {
+		const before = await this.canonical();
+		const admission = before.state?.taskAdmissions?.find(
+			(entry) => entry.metadata.binding.executionId === request.binding.executionId,
+		);
+		if (!admission || admission.outcome.status !== "STARTED") throw new ControlError("RUN_NOT_FOUND");
+		const runId = admission.outcome.runId;
+		let run = before.state?.runs.find((entry) => entry.runId === runId);
+		let source: "inline" | "archive" = "inline";
+		if (!run) {
+			source = "archive";
+			run = (await FileStateStore.readArchivedRun(this.root.path, runId))?.run;
+		}
+		if (!run) throw new ControlError("STATE_UNAVAILABLE");
+		const binding = run.taskBinding?.binding;
+		if (
+			!binding ||
+			request.binding.runId !== run.runId ||
+			request.binding.taskId !== binding.taskId ||
+			request.binding.environmentId !== binding.environmentId ||
+			request.binding.projectId !== binding.projectId ||
+			request.binding.threadId !== binding.threadId ||
+			request.binding.executionId !== binding.executionId
+		)
+			throw new ControlError("RUN_NOT_OWNED");
+		if (
+			request.binding.revision !== run.revision ||
+			(request.binding.diffDigest !== null && request.binding.diffDigest !== run.workspace?.diffDigest)
+		)
+			throw new ControlError("STALE_RUN");
+		const after = await this.canonical();
+		if (
+			(after.state?.revision ?? 0) !== (before.state?.revision ?? 0) ||
+			after.writerPresent !== before.writerPresent
+		)
+			throw new ControlError("STALE_RUN");
+		try {
+			const identity = {
+				runId: run.runId,
+				stateRevision: run.revision,
+				projectRevision: before.state?.revision ?? 0,
+			};
+			const data = projectHostEvidenceDetails({
+				run,
+				admission,
+				source,
+				writerPresent: before.writerPresent,
+				cursor: request.cursor,
+				fits: (candidate) =>
+					Buffer.byteLength(JSON.stringify(this.success(request, candidate, identity))) + 1 <=
+					HOST_CONTROL_MAX_RESPONSE_BYTES,
+			});
+			return this.success(request, data, identity);
+		} catch (error) {
+			if (error instanceof EvidenceDetailsCursorError) throw new ControlError("INVALID_REQUEST");
+			if (error instanceof EvidenceDetailsResponseTooLargeError) throw new ControlError("RESPONSE_TOO_LARGE");
+			throw error;
+		}
+	}
+	/** Exact clean checkout identity only. No writer, recovery, check execution, model or canonical mutation. */
+	private async checkoutIdentity(request: HostCheckoutIdentityRequest): Promise<HostControlResponse> {
+		if ((this.options.readiness ?? "READY") !== "READY") throw new ControlError("CONTROL_UNAVAILABLE");
+		if (this.execution) throw new ControlError("ACTIVE_RUN");
+		const before = await this.canonical();
+		if (before.writerPresent) throw new ControlError("WRITER_PRESENT");
+		if (
+			before.state?.runs.some(isActive) ||
+			before.state?.taskAdmissions?.some((entry) => entry.outcome.status === "ACCEPTED")
+		)
+			throw new ControlError("ACTIVE_RUN");
+		const config = await this.configuration();
+		const configDigest = fingerprint(config);
+		let checkout: CheckoutIdentity;
+		try {
+			checkout = await readCheckoutIdentity(this.root.path, {
+				allowedPaths: config.files.allowed_paths,
+				evidenceMode: config.workspace?.evidence.mode,
+			});
+		} catch {
+			throw new ControlError("PROJECT_CHANGED");
+		}
+		let currentConfig: RuntimeConfig;
+		try {
+			currentConfig = await this.configuration();
+		} catch {
+			throw new ControlError("CONFIG_CHANGED");
+		}
+		if (fingerprint(currentConfig) !== configDigest) throw new ControlError("CONFIG_CHANGED");
+		if (this.execution) throw new ControlError("ACTIVE_RUN");
+		const after = await this.canonical();
+		if (after.writerPresent) throw new ControlError("WRITER_PRESENT");
+		if (
+			after.state?.runs.some(isActive) ||
+			after.state?.taskAdmissions?.some((entry) => entry.outcome.status === "ACCEPTED")
+		)
+			throw new ControlError("ACTIVE_RUN");
+		if (fingerprint(after) !== fingerprint(before)) throw new ControlError("STALE_PROJECT");
+		return this.success(request, { kind: "checkout-identity", checkout });
+	}
 	private async mutate(request: HostControlMutation, origin?: HostBridgeConnection): Promise<HostControlResponse> {
 		if ((this.options.readiness ?? "READY") !== "READY") throw new ControlError("CONTROL_UNAVAILABLE");
+		if (request.type === "workflow.recover") {
+			await this.assertRoot();
+			if (this.disposed) throw new ControlError("CONTROL_UNAVAILABLE");
+			if (this.execution || this.planning) throw new ControlError("BUSY");
+			const result = await FileStateStore.recoverTask(
+				this.root.path,
+				request.metadata,
+				request.expectedProjectRevision,
+				{
+					now: () => this.now(),
+					events: this.options.events,
+				},
+			);
+			return this.success(
+				request,
+				{ kind: "task-recovery", ...result },
+				{
+					projectRevision: (await this.canonical()).state?.revision ?? 0,
+				},
+			);
+		}
 		if (request.type === "facts.prepare") {
 			await this.idleRevision(request.expectedProjectRevision);
 			const prepared = await prepareProjectFact(this.root.path, request.sourceRef, request.statement);
@@ -976,7 +1199,24 @@ export class HostControlBridge {
 					complexDraftBytes(complexDraft) > COMPLEX_DRAFT_MAX_BYTES)
 			)
 				throw new ControlError("INVALID_REQUEST");
-			await this.recoverDeadOwner(request.expectedProjectRevision);
+			if (await this.recoverDeadOwner(request.expectedProjectRevision))
+				await this.idleRevision(request.expectedProjectRevision);
+			if (request.task) {
+				const existing = (await this.canonical()).state?.taskAdmissions?.find(
+					(entry) => entry.metadata.binding.taskId === request.task?.taskId,
+				);
+				if (existing) {
+					if (
+						taskPreviewDigest(request, existing.metadata.binding, existing.metadata.configDigest) !==
+						existing.metadata.previewDigest
+					)
+						throw new ControlError("PLAN_CHANGED");
+					return this.success(request, {
+						kind: "task-receipt",
+						receipt: await FileStateStore.readTaskReceipt(this.root.path, existing.metadata.binding.executionId),
+					});
+				}
+			}
 			// A preview is only ever bound to the client's own expected revision; a recovery that moved it is STALE_PROJECT.
 			await this.idleRevision(request.expectedProjectRevision);
 			const config = await this.configuration();
@@ -992,24 +1232,80 @@ export class HostControlBridge {
 			if (this.planning) throw new ControlError("PLANNER_BUSY");
 			const prepared = this.prepared;
 			if (!prepared || prepared.preview.previewId !== request.previewId) throw new ControlError("PLAN_NOT_FOUND");
-			if (prepared.consumed) throw new ControlError("PLAN_CONSUMED");
-			if (prepared.preview.expiresAt <= this.now()) throw new ControlError("PLAN_EXPIRED");
 			if (prepared.preview.previewDigest !== request.previewDigest) throw new ControlError("PLAN_CHANGED");
 			if (prepared.preview.projectRevision !== request.expectedProjectRevision)
 				throw new ControlError("STALE_PROJECT");
+			if (prepared.consumed) {
+				if (!prepared.plan.task) throw new ControlError("PLAN_CONSUMED");
+				return this.success(request, {
+					kind: "task-receipt",
+					receipt: await FileStateStore.readTaskReceipt(this.root.path, prepared.plan.task.binding.executionId),
+				});
+			}
+			if (prepared.preview.expiresAt <= this.now()) throw new ControlError("PLAN_EXPIRED");
 			await this.idleRevision(request.expectedProjectRevision);
 			if (fingerprint(await this.configuration()) !== prepared.configurationDigest)
 				throw new ControlError("CONFIG_CHANGED");
 			await this.idleRevision(request.expectedProjectRevision);
 			if (this.disposed) throw new ControlError("CONTROL_UNAVAILABLE");
 			if (prepared.preview.expiresAt <= this.now()) throw new ControlError("PLAN_EXPIRED");
+			let admissionStore: FileStateStore | undefined;
+			let admission: TaskAdmission | undefined;
+			if (prepared.plan.task) {
+				try {
+					admissionStore = await FileStateStore.open(this.root.path, {
+						taskExecutionId: prepared.plan.task.binding.executionId,
+						recoverInterrupted: false,
+						events: this.options.events,
+					});
+					if (admissionStore.snapshot.revision !== request.expectedProjectRevision)
+						throw new ControlError("STALE_PROJECT");
+					await this.assertTaskCheckout(prepared.plan.task.binding, prepared.plan.config);
+					prepared.plan.task.assertCurrent();
+					if (this.disposed) throw new ControlError("CONTROL_UNAVAILABLE");
+					if (prepared.preview.expiresAt <= this.now()) throw new ControlError("PLAN_EXPIRED");
+					const acceptedAt = this.now();
+					admission = await admissionStore.saveTaskAdmission(
+						{
+							metadata: {
+								binding: prepared.plan.task.binding,
+								previewDigest: prepared.preview.previewDigest,
+								configDigest: prepared.configurationDigest,
+								confirmedProjectRevision: request.expectedProjectRevision,
+								admittedProjectRevision: request.expectedProjectRevision + 1,
+							},
+							outcome: { status: "ACCEPTED" },
+							cleanup: "NOT_STARTED",
+							acceptedAt,
+							updatedAt: acceptedAt,
+						},
+						request.expectedProjectRevision,
+					);
+				} catch (error) {
+					// A partially committed admission remains discoverable and keeps its writer for dead-owner recovery.
+					if (
+						admissionStore?.snapshot.taskAdmissions?.some(
+							(entry) => entry.metadata.binding.executionId === prepared.plan.task?.binding.executionId,
+						)
+					)
+						prepared.consumed = true;
+					else await admissionStore?.close();
+					throw error;
+				}
+			}
 			prepared.consumed = true;
 			this.workflow = undefined;
 			this.startFailure = null;
 			this.cancelling = false;
 			this.cancellation = new AbortController();
+			// Shutdown may have arrived while the durable admission write was awaited.
+			if (this.disposed) this.cancellation.abort();
 			const signal = this.cancellation.signal;
 			this.execution = (async () => {
+				let transferred = false;
+				let reasonCode: "MODEL_UNAVAILABLE" | "INITIALIZATION_FAILED" | "STALE_PREPARATION" = signal.aborted
+					? "INITIALIZATION_FAILED"
+					: "MODEL_UNAVAILABLE";
 				try {
 					const workflow = await createHostWorkflow({
 						cwd: this.root.path,
@@ -1022,22 +1318,60 @@ export class HostControlBridge {
 						approval: {
 							requestApproval: (approval, cancellation) => this.requestApproval(approval, cancellation),
 						},
-						startGuard: async (store) => {
+						startGuard: async (store, taskLifecycleAdvance = 0) => {
 							await this.assertRoot();
-							if (store.snapshot.revision !== request.expectedProjectRevision)
+							await store.assertWritable();
+							if (
+								store.snapshot.revision !==
+								(admission
+									? admission.metadata.admittedProjectRevision + taskLifecycleAdvance
+									: request.expectedProjectRevision)
+							)
 								throw new ControlError("STALE_PROJECT");
 							if (fingerprint(await this.configuration()) !== prepared.configurationDigest)
 								throw new ControlError("CONFIG_CHANGED");
+							if (prepared.plan.task) {
+								await this.assertTaskCheckout(prepared.plan.task.binding, prepared.plan.config, signal);
+								prepared.plan.task.assertCurrent();
+							}
 							signal.throwIfAborted();
 						},
+						...(admissionStore && admission && prepared.plan.task
+							? {
+									taskAdmission: {
+										store: admissionStore,
+										metadata: admission.metadata,
+										analysisContext: prepared.plan.task.analysis.packet,
+									},
+								}
+							: {}),
 					});
+					reasonCode = "STALE_PREPARATION";
 					await this.assertRoot();
 					signal.throwIfAborted();
 					this.workflow = workflow;
+					transferred = true;
 					const report = await workflow.execute();
 					if (!report.run) this.startFailure = "START_FAILED";
 				} catch {
 					this.startFailure = "START_FAILED";
+				} finally {
+					if (!transferred && admissionStore && admission) {
+						try {
+							await admissionStore.saveTaskAdmission(
+								{
+									...admission,
+									outcome: { status: "START_FAILED", reasonCode },
+									updatedAt: Math.max(this.now(), admission.updatedAt),
+								},
+								admissionStore.snapshot.revision,
+							);
+							await admissionStore.close();
+						} catch {
+							// Unknown storage/cleanup disposition is not permission to release or replay the admission.
+							this.startFailure = "START_FAILED";
+						}
+					}
 				}
 			})().finally(() => {
 				this.approval?.settle(false);
@@ -1046,7 +1380,26 @@ export class HostControlBridge {
 			});
 			// §8: a successful confirm starts the Run and drops the planner state (READY, FAILED or CANCELLED).
 			this.planner = undefined;
-			return this.success(request, { kind: "accepted", requestId: request.id, command: request.type, runId: null });
+			return this.success(
+				request,
+				{
+					kind: "accepted",
+					requestId: request.id,
+					command: request.type,
+					runId: null,
+					...(admission
+						? {
+								taskReceipt: {
+									status: "FOUND" as const,
+									executionId: admission.metadata.binding.executionId,
+									admission,
+									run: null,
+								},
+							}
+						: {}),
+				},
+				admission ? { projectRevision: admission.metadata.admittedProjectRevision } : {},
+			);
 		}
 		if (request.type === "planner.start") {
 			// §7.2: one planning request or Run execution per Host; a cancelled session still disposing counts.
@@ -1181,6 +1534,11 @@ export class HostControlBridge {
 					plannerContractVersion: PLANNER_CONTRACT_VERSION,
 					// V0.8C §6: `workflow.derive` exists on this connection; the `commands` tuple stays unchanged.
 					rerunContractVersion: RERUN_CONTRACT_VERSION,
+					taskBinding: 1,
+					taskRecovery: 1,
+					analysisContext: 1,
+					evidenceDetails: 1,
+					checkoutIdentity: 1,
 					recipes: listTaskRecipes().map(({ id, version, title }) => ({
 						id,
 						version,
@@ -1190,6 +1548,19 @@ export class HostControlBridge {
 				},
 			});
 		if (request.type === "control.snapshot") return this.snapshot(request);
+		if (request.type === "workflow.checkout") return this.checkoutIdentity(request);
+		if (request.type === "workflow.receipt") {
+			await this.assertRoot();
+			try {
+				return this.success(request, {
+					kind: "task-receipt",
+					receipt: await FileStateStore.readTaskReceipt(this.root.path, request.executionId),
+				});
+			} catch {
+				throw new ControlError("STATE_UNAVAILABLE");
+			}
+		}
+		if (request.type === "workflow.evidence") return this.evidence(request);
 		if (request.ownerId !== this.ownerId) throw new ControlError("OWNER_CHANGED");
 		const prefix = `${this.ownerId}:`;
 		const suffix = request.id.startsWith(prefix) ? request.id.slice(prefix.length) : "";
@@ -1311,6 +1682,10 @@ export class HostControlBridge {
 										...HOST_CONTROL_COMMANDS,
 										...HOST_PLANNER_COMMANDS,
 										...HOST_RERUN_COMMANDS,
+										...HOST_TASK_COMMANDS,
+										...HOST_TASK_RECOVERY_COMMANDS,
+										...HOST_EVIDENCE_COMMANDS,
+										...HOST_CHECKOUT_COMMANDS,
 									] as readonly string[]
 								).includes(command)
 							)

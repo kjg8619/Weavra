@@ -5,6 +5,9 @@ import {
   MessageId,
   ThreadLinkedPullRequest,
   UserInputRequestedPayload,
+  WeavraAnalysisContext,
+  WeavraCheckoutIdentity,
+  WeavraTaskExecution,
   isImportedAgentSessionMessageId,
   type OrchestrationCommand,
   type OrchestrationEvent,
@@ -21,6 +24,7 @@ import {
   threadPullRequestKeysEqual,
 } from "@t3tools/shared/threadPullRequests";
 import { compareDateTimeStrings } from "@t3tools/shared/dateTime";
+import { stableStringify } from "@t3tools/shared/relaySigning";
 import * as DateTime from "effect/DateTime";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -54,6 +58,10 @@ const isScriptRunCommand = Schema.is(SCRIPT_RUN_COMMAND_PATTERN);
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
 const decodeUserInputRequestedPayload = Schema.decodeUnknownOption(UserInputRequestedPayload);
 const threadPullRequestLinksEqual = Schema.toEquivalence(Schema.NullOr(ThreadLinkedPullRequest));
+const advisoryEncoder = new TextEncoder();
+const taskContextsEqual = Schema.toEquivalence(Schema.NullOr(WeavraAnalysisContext));
+const taskCheckoutsEqual = Schema.toEquivalence(WeavraCheckoutIdentity);
+const taskExecutionsEqual = Schema.toEquivalence(WeavraTaskExecution);
 
 /**
  * Blocked-on-you work derived from the thread's retained activities: an
@@ -222,6 +230,103 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
   Crypto.Crypto
 > {
   switch (command.type) {
+    case "thread.weavra-task.set": {
+      const task = command.task;
+      const thread = yield* requireThread({ readModel, command, threadId: command.threadId });
+      const project = yield* requireProject({ readModel, command, projectId: task.projectId });
+      const tasks = readModel.weavraTasks ?? [];
+      const previous = tasks.find((entry) => entry.id === task.id);
+      const owner = readModel.weavraOwnership?.find(
+        (entry) =>
+          entry.environmentId === task.environmentId &&
+          entry.canonicalCwd === task.checkout.canonicalCwd,
+      );
+      if (
+        thread.projectId !== task.projectId ||
+        thread.deletedAt !== null ||
+        project.deletedAt !== null ||
+        task.target.workspaceRoot !== project.workspaceRoot ||
+        task.target.worktreePath !== thread.worktreePath ||
+        (previous?.revision ?? null) !== command.expectedRevision ||
+        task.revision !== (previous?.revision ?? 0) + 1 ||
+        (owner?.generation ?? 0) !== command.expectedOwnershipGeneration ||
+        task.ownership.generation !== command.expectedOwnershipGeneration + 1 ||
+        (owner?.taskId != null && owner.taskId !== task.id) ||
+        tasks.some(
+          (entry) =>
+            entry.id !== task.id &&
+            entry.environmentId === task.environmentId &&
+            entry.threadId === task.threadId &&
+            (entry.phase !== "finished" || entry.ownership.state !== "released"),
+        )
+      ) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: "Task identity, revision, or checkout ownership changed.",
+        });
+      }
+      if (
+        previous
+          ? previous.environmentId !== task.environmentId ||
+            previous.projectId !== task.projectId ||
+            previous.threadId !== task.threadId ||
+            previous.createdAt !== task.createdAt ||
+            previous.target.workspaceRoot !== task.target.workspaceRoot ||
+            previous.target.worktreePath !== task.target.worktreePath ||
+            !taskCheckoutsEqual(previous.checkout, task.checkout) ||
+            previous.ownership.state === "released" ||
+            (previous.context !== null &&
+              !taskContextsEqual(previous.context, task.context) &&
+              (task.context === null ||
+                task.context.packetVersion !== previous.context.packetVersion + 1)) ||
+            (previous.execution?.confirmCommandId != null &&
+              (task.execution === null ||
+                !taskContextsEqual(previous.context, task.context) ||
+                !taskExecutionsEqual(
+                  { ...previous.execution, receipt: null },
+                  { ...task.execution, receipt: null },
+                )))
+          : task.phase !== "analysis" ||
+            task.ownership.state !== "analysis" ||
+            task.execution !== null
+      ) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: "Task identity and confirmed execution are immutable.",
+        });
+      }
+      if (task.execution !== null && task.context !== null) {
+        const crypto = yield* Crypto.Crypto;
+        const bytes = yield* crypto.digest(
+          "SHA-256",
+          advisoryEncoder.encode(
+            stableStringify({ domain: "weavra.analysis-context.v1", packet: task.context }),
+          ),
+        );
+        const digest = `sha256:${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+        if (digest !== task.execution.binding.advisoryDigest) {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: "Execution does not bind the reviewed advisory packet.",
+          });
+        }
+      }
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: task.updatedAt,
+          commandId: command.commandId,
+        })),
+        type: "thread.weavra-task-set",
+        payload: {
+          threadId: command.threadId,
+          expectedRevision: command.expectedRevision,
+          expectedOwnershipGeneration: command.expectedOwnershipGeneration,
+          task,
+        },
+      };
+    }
     case "project.create": {
       yield* requireProjectAbsent({
         readModel,
@@ -1417,6 +1522,9 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
               aggregateId: command.threadId,
               occurredAt: command.createdAt,
               commandId: command.commandId,
+              ...(command.controlledAnalysis !== undefined
+                ? { metadata: { controlledAnalysis: command.controlledAnalysis } }
+                : {}),
             })),
             type: "thread.message-sent",
             payload: {
@@ -1440,6 +1548,9 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           aggregateId: command.threadId,
           occurredAt: command.createdAt,
           commandId: command.commandId,
+          ...(command.controlledAnalysis !== undefined
+            ? { metadata: { controlledAnalysis: command.controlledAnalysis } }
+            : {}),
         })),
         ...(userMessageEvent ? { causationEventId: userMessageEvent.eventId } : {}),
         type: "thread.turn-start-requested",
@@ -1453,6 +1564,9 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           runtimeMode: targetThread.runtimeMode,
           interactionMode: targetThread.interactionMode,
           ...(sourceProposedPlan !== undefined ? { sourceProposedPlan } : {}),
+          ...(command.controlledAnalysis !== undefined
+            ? { controlledAnalysis: command.controlledAnalysis }
+            : {}),
           createdAt: command.createdAt,
         },
       };

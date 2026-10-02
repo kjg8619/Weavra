@@ -72,6 +72,7 @@ import { deviceHubProxyRouteLayer } from "./device/DeviceHubProxy.ts";
 import * as PreviewManager from "./preview/Manager.ts";
 import * as PortScanner from "./preview/PortScanner.ts";
 import * as ProcessRunner from "./processRunner.ts";
+import * as WorkspaceExecutionOwnership from "./workspace/WorkspaceExecutionOwnership.ts";
 import * as GitManager from "./git/GitManager.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -136,6 +137,7 @@ import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 import * as UsageService from "./usage/UsageService.ts";
 import * as WeavraRuntimeObserver from "./weavra/RuntimeObserver.ts";
 import * as WeavraRuntimeController from "./weavra/RuntimeController.ts";
+import * as WeavraTaskCoordinator from "./weavra/TaskCoordinator.ts";
 import { OrchestrationLayerLive } from "./orchestration/runtimeLayer.ts";
 import {
   clearPersistedServerRuntimeState,
@@ -475,7 +477,13 @@ const AntigravityInstallationRefreshLive = Layer.effectDiscard(
   }),
 );
 
-const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
+const WorkspaceExecutionOwnershipLive = WorkspaceExecutionOwnership.layer.pipe(
+  Layer.provide(ProcessRunner.layer),
+  Layer.provide(PersistenceLayerLive),
+  Layer.provide(ServerEnvironmentLayerLive),
+);
+
+const RuntimeCoreBaseLive = ReactorLayerLive.pipe(
   Layer.provideMerge(AntigravityInstallationRefreshLive),
   Layer.provideMerge(ProviderAuthServiceLive),
   // Core Services
@@ -531,6 +539,12 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   Layer.provideMerge(AuthLayerLive),
   Layer.provideMerge(ServerSecretStore.layer),
   Layer.provideMerge(CloudManagedEndpointRuntimeLive),
+  Layer.provideMerge(WorkspaceExecutionOwnershipLive),
+);
+
+const RuntimeCoreDependenciesLive = Layer.merge(
+  RuntimeCoreBaseLive,
+  WeavraTaskCoordinator.layer.pipe(Layer.provide(RuntimeCoreBaseLive)),
 );
 
 const RuntimeDependenciesLive = RuntimeCoreDependenciesLive.pipe(

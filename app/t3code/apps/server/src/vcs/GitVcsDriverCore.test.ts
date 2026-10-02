@@ -30,11 +30,14 @@ import {
 import { ServerConfig } from "../config.ts";
 import { gitCommandDuration } from "../observability/Metrics.ts";
 import {
-  makeGitVcsDriverCore,
+  makeGitVcsDriverCore as makeCore,
   parseGitCheckoutProgressLine,
   splitNullSeparatedGitStdoutPaths,
 } from "./GitVcsDriverCore.ts";
 import * as GitVcsDriver from "./GitVcsDriver.ts";
+import * as OwnershipTest from "../workspace/WorkspaceExecutionOwnershipTest.ts";
+
+const makeGitVcsDriverCore = () => makeCore().pipe(OwnershipTest.provide);
 
 const encodeGitCommandError = Schema.encodeEffect(Schema.fromJsonString(GitCommandError));
 
@@ -42,6 +45,7 @@ const ServerConfigLayer = ServerConfig.layerTest(process.cwd(), {
   prefix: "t3-git-vcs-driver-test-",
 });
 const TestLayer = GitVcsDriver.layer.pipe(
+  Layer.provide(OwnershipTest.layer),
   Layer.provide(ServerConfigLayer),
   Layer.provideMerge(NodeServices.layer),
 );
@@ -317,6 +321,7 @@ it.effect("uses stable diagnostics for every parsed non-repository command", () 
     Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner),
   );
   const layer = GitVcsDriver.layer.pipe(
+    Layer.provide(OwnershipTest.layer),
     Layer.provide(ServerConfigLayer),
     Layer.provideMerge(nodeServicesLayer),
   );

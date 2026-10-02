@@ -245,7 +245,14 @@ export const make = Effect.gen(function* () {
       projectCloneTracking: true,
       weavraReadOnly: true,
       weavraFitness: true,
-      ...(hostEnvironment.T3_WEAVRA_CONTROL === "1" ? { weavraControl: true } : {}),
+      ...(hostEnvironment.T3_WEAVRA_CONTROL === "1"
+        ? {
+            weavraControl: true,
+            weavraTasks: true,
+            weavraTaskRecovery: 1 as const,
+            weavraTaskAnalysis: "codex-read-only-v1" as const,
+          }
+        : {}),
       ...(serverSelfUpdate === null ? {} : { serverSelfUpdate }),
       ...(serverSelfUpdate === "boot-service" || desktopAppUpdate
         ? {

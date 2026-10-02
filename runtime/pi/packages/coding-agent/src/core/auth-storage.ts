@@ -328,8 +328,10 @@ export class AuthStorage implements CredentialStore {
 	private storage: AuthStorageBackend;
 	private authPath: string | undefined;
 	private readState: AuthFileReadState;
+	private readonly allowCredentialCommands: boolean;
 
-	private constructor(storage: AuthStorageBackend, authPath?: string) {
+	private constructor(storage: AuthStorageBackend, authPath?: string, allowCredentialCommands = true) {
+		this.allowCredentialCommands = allowCredentialCommands;
 		this.storage = storage;
 		this.authPath = authPath;
 		this.readState =
@@ -344,9 +346,16 @@ export class AuthStorage implements CredentialStore {
 		this.reload();
 	}
 
-	static create(authPath: string = join(getAgentDir(), "auth.json")): AuthStorage {
+	static create(
+		authPath: string = join(getAgentDir(), "auth.json"),
+		options: { allowCredentialCommands?: boolean } = {},
+	): AuthStorage {
 		const normalizedAuthPath = normalizePath(authPath);
-		return new AuthStorage(new FileAuthStorageBackend(normalizedAuthPath), normalizedAuthPath);
+		return new AuthStorage(
+			new FileAuthStorageBackend(normalizedAuthPath),
+			normalizedAuthPath,
+			options.allowCredentialCommands,
+		);
 	}
 
 	static fromStorage(storage: AuthStorageBackend): AuthStorage {
@@ -443,7 +452,7 @@ export class AuthStorage implements CredentialStore {
 		options?.signal?.throwIfAborted();
 		if (credential?.type !== "api_key") return credential;
 		if (credential.key === undefined) return credential;
-		return { ...credential, key: resolveConfigValue(credential.key, credential.env) };
+		return { ...credential, key: resolveConfigValue(credential.key, credential.env, this.allowCredentialCommands) };
 	}
 
 	async modify(

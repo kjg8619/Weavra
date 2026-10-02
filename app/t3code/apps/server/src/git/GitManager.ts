@@ -62,6 +62,7 @@ import {
   repositoryConventionsTextGenerationPolicy,
 } from "../textGeneration/TextGenerationPresets.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
+import { WorkspaceExecutionOwnership } from "../workspace/WorkspaceExecutionOwnership.ts";
 import * as ProviderRegistry from "../provider/Services/ProviderRegistry.ts";
 import { extractBranchNameFromRemoteRef } from "./remoteRefs.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -667,6 +668,7 @@ function toPullRequestHeadRemoteInfo(pr: {
 }
 
 export const make = Effect.gen(function* () {
+  const ownership = yield* WorkspaceExecutionOwnership;
   const gitCore = yield* GitVcsDriver.GitVcsDriver;
   const sourceControlProviders = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;
   const textGeneration = yield* TextGeneration.TextGeneration;
@@ -2813,8 +2815,42 @@ export const make = Effect.gen(function* () {
     invalidateRemoteStatus,
     invalidateStatus,
     resolvePullRequest,
-    preparePullRequestThread,
-    runStackedAction,
+    preparePullRequestThread: (input) =>
+      ownership
+        .withOperation(
+          { cwd: input.cwd, kind: "git", sharedGitMetadata: true },
+          preparePullRequestThread(input),
+        )
+        .pipe(
+          Effect.catchTag("WorkspaceOwnershipError", (cause) =>
+            Effect.fail(
+              new GitManagerError({
+                operation: "preparePullRequestThread",
+                cwd: input.cwd,
+                detail: cause.message,
+                cause,
+              }),
+            ),
+          ),
+        ),
+    runStackedAction: (input, options) =>
+      ownership
+        .withOperation(
+          { cwd: input.cwd, kind: "git", sharedGitMetadata: true },
+          runStackedAction(input, options),
+        )
+        .pipe(
+          Effect.catchTag("WorkspaceOwnershipError", (cause) =>
+            Effect.fail(
+              new GitManagerError({
+                operation: "runStackedAction",
+                cwd: input.cwd,
+                detail: cause.message,
+                cause,
+              }),
+            ),
+          ),
+        ),
   });
 });
 

@@ -11,6 +11,7 @@ import {
   ProviderRuntimeEvent,
   ProviderSession,
   ProviderInstanceId,
+  WeavraTaskId,
 } from "@t3tools/contracts";
 import {
   CommandId,
@@ -42,6 +43,7 @@ import * as VcsProcess from "../../vcs/VcsProcess.ts";
 import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
 import * as RepositoryIdentityResolver from "../../project/RepositoryIdentityResolver.ts";
 import { CheckpointReactorLive } from "./CheckpointReactor.ts";
+import * as OwnershipTest from "../../workspace/WorkspaceExecutionOwnershipTest.ts";
 import { OrchestrationEngineLive } from "./OrchestrationEngine.ts";
 import { OrchestrationProjectionPipelineLive } from "./ProjectionPipeline.ts";
 import { OrchestrationProjectionSnapshotQueryLive } from "./ProjectionSnapshotQuery.ts";
@@ -90,6 +92,7 @@ function createProviderServiceHarness(
   hasSession = true,
   sessionCwd = cwd,
   providerName: ProviderSession["provider"] = ProviderDriverKind.make("codex"),
+  controlledAnalysis = false,
 ) {
   const now = "2026-01-01T00:00:00.000Z";
   const runtimeEventPubSub = Effect.runSync(PubSub.unbounded<ProviderRuntimeEvent>());
@@ -111,6 +114,14 @@ function createProviderServiceHarness(
             runtimeMode: "full-access",
             threadId: ThreadId.make("thread-1"),
             cwd: sessionCwd,
+            ...(controlledAnalysis
+              ? {
+                  controlledAnalysis: {
+                    taskId: WeavraTaskId.make("11111111-1111-4111-8111-111111111111"),
+                    generation: 1,
+                  },
+                }
+              : {}),
             createdAt: now,
             updatedAt: now,
           },
@@ -310,6 +321,7 @@ describe("CheckpointReactor", () => {
     readonly gitStatusRefreshCalls?: Array<string>;
     readonly pullRequestRefreshCalls?: Array<string>;
     readonly pullRequestRefresh?: Effect.Effect<void>;
+    readonly controlledAnalysis?: boolean;
   }) {
     const cwd = createGitRepository();
     if (options?.initializeGit === false) {
@@ -321,6 +333,7 @@ describe("CheckpointReactor", () => {
       options?.hasSession ?? true,
       options?.providerSessionCwd ?? cwd,
       options?.providerName ?? ProviderDriverKind.make("codex"),
+      options?.controlledAnalysis ?? false,
     );
     const orchestrationLayer = OrchestrationEngineLive.pipe(
       Layer.provide(OrchestrationProjectionSnapshotQueryLive),
@@ -400,6 +413,7 @@ describe("CheckpointReactor", () => {
       Layer.provideMerge(VcsProcess.layer),
       Layer.provideMerge(ServerConfigLayer),
       Layer.provideMerge(NodeServices.layer),
+      Layer.provide(OwnershipTest.layer),
     );
 
     runtime = ManagedRuntime.make(layer);
@@ -591,6 +605,62 @@ describe("CheckpointReactor", () => {
         });
         expect(harness.provider.rollbackConversation).not.toHaveBeenCalled();
       }
+    }),
+  );
+
+  effectIt.effect("skips Git bookkeeping for controlled analysis provider events", () =>
+    Effect.gen(function* () {
+      const gitStatusRefreshCalls: string[] = [];
+      const harness = yield* Effect.promise(() =>
+        createHarness({ controlledAnalysis: true, gitStatusRefreshCalls }),
+      );
+      const turnId = asTurnId("controlled-analysis-turn");
+      yield* harness.engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.make("controlled-analysis-command"),
+        threadId: ThreadId.make("thread-1"),
+        message: {
+          messageId: MessageId.make("controlled-analysis-message"),
+          role: "user",
+          text: "Analyze only",
+          attachments: [],
+        },
+        runtimeMode: "full-access",
+        interactionMode: "plan",
+        controlledAnalysis: {
+          taskId: WeavraTaskId.make("11111111-1111-4111-8111-111111111111"),
+          expectedRevision: 1,
+        },
+        createdAt: "2026-01-01T00:00:03.000Z",
+      });
+      harness.provider.emit({
+        type: "turn.started",
+        eventId: EventId.make("controlled-analysis-started"),
+        provider: ProviderDriverKind.make("codex"),
+        createdAt: "2026-01-01T00:00:04.000Z",
+        threadId: ThreadId.make("thread-1"),
+        turnId,
+      });
+      NodeFS.writeFileSync(
+        NodePath.join(harness.cwd, "analysis-mutation.txt"),
+        "must stay unseen\n",
+      );
+      harness.provider.emit({
+        type: "turn.completed",
+        eventId: EventId.make("controlled-analysis-completed"),
+        provider: ProviderDriverKind.make("codex"),
+        createdAt: "2026-01-01T00:00:05.000Z",
+        threadId: ThreadId.make("thread-1"),
+        turnId,
+        payload: { state: "completed" },
+      });
+      yield* Effect.promise(harness.drain);
+
+      expect(
+        gitRefExists(harness.cwd, checkpointRefForThreadTurn(ThreadId.make("thread-1"), 3)),
+      ).toBe(false);
+      expect(gitStatusRefreshCalls).toEqual([]);
+      expect(harness.pullRequestRefreshes).toEqual([]);
     }),
   );
 

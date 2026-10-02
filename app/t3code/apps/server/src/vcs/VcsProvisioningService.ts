@@ -9,6 +9,7 @@ import {
   VcsUnsupportedOperationError,
 } from "@t3tools/contracts";
 import * as VcsDriverRegistry from "./VcsDriverRegistry.ts";
+import { WorkspaceExecutionOwnership } from "../workspace/WorkspaceExecutionOwnership.ts";
 
 export class VcsProvisioningService extends Context.Service<
   VcsProvisioningService,
@@ -38,13 +39,29 @@ function resolveRequestedKind(
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
   const registry = yield* VcsDriverRegistry.VcsDriverRegistry;
+  const ownership = yield* WorkspaceExecutionOwnership;
 
   const initRepository: VcsProvisioningService["Service"]["initRepository"] = Effect.fn(
     "VcsProvisioningService.initRepository",
   )(function* (input) {
     const kind = yield* resolveRequestedKind(input.kind);
     const driver = yield* registry.get(kind);
-    return yield* driver.initRepository(input);
+    return yield* ownership
+      .withOperation(
+        { cwd: input.cwd, kind: "git", sharedGitMetadata: kind === "git" },
+        driver.initRepository(input),
+      )
+      .pipe(
+        Effect.catchTag("WorkspaceOwnershipError", (cause) =>
+          Effect.fail(
+            new VcsUnsupportedOperationError({
+              operation: "VcsProvisioningService.ownership",
+              kind,
+              detail: cause.message,
+            }),
+          ),
+        ),
+      );
   });
 
   return VcsProvisioningService.of({

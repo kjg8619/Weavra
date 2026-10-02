@@ -2,6 +2,8 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 import { toPersistenceSqlError } from "../Errors.ts";
 
@@ -26,7 +28,8 @@ const makeOrchestrationCommandReceiptRepository = Effect.gen(function* () {
           accepted_at,
           result_sequence,
           status,
-          error
+          error,
+          task_fingerprint
         )
         VALUES (
           ${receipt.commandId},
@@ -35,7 +38,8 @@ const makeOrchestrationCommandReceiptRepository = Effect.gen(function* () {
           ${receipt.acceptedAt},
           ${receipt.resultSequence},
           ${receipt.status},
-          ${receipt.error}
+          ${receipt.error},
+          ${receipt.taskFingerprint ?? null}
         )
         ON CONFLICT (command_id)
         DO UPDATE SET
@@ -44,13 +48,17 @@ const makeOrchestrationCommandReceiptRepository = Effect.gen(function* () {
           accepted_at = excluded.accepted_at,
           result_sequence = excluded.result_sequence,
           status = excluded.status,
-          error = excluded.error
+          error = excluded.error,
+          task_fingerprint = excluded.task_fingerprint
       `,
   });
 
   const findReceiptByCommandId = SqlSchema.findOneOption({
     Request: GetByCommandIdInput,
-    Result: OrchestrationCommandReceipt,
+    Result: Schema.Struct({
+      ...OrchestrationCommandReceipt.fields,
+      taskFingerprint: Schema.NullOr(Schema.String),
+    }),
     execute: ({ commandId }) =>
       sql`
         SELECT
@@ -60,7 +68,8 @@ const makeOrchestrationCommandReceiptRepository = Effect.gen(function* () {
           accepted_at AS "acceptedAt",
           result_sequence AS "resultSequence",
           status,
-          error
+          error,
+          task_fingerprint AS "taskFingerprint"
         FROM orchestration_command_receipts
         WHERE command_id = ${commandId}
       `,
@@ -73,6 +82,12 @@ const makeOrchestrationCommandReceiptRepository = Effect.gen(function* () {
 
   const getByCommandId: OrchestrationCommandReceiptRepositoryShape["getByCommandId"] = (input) =>
     findReceiptByCommandId(input).pipe(
+      Effect.map(
+        Option.map(({ taskFingerprint, ...receipt }) => ({
+          ...receipt,
+          ...(taskFingerprint === null ? {} : { taskFingerprint }),
+        })),
+      ),
       Effect.mapError(
         toPersistenceSqlError("OrchestrationCommandReceiptRepository.getByCommandId:query"),
       ),

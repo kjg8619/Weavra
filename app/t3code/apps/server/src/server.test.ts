@@ -64,6 +64,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as OwnershipTest from "./workspace/WorkspaceExecutionOwnershipTest.ts";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PubSub from "effect/PubSub";
@@ -195,6 +196,7 @@ import * as ResourceTelemetry from "./resourceTelemetry/ResourceTelemetry.ts";
 import * as UsageService from "./usage/UsageService.ts";
 import * as WeavraRuntimeObserver from "./weavra/RuntimeObserver.ts";
 import * as WeavraRuntimeController from "./weavra/RuntimeController.ts";
+import * as WeavraTaskCoordinator from "./weavra/TaskCoordinator.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import * as Data from "effect/Data";
 
@@ -557,6 +559,7 @@ const buildAppUnderTest = (options?: {
     serverLifecycleEvents?: Partial<ServerLifecycleEvents.ServerLifecycleEvents["Service"]>;
     serverRuntimeStartup?: Partial<ServerRuntimeStartup.ServerRuntimeStartup["Service"]>;
     serverEnvironment?: Partial<ServerEnvironment.ServerEnvironment["Service"]>;
+    taskCoordinator?: Partial<WeavraTaskCoordinator.TaskCoordinator["Service"]>;
     repositoryIdentityResolver?: Partial<
       RepositoryIdentityResolver.RepositoryIdentityResolver["Service"]
     >;
@@ -718,6 +721,7 @@ const buildAppUnderTest = (options?: {
       WorkspacePaths.layer,
       workspaceEntriesLayer,
       WorkspaceFileSystem.layer.pipe(
+        Layer.provide(OwnershipTest.layer),
         Layer.provide(WorkspacePaths.layer),
         Layer.provide(workspaceEntriesLayer),
       ),
@@ -733,6 +737,7 @@ const buildAppUnderTest = (options?: {
       Layer.provideMerge(gitManagerLayer),
     );
     const vcsProvisioningLayer = VcsProvisioningService.layer.pipe(
+      Layer.provide(OwnershipTest.layer),
       Layer.provide(vcsDriverRegistryLayer),
     );
     const reviewLayer = options?.layers?.reviewService
@@ -1020,6 +1025,26 @@ const buildAppUnderTest = (options?: {
           }),
         ),
         Layer.provide(
+          Layer.mock(WeavraTaskCoordinator.TaskCoordinator)({
+            create: () => Effect.die("Weavra task create is not stubbed in this test"),
+            read: () => Effect.die("Weavra task read is not stubbed in this test"),
+            list: () => Effect.die("Weavra task list is not stubbed in this test"),
+            listRecoverable: Effect.succeed([]),
+            reconcileAll: Effect.succeed([]),
+            prepare: () => Effect.die("Weavra task prepare is not stubbed in this test"),
+            confirm: () => Effect.die("Weavra task confirm is not stubbed in this test"),
+            reconcile: () => Effect.die("Weavra task reconcile is not stubbed in this test"),
+            abortUnconfirmed: () => Effect.die("Weavra task abort is not stubbed in this test"),
+            reprepare: () => Effect.die("Weavra task reprepare is not stubbed in this test"),
+            cancel: () => Effect.die("Weavra task cancel is not stubbed in this test"),
+            readApproval: () => Effect.die("Weavra task approval is not stubbed in this test"),
+            resolveApproval: () =>
+              Effect.die("Weavra task approval resolution is not stubbed in this test"),
+            evidence: () => Effect.die("Weavra task evidence is not stubbed in this test"),
+            ...options?.layers?.taskCoordinator,
+          }),
+        ),
+        Layer.provide(
           Layer.mock(ProjectionSnapshotQuery.ProjectionSnapshotQuery)({
             getUserInputActivity: () => Effect.die("unused"),
             getCommandReadModel: () => Effect.succeed(makeDefaultOrchestrationReadModel()),
@@ -1225,6 +1250,7 @@ const buildAppUnderTest = (options?: {
       Layer.provideMerge(FetchHttpClient.layer),
       Layer.provide(GitHubCli.layer.pipe(Layer.provideMerge(VcsProcess.layer))),
       Layer.provide(layerConfig),
+      Layer.provide(OwnershipTest.layer),
     );
 
     yield* Layer.build(appLayer);
@@ -4870,6 +4896,100 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             ),
           );
         }
+      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect(
+    "authorizes task reads separately and rejects foreign task creation before side effects",
+    () =>
+      Effect.gen(function* () {
+        let listCalls = 0;
+        let createSideEffects = 0;
+        yield* buildAppUnderTest({
+          layers: {
+            taskCoordinator: {
+              list: () =>
+                Effect.sync(() => {
+                  listCalls += 1;
+                  return [];
+                }),
+              create: (input) =>
+                input.environmentId !== testEnvironmentDescriptor.environmentId ||
+                input.threadId !== defaultThreadId
+                  ? Effect.fail(
+                      new WeavraTaskCoordinator.TaskCoordinatorError({
+                        code: "TARGET_CHANGED",
+                      }),
+                    )
+                  : Effect.sync(() => {
+                      createSideEffects += 1;
+                      throw new Error("valid task creation is outside this authorization test");
+                    }),
+            },
+          },
+        });
+        const connect = Effect.fnUntraced(function* (scope: string) {
+          const token = yield* exchangeAccessToken(defaultDesktopBootstrapToken, { scope });
+          const ticketResponse = yield* HttpClient.post("/api/auth/websocket-ticket", {
+            headers: { authorization: `Bearer ${token.body.access_token ?? ""}` },
+          });
+          const { ticket } = yield* responseJsonEffect<{ readonly ticket: string }>(ticketResponse);
+          return `${yield* getWsServerUrl("/ws", { authenticated: false })}?wsTicket=${encodeURIComponent(ticket)}`;
+        });
+        const scope = {
+          environmentId: testEnvironmentDescriptor.environmentId,
+          projectId: defaultProjectId,
+          threadId: defaultThreadId,
+        };
+        const readUrl = yield* connect("orchestration:read");
+        yield* Effect.scoped(
+          withWsRpcClient(readUrl, (client) =>
+            Effect.gen(function* () {
+              assert.deepStrictEqual(yield* client[WS_METHODS.weavraTaskList](scope), []);
+              const error = yield* client[WS_METHODS.weavraTaskCreate]({
+                ...scope,
+                commandId: CommandId.make("read-token-create"),
+              }).pipe(Effect.flip);
+              assert.equal(error._tag, "EnvironmentAuthorizationError");
+            }),
+          ),
+        );
+        assert.equal(listCalls, 1);
+        assert.equal(createSideEffects, 0);
+
+        const operateUrl = yield* connect("orchestration:operate");
+        yield* Effect.scoped(
+          withWsRpcClient(operateUrl, (client) =>
+            Effect.forEach(
+              [
+                {
+                  ...scope,
+                  environmentId: EnvironmentId.make("foreign-environment"),
+                  commandId: CommandId.make("foreign-environment-create"),
+                },
+                {
+                  ...scope,
+                  threadId: ThreadId.make("foreign-thread"),
+                  commandId: CommandId.make("foreign-thread-create"),
+                },
+              ],
+              (input) =>
+                client[WS_METHODS.weavraTaskCreate](input).pipe(
+                  Effect.flip,
+                  Effect.tap((error) =>
+                    Effect.sync(() => {
+                      assert.equal(error._tag, "WeavraTaskRpcError");
+                      if (error._tag === "WeavraTaskRpcError") {
+                        assert.equal(error.code, "TARGET_CHANGED");
+                      }
+                    }),
+                  ),
+                ),
+              { discard: true },
+            ),
+          ),
+        );
+        assert.equal(createSideEffects, 0);
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 

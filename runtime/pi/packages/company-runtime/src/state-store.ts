@@ -3,10 +3,25 @@ import { constants } from "node:fs";
 import { type FileHandle, lstat, mkdir, open, realpath, rename, unlink } from "node:fs/promises";
 import { hostname } from "node:os";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { type Static, Type } from "typebox";
 import { readAnchoredSource } from "./anchored-files.ts";
 import { complexRunError, settleComplexState } from "./complex-state.ts";
-import { type PolicyDecision, PolicyDecisionSchema, type Run, RunSchema, validateContract } from "./contracts.ts";
+import {
+	isTaskContract,
+	type PolicyDecision,
+	PolicyDecisionSchema,
+	type Run,
+	RunSchema,
+	type TaskAdmission,
+	TaskAdmissionSchema,
+	TaskIdentityIdSchema,
+	type TaskReceipt,
+	TaskReceiptSchema,
+	type TaskRunMetadata,
+	TaskRunMetadataSchema,
+	validateContract,
+} from "./contracts.ts";
 import { createRuntimeEvent, type EventDeliveryFailure, type RuntimeEvent, type RuntimeEventSink } from "./events.ts";
 import { isExecutionMode } from "./execution-contract.ts";
 import { OBSERVATION_MAX_BYTES, readRuntimeFile, writeObservationFiles } from "./observation-files.ts";
@@ -42,6 +57,7 @@ const ArchivedRunSchema = Type.Object(
 		updatedAt: counter,
 		actions: counter,
 		digest: Type.String({ pattern: "^sha256:[0-9a-f]{64}$" }),
+		taskBinding: Type.Optional(TaskRunMetadataSchema),
 	},
 	{ additionalProperties: false },
 );
@@ -59,6 +75,7 @@ const StateSchema = Type.Object(
 		actions: Type.Array(ActionRecordSchema),
 		projectFacts: Type.Optional(Type.Array(ProjectFactSchema, { maxItems: PROJECT_FACT_LIMIT })),
 		archivedRuns: Type.Optional(Type.Array(ArchivedRunSchema)),
+		taskAdmissions: Type.Optional(Type.Array(TaskAdmissionSchema)),
 	},
 	{ additionalProperties: false },
 );
@@ -135,8 +152,13 @@ async function loadArchive(project: string, entry: ArchivedRun): Promise<{ run: 
 	).catch(() => undefined);
 	if (text === undefined || archiveDigest(text) !== entry.digest) throw new StateStoreError("archived run integrity");
 	const archive = validateContract(RunArchiveSchema, JSON.parse(text));
-	if (archive.run.runId !== entry.runId || archive.actions.some((action) => action.decision.runId !== entry.runId))
+	if (
+		archive.run.runId !== entry.runId ||
+		archive.actions.some((action) => action.decision.runId !== entry.runId) ||
+		JSON.stringify(archive.run.taskBinding) !== JSON.stringify(entry.taskBinding)
+	)
 		throw new StateStoreError("archived run integrity");
+	assertTaskBinding(archive.run);
 	return { run: archive.run, actions: archive.actions };
 }
 type StateFile = "state.json" | "tasks.json";
@@ -145,11 +167,33 @@ export interface FileStateStoreOptions {
 	events?: RuntimeEventSink;
 	/** Export-only ownership refuses active snapshots and skips recovery/projection repair. */
 	recoverInterrupted?: boolean;
+	/** Compiled execution identity, written on first lock creation, before admission persistence. */
+	taskExecutionId?: string;
 	/** Deterministic I/O failure injection for tests, not an execution/policy hook. */
 	beforeAtomicStep?: (
-		file: StateFile | "decisions.md" | "logs/checks.json",
+		file: StateFile | "writer.lock" | "decisions.md" | "logs/checks.json",
 		step: "write" | "sync" | "rename",
 	) => void;
+}
+export interface TaskRecoveryResult {
+	receipt: TaskReceipt;
+	disposition: "RECOVERED" | "ALREADY_SETTLED" | "NOT_RECOVERED";
+	cleanup: "CONFIRMED" | "UNCONFIRMED";
+	reason:
+		| "UNKNOWN_ADMISSION"
+		| "METADATA_MISMATCH"
+		| "STALE_PROJECT"
+		| "OWNER_UNPROVEN"
+		| "CONFLICTING_STATE"
+		| "CLEANUP_UNCONFIRMED"
+		| null;
+}
+type RecoveryRefusal = Exclude<TaskRecoveryResult["reason"], "CLEANUP_UNCONFIRMED" | null>;
+interface TaskRecoveryExpectation {
+	metadata: TaskRunMetadata;
+	revision: number;
+	state?: FileRuntimeState;
+	refusal?: RecoveryRefusal;
 }
 export class StateStoreError extends Error {
 	readonly stage: string;
@@ -175,6 +219,31 @@ function implementingRows(run: Run): number {
 function actionSlots(run: Run): number {
 	return Math.max(1, implementingRows(run));
 }
+function assertTaskBinding(run: Run): void {
+	const binding = run.taskBinding?.binding;
+	if (!binding) return;
+	const task = run.tasks[0];
+	if (
+		run.workflow !== "STANDARD" ||
+		run.tasks.length !== 1 ||
+		!task ||
+		!isTaskContract(task) ||
+		task.id !== binding.executionId ||
+		run.currentTask !== binding.executionId
+	)
+		throw new StateStoreError("task execution identity");
+	const symptom = binding.symptomVerification;
+	if (
+		symptom &&
+		!task.acceptanceCriteria.some(
+			(criterion) =>
+				criterion.id === symptom.criterionId &&
+				criterion.verification.reviewRequired &&
+				criterion.verification.checkIds.includes(symptom.checkId),
+		)
+	)
+		throw new StateStoreError("symptom criterion identity");
+}
 function assertState(value: unknown): FileRuntimeState {
 	const state = validateContract(StateSchema, value);
 	const runIds = new Set(state.runs.map((run) => run.runId));
@@ -191,6 +260,33 @@ function assertState(value: unknown): FileRuntimeState {
 		archived.some((entry) => runIds.has(entry.runId))
 	)
 		throw new Error("Conflicting archived runs");
+	const admissions = state.taskAdmissions ?? [];
+	if (
+		new Set(admissions.map((entry) => entry.metadata.binding.executionId)).size !== admissions.length ||
+		admissions.filter((entry) => entry.outcome.status === "ACCEPTED").length > 1 ||
+		admissions.some((entry) => entry.metadata.admittedProjectRevision > state.revision)
+	)
+		throw new StateStoreError("conflicting task admissions");
+	const boundRuns = [...state.runs, ...archived].filter((run) => run.taskBinding !== undefined);
+	if (
+		new Set(boundRuns.map((run) => run.taskBinding?.binding.executionId)).size !== boundRuns.length ||
+		boundRuns.some((run) => {
+			const admission = admissions.find(
+				(entry) => entry.metadata.binding.executionId === run.taskBinding?.binding.executionId,
+			);
+			return (
+				admission?.outcome.status !== "STARTED" ||
+				admission.outcome.runId !== run.runId ||
+				JSON.stringify(admission.metadata) !== JSON.stringify(run.taskBinding)
+			);
+		}) ||
+		admissions.some(
+			(entry) =>
+				entry.outcome.status === "STARTED" &&
+				!boundRuns.some((run) => run.taskBinding?.binding.executionId === entry.metadata.binding.executionId),
+		)
+	)
+		throw new StateStoreError("task admission run identity");
 	for (const run of state.runs) {
 		const taskIds = new Set(run.tasks.map((task) => task.id));
 		if (taskIds.size !== run.tasks.length || !taskIds.has(run.currentTask) || run.revision < 1)
@@ -198,6 +294,7 @@ function assertState(value: unknown): FileRuntimeState {
 		// COMPLEX identity/state invariants hold for every stored snapshot, not only for fresh saves.
 		const complex = complexRunError(run);
 		if (complex) throw new Error(`Invalid COMPLEX run state: ${complex}`);
+		assertTaskBinding(run);
 	}
 	const actionIds = new Set<string>();
 	for (const action of state.actions) {
@@ -259,12 +356,18 @@ export class FileStateStore implements StateStore, ActionAudit {
 	private readonly eventFailures: EventDeliveryFailure[] = [];
 	/** Set when open removed a lock whose same-host owner PID no longer exists. */
 	recoveredStaleLock?: { pid: number };
+	/** Restore this proven-dead owner if recovery cannot durably finish initialization. */
+	private recoveredLockRecord?: object;
+	private recoveredLockText?: string;
+	private taskRecovery?: TaskRecoveryExpectation;
+	private recoveryGuard?: { handle: FileHandle; path: string };
 
 	private constructor(projectPath: string, options: FileStateStoreOptions) {
 		this.projectPath = projectPath;
 		this.directory = join(projectPath, ".ai");
 		this.lockPath = join(this.directory, "writer.lock");
 		this.options = options;
+		if (options.taskExecutionId !== undefined) validateContract(TaskIdentityIdSchema, options.taskExecutionId);
 	}
 	static async open(projectPath: string, options: FileStateStoreOptions = {}): Promise<FileStateStore> {
 		const canonical = await realpath(projectPath);
@@ -291,6 +394,120 @@ export class FileStateStore implements StateStore, ActionAudit {
 		await store.close();
 		return store.recoveredStaleLock;
 	}
+	/** Explicit task recovery. No model, checkout digest collection, prepare, or new execution. */
+	static async recoverTask(
+		projectPath: string,
+		rawMetadata: TaskRunMetadata,
+		expectedProjectRevision: number,
+		options: Pick<FileStateStoreOptions, "now" | "events" | "beforeAtomicStep"> = {},
+	): Promise<TaskRecoveryResult> {
+		const metadata = structuredClone(validateContract(TaskRunMetadataSchema, rawMetadata));
+		const canonical = await realpath(projectPath);
+		if (!(await lstat(canonical)).isDirectory()) throw new StateStoreError("workspace");
+		const store = new FileStateStore(canonical, { ...options, taskExecutionId: metadata.binding.executionId });
+		store.taskRecovery = { metadata, revision: expectedProjectRevision };
+		const receipt = () => FileStateStore.readTaskReceipt(canonical, metadata.binding.executionId);
+		const refused = async (reason: RecoveryRefusal): Promise<TaskRecoveryResult> => ({
+			receipt: await receipt(),
+			disposition: "NOT_RECOVERED",
+			cleanup: "UNCONFIRMED",
+			reason,
+		});
+		// Observation is not the mutation CAS: the same checks run under the recovery guard and before commit.
+		const before = await FileStateStore.readSnapshot(canonical);
+		const initialRefusal = store.taskRecoveryRefusal(before.state, store.taskRecovery);
+		if (initialRefusal) return refused(initialRefusal);
+		const prior = await receipt();
+		if (prior.status !== "FOUND") return refused("UNKNOWN_ADMISSION");
+		const settled =
+			prior.admission.outcome.status !== "ACCEPTED" &&
+			(!prior.run || !["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(prior.run.status));
+		if (!before.writerPresent) {
+			if (!settled) return refused("OWNER_UNPROVEN");
+			const safe = prior.admission.cleanup === "NOT_STARTED" || prior.admission.cleanup === "CONFIRMED";
+			return {
+				receipt: prior,
+				disposition: "ALREADY_SETTLED",
+				cleanup: safe ? "CONFIRMED" : "UNCONFIRMED",
+				reason: safe ? null : "CLEANUP_UNCONFIRMED",
+			};
+		}
+		try {
+			if (!(await store.acquire(true))) return refused(store.taskRecovery.refusal ?? "OWNER_UNPROVEN");
+			const canonicalReceipt = await receipt();
+			if (canonicalReceipt.status !== "FOUND") throw new StateStoreError("recovered admission missing");
+			const safe =
+				canonicalReceipt.admission.cleanup === "NOT_STARTED" || canonicalReceipt.admission.cleanup === "CONFIRMED";
+			if (safe) await store.close();
+			else {
+				// PID death is not descendant cleanup. Restore the same proven-dead barrier, with no unlocked gap.
+				await store.atomicReplace("writer.lock", store.recoveredLockRecord);
+				store.lockIdentity = undefined;
+				store.closed = true;
+			}
+			return {
+				receipt: canonicalReceipt,
+				disposition: settled && !safe ? "ALREADY_SETTLED" : "RECOVERED",
+				cleanup: safe ? "CONFIRMED" : "UNCONFIRMED",
+				reason: safe ? null : "CLEANUP_UNCONFIRMED",
+			};
+		} catch (error) {
+			// Save/projection/close failure must preserve dead-owner proof, never manufacture cleanup success.
+			if (store.recoveredLockRecord && store.lockIdentity) {
+				store.closed = false;
+				try {
+					await store.atomicReplace("writer.lock", store.recoveredLockRecord);
+					store.lockIdentity = undefined;
+				} catch {
+					if (error instanceof StateStoreError) error.cleanupFailed = true;
+				} finally {
+					store.closed = true;
+				}
+			}
+			throw error;
+		} finally {
+			if (store.recoveryGuard) {
+				await store.recoveryGuard.handle.close();
+				await unlink(store.recoveryGuard.path);
+				store.recoveryGuard = undefined;
+			}
+		}
+	}
+	private taskRecoveryRefusal(
+		state: FileRuntimeState | undefined,
+		expected: TaskRecoveryExpectation,
+	): RecoveryRefusal | undefined {
+		const admission = state?.taskAdmissions?.find(
+			(entry) => entry.metadata.binding.executionId === expected.metadata.binding.executionId,
+		);
+		if (!admission) return "UNKNOWN_ADMISSION";
+		if (
+			expected.metadata.binding.checkout.canonicalCwd !== this.projectPath ||
+			!isDeepStrictEqual(admission.metadata, expected.metadata)
+		)
+			return "METADATA_MISMATCH";
+		if (state?.revision !== expected.revision) return "STALE_PROJECT";
+		if (admission.cleanup === undefined) return "OWNER_UNPROVEN";
+		const runId = admission.outcome.status === "STARTED" ? admission.outcome.runId : undefined;
+		if (
+			state.runs.some((run) => active(run) && run.runId !== runId) ||
+			state.actions.some((action) => action.status === "PREPARED" && action.decision.runId !== runId) ||
+			state.taskAdmissions?.some((entry) => entry.outcome.status === "ACCEPTED" && entry !== admission)
+		)
+			return "CONFLICTING_STATE";
+		return undefined;
+	}
+	private async recoveryState(): Promise<FileRuntimeState | undefined> {
+		await this.assertDirectory();
+		const text = await readRuntimeOwnedFile([this.directory], join(this.directory, "state.json"));
+		return text === undefined ? undefined : assertState(JSON.parse(text));
+	}
+	private async assertRecoveryState(): Promise<void> {
+		if (!this.taskRecovery) return;
+		const state = await this.recoveryState();
+		if (this.taskRecoveryRefusal(state, this.taskRecovery) || !isDeepStrictEqual(state, this.taskRecovery.state))
+			throw new StateStoreError("task recovery canonical CAS");
+	}
 	/**
 	 * Takes the writer lock, then loads the canonical state with the configured recovery. `deadOwnerOnly` proceeds only
 	 * through a lock that `recoverStaleLock` proved dead and otherwise resolves false without any write.
@@ -305,52 +522,61 @@ export class FileStateStore implements StateStore, ActionAudit {
 			if (!directory.isDirectory() || directory.isSymbolicLink()) throw new StateStoreError("directory");
 			this.directoryIdentity = { dev: directory.dev, ino: directory.ino };
 			const createLock = () => open(this.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
-			let lock: FileHandle;
+			let lock: FileHandle | undefined;
 			if (deadOwnerOnly) {
 				if (!(await this.recoverStaleLock())) {
 					this.closed = true;
 					return false;
 				}
-				lock = await createLock();
 			} else
 				try {
 					lock = await createLock();
 				} catch (error) {
-					if ((error as NodeJS.ErrnoException).code !== "EEXIST" || !(await this.recoverStaleLock())) throw error;
-					lock = await createLock();
+					if (
+						(error as NodeJS.ErrnoException).code !== "EEXIST" ||
+						this.options.recoverInterrupted === false ||
+						!(await this.recoverStaleLock())
+					)
+						throw error;
 				}
-			try {
-				const identity = await lock.stat();
-				this.lockIdentity = { dev: identity.dev, ino: identity.ino };
-				await lock.writeFile(
-					JSON.stringify({
-						schemaVersion: 1,
-						projectPath: this.projectPath,
-						token: this.token,
-						pid: process.pid,
-						hostname: hostname(),
-					}),
-				);
-				await lock.sync();
-			} finally {
-				await lock.close();
-			}
+			if (lock)
+				try {
+					const identity = await lock.stat();
+					this.lockIdentity = { dev: identity.dev, ino: identity.ino };
+					await lock.writeFile(
+						JSON.stringify({
+							schemaVersion: 1,
+							projectPath: this.projectPath,
+							token: this.token,
+							pid: process.pid,
+							hostname: hostname(),
+							...(this.options.taskExecutionId ? { taskExecutionId: this.options.taskExecutionId } : {}),
+						}),
+					);
+					await lock.sync();
+				} finally {
+					await lock.close();
+				}
 			await this.initialize();
 			return true;
 		} catch (error) {
 			const failure = error instanceof StateStoreError ? error : new StateStoreError("open/lock");
-			this.closed = true;
 			try {
-				await this.releaseLock();
+				if (this.recoveredLockRecord && this.lockIdentity) {
+					await this.atomicReplace("writer.lock", this.recoveredLockRecord);
+					this.lockIdentity = undefined;
+				} else await this.releaseLock();
 			} catch {
 				failure.cleanupFailed = true;
+			} finally {
+				this.closed = true;
 			}
 			throw failure;
 		}
 	}
 	/**
-	 * Removes a lock only when its same-host owner PID provably no longer exists. A recovery guard created with
-	 * O_EXCL excludes concurrent recoverers; normal openers never touch an existing lock, so no fresh lock is removed.
+	 * Replaces a lock only when its same-host owner PID provably no longer exists. A recovery guard created with
+	 * O_EXCL excludes concurrent recoverers; a synced replacement is renamed over the old proof without an unlocked gap.
 	 * Locks without a hostname (older format), other hosts, live or unverifiable owners and a leftover guard are kept.
 	 */
 	private async recoverStaleLock(): Promise<boolean> {
@@ -363,13 +589,14 @@ export class FileStateStore implements StateStore, ActionAudit {
 		}
 		try {
 			await guard.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname(), token: this.token }));
-			let stale: { dev: number; ino: number; pid: number } | undefined;
+			let stale: { dev: number; ino: number; pid: number; taskExecutionId?: string } | undefined;
 			try {
 				const handle = await open(this.lockPath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
 				try {
 					const stat = await handle.stat();
 					if (!stat.isFile() || stat.nlink !== 1 || stat.size > 4096) return false;
-					const owner: unknown = JSON.parse(await handle.readFile("utf8"));
+					const ownerText = await handle.readFile("utf8");
+					const owner: unknown = JSON.parse(ownerText);
 					if (
 						owner &&
 						typeof owner === "object" &&
@@ -384,8 +611,40 @@ export class FileStateStore implements StateStore, ActionAudit {
 						Number.isSafeInteger(owner.pid) &&
 						owner.pid > 0 &&
 						!processAlive(owner.pid)
-					)
-						stale = { dev: stat.dev, ino: stat.ino, pid: owner.pid };
+					) {
+						const taskExecutionId = "taskExecutionId" in owner ? owner.taskExecutionId : undefined;
+						if (
+							taskExecutionId !== undefined &&
+							(typeof taskExecutionId !== "string" || !validateContract(TaskIdentityIdSchema, taskExecutionId))
+						)
+							return false;
+						const state = await this.recoveryState();
+						if (this.taskRecovery) {
+							if (!("token" in owner) || typeof owner.token !== "string") return false;
+							validateContract(TaskIdentityIdSchema, owner.token);
+							this.taskRecovery.refusal = this.taskRecoveryRefusal(state, this.taskRecovery);
+							if (
+								this.taskRecovery.refusal ||
+								taskExecutionId !== this.taskRecovery.metadata.binding.executionId
+							)
+								return false;
+							this.taskRecovery.state = state;
+						} else if (taskExecutionId) {
+							// Generic prepare/planner/open must not erase a task's unconfirmed resource barrier.
+							const cleanup = state?.taskAdmissions?.find(
+								(entry) => entry.metadata.binding.executionId === taskExecutionId,
+							)?.cleanup;
+							if (cleanup !== "NOT_STARTED" && cleanup !== "CONFIRMED") return false;
+						}
+						stale = {
+							dev: stat.dev,
+							ino: stat.ino,
+							pid: owner.pid,
+							...(typeof taskExecutionId === "string" ? { taskExecutionId } : {}),
+						};
+						this.recoveredLockRecord = owner;
+						this.recoveredLockText = ownerText;
+					}
 				} finally {
 					await handle.close();
 				}
@@ -393,14 +652,54 @@ export class FileStateStore implements StateStore, ActionAudit {
 				return false;
 			}
 			if (!stale) return false;
-			const current = await lstat(this.lockPath);
-			if (current.dev !== stale.dev || current.ino !== stale.ino) return false;
-			await unlink(this.lockPath);
-			this.recoveredStaleLock = { pid: stale.pid };
-			return true;
+			this.options.beforeAtomicStep?.("writer.lock", "write");
+			const temporary = join(this.directory, `.writer.lock.${this.token}.tmp`);
+			const replacement = await open(temporary, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+			try {
+				const identity = await replacement.stat();
+				await replacement.writeFile(
+					JSON.stringify({
+						schemaVersion: 1,
+						projectPath: this.projectPath,
+						token: this.token,
+						pid: process.pid,
+						hostname: hostname(),
+						...(stale.taskExecutionId ? { taskExecutionId: stale.taskExecutionId } : {}),
+					}),
+				);
+				this.options.beforeAtomicStep?.("writer.lock", "sync");
+				await replacement.sync();
+				this.options.beforeAtomicStep?.("writer.lock", "rename");
+				await this.assertDirectory();
+				if (this.taskRecovery) {
+					const state = await this.recoveryState();
+					this.taskRecovery.refusal = this.taskRecoveryRefusal(state, this.taskRecovery);
+					if (this.taskRecovery.refusal || !isDeepStrictEqual(state, this.taskRecovery.state)) return false;
+				}
+				const current = await lstat(this.lockPath);
+				if (!current.isFile() || current.nlink !== 1 || current.dev !== stale.dev || current.ino !== stale.ino)
+					return false;
+				// An inode can also be rewritten in place; compare the exact owner record at the replacement boundary.
+				const currentOwner = await readRuntimeOwnedFile([this.directory], this.lockPath);
+				if (!currentOwner || !isDeepStrictEqual(JSON.parse(currentOwner), this.recoveredLockRecord)) return false;
+				const finalOwner = await lstat(this.lockPath);
+				if (finalOwner.dev !== stale.dev || finalOwner.ino !== stale.ino || processAlive(stale.pid)) return false;
+				await rename(temporary, this.lockPath);
+				this.lockIdentity = { dev: identity.dev, ino: identity.ino };
+				this.recoveredStaleLock = { pid: stale.pid };
+				return true;
+			} finally {
+				await replacement.close();
+				await unlink(temporary).catch((error: NodeJS.ErrnoException) => {
+					if (error.code !== "ENOENT") throw error;
+				});
+			}
 		} finally {
-			await guard.close();
-			await unlink(guardPath);
+			if (this.taskRecovery) this.recoveryGuard = { handle: guard, path: guardPath };
+			else {
+				await guard.close();
+				await unlink(guardPath);
+			}
 		}
 	}
 	/** Final-use canonical validation for advisory inputs; no recovery, migration or lock mutation. */
@@ -506,7 +805,14 @@ export class FileStateStore implements StateStore, ActionAudit {
 			)
 				throw new StateStoreError("lock lost");
 			const owner: unknown = JSON.parse(await handle.readFile("utf8"));
-			if (!owner || typeof owner !== "object" || !("token" in owner) || owner.token !== this.token)
+			if (
+				!owner ||
+				typeof owner !== "object" ||
+				!("token" in owner) ||
+				owner.token !== this.token ||
+				(this.options.taskExecutionId !== undefined &&
+					(!("taskExecutionId" in owner) || owner.taskExecutionId !== this.options.taskExecutionId))
+			)
 				throw new StateStoreError("lock lost");
 		} finally {
 			await handle.close();
@@ -552,7 +858,14 @@ export class FileStateStore implements StateStore, ActionAudit {
 			const content = await handle.readFile("utf8");
 			if (content) {
 				const owner: unknown = JSON.parse(content);
-				if (!owner || typeof owner !== "object" || !("token" in owner) || owner.token !== this.token)
+				if (
+					!owner ||
+					typeof owner !== "object" ||
+					!("token" in owner) ||
+					owner.token !== this.token ||
+					(this.options.taskExecutionId !== undefined &&
+						(!("taskExecutionId" in owner) || owner.taskExecutionId !== this.options.taskExecutionId))
+				)
 					throw new StateStoreError("lock owner changed");
 			}
 		} finally {
@@ -603,8 +916,15 @@ export class FileStateStore implements StateStore, ActionAudit {
 			await handle.close();
 		}
 	}
-	private async atomicReplace(file: StateFile, value: unknown, beforeRename?: () => void): Promise<void> {
-		const content = `${JSON.stringify(value, null, 2)}\n`;
+	private async atomicReplace(
+		file: StateFile | "writer.lock",
+		value: unknown,
+		beforeRename?: () => void | Promise<void>,
+	): Promise<void> {
+		const content =
+			file === "writer.lock" && value === this.recoveredLockRecord && this.recoveredLockText !== undefined
+				? this.recoveredLockText
+				: `${JSON.stringify(value, null, 2)}\n`;
 		if (Buffer.byteLength(content, "utf8") > 16 * 1024 * 1024) throw new StateStoreError("state size limit");
 		await this.checkOwnership();
 		const target = join(this.directory, file);
@@ -618,16 +938,16 @@ export class FileStateStore implements StateStore, ActionAudit {
 		const handle = await open(temporary, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
 		try {
 			try {
-				this.options.beforeAtomicStep?.(file, "write");
+				if (file !== "writer.lock") this.options.beforeAtomicStep?.(file, "write");
 				await handle.writeFile(content);
-				this.options.beforeAtomicStep?.(file, "sync");
+				if (file !== "writer.lock") this.options.beforeAtomicStep?.(file, "sync");
 				await handle.sync();
 			} finally {
 				await handle.close();
 			}
 			await this.checkOwnership();
-			this.options.beforeAtomicStep?.(file, "rename");
-			beforeRename?.();
+			if (file !== "writer.lock") this.options.beforeAtomicStep?.(file, "rename");
+			await beforeRename?.();
 			await rename(temporary, target);
 			// File data is flushed before rename. Directory fsync/power-loss durability is not promised.
 		} finally {
@@ -641,7 +961,10 @@ export class FileStateStore implements StateStore, ActionAudit {
 		assertState(next);
 		await this.gate.run(async () => {
 			try {
-				await this.atomicReplace("state.json", next, beforeStateRename);
+				await this.atomicReplace("state.json", next, async () => {
+					await this.assertRecoveryState();
+					beforeStateRename?.();
+				});
 			} catch {
 				throw new StateStoreError("state.json", false);
 			}
@@ -661,12 +984,22 @@ export class FileStateStore implements StateStore, ActionAudit {
 			if ((await this.readJson("tasks.json")) !== undefined) throw new StateStoreError("missing state.json");
 			return;
 		}
+		await this.assertRecoveryState();
 		const next = structuredClone(this.state);
 		if (
 			this.options.recoverInterrupted === false &&
-			(next.runs.some(active) || next.actions.some((action) => action.status === "PREPARED"))
+			(next.runs.some(active) ||
+				next.actions.some((action) => action.status === "PREPARED") ||
+				next.taskAdmissions?.some((entry) => entry.outcome.status === "ACCEPTED"))
 		)
 			throw new StateStoreError("active run; recovery disabled");
+		// A read or a free-lock reopen cannot establish owner death. Only proven dead-owner recovery settles these.
+		if (this.recoveredStaleLock)
+			for (const admission of next.taskAdmissions ?? [])
+				if (admission.outcome.status === "ACCEPTED") {
+					admission.outcome = { status: "INTERRUPTED_BEFORE_START", reasonCode: "OWNER_LOST" };
+					admission.updatedAt = Math.max(admission.updatedAt, (this.options.now ?? Date.now)());
+				}
 		const events: RuntimeEvent[] = [];
 		for (const run of next.runs)
 			if (active(run)) {
@@ -699,7 +1032,7 @@ export class FileStateStore implements StateStore, ActionAudit {
 				events.push(createRuntimeEvent(run, run.eventSequence, { type: "RunInterrupted", reason: run.lastError }));
 			}
 		for (const action of next.actions) if (action.status === "PREPARED") action.status = "INTERRUPTED";
-		if (this.options.recoverInterrupted !== false) await this.archiveTerminalRuns(next);
+		if (!this.taskRecovery && this.options.recoverInterrupted !== false) await this.archiveTerminalRuns(next);
 		if (JSON.stringify(next) !== JSON.stringify(this.state)) await this.commit(next);
 		else {
 			if (this.options.recoverInterrupted === false) return;
@@ -743,6 +1076,7 @@ export class FileStateStore implements StateStore, ActionAudit {
 				updatedAt: run.updatedAt,
 				actions: actions.length,
 				digest: await this.writeArchive(run, actions),
+				...(run.taskBinding === undefined ? {} : { taskBinding: run.taskBinding }),
 			});
 		}
 		const moved = new Set(selected.map((run) => run.runId));
@@ -792,6 +1126,29 @@ export class FileStateStore implements StateStore, ActionAudit {
 		const entry = state?.archivedRuns?.find((item) => item.runId === runId);
 		return entry ? loadArchive(await realpath(projectPath), entry) : undefined;
 	}
+	/** Canonical data lookup only. No writer, recovery, execution, or completion mutation. */
+	static async readTaskReceipt(projectPath: string, executionId: string): Promise<TaskReceipt> {
+		validateContract(TaskIdentityIdSchema, executionId);
+		const { state } = await FileStateStore.readSnapshot(projectPath);
+		const admission = state?.taskAdmissions?.find((entry) => entry.metadata.binding.executionId === executionId);
+		if (!admission) return { status: "UNKNOWN", executionId };
+		let run: Run | undefined;
+		if (admission.outcome.status === "STARTED") {
+			const runId = admission.outcome.runId;
+			run = state?.runs.find((entry) => entry.runId === runId);
+			if (!run) {
+				const entry = state?.archivedRuns?.find((entry) => entry.runId === runId);
+				if (entry) run = (await loadArchive(await realpath(projectPath), entry)).run;
+			}
+			if (!run) throw new StateStoreError("task receipt run unavailable");
+		}
+		return validateContract(TaskReceiptSchema, {
+			status: "FOUND",
+			executionId,
+			admission,
+			run: run ? { runId: run.runId, status: run.status, revision: run.revision } : null,
+		});
+	}
 	private async mutate(change: (next: FileRuntimeState) => void, beforeStateRename?: () => void): Promise<void> {
 		if (this.closed || this.busy) throw new StateStoreError("closed or concurrent operation");
 		this.busy = true;
@@ -829,6 +1186,82 @@ export class FileStateStore implements StateStore, ActionAudit {
 			next.projectFacts = facts;
 		}, assertFresh);
 	}
+	/**
+	 * Writer-only persistence primitive. The Host saves ACCEPTED before acknowledgment and transfers this same store.
+	 * STARTED is written only by the initial Run save, in that same canonical-state commit.
+	 */
+	async saveTaskAdmission(admission: TaskAdmission, expectedRevision: number): Promise<TaskAdmission> {
+		const value = structuredClone(validateContract(TaskAdmissionSchema, admission));
+		return this.lane.run(async () => {
+			await this.assertWritable();
+			const previous = this.state.taskAdmissions?.find(
+				(entry) => entry.metadata.binding.executionId === value.metadata.binding.executionId,
+			);
+			if (
+				previous &&
+				JSON.stringify(previous.metadata) === JSON.stringify(value.metadata) &&
+				(previous.outcome.status === value.outcome.status
+					? JSON.stringify(previous) === JSON.stringify(value)
+					: value.outcome.status === "ACCEPTED")
+			)
+				return structuredClone(previous);
+			await this.mutate((next) => {
+				if (
+					next.revision !== expectedRevision ||
+					(this.options.taskExecutionId !== undefined &&
+						(this.options.taskExecutionId !== value.metadata.binding.executionId ||
+							(!previous && value.cleanup !== "NOT_STARTED"))) ||
+					value.metadata.binding.checkout.canonicalCwd !== this.projectPath ||
+					value.outcome.status === "STARTED" ||
+					(previous
+						? previous.outcome.status !== "ACCEPTED" ||
+							JSON.stringify(previous.metadata) !== JSON.stringify(value.metadata) ||
+							previous.acceptedAt !== value.acceptedAt ||
+							previous.cleanup !== value.cleanup ||
+							value.updatedAt < previous.updatedAt
+						: value.outcome.status !== "ACCEPTED" ||
+							value.metadata.confirmedProjectRevision !== expectedRevision ||
+							value.metadata.admittedProjectRevision !== expectedRevision + 1 ||
+							next.runs.some(active) ||
+							next.taskAdmissions?.some(
+								(entry) =>
+									entry.outcome.status === "ACCEPTED" ||
+									entry.metadata.binding.taskId === value.metadata.binding.taskId,
+							))
+				)
+					throw new StateStoreError("stale or conflicting task admission");
+				next.taskAdmissions = previous
+					? (next.taskAdmissions ?? []).map((entry) =>
+							entry.metadata.binding.executionId === value.metadata.binding.executionId ? value : entry,
+						)
+					: [...(next.taskAdmissions ?? []), value];
+			});
+			return structuredClone(value);
+		});
+	}
+	/** Monotonic resource lifecycle in the existing writer lane; never rewrites immutable metadata. */
+	async markTaskCleanup(metadata: TaskRunMetadata, cleanup: "UNCONFIRMED" | "CONFIRMED"): Promise<number> {
+		return this.lane.run(async () => {
+			await this.assertWritable();
+			const admission = this.state.taskAdmissions?.find(
+				(entry) => entry.metadata.binding.executionId === metadata.binding.executionId,
+			);
+			if (
+				!admission ||
+				!isDeepStrictEqual(admission.metadata, metadata) ||
+				admission.cleanup === undefined ||
+				(admission.cleanup === "CONFIRMED" && cleanup !== "CONFIRMED")
+			)
+				throw new StateStoreError("task cleanup lifecycle");
+			if (admission.cleanup === cleanup) return this.state.revision;
+			await this.mutate((next) => {
+				next.taskAdmissions = next.taskAdmissions?.map((entry) =>
+					entry.metadata.binding.executionId === metadata.binding.executionId ? { ...entry, cleanup } : entry,
+				);
+			});
+			return this.state.revision;
+		});
+	}
 	async load(runId: string): Promise<Run | undefined> {
 		await this.assertWritable();
 		return structuredClone(this.state.runs.find((run) => run.runId === runId));
@@ -848,6 +1281,23 @@ export class FileStateStore implements StateStore, ActionAudit {
 			validateContract(RunSchema, run);
 			const index = next.runs.findIndex((item) => item.runId === run.runId);
 			const previous = next.runs[index];
+			if (previous && JSON.stringify(previous.taskBinding) !== JSON.stringify(run.taskBinding))
+				throw new StateStoreError("task binding is immutable");
+			if (!previous) {
+				const admission = next.taskAdmissions?.find((entry) => entry.outcome.status === "ACCEPTED");
+				if (run.taskBinding) {
+					if (
+						!admission ||
+						JSON.stringify(admission.metadata) !== JSON.stringify(run.taskBinding) ||
+						run.taskBinding.binding.checkout.canonicalCwd !== this.projectPath
+					)
+						throw new StateStoreError("initial run requires its exact task admission");
+					admission.outcome = { status: "STARTED", runId: run.runId };
+					admission.updatedAt = Math.max(admission.updatedAt, run.createdAt);
+				} else if (admission) {
+					throw new StateStoreError("unrelated run cannot consume pending task admission");
+				}
+			}
 			if (previous && JSON.stringify(previous.projectInstruction) !== JSON.stringify(run.projectInstruction))
 				throw new Error("Project instruction metadata cannot change within a run");
 			if (previous && previous.verificationRepair?.mode !== run.verificationRepair?.mode)

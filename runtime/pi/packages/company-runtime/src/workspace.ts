@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { type BigIntStats, constants, type Stats } from "node:fs";
 import { lstat, open, readdir, readFile, readlink, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { Run } from "./contracts.ts";
+import type { CheckoutIdentity, Run } from "./contracts.ts";
 import { OBSERVATION_FILES, ownedObservationPaths } from "./observation-files.ts";
 import { evaluatePolicy, isPolicyPath, type PolicyContext } from "./policy.ts";
 import { FilePolicyPathInspector } from "./policy-paths.ts";
@@ -16,6 +16,18 @@ type FileImage =
 	| (Fingerprint & { kind: "opaque" })
 	| (Fingerprint & { kind: "symlink" });
 type Capture = { images: Map<string, FileImage>; head: string; index: string; gitConfig: string };
+function captureDigest(capture: Capture, evidenceMode?: WorkspaceEvidenceOptions["evidenceMode"]): string {
+	return hash(
+		JSON.stringify({
+			head: capture.head,
+			index: capture.index,
+			gitConfig: capture.gitConfig,
+			files: [...capture.images].map(([path, image]) =>
+				evidenceMode ? [path, image.kind, image.mode, image.length, image.hash] : [path, image.mode, image.hash],
+			),
+		}),
+	);
+}
 export interface WorkspaceEvidenceOptions {
 	readonly allowedPaths: readonly string[];
 	readonly evidenceMode?: "bounded-monorepo";
@@ -415,6 +427,29 @@ export async function probeWorkspaceEvidence(
 	}
 }
 
+/** Exact clean checkout identity using the execution collector; no writer, baseline or check execution. */
+export async function readCheckoutIdentity(
+	cwd: string,
+	options: WorkspaceEvidenceOptions,
+	signal?: AbortSignal,
+): Promise<CheckoutIdentity> {
+	return boundedCapture(signal, async (signal) => {
+		const collector = await WorkspaceEvidenceCollector.create(cwd, options);
+		const index = await collector.initialize(signal);
+		await collector.assertClean(signal);
+		const capture = await collector.capture(signal);
+		if (capture.index !== index)
+			throw new WorkspaceEvidenceError("unavailable", "Workspace index changed during capture");
+		await collector.assertClean(signal);
+		return {
+			canonicalCwd: collector.cwd,
+			repositoryRoot: collector.cwd,
+			headCommit: capture.head,
+			workspaceDigest: `sha256:${captureDigest(capture, options.evidenceMode)}`,
+		};
+	});
+}
+
 /** Full byte/mode snapshots plus Git HEAD/index identity. No stash/reset/checkout/clean/commit. */
 export class GitWorkspace {
 	readonly cwd: string;
@@ -612,18 +647,7 @@ export class GitWorkspace {
 		}
 		const diff = JSON.stringify(changes, null, 2);
 		if (Buffer.byteLength(diff) > 240000) throw new Error("Diff evidence exceeds review context limit");
-		const diffDigest = hash(
-			JSON.stringify({
-				head,
-				index,
-				gitConfig,
-				files: [...images].map(([path, image]) =>
-					this.collector.options.evidenceMode
-						? [path, image.kind, image.mode, image.length, image.hash]
-						: [path, image.mode, image.hash],
-				),
-			}),
-		);
+		const diffDigest = captureDigest(capture, this.collector.options.evidenceMode);
 		return { diffDigest, changedFiles, changedLines, evidenceRefs: [`diff:${diffDigest}`], safe, diff };
 	}
 }

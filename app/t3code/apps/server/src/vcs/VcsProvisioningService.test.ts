@@ -8,6 +8,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import * as VcsDriver from "./VcsDriver.ts";
 import * as VcsDriverRegistry from "./VcsDriverRegistry.ts";
 import * as VcsProvisioningService from "./VcsProvisioningService.ts";
+import * as OwnershipTest from "../workspace/WorkspaceExecutionOwnershipTest.ts";
 
 const TEST_EPOCH = DateTime.makeUnsafe("1970-01-01T00:00:00.000Z");
 
@@ -62,6 +63,7 @@ it.effect("routes repository initialization through an explicit VCS driver kind"
   const calls: string[] = [];
   const driver = makeDriver(calls);
   const testLayer = VcsProvisioningService.layer.pipe(
+    Layer.provide(OwnershipTest.layer),
     Layer.provide(
       Layer.mock(VcsDriverRegistry.VcsDriverRegistry)({
         get: (kind) => (kind === "git" ? Effect.succeed(driver) : Effect.die("unexpected kind")),
@@ -81,6 +83,7 @@ it.effect("defaults repository initialization to Git until callers choose a VCS 
   const calls: string[] = [];
   const driver = makeDriver(calls);
   const testLayer = VcsProvisioningService.layer.pipe(
+    Layer.provide(OwnershipTest.layer),
     Layer.provide(
       Layer.mock(VcsDriverRegistry.VcsDriverRegistry)({
         get: (kind) => (kind === "git" ? Effect.succeed(driver) : Effect.die("unexpected kind")),

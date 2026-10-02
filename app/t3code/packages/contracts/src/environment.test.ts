@@ -50,6 +50,16 @@ describe("ExecutionEnvironmentDescriptor", () => {
     ).toBe(true);
   });
 
+  it("requires explicit task RPC capability advertisement", () => {
+    expect(decodeDescriptor(descriptor).capabilities.weavraTasks).toBeUndefined();
+    expect(
+      decodeDescriptor({
+        ...descriptor,
+        capabilities: { ...descriptor.capabilities, weavraTasks: true },
+      }).capabilities.weavraTasks,
+    ).toBe(true);
+  });
+
   it("preserves the server's generic attachment upload limit", () => {
     expect(
       decodeDescriptor({

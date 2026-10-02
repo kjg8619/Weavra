@@ -1,8 +1,10 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import { WeavraTaskId } from "./weavraTask.ts";
 import * as SchemaIssue from "effect/SchemaIssue";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as Struct from "effect/Struct";
+import { WeavraCheckoutOwnership, WeavraTask, WeavraTaskSetCommand } from "./weavraTask.ts";
 import { OrchestrationMessageContext } from "./composerContext.ts";
 import { ProviderOptionSelections } from "./model.ts";
 import { RepositoryIdentity, ThreadEnvMode } from "./environment.ts";
@@ -836,6 +838,8 @@ export const OrchestrationReadModel = Schema.Struct({
   snapshotSequence: NonNegativeInt,
   projects: Schema.Array(OrchestrationProject),
   threads: Schema.Array(OrchestrationThread),
+  weavraTasks: Schema.optionalKey(Schema.Array(WeavraTask)),
+  weavraOwnership: Schema.optionalKey(Schema.Array(WeavraCheckoutOwnership)),
   updatedAt: IsoDateTime,
 });
 export type OrchestrationReadModel = typeof OrchestrationReadModel.Type;
@@ -1283,6 +1287,12 @@ const ThreadTurnStartBootstrap = Schema.Struct({
 
 export type ThreadTurnStartBootstrap = typeof ThreadTurnStartBootstrap.Type;
 
+export const ControlledAnalysisTurn = Schema.Struct({
+  taskId: WeavraTaskId,
+  expectedRevision: NonNegativeInt,
+});
+export type ControlledAnalysisTurn = typeof ControlledAnalysisTurn.Type;
+
 export const ThreadTurnStartCommand = Schema.Struct({
   type: Schema.Literal("thread.turn.start"),
   commandId: CommandId,
@@ -1302,6 +1312,7 @@ export const ThreadTurnStartCommand = Schema.Struct({
   ),
   bootstrap: Schema.optional(ThreadTurnStartBootstrap),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
+  controlledAnalysis: Schema.optional(ControlledAnalysisTurn),
   createdAt: IsoDateTime,
 });
 
@@ -1624,6 +1635,7 @@ const ThreadPullRequestLinkSyncCommand = Schema.Struct({
 });
 
 const InternalOrchestrationCommand = Schema.Union([
+  WeavraTaskSetCommand,
   ThreadAutoSettleCommand,
   ThreadPullRequestSyncCommand,
   ThreadPullRequestLinkSyncCommand,
@@ -1653,6 +1665,7 @@ export const OrchestrationCommand = Schema.Union([
 export type OrchestrationCommand = typeof OrchestrationCommand.Type;
 
 export const OrchestrationEventType = Schema.Literals([
+  "thread.weavra-task-set",
   "project.created",
   "project.meta-updated",
   "project.deleted",
@@ -1889,6 +1902,7 @@ export const ThreadTurnStartRequestedPayload = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_PROVIDER_INTERACTION_MODE)),
   ),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
+  controlledAnalysis: Schema.optional(ControlledAnalysisTurn),
   createdAt: IsoDateTime,
 });
 
@@ -1981,6 +1995,7 @@ export const OrchestrationEventMetadata = Schema.Struct({
    * turn-start event instead.
    */
   deferredTurn: Schema.optional(Schema.Boolean),
+  controlledAnalysis: Schema.optional(ControlledAnalysisTurn),
   origin: Schema.optional(OrchestrationClientOrigin),
 });
 export type OrchestrationEventMetadata = typeof OrchestrationEventMetadata.Type;
@@ -1998,6 +2013,16 @@ const EventBaseFields = {
 } as const;
 
 export const OrchestrationEvent = Schema.Union([
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.weavra-task-set"),
+    payload: Schema.Struct({
+      threadId: ThreadId,
+      expectedRevision: Schema.NullOr(PositiveInt),
+      expectedOwnershipGeneration: NonNegativeInt,
+      task: WeavraTask,
+    }).check(Schema.makeFilter((payload) => payload.threadId === payload.task.threadId)),
+  }),
   Schema.Struct({
     ...EventBaseFields,
     type: Schema.Literal("project.created"),

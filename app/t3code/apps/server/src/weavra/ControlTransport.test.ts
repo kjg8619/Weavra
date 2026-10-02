@@ -38,6 +38,19 @@ const snapshotRequest = {
   id: "t3-control-snapshot-2",
   type: "control.snapshot",
 } as const satisfies WeavraControlRequest;
+const checkoutRequest = {
+  protocolVersion: 1,
+  id: "t3-control-checkout-1",
+  type: "workflow.checkout",
+} as const satisfies WeavraControlRequest;
+const prepareRequest = {
+  protocolVersion: 1,
+  id: "owner-1:prepare",
+  ownerId: "owner-1",
+  expectedProjectRevision: 7,
+  type: "workflow.prepare",
+  goal: "Update the project",
+} as const satisfies WeavraControlRequest;
 const helloResponse = {
   protocolVersion: 1,
   runId: null,
@@ -78,6 +91,35 @@ const helloResponse = {
       recipes: [],
     },
   },
+} as const satisfies WeavraControlResponse;
+const checkoutResponse = {
+  ...helloResponse,
+  id: checkoutRequest.id,
+  command: checkoutRequest.type,
+  projectRevision: null,
+  data: {
+    kind: "checkout-identity",
+    checkout: {
+      canonicalCwd: "/project",
+      repositoryRoot: "/project",
+      headCommit: "a".repeat(40),
+      workspaceDigest: `sha256:${"a".repeat(64)}`,
+    },
+  },
+} as const satisfies WeavraControlResponse;
+const prepareResponse = {
+  protocolVersion: 1,
+  runId: null,
+  stateRevision: null,
+  projectRevision: 7,
+  eventId: null,
+  timestamp: 1000,
+  type: "control_response",
+  id: prepareRequest.id,
+  command: prepareRequest.type,
+  ownerId: "owner-1",
+  success: false,
+  error: { code: "PROJECT_CHANGED" },
 } as const satisfies WeavraControlResponse;
 const acceptedResponse = {
   protocolVersion: 1,
@@ -167,6 +209,8 @@ const responses = ${JSON.stringify({
   "control.hello": helloResponse,
   "workflow.confirm": acceptedResponse,
   "control.snapshot": snapshotResponse,
+  "workflow.checkout": checkoutResponse,
+  "workflow.prepare": prepareResponse,
 })};
 for await (const line of createInterface({input:process.stdin})) {
  appendFileSync('request-lines', line+'\\n');
@@ -420,6 +464,71 @@ it.effect("rejects an oversized UTF-8 request before writing to the child", () =
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
+for (const [request, response, seconds, timedOut] of [
+  [checkoutRequest, checkoutResponse, 60, false],
+  [checkoutRequest, checkoutResponse, 70, true],
+  [prepareRequest, prepareResponse, 60, false],
+  [prepareRequest, prepareResponse, 70, true],
+  [confirmRequest, acceptedResponse, 60, false],
+  [confirmRequest, acceptedResponse, 70, true],
+  [snapshotRequest, snapshotResponse, 10, true],
+] as const) {
+  it.effect(`keeps ${request.type} bounded at ${seconds} seconds without replay`, () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "weavra-checkout-deadline-" });
+      const executable = writeFakeCli({ directory: cwd, name: "controller", source });
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const replySeen = yield* Deferred.make<void>();
+      const releaseReply = yield* Deferred.make<void>();
+      const gatedSpawner = ChildProcessSpawner.make((command) =>
+        spawner.spawn(command).pipe(
+          Effect.map((child) =>
+            ChildProcessSpawner.makeHandle({
+              ...child,
+              stdout: child.stdout.pipe(
+                Stream.mapEffect((chunk) =>
+                  Deferred.succeed(replySeen, undefined).pipe(
+                    Effect.andThen(Deferred.await(releaseReply)),
+                    Effect.as(chunk),
+                  ),
+                ),
+              ),
+            }),
+          ),
+        ),
+      );
+      yield* Effect.gen(function* () {
+        const bridge = yield* openControlTransport(executable, cwd, env);
+        const first = yield* bridge.exchange(request).pipe(Effect.result, Effect.forkScoped);
+        yield* Deferred.await(replySeen);
+        yield* TestClock.adjust(seconds * 1000);
+        if (timedOut) {
+          expect(yield* Fiber.join(first)).toMatchObject({
+            _tag: "Failure",
+            failure: { code: "REQUEST_TIMEOUT" },
+          });
+          const resumed = yield* bridge.exchange(request).pipe(Effect.forkScoped);
+          yield* TestClock.adjust("0 millis");
+          yield* Deferred.succeed(releaseReply, undefined);
+          expect(yield* Fiber.join(resumed)).toEqual(response);
+        } else {
+          yield* Deferred.succeed(releaseReply, undefined);
+          expect(yield* Fiber.join(first)).toMatchObject({
+            _tag: "Success",
+            success: response,
+          });
+        }
+        expect(yield* fs.readFileString(`${cwd}/request-lines`)).toBe(requestLines(request));
+      }).pipe(
+        Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, gatedSpawner),
+        Effect.scoped,
+      );
+      expect(yield* fs.readFileString(`${cwd}/control-closed`)).toBe("closed");
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+}
+
 it.effect("retains a timed-out mutation and resumes its receipt without replaying it", () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -436,7 +545,7 @@ it.effect("retains a timed-out mutation and resumes its receipt without replayin
       const first = yield* bridge.exchange(confirmRequest).pipe(Effect.result, Effect.forkScoped);
       yield* waitForFile(`${cwd}/mutation-pending`);
       expect(yield* fs.readFileString(`${cwd}/mutation-lines`)).toBe(requestLines(confirmRequest));
-      yield* TestClock.adjust("10 seconds");
+      yield* TestClock.adjust("70 seconds");
       expect(yield* Fiber.join(first)).toMatchObject({
         _tag: "Failure",
         failure: { _tag: "WeavraControlTransportError", code: "REQUEST_TIMEOUT" },

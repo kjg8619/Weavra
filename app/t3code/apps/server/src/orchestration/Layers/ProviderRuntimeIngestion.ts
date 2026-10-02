@@ -52,10 +52,11 @@ import {
   type ProviderRuntimeIngestionShape,
 } from "../Services/ProviderRuntimeIngestion.ts";
 import { projectActivityPayload } from "../ActivityPayloadProjection.ts";
-import { forkParked } from "../../serverActivation.ts";
+import { forkParked, ServerActivation } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { canReplaceThreadTitle } from "../threadTitles.ts";
+import { WorkspaceExecutionOwnership } from "../../workspace/WorkspaceExecutionOwnership.ts";
 
 const providerTurnKey = (threadId: ThreadId, turnId: TurnId) => `${threadId}:${turnId}`;
 // Suffixed, not prefixed: `clearTurnStateForSession` sweeps by thread prefix.
@@ -1017,6 +1018,14 @@ export function runtimeEventToActivities(
 }
 
 const make = Effect.gen(function* () {
+  const ownership = yield* WorkspaceExecutionOwnership;
+  yield* ownership.registerEventConsumer("ingestion", [
+    "turn.started",
+    "turn.completed",
+    "turn.aborted",
+    "session.exited",
+    "turn.diff.updated",
+  ]);
   const threadBackgroundLiveness = yield* ThreadBackgroundLivenessService;
   const threadPlanProgress = yield* ThreadPlanProgressService;
   const crypto = yield* Crypto.Crypto;
@@ -2662,7 +2671,10 @@ const make = Effect.gen(function* () {
       );
 
   const worker = yield* makeDrainableWorker((input: RuntimeIngestionInput) =>
-    processInput(input).pipe(logIngestionFailure(input.source, input.event)),
+    (input.source !== "domain"
+      ? ownership.withProviderEvent("ingestion", input.event, processInput(input))
+      : processInput(input)
+    ).pipe(logIngestionFailure(input.source, input.event)),
   );
 
   // Repository detection for a diff goes through VCS subprocesses, which can
@@ -2671,29 +2683,42 @@ const make = Effect.gen(function* () {
   const detectProviderDiffRepository = Effect.fn("detectProviderDiffRepository")(function* (
     event: ProviderDiffEvent,
   ) {
-    if (!toTurnId(event.turnId)) return;
+    if (!toTurnId(event.turnId)) return false;
     const checkpointContext = yield* projectionSnapshotQuery
       .getThreadCheckpointContext(event.threadId)
       .pipe(Effect.map(Option.getOrUndefined));
     const workspaceCwd = checkpointContext?.worktreePath ?? checkpointContext?.workspaceRoot;
-    if (!workspaceCwd || !(yield* checkpointStore.isGitRepository(workspaceCwd))) return;
+    if (!workspaceCwd || !(yield* checkpointStore.isGitRepository(workspaceCwd))) return false;
     yield* worker.enqueue({ source: "diff", event });
+    return true;
   });
   const diffWorker = yield* makeDrainableWorker((event: ProviderDiffEvent) =>
-    detectProviderDiffRepository(event).pipe(logIngestionFailure("diff", event)),
+    detectProviderDiffRepository(event).pipe(
+      Effect.flatMap((forwarded) =>
+        forwarded ? Effect.void : ownership.withProviderEvent("ingestion", event, Effect.void),
+      ),
+      Effect.catchCause((cause) =>
+        ownership.withProviderEvent("ingestion", event, Effect.failCause(cause)),
+      ),
+      logIngestionFailure("diff", event),
+    ),
   );
 
   const start: ProviderRuntimeIngestionShape["start"] = () =>
     Effect.gen(function* () {
-      yield* forkParked(
-        Stream.runForEach(providerService.streamEvents, (event) =>
-          event.type === "turn.diff.updated"
-            ? diffWorker.enqueue(event)
-            : worker.enqueue({ source: "runtime", event }),
+      const activation = yield* ServerActivation;
+      yield* Stream.runForEach(providerService.streamEvents, (event) =>
+        (activation ?? Effect.void).pipe(
+          Effect.andThen(
+            event.type === "turn.diff.updated"
+              ? diffWorker.enqueue(event)
+              : worker.enqueue({ source: "runtime", event }),
+          ),
         ),
-      );
+      ).pipe(Effect.forkScoped({ startImmediately: true }));
+      const domainEvents = yield* orchestrationEngine.subscribeDomainEvents;
       yield* forkParked(
-        Stream.runForEach(orchestrationEngine.streamDomainEvents, (event) => {
+        Stream.runForEach(domainEvents, (event) => {
           if (event.type !== "thread.turn-start-requested") {
             return Effect.void;
           }

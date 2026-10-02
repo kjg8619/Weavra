@@ -5,6 +5,9 @@ import { describe, it } from "vite-plus/test";
 import {
   codexAppServerArgs,
   codexExecLaunchArgs,
+  codexSessionAppServerArgs,
+  controlledAnalysisConfigIssue,
+  CONTROLLED_ANALYSIS_DISABLED_FEATURES,
   resolveCodexLaunchArgs,
 } from "./codexLaunchArgs.ts";
 
@@ -55,5 +58,73 @@ describe("codexExecLaunchArgs", () => {
     NodeAssert.deepStrictEqual(codexExecLaunchArgs("--config --strict-config --enable --disable"), [
       "--strict-config",
     ]);
+  });
+});
+
+describe("controlled Codex launch", () => {
+  it("forces strict configuration and feature disables despite inherited enables", () => {
+    const args = codexSessionAppServerArgs(
+      [],
+      '--enable plugins --config features.apps=true --config model_provider="fixture"',
+      true,
+    );
+    NodeAssert.equal(args.filter((arg) => arg === "--strict-config").length, 1);
+    for (const feature of [
+      "apps",
+      "plugins",
+      "hooks",
+      "codex_hooks",
+      "plugin_hooks",
+      "skill_mcp_dependency_install",
+    ]) {
+      NodeAssert.ok(args.some((arg, index) => arg === "--disable" && args[index + 1] === feature));
+    }
+    NodeAssert.ok(args.includes("model_provider=fixture"));
+  });
+
+  it("rejects selected profiles and ambiguous controlled launch options", () => {
+    for (const input of [
+      "--profile work",
+      "-pwork",
+      "-c profile='work'",
+      "--",
+      "--listen ws://localhost:1234",
+    ]) {
+      NodeAssert.throws(() => codexSessionAppServerArgs([], input, true));
+    }
+  });
+
+  it("requires explicit feature denial and disabled MCP servers in effective configuration", () => {
+    const features = Object.fromEntries(
+      CONTROLLED_ANALYSIS_DISABLED_FEATURES.map((key) => [key, false]),
+    );
+    const clean = { features, model_provider: "fixture", model: "custom", profile: null };
+    NodeAssert.equal(controlledAnalysisConfigIssue(clean), null);
+    NodeAssert.equal(controlledAnalysisConfigIssue({ ...clean, mcp_servers: {} }), null);
+    NodeAssert.equal(
+      controlledAnalysisConfigIssue({
+        ...clean,
+        mcp_servers: { mutator: { enabled: false, command: "fixture-writer" } },
+        plugins: { configuredButGloballyDisabled: { enabled: true } },
+      }),
+      null,
+    );
+    for (const mcp_servers of [
+      null,
+      [],
+      { mutator: {} },
+      { mutator: { enabled: true } },
+      { mutator: null },
+    ]) {
+      NodeAssert.notEqual(controlledAnalysisConfigIssue({ ...clean, mcp_servers }), null);
+    }
+    for (const key of CONTROLLED_ANALYSIS_DISABLED_FEATURES) {
+      NodeAssert.notEqual(
+        controlledAnalysisConfigIssue({ ...clean, features: { ...features, [key]: true } }),
+        null,
+      );
+    }
+    NodeAssert.notEqual(controlledAnalysisConfigIssue({ ...clean, features: {} }), null);
+    NodeAssert.notEqual(controlledAnalysisConfigIssue({ ...clean, profile: "unresolved" }), null);
   });
 });

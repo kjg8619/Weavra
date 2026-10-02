@@ -23,12 +23,18 @@ import {
   ProjectId,
   ThreadId,
   TurnId,
+  WeavraTask,
 } from "@t3tools/contracts";
 import { serializeAssistantCitation } from "@t3tools/shared/assistantCitations";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as OwnershipTest from "../../workspace/WorkspaceExecutionOwnershipTest.ts";
+import { WorkspaceExecutionOwnership } from "../../workspace/WorkspaceExecutionOwnership.ts";
+import * as ProcessRunner from "../../processRunner.ts";
+import * as FileSystem from "effect/FileSystem";
+import * as Schema from "effect/Schema";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
@@ -75,10 +81,13 @@ import { ServerActivation } from "../../serverActivation.ts";
 import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
 import * as GitWorkflowService from "../../git/GitWorkflowService.ts";
 
+const decodeControlledTask = Schema.decodeUnknownEffect(WeavraTask);
+
 const asProjectId = (value: string): ProjectId => ProjectId.make(value);
 const asApprovalRequestId = (value: string): ApprovalRequestId => ApprovalRequestId.make(value);
 const asMessageId = (value: string): MessageId => MessageId.make(value);
 const asTurnId = (value: string): TurnId => TurnId.make(value);
+const decodeOwnershipTask = Schema.decodeUnknownSync(WeavraTask);
 
 const assistantQuoteText = "Retain the reconnect backoff.";
 const assistantCitation = {
@@ -120,6 +129,7 @@ describe("ProviderCommandReactor", () => {
     | OrchestrationEngineService
     | ProviderCommandReactor
     | ProjectionSnapshotQuery
+    | WorkspaceExecutionOwnership
     | SqlClient.SqlClient,
     unknown
   > | null = null;
@@ -168,6 +178,7 @@ describe("ProviderCommandReactor", () => {
 
   async function createHarness(input?: {
     readonly baseDir?: string;
+    readonly workspaceRoot?: string;
     readonly initialTitle?: string;
     readonly deferReactorStart?: boolean;
     readonly threadModelSelection?: ModelSelection;
@@ -180,6 +191,7 @@ describe("ProviderCommandReactor", () => {
     readonly beforeReadySessionDispatch?: () => Effect.Effect<void>;
     readonly beforeTurnStartDispatch?: () => Effect.Effect<void>;
     readonly afterTurnStartDispatch?: () => Effect.Effect<void>;
+    readonly afterSendTurn?: () => Effect.Effect<void>;
     readonly compactThreadEffect?: () => Effect.Effect<void, ProviderAdapterRequestError>;
     readonly interruptTurnEffect?: () => Effect.Effect<void, ProviderAdapterRequestError>;
     readonly stopSessionEffect?: () => Effect.Effect<void, ProviderAdapterRequestError>;
@@ -270,7 +282,7 @@ describe("ProviderCommandReactor", () => {
       Effect.succeed({
         threadId: ThreadId.make("thread-1"),
         turnId: asTurnId("turn-1"),
-      }),
+      }).pipe(Effect.tap(() => input?.afterSendTurn?.() ?? Effect.void)),
     );
     const compactThread = vi.fn((_: ThreadId) => input?.compactThreadEffect?.() ?? Effect.void);
     const interruptTurn = vi.fn((_: unknown) => input?.interruptTurnEffect?.() ?? Effect.void);
@@ -461,6 +473,7 @@ describe("ProviderCommandReactor", () => {
       }),
     ).pipe(Layer.provide(orchestrationLayer));
     const layer = ProviderCommandReactorLive.pipe(
+      Layer.provideMerge(OwnershipTest.baseLayer),
       Layer.provideMerge(reactorOrchestrationLayer),
       Layer.provideMerge(projectionSnapshotLayer),
       Layer.provideMerge(Layer.succeed(ProviderService, service)),
@@ -500,7 +513,13 @@ describe("ProviderCommandReactor", () => {
     const engine = await runtime.runPromise(Effect.service(OrchestrationEngineService));
     const snapshotQuery = await runtime.runPromise(Effect.service(ProjectionSnapshotQuery));
     const reactor = await runtime.runPromise(Effect.service(ProviderCommandReactor));
-    const runEffect = <A, E>(effect: Effect.Effect<A, E>) => runtime!.runPromise(effect);
+    const runEffect = <A, E>(
+      effect: Effect.Effect<
+        A,
+        E,
+        WorkspaceExecutionOwnership | OrchestrationEngineService | ProjectionSnapshotQuery
+      >,
+    ) => runtime!.runPromise(effect);
 
     await Effect.runPromise(
       engine.dispatch({
@@ -508,7 +527,7 @@ describe("ProviderCommandReactor", () => {
         commandId: CommandId.make("cmd-project-create"),
         projectId: asProjectId("project-1"),
         title: "Provider Project",
-        workspaceRoot: "/tmp/provider-project",
+        workspaceRoot: input?.workspaceRoot ?? "/tmp/provider-project",
         defaultModelSelection: modelSelection,
         createdAt: now,
       }),
@@ -634,6 +653,291 @@ describe("ProviderCommandReactor", () => {
       },
     };
   }
+
+  effectIt.effect(
+    "starts a fresh controlled analysis from an existing free Codex conversation",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const cwd = yield* fs.realPath(
+          yield* fs.makeTempDirectoryScoped({ prefix: "controlled-transition-" }),
+        );
+        const runner = yield* ProcessRunner.ProcessRunner;
+        expect((yield* runner.run({ command: "git", args: ["-C", cwd, "init", "-q"] })).code).toBe(
+          0,
+        );
+        const started = yield* Deferred.make<void>();
+        const harness = yield* Effect.promise(() =>
+          createHarness({
+            workspaceRoot: cwd,
+            deferReactorStart: true,
+            afterSendTurn: () => Deferred.succeed(started, undefined).pipe(Effect.asVoid),
+          }),
+        );
+        const threadId = ThreadId.make("thread-1");
+        const now = "2026-01-01T00:00:00.000Z";
+        harness.runtimeSessions.push({
+          provider: ProviderDriverKind.make("codex"),
+          providerInstanceId: ProviderInstanceId.make("codex"),
+          threadId,
+          status: "ready",
+          runtimeMode: "approval-required",
+          cwd,
+          model: "gpt-5-codex",
+          resumeCursor: { threadId: "existing-free-provider-thread" },
+          createdAt: now,
+          updatedAt: now,
+        });
+        yield* harness.engine.dispatch({
+          type: "thread.session.set",
+          commandId: CommandId.make("existing-free-session"),
+          threadId,
+          session: {
+            threadId,
+            status: "ready",
+            providerName: "codex",
+            providerInstanceId: ProviderInstanceId.make("codex"),
+            runtimeMode: "approval-required",
+            activeTurnId: null,
+            lastError: null,
+            updatedAt: now,
+          },
+          createdAt: now,
+        });
+        const ownership = yield* Effect.promise(() =>
+          harness.runEffect(Effect.service(WorkspaceExecutionOwnership)),
+        );
+        const task = yield* decodeControlledTask({
+          id: "88888888-8888-4888-8888-888888888888",
+          environmentId: ownership.environmentId,
+          projectId: asProjectId("project-1"),
+          threadId,
+          target: { workspaceRoot: cwd, worktreePath: null },
+          checkout: {
+            canonicalCwd: cwd,
+            repositoryRoot: cwd,
+            headCommit: "a".repeat(40),
+            workspaceDigest: `sha256:${"a".repeat(64)}`,
+          },
+          phase: "analysis",
+          revision: 1,
+          context: null,
+          execution: null,
+          ownership: { generation: 1, state: "analysis" },
+          createdAt: now,
+          updatedAt: now,
+        });
+        yield* Effect.promise(() =>
+          harness.runEffect(
+            ownership.updateTask({
+              type: "thread.weavra-task.set",
+              commandId: CommandId.make("controlled-transition-task"),
+              threadId,
+              expectedRevision: null,
+              expectedOwnershipGeneration: 0,
+              task,
+            }),
+          ),
+        );
+        yield* Effect.promise(() => harness.startReactor());
+        yield* harness.engine.dispatch({
+          type: "thread.turn.start",
+          commandId: CommandId.make("controlled-transition-turn"),
+          threadId,
+          message: {
+            messageId: MessageId.make("controlled-transition-message"),
+            role: "user",
+            text: "Analyze the observed bug",
+            attachments: [],
+          },
+          interactionMode: "plan",
+          runtimeMode: "approval-required",
+          createdAt: now,
+          controlledAnalysis: { taskId: task.id, expectedRevision: task.revision },
+        });
+        yield* Deferred.await(started);
+        yield* Effect.promise(() => harness.drain());
+        expect(harness.startSession).toHaveBeenCalledTimes(1);
+        expect(harness.startSession.mock.calls[0]?.[1]).toMatchObject({
+          controlledAnalysis: { taskId: task.id, generation: task.ownership.generation },
+        });
+        expect(harness.startSession.mock.calls[0]?.[1]).not.toHaveProperty("resumeCursor");
+        expect(harness.sendTurn).toHaveBeenCalledTimes(1);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(ProcessRunner.layer.pipe(Layer.provideMerge(NodeServices.layer))),
+      ),
+  );
+
+  effectIt.effect("retains compaction across an ownership acquire-drain-release ABA attempt", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const cwd = yield* fs.realPath(
+        yield* fs.makeTempDirectoryScoped({ prefix: "weavra-compact-aba-" }),
+      );
+      const runner = yield* ProcessRunner.ProcessRunner;
+      const initialized = yield* runner.run({ command: "git", args: ["-C", cwd, "init", "-q"] });
+      expect(initialized.code).toBe(0);
+      const entered = yield* Deferred.make<void>();
+      const resume = yield* Deferred.make<void>();
+      const attempted = yield* Deferred.make<void>();
+      const restored = yield* Deferred.make<void>();
+      const ownerReady = yield* Deferred.make<WorkspaceExecutionOwnership["Service"]>();
+      let mutations = 0;
+      const threadId = ThreadId.make("thread-1");
+      const harness = yield* Effect.promise(() =>
+        createHarness({
+          workspaceRoot: cwd,
+          deferReactorStart: true,
+          compactThreadEffect: () =>
+            Effect.gen(function* () {
+              yield* Deferred.succeed(entered, undefined);
+              yield* Deferred.await(resume);
+              const owner = yield* Deferred.await(ownerReady);
+              yield* owner
+                .withFreshOperation(
+                  { cwd, kind: "provider", threadId },
+                  Effect.sync(() => {
+                    mutations++;
+                  }),
+                )
+                .pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new ProviderAdapterRequestError({
+                        provider: "codex",
+                        method: "compactThread",
+                        detail: cause.message,
+                        cause,
+                      }),
+                  ),
+                );
+            }).pipe(Effect.ensuring(Deferred.succeed(attempted, undefined))),
+        }),
+      );
+      const ownership = yield* Effect.promise(() =>
+        harness.runEffect(Effect.service(WorkspaceExecutionOwnership)),
+      );
+      yield* Deferred.succeed(ownerReady, ownership);
+      harness.runtimeSessions.push({
+        provider: ProviderDriverKind.make("codex"),
+        providerInstanceId: ProviderInstanceId.make("codex"),
+        threadId,
+        status: "ready",
+        runtimeMode: "approval-required",
+        cwd,
+        model: "gpt-5-codex",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      yield* harness.engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.make("compact-history"),
+        threadId,
+        message: {
+          messageId: MessageId.make("compact-history"),
+          role: "user",
+          text: "Earlier work",
+          attachments: [],
+        },
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "approval-required",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      yield* harness.engine.dispatch({
+        type: "thread.session.set",
+        commandId: CommandId.make("compact-ready"),
+        threadId,
+        session: {
+          threadId,
+          status: "ready",
+          providerName: "codex",
+          providerInstanceId: ProviderInstanceId.make("codex"),
+          runtimeMode: "approval-required",
+          activeTurnId: null,
+          lastError: null,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      yield* Effect.promise(() => harness.startReactor());
+      yield* harness.engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.make("compact-aba"),
+        threadId,
+        message: {
+          messageId: MessageId.make("compact-aba"),
+          role: "user",
+          text: "/compact",
+          attachments: [],
+        },
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "approval-required",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      yield* Deferred.await(entered);
+      yield* Effect.promise(() => harness.drain());
+      const events = yield* harness.engine.subscribeDomainEvents;
+      yield* Stream.runForEach(events, (event) =>
+        event.type === "thread.session-set" && event.payload.session.status === "ready"
+          ? Deferred.succeed(restored, undefined)
+          : Effect.void,
+      ).pipe(Effect.forkScoped({ startImmediately: true }));
+      const task = decodeOwnershipTask({
+        id: "77777777-7777-4777-8777-777777777777",
+        environmentId: ownership.environmentId,
+        projectId: asProjectId("project-1"),
+        threadId,
+        target: { workspaceRoot: cwd, worktreePath: null },
+        checkout: {
+          canonicalCwd: cwd,
+          repositoryRoot: cwd,
+          headCommit: "a".repeat(40),
+          workspaceDigest: `sha256:${"a".repeat(64)}`,
+        },
+        phase: "analysis",
+        revision: 1,
+        context: null,
+        execution: null,
+        ownership: { generation: 1, state: "analysis" },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      yield* Effect.promise(() =>
+        harness.runEffect(
+          ownership.updateTask({
+            type: "thread.weavra-task.set",
+            commandId: CommandId.make("compact-task"),
+            threadId,
+            expectedRevision: null,
+            expectedOwnershipGeneration: 0,
+            task,
+          }),
+        ),
+      );
+      yield* Effect.promise(() => harness.runEffect(ownership.closeAdmission(task.id)));
+      const retained = (yield* ownership.activeOperations).length > 0;
+      if (!retained) {
+        // Exercise the full ABA cycle when the bug has lost the fork's admission.
+        yield* Effect.promise(() => harness.runEffect(ownership.drain(task.id)));
+        yield* Effect.promise(() => harness.runEffect(ownership.releaseAnalysis(task.id)));
+      } else {
+        const blocked = yield* Effect.promise(() =>
+          harness.runEffect(ownership.releaseAnalysis(task.id).pipe(Effect.result)),
+        );
+        expect(blocked._tag).toBe("Failure");
+      }
+      yield* Deferred.succeed(resume, undefined);
+      yield* Deferred.await(attempted);
+      yield* Deferred.await(restored);
+      if (retained) {
+        yield* Effect.promise(() => harness.runEffect(ownership.drain(task.id)));
+        yield* Effect.promise(() => harness.runEffect(ownership.releaseAnalysis(task.id)));
+      }
+      expect(mutations).toBe(0);
+      expect(yield* ownership.activeOperations).toEqual([]);
+    }).pipe(Effect.provide(ProcessRunner.layer.pipe(Layer.provideMerge(NodeServices.layer)))),
+  );
 
   effectIt.effect.each(["new", "ready", "stopped"] as const)(
     "handles sign-out for a %s thread before worktree repair, text helpers, or startup",
