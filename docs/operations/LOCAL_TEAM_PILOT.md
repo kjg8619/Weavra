@@ -100,6 +100,18 @@ corepack pnpm exec vp run dev --home-dir "$WEAVRA_APP_HOME"
 
 실제 작업 전 사람은 목표와 acceptance criteria를 담은 계획을 검토·수정하고 직접 확인한다. 실행 뒤에는 Runtime이 fresh하게 수행한 등록 check 결과와 각 기준을 다루는 **독립 Reviewer** 결과를 함께 확인한다. Developer의 자체 보고, doctor 결과, 과거/캐시된 evidence만으로 완료를 판단하지 않는다. App의 Workflow control에서 실패한 Run의 진단을 확인하고 실행 카드의 증거 링크로 acceptance criteria, 현재 revision의 check, review 독립성, failure category를 검토한다. 프로젝트 진단이 READY인데 시작에 실패하면 승인된 모델 프로필의 등록·가용성과 인증을 별도로 확인한 뒤 새 계획을 준비한다.
 
+### 같은 대화에서 문제 분석과 구현 연결
+
+대화의 선택된 프로젝트·checkout을 확인하고 controlled task를 시작한다. 분석 모델은 현재 대화의 Codex 선택을 사용하며 읽기 전용·네트워크 차단으로 새 provider 세션을 연다. 기존 자유 코딩 대화의 메시지는 남지만 그 provider의 resume 상태를 분석 권한으로 승계하지 않는다. 구현 Developer/Reviewer 모델은 대화 모델 선택이 아니라 대상 Runtime 설정에서 결정한다.
+
+저장된 분석 메시지를 advisory로 선택하고 원인 가설·불확실성·소스·제약을 검토한다. 목표와 acceptance criteria를 입력해 snapshot을 준비한 뒤, 실제 경로·검사·모델·만료 시간을 확인하고 그 snapshot을 한 번 확인한다. 분석은 검증 증거가 아니다. 일반적인 `Fix …` 문구는 현 분류기에서 의도가 불명확해 준비 단계에서 거부될 수 있다. 실제 결함을 명시하는 새 초안은 다시 검토해야 하며, 분류 거부 자체가 개선됐다는 뜻은 아니다.
+
+확인 전 terminal/provider 정리가 거부되면 원인을 해소하고 새 snapshot 준비 또는 중단을 선택한다. 이미 confirm intent가 기록된 실행은 이 경로로 해제하지 않는다. 재접속은 실행을 반복하지 않으며, 결과와 증거를 새로 조회해 동일 Run·revision·diff의 symptom check와 독립 review를 확인한다. Kernel 완료와 신선한 symptom 검증이 함께 있어야 원래 문제가 해결됐다고 판단한다.
+
+2026-09-30 역사적 실제 결함 replay는 저장 분석을 재사용해 Run `798d5577-d69b-4950-a086-f25712cd9b66`의 Kernel COMPLETED, 두 기준 MET, strict SELF_CHECK/TEST 네 기록 PASS와 독립 Reviewer PASS를 확인했다. 당시 확인은 RPC로 전달했다. 2026-10-02에는 별도 기준 checkout에서 실제 UI 동의·확인 버튼을 한 번 조작해 Run `0624b5d6-6561-4555-82e9-aee3833909e2`의 같은 수용 결과를 확인했다. 새 Run은 2 workers/78,212 reported tokens를 사용했고 재분석·revision retry는 없었다. 1280/375 결과와 연결 해제·같은 DB 재시작 후 복원을 확인했으며 추가 실행 없이 상태와 diff가 유지됐다. 구현은 각 격리 target의 `WeavraSettings.tsx` 한 파일에만 남고 제품 checkout으로 자동 반영하지 않았다. 이전 실패 카드 QA는 별도 합성 응답의 화면 검증이며 실제 모델 실패 Run으로 해석하지 않는다. 설치형 앱·모바일 네이티브 검증도 포함하지 않는다.
+
+이 replay의 동결 한도는 Run당 4 worker invocation/100,000 reported tokens/재시도 0이다. 실제 Developer 82,170과 Reviewer 15,617을 합쳐 2 worker/97,787 tokens를 썼고, 저장 분석 78,053은 별도 항목이다. worker invocation은 내부 model turn 수와 다르다. 현재 Runtime의 누적 사전 예산 검사는 다음 한 호출의 최종 토큰 수를 미리 보장하지 않는다. 이 결과는 이번 Run이 한도 안에서 끝났다는 증거이며 일반적인 hard token cap을 보장한다는 주장이 아니다.
+
 ## 4. 중단, 변경사항과 비공개 상태
 
 취소·프로세스 종료·비정상 종료는 자동 rollback이나 재개를 보장하지 않는다. `INTERRUPTED` 상태와 작업 트리의 일부 변경이 남을 수 있다. 새 실행 전 Git diff/status를 직접 검토하고 변경을 보존할지, 별도 검토를 거쳐 정리할지 결정한다. Runtime은 완료되지 않은 작업을 자동 재개하지 않는다.

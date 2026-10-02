@@ -1301,3 +1301,82 @@
 - 이번 새 검사: SSE 12, Runtime 집중 회귀 233, SDK workflow 53, App controls 64 tests PASS. Runtime `npm run check:ci`와 App scoped typecheck/lint/format도 exit 0. 이전 실모델·UI·빌드 결과와 구별하며 새 유료 모델 실행은 하지 않았다.
 - `devlop`의 미추적 `.omo/`와 별도 first-task의 실모델 재현 diff·Run 기록은 보존한다. 동일 stale 수정의 재현 결과를 중복 병합하지 않는다. 자격 증명·개인 홈·스크린샷·임시 증거는 커밋에 넣지 않는다.
 - 병합 뒤에는 동일 tree인지 확인하고 대상 checkout의 정적 검사·오프라인 빌드 및 집중 App 검사를 실행한다. 최종 병합 hash와 실제 종료 결과는 외부 운영 인계 기록에 남긴다.
+
+## 2026-09-28 KST — task4 선행 Runtime checkout identity stdio
+
+- 범위: 전체 task4 coordinator가 아니라, App이 `task.checkout`에 넣을 정확한 Runtime checkout identity를 얻는 선행 조건만 구현했다. task3 소유권 checkout, coordinator/RPC/UI, commit·staging·merge·push·배포·모델 추론은 건드리지 않았다.
+- Runtime: 기존 `readCheckoutIdentity` bounded evidence collector를 그대로 사용하는 capability-gated read-only `workflow.checkout`을 추가했다. 요청은 cwd·owner·mutation sequence·revision을 받지 않으며, 기존 strict `commands` tuple은 바꾸지 않았다. dirty/unsupported/root drift, writer/active Run/accepted admission을 거부하고 capture 전후 configuration 및 canonical state가 달라지면 실패한다. writer·복구·검사·모델·repair·Run/state mutation은 수행하지 않는다.
+- App: `packages/contracts/src/weavraControl.ts`에만 동일 wire schema를 복제하고 `RuntimeController.checkout` adapter를 추가했다. `checkoutIdentity: 1`이 없는 Runtime에는 요청을 보내지 않으며, 응답 root가 server-resolved trusted root와 다르면 `INVALID_PAYLOAD`로 거부한다.
+- 회귀: Runtime actual stdio fixture가 wire identity를 받아 subsequent task preparation에 사용하도록 변경했다. arbitrary cwd, dirty/root drift, active writer, capture 중 config/state change를 deterministic barrier로 검증했다. App은 schema round-trip, legacy capability refusal, wrong-root response를 검증했다.
+- 현재 검증(Node 24.19.0 / pnpm 11.10.0):
+  - Runtime focused 2 files / 39 PASS. App focused 최종 2 files / 144 PASS.
+  - 변경 Runtime 6 files Biome, 전체 native typecheck, 변경 App 4 files lint/fmt, contracts/server typecheck exit 0. App typecheck의 기존 Effect suggestion은 보존했다.
+  - Runtime `npm run check:ci` exit 0(Biome 1,542 files, dependency/import/entry graph, shrinkwrap/install-lock, type 및 browser smoke). `npm run build:offline` exit 0, coding-agent bundle 51 files / 7.8 MiB.
+  - `corepack pnpm exec vp run --filter t3 build` exit 0. Web 6,083 modules 및 server production bundle을 빌드했다. 기존 500 kB chunk 경고는 숨기지 않았다.
+  - production `bin/weavra bridge --stdio --project-trusted --control` smoke에서 capability 1, legacy commands tuple 불변, wire identity와 collector 결과 exact equality, `.ai`에는 config만 존재, model files 0, launcher exit 0을 확인했다. 소유한 임시 Git/home fixture와 smoke script를 제거했다.
+- 정리: staged files 0, `git diff --check` exit 0. 기존 task1/2/5 미커밋 변경은 보존했고 task3 파일은 변경하지 않았다. 작업 증거는 저장소 밖 `task-4-checkout-identity.txt`에 남긴다.
+- 한계: 이는 task4 완료가 아니다. thread root resolution, coordinator persistence/recovery, ownership guard, RPC/client/UI 및 실제 problem-cycle acceptance는 후속 작업이다.
+- 커밋 상태: staging, commit, push, merge, deploy 없음.
+
+## 2026-09-29 KST — 통제 작업의 명시적 Runtime 복구 검증
+
+- 상태: 같은 대화 problem-cycle의 Runtime 복구 증분은 검증했다. App 복구 RPC/UI 연결과 전체 corpus·실제 모델 결함 replay는 아직 진행 중이다. 제품 전체 완료로 기록하지 않는다.
+- 원인: 기존 App은 프로세스 중단 후 확인된 작업을 격리했지만 명시적 복구 경로가 없었다. Host PID 사망만으로 별도 검사/LSP 프로세스의 정리를 증명할 수도 없었다.
+- 구현: `workflow.recover`/`taskRecovery: 1`, 최초 writer의 execution 귀속, canonical metadata/revision/lock identity CAS, admission의 NOT_STARTED/UNCONFIRMED/CONFIRMED cleanup 기록을 추가했다. UNCONFIRMED는 interruption을 기록하되 원래 dead-owner lock을 보존하고 generic prepare/open의 해제를 거부한다. 새 Run·confirm 재전송·작업 되돌리기는 없다.
+- SDK: bound task만 `allowCredentialCommands: false`를 사용한다. 저장된 인증 값과 provider/model header의 명령 실행을 실제 해석 시점에 거절하고 기본 자유 실행 동작은 보존한다. custom provider 코드를 sandbox한다고 주장하지 않는다.
+- 현재 검증: 복구 RED 2개, credential RED 6개 실패를 먼저 확인했다. 부모가 stdio command 등록 누락, clock callback의 this 손실을 고쳤다. 같은 task prepare는 기존 receipt를 반환할 수 있으므로 이를 새 task 실행 거절과 구분해 검사했다.
+- 최종 집중 검사: Runtime 6 files/170 PASS, SDK 인증·provider 6 files/147 PASS. `npm run check:ci`와 `npm run build:offline` exit 0. App wire mirror 2 files/76 PASS 및 contracts typecheck exit 0. 실제 App recovery 검증은 이 수치에 포함하지 않는다.
+- 독립 검토: Runtime/SDK 증분 APPROVE, source blocker 없음. read-only review이며 테스트 실행은 부모 근거를 따른다.
+- 별도 UI 회귀: 긴 controlled task footer를 overflow 계산에 포함했다. 2개 실패 회귀 이후 198 tests/types/build 및 좁은 독립 코드 검토가 통과했다. ReactNode 객체 의존성으로 생긴 렌더 반복도 실제 화면에서 재현해 Boolean 존재 여부로 수정했다. 최종 App recovery 화면 검증은 후속이다.
+- 커밋 상태: 제품 staging/commit/merge/push/deploy 없음. 기존 미커밋 작업·failed Run·실행별 실패 증거를 보존했다.
+
+## 2026-09-30 KST — 저장 분석 재개와 확인 전 회귀 수정
+
+- 상태: task9 및 F1–F4의 전체 완료 전이다. 보존된 원래 Runtime 응답은 `UNSUPPORTED_WORKFLOW`이며 App이 `PREPARE_REJECTED`로 표시했다. 원문 generic `Fix`는 intent 미확정으로 거부된다. 같은 결함에 `bug`를 명시한 새 초안은 bugfix로 분류되지만 원문 경로가 개선됐다는 증거는 아니다. 분류기·oracle·모델·예산을 변경하지 않았다.
+- 저장 분석의 같은 thread/task/message, 완료 메시지와 event projection의 정확한 일치 및 원본 DB/WAL 해시를 확인했다. 기존 분석은 1회/78,053 reported tokens이며 재분석은 하지 않았다. 새 Runtime Run은 아직 없고 추가 실제 호출은 0이다. 동결된 `codex-lb/gpt-6-astra`, Run당 4 worker/100,000 reported tokens/재시도 0 조건을 유지한다.
+- 독립 검토에서 발견한 세 결함을 수정했다. ProviderService는 released generation과 controlled session identity를 구분한다. controlled analysis는 Reactor의 active cursor와 Service의 persisted free cursor를 승계하지 않는다. confirm intent 없는 handoff/draining UI는 기존 abort/reprepare 경로를 제공한다. 명시적 unsafe resume 거부와 ownership fencing은 유지한다.
+- 직접 회귀와 관련 검증: App 5 files/244 PASS 및 coordinator 59 PASS. 신규 테스트 타입·동기화 문제와 기존 Mac linked-checkout fixture의 비정규 경로를 고쳐 재검증했다. Runtime 집중 76 PASS; 최초 Unix socket EPERM 실패를 보존하고 승인된 동일 복구 검사 27 PASS로 구분했다. Runtime check:ci/build:offline, App production build, server/web typecheck 통과. 기존 Effect suggestions 및 lint의 기존 unused-parameter 경고는 성공 증거와 구분해 보존했다.
+- 외부 실증 driver는 원본을 보존한 별도 사본에서 현행 prepare-only abort 계약과 상태를 맞췄다. offline driver 38 PASS. 목표 재문구·새 preview·정확한 확인·실제 Kernel 및 UI 결과는 별도 단계이며 테스트 PASS로 대체하지 않는다.
+- 운영 문서와 계약 문서의 현재 지원 경로·미완료 범위를 갱신했다. 활성 omonyang 프로젝트 상태와 개인 App DB는 변경하지 않았다. 기존 미커밋 파일을 보존했으며 commit/staging/merge/push/deploy 없음.
+
+## 2026-09-30 KST — 실제 replay 완료 증거와 최종 수용 잔여
+
+- 위 중간 기록 이후 사용자의 실행 승인을 받았다. 만료된 preview `e2d9b7e9-9ab2-44e5-91b1-dd026bd3b017`은 실행하지 않고 보존했다. 새 preview `153b5b33-f97d-40a7-b48a-850421ae01db`의 goal/checkout/HEAD/허용 파일/검사/모델/예산/재시도가 동일함을 비교하고 정확한 확인을 한 번 전달했다. 저장 분석 재호출은 0이다.
+- 실제 Run `798d5577-d69b-4950-a086-f25712cd9b66`, execution `1453f1cd-b524-4cc7-b0f9-1598e0de4536`은 Kernel COMPLETED/COMPLETE, Run revision 19/code revision 0, 기준 2 MET, 독립 Reviewer PASS, strict 등록 검사 2종의 SELF_CHECK/TEST 4 PASS다. baseline의 정상 connected 설정에서 재현된 stale 11필드는 최종 검사에서 0이다. model diff는 별도 target `b7954d94`의 `WeavraSettings.tsx` 한 파일 26삽입/17삭제이며 제품 checkout으로 복사하지 않았다. 이는 역사적 실제 결함 replay이며 회사 생산성 실적 주장이 아니다.
+- 사용량: frozen `codex-lb/gpt-6-astra`, Developer 82,170/Reviewer 15,617 = 2 canonical worker invocations, 내부 model turns 6, 97,787 reported tokens. Run당 잔여 2 worker/2,213 tokens, revision retry 0. 기존 분석 1회/78,053을 별도로 기록한 전체 관측 합계는 175,840이다. 사전 누적 검사만으로 다음 한 호출의 hard token cap을 보장하지 못한다는 기존 한계를 기록하며 추가 유료 호출은 하지 않았다.
+- 최초 actual driver는 cleanup 상세 페이지 UNKNOWN 때문에 FAIL했다. authoritative admission은 CONFIRMED였으나 task-bound projection이 이를 받지 않았던 정보 누락이다. 원 FAIL/raw pages를 보존하고 exact admission/Run/metadata·terminal·agents 0·writer false를 요구하는 좁은 read projection을 고쳤다. legacy uncertainty 우선, project revision/writer drift 거절을 유지했다. 기존 success assertion을 완화하지 않고 같은 Run 네 category를 새로 읽어 PASS했고 canonical state·모델 diff는 byte 불변이다.
+- 추가 집중 검증: Runtime evidence/actual stdio 45 PASS, uncertainty 추가 회귀를 포함한 evidence 12 PASS(중복 합산하지 않음), 최종 check:ci/build:offline PASS. 최초 병행 build 중 dist 파일 부재 실패와 테스트 fixture 작성 실패는 별도 로그로 남겼다. F2 독립 재검토 최종 ACCEPT이며 이전 세 회귀의 closure도 유지한다.
+- 실제 웹 UI: 원래 같은 thread의 분석/검토된 context와 완료 결과를 복원했다. 결과·strict check·cleanup confirmed의 1280/375 표시, 소유 App 종료 후 historical/unverified 및 버튼 비활성화, 같은 DB 재시작 후 재실행 없는 fresh 결과 복원이 PASS했다. historical과 transport-disabled 전환을 동시에 가정한 첫 관찰 FAIL을 보존하고 실제 두 번째 전이까지 기다린 동일 assertion으로 PASS했다. 실제 target Settings도 별도 무추론 관찰에서 1280/375 stale 값 제거와 disabled/guidance를 확인했다. 등록 oracle와 이 추가 관찰을 구분한다.
+- 완료 한계: actual confirm은 승인된 exact RPC 경로여서 실제 유료 확인 버튼 클릭의 전체 UI 경로는 미실증이다. 최종 tree의 모든 실패 카드 수동 QA도 남는다. F1/F3/F4 전체 CLOSED를 주장하지 않는다. 원문 generic Fix 분류 경로도 그대로 거부되며 `bug` 재문구는 의미 동일 입력의 명확화일 뿐 일반 경로 개선 증거가 아니다.
+- 원본 DB/WAL·기존 실패 증거·동결 oracle/profile/예산과 다른 프로젝트 Boulder를 보존한다. 소유 프로세스만 정상 종료했고 no staging/commit/merge/push/deploy를 유지한다. 상세 상태표·해시·재개 경로는 `/tmp/weavra-dots-continuation-20260930/FINAL-HANDOFF.md`와 단일 `actual-usage-ledger.json`을 참조한다.
+- 최종 보존 감사의 구분: 원본 DB/WAL·실패 receipt·등록 trust·Run 상태는 불변이다. 다른 활성 프로젝트 소유의 전역 Boulder는 시작/종료 hash가 달라 동시 변경을 관측했다. 이 continuation은 그 파일에 쓰지 않았으며 복원하거나 덮어쓰지 않았다. 따라서 Boulder의 byte 불변을 주장하지 않는다.
+
+## 2026-09-30 KST — 추가 무과금 실패 화면 관찰
+
+- 위 인계 이후 final production App과 원래 합성 task7 presentation peer로 8 cases를 관찰했다. START_FAILED/no-Run, BLOCKED, INTERRUPTED, build-only COMPLETED, stale symptom check, registration mismatch, WAITING_APPROVAL→reject→BLOCKED, WAITING_APPROVAL→cancel→CANCELLED 모두 PASS. Runtime/Kernel 실제 통합이나 실제 모델 출력 증거로 확대하지 않는다.
+- 1280/375 결과·unverified 이유, overflow 0, 승인 상단/제어 별도 캡처, native Tab/Shift+Tab, same-task hash focus, evidence ref의 native Space→matching check focus를 확인했다. 알림 가림·관찰 드라이버 라벨/키 동작 실패는 보존한 뒤 최종 observer8에서 보완했다. 추가 제품 코드는 변경하지 않았다.
+- 추가 실제 모델/분석/Kernel 호출 0, 원본 DB/WAL/실패 응답·완료 Run/target diff byte 불변, 합성 fixture의 README 불변. 소유 App/browser는 강제 종료 없이 정리했다. 과거 task7/task8 fixture는 이미 삭제돼 동일 state 재관찰은 불가능했으며 새 fixture와 과거 증거를 구분한다.
+- 실제 모델 UI confirm-click은 새로운 유료 Run이 필요해 현재 금지 상태다. 추가 전 경로 수용을 위해 새 Run을 허용할지는 사용자 결정이며 새 preview 승인·token hard bound 한계를 먼저 해결해야 한다. F1 감사 완료/F2 ACCEPT를 유지하고 F3/전 경로 F4 CLOSED는 선언하지 않는다. 같은 FINAL-HANDOFF.md와 f1-f4-audit-final.md에 항목별 가능/유료/결정/기술적 불가 분류를 기록했다.
+- 최종 추가 관찰 독립 리뷰 ACCEPT: 8 cases/38 captures와 대표 PNG 6장을 확인했고 승인 패널 가림 보완을 수용했다. 국소 키보드 확인으로 한정하며 전체 접근성 감사로 확대하지 않는다. 최종 보호 해시 PASS 및 소유 PID 79개/합성 process group 29개 잔존 0이다.
+
+## 2026-10-02 KST — 실제 UI 확인부터 완료·재접속까지 수용 검증
+
+- 재개 범위: 중단 지점부터 계속 진행하라는 소유자 지시를, 앞서 설명한 별도 깨끗한 checkout·동일 내용의 검증 파일·새 파일시스템 등록 범위로 해석해 진행했다. 기존 성공·실패 결과와 DB/WAL은 보존했다. baseline `b7954d94`의 여섯 oracle 파일을 그대로 사용했으며, Goal·허용 Settings 파일·수락 기준·`codex-lb/gpt-6-astra`·Run당 4 workers/100,000 reported tokens/retries 0은 바꾸지 않았다.
+- 새 기준 검증: strict 등록의 11개 source bytes 일치와 single-link 조건을 확인했다. 동일한 filtered environment에서 실제 연결·단절을 거친 stale-configuration 검사만 11개 잔존 필드로 실패했고, web-controls는 통과했다. 준비·정리 실패를 증상 재현으로 취급하지 않았다.
+- 실제 사용 중 수정한 결함: App의 10초 응답 한도가 Runtime의 60초 유한 checkout 수집보다 짧아 task 생성과 준비가 `INTERNAL_ERROR`로 끝났다. `ControlTransport.ts`에서 checkout/prepare/confirm만 70초, 나머지는 10초로 맞췄다. timeout 뒤 요청 상관관계와 재전송 금지는 유지했다. 기존 oversized UTF-8 회귀가 발견한 오류 분류도 Schema 코덱 기반 선행 크기 검사로 수정했으며 32,768-byte 한도는 그대로다.
+- 회귀: 실제 child 응답을 Deferred/TestClock으로 제어하는 7개 경계 사례를 추가했다. 이전 코드의 checkout 및 prepare/confirm 60초 응답 거절을 RED로 보존했고, 70초 만료·늦은 동일 응답·일반 snapshot 10초·중복 전송 방지를 함께 검증했다. 기존 초과 요청 assertion은 바꾸지 않았다.
+- 실제 UI 실행: 저장된 분석 메시지를 byte-identical로 재사용했고 재분석은 0회다. 같은 thread의 새 task `caf2b2ef-25ce-4e18-ba2d-a29da150ac60`, execution `864ddcad-0b63-4ab4-a9bb-92d73a9458fe`의 미리보기를 확인한 뒤 실제 checkbox와 `Confirm Runtime implementation` 버튼을 한 번 조작했다. 직접 confirm RPC로 대체하지 않았다.
+- 현재 수용 결과: Run `0624b5d6-6561-4555-82e9-aee3833909e2`는 Kernel COMPLETED, 2 criteria MET, 독립 Reviewer PASS, SELF_CHECK/TEST의 두 strict 검사 4 PASS, cleanup CONFIRMED다. Developer/Reviewer 2 workers, 78,212 reported tokens(캐시 포함), revision retry 0이며 예산 초과가 없다. Run 생성부터 최종 갱신까지 232.769초다. 금전 비용이나 회사 생산성 개선을 주장하지 않는다.
+- 실제 화면: 같은 대화에서 criteria/checks/changed-path 증거를 열었다. 1280/375 px에서 원래 문제의 verified 표시, 정리 확인, 가로 overflow 0을 확인했다. 소유 서버 종료 시 historical/unverified 및 제어 비활성화, 같은 DB 재시작·새 증거 조회 후 fresh verified 복원을 확인했다. Run/admission 각각 1개, Runtime 상태 SHA-256 `99bf481ad0df506cc5f3d1fb9351bdd3d73eaf029b12dfbc261358d6951d2561`과 model diff가 재접속 전후 동일했다.
+- 최종 현재 검사: Runtime 9 files/211 PASS, SDK 1 file/7 PASS, App 11 files/462 PASS(전송 64 포함), 외부 driver 38 PASS. Runtime check:ci/build:offline, App server/web typecheck·scoped fmt/lint·t3 production build 모두 exit 0. 반복 결과는 합산하지 않는다. 기존 Effect suggestions와 미수정 provider-reactor 테스트의 unused-parameter 경고 8개는 남겼다. LSP의 일부 fresh 진단은 timeout/No Project였으며 실제 패키지 타입 검사는 통과했다.
+- 정리·보존: 소유 App/Chromium과 포트를 종료하고 browser profile·임시 홈·캐시를 제거했다. 초기 monitor 만료로 남은 소유 App은 캡처된 PID만 정상 종료하고 별도 실패/복구 영수증을 보존했다. 재검토할 새 target·대화 DB·실제 worker 증거는 외부 evidence에 남겼다. 원래 205개 변경의 기존 내용, 보호 파일 13개와 실패 identity 7개를 보존하고 이번 두 전송 파일과 이 append를 별도로 기록했다.
+- 근거: `/Users/kangjingoo/.omo/evidence/weavra-project-problem-cycle/resumed-20261002/`의 `runtime-result.json`, `ui-confirm-actions.json`, `reconnect.json`, `actual-usage-ledger.json`, `cleanup.json`, `self-review.md`, 최종 gate logs. 이전 F1/F2 및 합성 실패 corpus의 역사적 근거와 이번 실제 UI 실행을 구분한다. 남아 있던 실제 UI confirm 경로는 이번 웹 수용 범위에서 검증됐다.
+- 인계 한계: 일반 `Fix` 분류 확대, 전체 저장소 CI, 설치형 Electron/모바일, 회사 배포는 이번 결과가 아니다. HEAD `d73b3d1c`에는 checkout wire 계약이 없고 이번 수정은 기존 미커밋 기능에 의존하므로, 이전 변경을 임의로 stage하지 않고 추가 수정도 미커밋 보존한다. staging/commit/push/merge/deploy는 하지 않았다.
+
+## 2026-10-03 KST — 소유자 승인에 따른 problem-cycle 커밋·푸시
+
+- 소유자가 검증 완료 뒤 커밋·푸시를 명시적으로 요청했다. 이전 미커밋 보존 상태는 위 역사적 결과이며, 이번 요청으로 검증된 통제 작업 기능과 직접 의존성을 발행한다.
+- 작업 브랜치는 `feat/problem-cycle`이다. Runtime/App의 wire 계약·실행/소유권·UI 소비자는 함께 빌드돼야 하므로 제품 코드·직접 테스트·통합 하네스를 하나의 기능 단위로 묶고, 운영/계약/검증 문서는 별도 커밋으로 분리한다.
+- 발행 전 기존 검증 해시와 원본 보존 검사를 다시 확인했다. 새 모델 호출이나 테스트 결과를 만들지 않았으며 위 10월 2일의 실제 UI 수용·최종 검사 결과를 근거로 사용한다. 문서의 현재 상태 설명은 실제 UI 확인 검증 완료에 맞게 정정했다.
+- `.pi-subagents/`의 로컬 작업 자료, 외부 증거·스크린샷·개인 실행 홈, 별도 모델 결과 checkout은 제외한다. 훅을 우회하지 않으며 원격은 `origin`의 새 기능 브랜치만 대상으로 한다. main/devlop 갱신, PR, merge, deploy는 범위 밖이다.
+- 커밋 hash와 푸시 종료·원격 SHA 일치는 외부 `publication-result.json`에 기록한다. 이 항목 자체는 아직 원격 CI 성공을 주장하지 않는다.
