@@ -243,6 +243,10 @@ describe("state-bound capture evidence", () => {
     };
     expect(() => validateVisibleState("38", observation)).toThrow("Missing error recovery context");
   });
+  test("rejects a thread title without its visible rename input", () => {
+    const observation = { text: "03 Code blocks", renameTitle: [] };
+    expect(() => validateVisibleState("45", observation)).toThrow("Wrong visible rename editor");
+  });
   test("seeds an existing isolated database without dispatching a turn", async () => {
     const base = await NodeFSP.realpath(await NodeFSP.mkdtemp("/tmp/weavra-hig-"));
     const home = NodePath.join(base, "home");

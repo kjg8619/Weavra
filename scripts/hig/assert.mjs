@@ -77,6 +77,9 @@ export function observeVisibleState({ target, boundary }) {
       .querySelector('[aria-label="Appearance mode"] [aria-pressed="true"]')
       ?.getAttribute("aria-label"),
     customModel: document.querySelector('input[id$="-custom-model"]')?.value,
+    renameTitle: [...document.querySelectorAll('input[aria-label="대화 제목"]')]
+      .filter((e) => visible(e, e.getBoundingClientRect()))
+      .map((e) => e.value),
     filesPane: [...document.querySelectorAll('button[aria-label="Refresh workspace files"]')].some(
       (e) => visible(e, e.getBoundingClientRect()),
     ),
@@ -99,7 +102,7 @@ export function validateVisibleState(id, observation, contract = {}) {
   const { target = "body", boundary = null, theme = null } = contract;
   const state = [...DESKTOP_STATES, ...STRESS_STATES].find((s) => s.id === id);
   NodeAssert.ok(state, `Unknown state: ${id}`);
-  if (!boundary || boundary !== "end")
+  if (id !== "45" && (!boundary || boundary !== "end"))
     NodeAssert.ok(
       observation.text.includes(state.expected),
       `Visible state mismatch ${id}: ${state.expected}`,
@@ -131,6 +134,12 @@ export function validateVisibleState(id, observation, contract = {}) {
       observation.customModel,
       "capture-fixture-unsaved",
       "Custom model form not populated",
+    );
+  if (id === "45")
+    NodeAssert.deepEqual(
+      observation.renameTitle,
+      ["03 Code blocks"],
+      "Wrong visible rename editor",
     );
   const settings = {
     17: "general",
