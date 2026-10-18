@@ -136,72 +136,75 @@ async function text(page, value) {
 
 // Observe DOM changes and actual animation frames, not guessed delays.
 async function ready(page, expected, target = "body") {
+  const waitForFrame = async ({ expected, target }, observe) => {
+    await document.fonts.ready;
+    const finiteAnimations = document
+      .getAnimations()
+      .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime));
+    await Promise.allSettled(finiteAnimations.map((animation) => animation.finished));
+    await new Promise((resolve, reject) => {
+      let prior = null;
+      let stable = 0;
+      let raf;
+      const deadline = setTimeout(() => {
+        cancelAnimationFrame(raf);
+        observer.disconnect();
+        reject(new Error(`Readiness timeout: ${target}`));
+      }, 15000);
+      const sample = () => {
+        const node = document.querySelector(target);
+        const rect = node?.getBoundingClientRect();
+        const content = document.body.innerText;
+        const measured = [
+          ...document.querySelectorAll("[data-index], pre, [data-virtual-index]"),
+        ].map((e) => {
+          const r = e.getBoundingClientRect();
+          return [e.getAttribute("data-index"), r.x, r.y, r.width, r.height];
+        });
+        const current = JSON.stringify([
+          rect?.toJSON(),
+          measured,
+          document.documentElement.className,
+          content,
+        ]);
+        const complete =
+          node &&
+          rect.width > 0 &&
+          rect.height > 0 &&
+          content.includes(expected) &&
+          (target !== "body" ||
+            !expected ||
+            observe({ target, boundary: null }).text.includes(expected)) &&
+          !document
+            .getAnimations()
+            .some(
+              (animation) =>
+                (animation.playState === "running" || animation.pending) &&
+                Number.isFinite(animation.effect?.getComputedTiming().endTime),
+            );
+        stable = complete && current === prior ? stable + 1 : 0;
+        prior = current;
+        if (stable >= 2) {
+          clearTimeout(deadline);
+          observer.disconnect();
+          resolve();
+        } else raf = requestAnimationFrame(sample);
+      };
+      const observer = new MutationObserver(() => {
+        stable = 0;
+      });
+      observer.observe(document, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true,
+      });
+      raf = requestAnimationFrame(sample);
+    });
+  };
   await bounded(
     page.evaluate(
-      async ({ expected, target }) => {
-        await document.fonts.ready;
-        const finiteAnimations = document
-          .getAnimations()
-          .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime));
-        await Promise.allSettled(finiteAnimations.map((animation) => animation.finished));
-        await new Promise((resolve, reject) => {
-          let prior = null;
-          let stable = 0;
-          let raf;
-          const deadline = setTimeout(() => {
-            cancelAnimationFrame(raf);
-            observer.disconnect();
-            reject(new Error(`Readiness timeout: ${target}`));
-          }, 15000);
-          const sample = () => {
-            const node = document.querySelector(target);
-            const rect = node?.getBoundingClientRect();
-            const content = document.body.innerText;
-            const measured = [
-              ...document.querySelectorAll("[data-index], pre, [data-virtual-index]"),
-            ].map((e) => {
-              const r = e.getBoundingClientRect();
-              return [e.getAttribute("data-index"), r.x, r.y, r.width, r.height];
-            });
-            const current = JSON.stringify([
-              rect?.toJSON(),
-              measured,
-              document.documentElement.className,
-              content,
-            ]);
-            const complete =
-              node &&
-              rect.width > 0 &&
-              rect.height > 0 &&
-              content.includes(expected) &&
-              !document
-                .getAnimations()
-                .some(
-                  (animation) =>
-                    (animation.playState === "running" || animation.pending) &&
-                    Number.isFinite(animation.effect?.getComputedTiming().endTime),
-                );
-            stable = complete && current === prior ? stable + 1 : 0;
-            prior = current;
-            if (stable >= 2) {
-              clearTimeout(deadline);
-              observer.disconnect();
-              resolve();
-            } else raf = requestAnimationFrame(sample);
-          };
-          const observer = new MutationObserver(() => {
-            stable = 0;
-          });
-          observer.observe(document, {
-            subtree: true,
-            childList: true,
-            attributes: true,
-            characterData: true,
-          });
-          raf = requestAnimationFrame(sample);
-        });
-      },
-      { expected, target },
+      `(${waitForFrame})(${JSON.stringify({ expected, target })}, ${observeVisibleState})`,
     ),
     `State readiness ${expected}`,
     20000,
@@ -311,13 +314,12 @@ async function runSize(width, height, includeStress = false) {
     async function snap(id, target = "body", suffix = null, stress = false) {
       const state = [...DESKTOP_STATES, ...STRESS_STATES].find((s) => s.id === id);
       NodeAssert.ok(state);
-      const readiness = await ready(page, state.expected, target);
       if (id === "35") {
         await page
           .getByRole("heading", { name: "Baseline review", exact: true })
           .scrollIntoViewIfNeeded();
-        await ready(page, state.expected, target);
       }
+      const readiness = await ready(page, id === "45" ? "" : state.expected, target);
       const boundary = suffix?.includes("/top-")
         ? "start"
         : suffix?.includes("/end-") || suffix?.includes("/actions-end-")
@@ -534,6 +536,7 @@ async function runSize(width, height, includeStress = false) {
       await (await named(page, role, key, scope)).click();
     }
     async function theme(mode) {
+      const returnRoute = await page.evaluate(() => location.hash);
       await click("button", "settings");
       await click("button", "appearance");
       await (await text(page, mode === "dark" ? "Dark" : "Light")).click();
@@ -558,9 +561,10 @@ async function runSize(width, height, includeStress = false) {
         ),
         "Root theme and tokens",
       );
-      await page.evaluate(() => {
-        location.hash = "/";
-      });
+      await page.evaluate((route) => {
+        location.hash = route;
+      }, returnRoute);
+      await (await named(page, "button", "settings")).waitFor({ state: "visible" });
     }
     const threadRoutes = new Map();
     async function thread(title) {
