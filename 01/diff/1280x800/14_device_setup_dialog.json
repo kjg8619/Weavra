@@ -1,0 +1,51 @@
+{
+  "file": "1280x800/14_device_setup_dialog.png",
+  "beforeSha256": "0a1db62e2ddafa3ee59371280b65388e04c86c1c34784089e5ab632180609326",
+  "afterSha256": "38f7c4d48fb9e07f2e88fd31afb98d7c6b881f381dccfd831f5a882f51e753e2",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 43,
+    "diffRatio": 0,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 3,
+        "gridY": 3,
+        "x": 480,
+        "y": 300,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0016
+      },
+      {
+        "gridX": 4,
+        "gridY": 3,
+        "x": 640,
+        "y": 300,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0011
+      }
+    ],
+    "summary": "100/100 similarity; 43/1024000 pixels differ; 2 hotspot region(s)."
+  }
+}
