@@ -14,6 +14,7 @@ import {
   validateProvenance,
   observeVisibleState,
   validateVisibleState,
+  validateDistinctStates,
 } from "./assert.mjs";
 
 const exec = NodeUtil.promisify(NodeChildProcess.execFile);
@@ -767,7 +768,7 @@ async function runSize(width, height, includeStress = false) {
       "#weavra-controls",
       `matrix/${width}x${height}/light/46/prepare-end-default.png`,
     );
-    await scrollTo("#weavra-evidence");
+    await scrollTo("#weavra-evidence", "end");
     await snap("47", "#weavra-evidence");
     await scrollTo("#weavra-fitness");
     await snap("48", "#weavra-fitness");
@@ -897,6 +898,7 @@ async function runSize(width, height, includeStress = false) {
 try {
   for (const [index, [w, h]] of SIZES.entries()) await runSize(w, h, index === 0);
   packet.cleanup.exited = packet.runs.every((run) => run.cleanup.exited);
+  validateDistinctStates(packet.manifest);
   if (!values.diagnostic)
     NodeAssert.equal(await git("diff", "HEAD", "--"), "", "Source changed during capture");
   NodeAssert.equal(packet.counters.model, 0);
