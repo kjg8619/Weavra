@@ -12,7 +12,21 @@ export async function diffCapture(before, after, out, visualCli) {
   // Refuse reuse: old successful pair receipts must never survive a failed run.
   await NodeFSP.mkdir(out);
   const result = { before, after, pairs: [], failures: [] };
-  for (const file of expectedFiles()) {
+  const [beforePacket, afterPacket] = await Promise.all(
+    [before, after].map(async (directory) =>
+      JSON.parse(await NodeFSP.readFile(NodePath.join(directory, "capture-manifest.json"), "utf8")),
+    ),
+  );
+  const afterFiles = new Set(
+    afterPacket.manifest.flatMap((r) => [r.file, r.electronFile].filter(Boolean)),
+  );
+  const files = new Set([
+    ...expectedFiles(),
+    ...beforePacket.manifest.flatMap((r) =>
+      [r.file, r.electronFile].filter((file) => afterFiles.has(file)),
+    ),
+  ]);
+  for (const file of files) {
     try {
       const b = NodePath.join(before, file);
       const a = NodePath.join(after, file);

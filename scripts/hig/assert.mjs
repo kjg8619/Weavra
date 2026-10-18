@@ -123,7 +123,12 @@ export async function verifyPacket(directory, harnessOnly) {
   const diff = JSON.parse(
     await NodeFSP.readFile(NodePath.join(directory, "diff/pairs.json"), "utf8"),
   );
-  NodeAssert.equal(diff.pairs.length, 94);
+  for (const file of expectedFiles()) {
+    NodeAssert.ok(
+      diff.pairs.some((pair) => pair.file === file),
+      `Missing pair: ${file}`,
+    );
+  }
   NodeAssert.equal(diff.failures.length, 0);
   for (const pair of diff.pairs) {
     NodeAssert.ok(pair.result.dimensionsMatch);

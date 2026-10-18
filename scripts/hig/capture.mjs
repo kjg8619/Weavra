@@ -35,9 +35,11 @@ NodeAssert.equal(revision, values.revision, "Wrong source revision");
 const trackedDiff = await git("diff", "HEAD", "--");
 if (!values.diagnostic) NodeAssert.equal(trackedDiff, "", "Commit source edits before capturing");
 const { _electron } = await import(
-  `${repo}/app/t3code/apps/desktop/node_modules/playwright-core/index.mjs`
+  `${NodePath.resolve(here, "../..")}/app/t3code/apps/desktop/node_modules/playwright-core/index.mjs`
 );
-const desktopRequire = NodeModule.createRequire(`${repo}/app/t3code/apps/desktop/package.json`);
+const desktopRequire = NodeModule.createRequire(
+  `${NodePath.resolve(here, "../..")}/app/t3code/apps/desktop/package.json`,
+);
 const builderRequire = NodeModule.createRequire(desktopRequire.resolve("electron-builder"));
 const asarRequire = NodeModule.createRequire(builderRequire.resolve("app-builder-lib"));
 const { extractFile } = asarRequire("@electron/asar");
@@ -518,6 +520,12 @@ async function runSize(width, height, includeStress = false) {
     await snap("05");
     await (await text(page, "로컬 폴더")).click();
     const address = page.locator(
+      '[data-slot="command-dialog-popup"] input[data-slot="autocomplete-input"]',
+    );
+    await address.focus();
+    await ready(
+      page,
+      "폴더",
       '[data-slot="command-dialog-popup"] input[data-slot="autocomplete-input"]',
     );
     await address.fill(`${isolation.workspace}/`);
