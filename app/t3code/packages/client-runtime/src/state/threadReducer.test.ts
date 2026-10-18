@@ -10,10 +10,13 @@ import {
   ProviderInstanceId,
   ThreadId,
   TurnId,
+  EnvironmentId,
+  makeWorkspaceTurnStartRefusalIdentity,
 } from "@t3tools/contracts";
 import type { OrchestrationThread } from "@t3tools/contracts";
 
 import { applyThreadDetailEvent } from "./threadReducer.ts";
+import { decodeTurnStartRefusal } from "./turnStartRefusal.ts";
 
 const baseEventFields = {
   eventId: EventId.make("event-1"),
@@ -1087,6 +1090,150 @@ describe("applyThreadDetailEvent", () => {
   });
 
   describe("thread.activity-appended", () => {
+    it("retains an old refusal through out-of-order replay without changing newer turn or message flags", () => {
+      const requestId = MessageId.make("refused-old-message");
+      const identity = makeWorkspaceTurnStartRefusalIdentity(baseThread.id, requestId);
+      const at = baseThread.createdAt;
+      const payload = {
+        version: 1,
+        source: "workspace-ownership",
+        requestId,
+        reason: "owned",
+        originCommandId: CommandId.make("original-start"),
+        originSequence: 1,
+      } as const;
+      const refusal = {
+        id: identity.activityId,
+        tone: "error",
+        kind: "provider.turn.start.failed",
+        summary: "Not started",
+        payload,
+        turnId: null,
+        sequence: 2,
+        createdAt: at,
+      } as const;
+      let thread: OrchestrationThread = {
+        ...baseThread,
+        messages: [
+          {
+            id: requestId,
+            role: "user",
+            text: "old intent",
+            turnId: null,
+            streaming: false,
+            createdAt: at,
+            updatedAt: at,
+          },
+          {
+            id: MessageId.make("newer-message"),
+            role: "user",
+            text: "newer intent",
+            turnId: null,
+            streaming: false,
+            createdAt: at,
+            updatedAt: at,
+          },
+        ],
+        latestTurn: {
+          turnId: TurnId.make("newer-turn"),
+          state: "running",
+          requestedAt: at,
+          startedAt: at,
+          completedAt: null,
+          assistantMessageId: null,
+        },
+        session: {
+          threadId: baseThread.id,
+          status: "running",
+          providerName: "codex",
+          runtimeMode: "full-access",
+          activeTurnId: TurnId.make("newer-turn"),
+          lastError: null,
+          updatedAt: at,
+        },
+        activities: Array.from({ length: 501 }, (_, index) => ({
+          id: EventId.make(`refusal-noise-${index}`),
+          tone: "tool" as const,
+          kind: "tool.completed",
+          summary: "Ran tool",
+          payload: {},
+          turnId: null,
+          sequence: index + 10,
+          createdAt: at,
+        })),
+      };
+      const original = thread;
+      for (const sequence of [600, 601]) {
+        const result = applyThreadDetailEvent(thread, {
+          ...baseEventFields,
+          sequence,
+          occurredAt: at,
+          aggregateKind: "thread",
+          aggregateId: baseThread.id,
+          type: "thread.activity-appended",
+          payload: { threadId: baseThread.id, activity: refusal },
+        });
+        expect(result.kind).toBe("updated");
+        if (result.kind !== "updated") throw new Error("Refusal did not update thread");
+        thread = result.thread;
+      }
+      expect(thread.activities).toHaveLength(502);
+      expect(thread.activities.filter((activity) => activity.id === identity.activityId)).toEqual([
+        refusal,
+      ]);
+      expect(thread.activities[0]).toEqual(refusal);
+      expect(thread.messages).toEqual(original.messages);
+      expect(thread.latestTurn).toEqual(original.latestTurn);
+      expect(thread.session).toEqual(original.session);
+      const scope = { environmentId: EnvironmentId.make("environment-1"), threadId: baseThread.id };
+      expect(decodeTurnStartRefusal(scope, scope, thread.activities[0])).toEqual(payload);
+      expect(
+        decodeTurnStartRefusal(
+          scope,
+          { ...scope, environmentId: EnvironmentId.make("environment-2") },
+          thread.activities[0],
+        ),
+      ).toBeNull();
+      expect(
+        decodeTurnStartRefusal(
+          scope,
+          { ...scope, threadId: ThreadId.make("foreign-thread") },
+          thread.activities[0],
+        ),
+      ).toBeNull();
+    });
+
+    it.each([
+      "provider.turn.admission.claimed",
+      "provider.turn.compaction.continuation",
+      "provider.turn.start.failed",
+    ])("keeps internal admission proofs out of the activity feed: %s", (kind) => {
+      const result = applyThreadDetailEvent(baseThread, {
+        ...baseEventFields,
+        sequence: 12,
+        occurredAt: "2026-04-01T11:00:00.000Z",
+        aggregateKind: "thread",
+        aggregateId: ThreadId.make("thread-1"),
+        type: "thread.activity-appended",
+        payload: {
+          threadId: ThreadId.make("thread-1"),
+          activity: {
+            id: EventId.make("admission-activity"),
+            tone: "info",
+            kind,
+            summary: "Admission state",
+            payload: {},
+            turnId: null,
+            createdAt: "2026-04-01T11:00:00.000Z",
+          },
+        },
+      });
+      expect(result.kind).toBe(kind === "provider.turn.start.failed" ? "updated" : "unchanged");
+      if (result.kind === "updated") {
+        expect(result.thread.activities.map((activity) => activity.kind)).toEqual([kind]);
+      }
+    });
+
     it("adds an activity", () => {
       const result = applyThreadDetailEvent(baseThread, {
         ...baseEventFields,

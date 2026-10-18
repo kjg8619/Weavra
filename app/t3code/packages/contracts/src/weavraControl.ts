@@ -7,6 +7,7 @@ import {
   WeavraPreparedModelRoute,
   WeavraSymptomVerification,
   WeavraTaskBinding,
+  WeavraTaskFailureSummary,
   WeavraTaskPreparation,
   WeavraTaskReceipt,
   WeavraTaskRunMetadata,
@@ -739,7 +740,19 @@ export type WeavraTaskReceiptRequest = typeof WeavraTaskReceiptRequest.Type;
 export const WeavraTaskReceiptData = Schema.Struct({
   kind: Schema.Literal("task-receipt"),
   receipt: WeavraTaskReceipt,
-}).pipe(closedRpcInput);
+  failureSummary: Schema.optionalKey(WeavraTaskFailureSummary),
+})
+  .check(
+    Schema.makeFilter(
+      (data) =>
+        data.failureSummary === undefined ||
+        (data.receipt.status === "FOUND" &&
+          data.receipt.run !== null &&
+          data.receipt.run.status !== "COMPLETED" &&
+          data.receipt.admission.cleanup === "CONFIRMED"),
+    ),
+  )
+  .pipe(closedRpcInput);
 export type WeavraTaskReceiptData = typeof WeavraTaskReceiptData.Type;
 export const WeavraTaskRecoveryRequest = Schema.Struct({
   ...mutation,
@@ -774,7 +787,36 @@ export const WeavraCheckoutIdentityData = Schema.Struct({
   checkout: WeavraCheckoutIdentity,
 }).pipe(closedRpcInput);
 export type WeavraCheckoutIdentityData = typeof WeavraCheckoutIdentityData.Type;
-export const WEAVRA_EVIDENCE_PAGE_RECORD_LIMIT = 50;
+/**
+ * Read-only `facts.candidates`, exactly the Runtime wire form: no owner or revision. Advertised only
+ * by `factCandidates: 1`. The App RPC form carries the observed owner and revision (see
+ * WeavraControlMutation) and the transport strips them before writing to the Runtime.
+ */
+export const WeavraFactCandidatesRequest = Schema.Struct({
+  ...envelope,
+  type: Schema.Literal("facts.candidates"),
+}).pipe(closedRpcInput);
+export type WeavraFactCandidatesRequest = typeof WeavraFactCandidatesRequest.Type;
+/** An unreviewed rule suggestion from a failed Run; never a fact until facts.prepare + confirm. */
+export const WeavraFactCandidate = Schema.Struct({
+  id: digest,
+  source: Schema.Struct({
+    runId: identifier,
+    kind: Schema.Literals(["policy_denied", "check_failed", "review_revise"]),
+  }),
+  statement: factStatement,
+  evidenceRef: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
+  /** The facts.prepare source: `run:<runId>#<id>`, verified by Runtime against the recorded Run. */
+  sourceRef: factSource,
+});
+export type WeavraFactCandidate = typeof WeavraFactCandidate.Type;
+export const WeavraFactCandidatesData = Schema.Struct({
+  kind: Schema.Literal("fact-candidates"),
+  projectRevision: counter,
+  candidates: Schema.Array(WeavraFactCandidate).check(Schema.isMaxLength(16)),
+});
+export type WeavraFactCandidatesData = typeof WeavraFactCandidatesData.Type;
+const WEAVRA_EVIDENCE_PAGE_RECORD_LIMIT = 50;
 const evidenceIdentity = Schema.String.check(Schema.isPattern(/\S/));
 const evidenceUuid = Schema.String.check(
   Schema.isPattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
@@ -788,6 +830,7 @@ export const WeavraEvidenceCategory = Schema.Literals([
   "checks",
   "changed-files",
   "trust-sources",
+  "run-diff",
 ]);
 export const WeavraEvidenceBinding = Schema.Struct({
   taskId: evidenceTaskId,
@@ -833,6 +876,9 @@ export const WeavraControlMutation = Schema.Union([
     previewId: identifier,
     previewDigest: digest,
   }),
+  // Read-only: the owner and revision bind the read to the observed state; the transport sends
+  // only the WeavraFactCandidatesRequest envelope to the Runtime.
+  Schema.Struct({ ...mutation, type: Schema.Literal("facts.candidates") }),
   Schema.Struct({ ...mutation, type: Schema.Literal("browser.inspect") }),
   Schema.Struct({
     ...mutation,
@@ -919,6 +965,7 @@ export const WeavraControlRequest = Schema.Union([
   Schema.Struct({ ...envelope, type: Schema.Literal("control.snapshot") }),
   WeavraTaskReceiptRequest,
   WeavraCheckoutIdentityRequest,
+  WeavraFactCandidatesRequest,
   WeavraEvidenceDetailsRequest,
   WeavraControlMutation,
 ])
@@ -932,6 +979,10 @@ export const WeavraControlErrorCode = Schema.Literals([
   "UNSUPPORTED_COMMAND",
   "HANDSHAKE_REQUIRED",
   "CONTROL_UNAVAILABLE",
+  "PROJECT_NOT_CONFIGURED",
+  "WORKSPACE_EVIDENCE_CAPACITY",
+  "WORKSPACE_EVIDENCE_UNSUPPORTED",
+  "WORKSPACE_EVIDENCE_UNAVAILABLE",
   "OWNER_CHANGED",
   "PROJECT_CHANGED",
   "STATE_UNAVAILABLE",
@@ -975,6 +1026,17 @@ export const WeavraControlErrorCode = Schema.Literals([
   "RERUN_NOT_APPLICABLE",
 ]);
 export type WeavraControlErrorCode = typeof WeavraControlErrorCode.Type;
+
+export const WEAVRA_DIRTY_WORKSPACE_MAX_FILES = 50;
+// PROJECT_CHANGED from a dirty task checkout names the repo-relative dirty paths, never contents.
+export const WeavraDirtyWorkspaceDetails = Schema.Struct({
+  reason: Schema.Literal("DIRTY_WORKSPACE"),
+  files: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(
+    Schema.isMaxLength(WEAVRA_DIRTY_WORKSPACE_MAX_FILES),
+  ),
+  truncated: Schema.Boolean,
+});
+export type WeavraDirtyWorkspaceDetails = typeof WeavraDirtyWorkspaceDetails.Type;
 
 export const WeavraControlPreview = Schema.Struct({
   taskBinding: Schema.optionalKey(WeavraTaskBinding),
@@ -1262,6 +1324,9 @@ export const WeavraControlCapabilities = Schema.Struct({
   analysisContext: Schema.optionalKey(Schema.Literal(1)),
   evidenceDetails: Schema.optionalKey(Schema.Literal(1)),
   checkoutIdentity: Schema.optionalKey(Schema.Literal(1)),
+  // Read-only `facts.candidates` (rule suggestions from failed Runs). Absence means unsupported; the
+  // `commands` tuple stays unchanged.
+  factCandidates: Schema.optionalKey(Schema.Literal(1)),
   recipes: Schema.Array(
     Schema.Struct({
       id: identifier,
@@ -1274,6 +1339,8 @@ export const WeavraControlCapabilities = Schema.Struct({
 export type WeavraControlCapabilities = typeof WeavraControlCapabilities.Type;
 
 const evidenceAvailability = Schema.Literals(["available", "unavailable"]);
+// Byte bound is Runtime-owned; 2048 UTF-16 units is the loosest char bound a 2 KiB UTF-8 tail can reach.
+const outputTail = Schema.String.check(Schema.isMaxLength(2048));
 export const WeavraEvidenceSnapshotIdentity = Schema.Struct({
   executionId: WeavraExecutionId,
   runId: identifier,
@@ -1313,6 +1380,19 @@ export const WeavraEvidenceCompleteness = Schema.Struct({
           value.checks.required <= value.checks.total),
   ),
 );
+/** A Run diff has one record per recorded changed file, so it shares the changed-files total. */
+function evidenceCategoryCompleteness(page: {
+  readonly completeness: typeof WeavraEvidenceCompleteness.Type;
+  readonly cursor: WeavraEvidenceCursor;
+}) {
+  return {
+    criteria: page.completeness.criteria,
+    checks: page.completeness.checks,
+    "changed-files": page.completeness.changedFiles,
+    "trust-sources": page.completeness.trustSources,
+    "run-diff": page.completeness.changedFiles,
+  }[page.cursor.category];
+}
 const evidencePageBase = {
   snapshot: WeavraEvidenceSnapshotIdentity,
   completeness: WeavraEvidenceCompleteness,
@@ -1332,6 +1412,8 @@ const evidencePageBase = {
       revision: counter,
       diffDigest: boundedText,
       criteriaCount: counter,
+      /** REVISE only: Runtime summary of the structured review issues; display-only. */
+      reviseSummary: Schema.optional(Schema.String.check(Schema.isMaxLength(500))),
     }),
   ),
   cursor: WeavraEvidenceCursor,
@@ -1375,6 +1457,9 @@ const evidenceCheckRecord = Schema.Struct({
       policyDigest: digest,
     }),
   ),
+  /** FAIL checks only: masked output tail (stderr+stdout share 20 lines / 2 KiB); display-only. */
+  stdoutTail: Schema.optional(outputTail),
+  stderrTail: Schema.optional(outputTail),
 });
 const evidenceChangedFileRecord = Schema.Struct({
   category: Schema.Literal("changed-files"),
@@ -1390,11 +1475,22 @@ const evidenceTrustSourceRecord = Schema.Struct({
   path: boundedText,
   digest,
 });
+/** Runtime display-only Run diff: JSON-encoded patch per file is at most 32 KiB, all patches 256 KiB. */
+const WEAVRA_RUN_DIFF_FILE_MAX_BYTES = 32_768;
+const evidenceRunDiffRecord = Schema.Struct({
+  category: Schema.Literal("run-diff"),
+  index: counter,
+  path: boundedText,
+  change: Schema.Literals(["added", "modified", "deleted"]),
+  patch: Schema.NullOr(Schema.String.check(Schema.isMaxLength(WEAVRA_RUN_DIFF_FILE_MAX_BYTES))),
+  omitted: Schema.NullOr(Schema.Literals(["DIFF_TOO_LARGE", "NOT_TEXT"])),
+}).check(Schema.makeFilter((record) => (record.patch === null) !== (record.omitted === null)));
 export const WeavraEvidenceRecord = Schema.Union([
   evidenceCriterionRecord,
   evidenceCheckRecord,
   evidenceChangedFileRecord,
   evidenceTrustSourceRecord,
+  evidenceRunDiffRecord,
 ]);
 export type WeavraEvidenceRecord = typeof WeavraEvidenceRecord.Type;
 export const WeavraEvidenceDetailsPage = Schema.Struct({
@@ -1406,12 +1502,7 @@ export const WeavraEvidenceDetailsPage = Schema.Struct({
   nextCursor: Schema.NullOr(WeavraEvidenceCursor),
 }).check(
   Schema.makeFilter((page) => {
-    const category = {
-      criteria: page.completeness.criteria,
-      checks: page.completeness.checks,
-      "changed-files": page.completeness.changedFiles,
-      "trust-sources": page.completeness.trustSources,
-    }[page.cursor.category];
+    const category = evidenceCategoryCompleteness(page);
     const end = page.cursor.index + page.records.length;
     return (
       category.availability !== "unavailable" &&
@@ -1434,23 +1525,26 @@ export type WeavraEvidenceDetailsPage = typeof WeavraEvidenceDetailsPage.Type;
 export const WeavraEvidenceDetailsUnavailable = Schema.Struct({
   kind: Schema.Literal("evidence-detail-unavailable"),
   ...evidencePageBase,
-  reason: Schema.Literals(["CATEGORY_UNAVAILABLE", "RECORD_TOO_LARGE"]),
+  /** DIFF_*: the whole Run diff is refused (workspace moved on, base unproven, or over the total). */
+  reason: Schema.Literals([
+    "CATEGORY_UNAVAILABLE",
+    "RECORD_TOO_LARGE",
+    "DIFF_STALE",
+    "DIFF_UNVERIFIED",
+    "DIFF_TOO_LARGE",
+  ]),
   recordIndex: counter,
 }).check(
   Schema.makeFilter((page) => {
-    const category = {
-      criteria: page.completeness.criteria,
-      checks: page.completeness.checks,
-      "changed-files": page.completeness.changedFiles,
-      "trust-sources": page.completeness.trustSources,
-    }[page.cursor.category];
+    const category = evidenceCategoryCompleteness(page);
+    if (page.recordIndex !== page.cursor.index) return false;
+    if (page.reason === "CATEGORY_UNAVAILABLE")
+      return category.availability === "unavailable" && category.total === null;
+    if (category.availability === "unavailable" || category.total === null) return false;
+    if (page.reason === "RECORD_TOO_LARGE") return page.recordIndex < category.total;
     return (
-      page.recordIndex === page.cursor.index &&
-      (page.reason === "CATEGORY_UNAVAILABLE"
-        ? category.availability === "unavailable" && category.total === null
-        : category.availability !== "unavailable" &&
-          category.total !== null &&
-          page.recordIndex < category.total)
+      page.cursor.category === "run-diff" &&
+      (category.total === 0 ? page.recordIndex === 0 : page.recordIndex < category.total)
     );
   }),
 );
@@ -1538,6 +1632,7 @@ const controlData = Schema.Union([
   WeavraTaskReceiptData,
   WeavraTaskRecoveryData,
   WeavraCheckoutIdentityData,
+  WeavraFactCandidatesData,
   WeavraEvidenceDetailsPage,
   WeavraEvidenceDetailsUnavailable,
   Schema.Struct({ kind: Schema.Literal("capabilities"), capabilities: WeavraControlCapabilities }),
@@ -1616,7 +1711,12 @@ export const WeavraControlResponse = Schema.Union([
   Schema.Struct({
     ...responseEnvelope,
     success: Schema.Literal(false),
-    error: Schema.Struct({ code: WeavraControlErrorCode }),
+    error: Schema.Struct({
+      code: WeavraControlErrorCode,
+      details: Schema.optionalKey(WeavraDirtyWorkspaceDetails),
+    }).check(
+      Schema.makeFilter((error) => error.details === undefined || error.code === "PROJECT_CHANGED"),
+    ),
   }),
 ]);
 export type WeavraControlResponse = typeof WeavraControlResponse.Type;

@@ -2063,6 +2063,8 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 					// Anthropic SDK appends /v1/messages to baseURL
 					baseUrl = variant.basePath;
 				} else if (npm === "@ai-sdk/google") {
+					// opencodeGoProvider() registers only the Anthropic and OpenAI APIs; a Google-API model there fails the build.
+					if (variant.provider === "opencode-go") continue;
 					api = "google-generative-ai";
 					baseUrl = `${variant.basePath}/v1`;
 				} else if (npm === "@ai-sdk/alibaba") {

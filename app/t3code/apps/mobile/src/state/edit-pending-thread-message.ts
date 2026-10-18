@@ -3,13 +3,14 @@ import { scopedThreadKey } from "../lib/scopedEntities";
 import { appAtomRegistry } from "./atom-registry";
 import {
   confirmThreadOutboxMessageQueued,
-  threadOutboxRevision,
+  threadOutboxStorageIdentity,
   type QueuedThreadMessage,
 } from "./thread-outbox";
-import { removeThreadOutboxMessage } from "./thread-outbox-removal";
+import { retireTransferredMessage, releaseTransferredMessage } from "./thread-outbox-removal";
 import {
   flushComposerDrafts,
   getComposerDraftSnapshot,
+  sameComposerDraftState,
   mergeComposerDraftContent,
   undoComposerDraftMerge,
   updateComposerDraftSettings,
@@ -19,27 +20,31 @@ import {
   dispatchingQueuedMessageIdAtom,
   editingQueuedMessageIdsAtom,
   holdEditingQueuedMessage,
-  releaseEditingQueuedMessage,
 } from "./use-thread-outbox";
 
 /** Take delivery ownership before any await; the durable draft then takes ownership of the files. */
 export async function editPendingThreadMessage(message: QueuedThreadMessage): Promise<boolean> {
   if (
     message.creation ||
-    appAtomRegistry.get(dispatchingQueuedMessageIdAtom) === message.messageId ||
-    appAtomRegistry.get(editingQueuedMessageIdsAtom)[message.messageId]
+    appAtomRegistry.get(dispatchingQueuedMessageIdAtom) === threadOutboxStorageIdentity(message) ||
+    appAtomRegistry.get(editingQueuedMessageIdsAtom)[threadOutboxStorageIdentity(message)]
   ) {
     return false;
   }
-  holdEditingQueuedMessage(message.messageId);
+  const release = holdEditingQueuedMessage(message);
+  if (release === null) return false;
   const draftKey = scopedThreadKey(message.environmentId, message.threadId);
   let rollback: {
     snapshot: ReturnType<typeof getComposerDraftSnapshot>;
     merged: ReturnType<typeof getComposerDraftSnapshot>;
   } | null = null;
   try {
-    if (!(await confirmThreadOutboxMessageQueued(message))) return false;
-    const revision = threadOutboxRevision(message.messageId);
+    const expected = await confirmThreadOutboxMessageQueued(message);
+    // Uncertain/refused content stays in the outbox. Moving it into an ordinary
+    // composer would also grant that composer's background upload worker access.
+    // Explicit native recovery has its own source marker and later UI activation.
+    if (expected === null || expected.kind !== "message" || expected.delivery.state !== "ready")
+      return false;
     await waitForComposerDraftsLoaded();
     const snapshot = getComposerDraftSnapshot(draftKey);
     const attachmentIds = new Set(snapshot.attachments.map((attachment) => attachment.id));
@@ -59,14 +64,20 @@ export async function editPendingThreadMessage(message: QueuedThreadMessage): Pr
     });
     rollback = { snapshot, merged: getComposerDraftSnapshot(draftKey) };
     await flushComposerDrafts();
-    if (!(await removeThreadOutboxMessage(message, revision))) return false;
+    const destination = getComposerDraftSnapshot(draftKey);
+    const destinationCurrent = () =>
+      sameComposerDraftState(destination, getComposerDraftSnapshot(draftKey));
+    const retired = await retireTransferredMessage(expected, destinationCurrent);
+    if (retired === null) return false;
     rollback = null;
+    release();
+    await releaseTransferredMessage(retired, message, destinationCurrent);
     return true;
   } finally {
     try {
       if (rollback) await undoComposerDraftMerge(draftKey, rollback.snapshot, rollback.merged);
     } finally {
-      releaseEditingQueuedMessage(message.messageId);
+      release();
     }
   }
 }

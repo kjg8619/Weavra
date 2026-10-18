@@ -1,5 +1,5 @@
 import { type AuthType, type CredentialStore, InMemoryCredentialStore } from "@earendil-works/pi-ai";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AuthStorage } from "../src/core/auth-storage.ts";
 import { ModelRuntime } from "../src/core/model-runtime.ts";
 
@@ -33,6 +33,63 @@ function testModel(id: string) {
 }
 
 describe("ModelRuntime auth options", () => {
+	it("restricts the actual auth selection before a swapped OAuth credential can refresh or derive auth", async () => {
+		const credentials = new InMemoryCredentialStore();
+		await credentials.modify("restricted", async () => ({ type: "api_key", key: "synthetic-key" }));
+		const runtime = await ModelRuntime.create({ credentials, modelsPath: null, refreshOnCreate: false });
+		const refresh = vi.fn(async () => ({ access: "refreshed", refresh: "r", expires: Number.MAX_SAFE_INTEGER }));
+		const toAuth = vi.fn(() => "oauth-access");
+		runtime.registerProvider("restricted", {
+			baseUrl: "https://example.test",
+			api: "openai-completions",
+			oauth: {
+				name: "Synthetic OAuth",
+				login: async () => ({ access: "a", refresh: "r", expires: 0 }),
+				refreshToken: refresh,
+				getApiKey: toAuth,
+			},
+			models: [testModel("restricted-model")],
+		});
+		const metadata = await runtime.listCredentials();
+		await credentials.modify("restricted", async () => ({
+			type: "oauth",
+			access: "expired",
+			refresh: "r",
+			expires: 0,
+		}));
+
+		await expect(runtime.getAuth("restricted", { requiredAuthType: "api_key" })).rejects.toMatchObject({
+			code: "auth",
+		});
+
+		expect(metadata.find((entry) => entry.providerId === "restricted")?.type).toBe("api_key");
+		expect(refresh).not.toHaveBeenCalled();
+		expect(toAuth).not.toHaveBeenCalled();
+	});
+
+	it("leaves unrestricted callers unchanged and enforces both explicit auth kinds", async () => {
+		const credentials = new InMemoryCredentialStore();
+		await credentials.modify("anthropic", async () => ({
+			type: "oauth",
+			access: "synthetic-oauth",
+			refresh: "r",
+			expires: Number.MAX_SAFE_INTEGER,
+		}));
+		const runtime = await ModelRuntime.create({ credentials, modelsPath: null, refreshOnCreate: false });
+
+		expect((await runtime.getAuth("anthropic"))?.auth.apiKey).toBe("synthetic-oauth");
+		expect((await runtime.getAuth("anthropic", { requiredAuthType: "oauth" }))?.auth.apiKey).toBe("synthetic-oauth");
+		await expect(
+			runtime.getAuth("anthropic", { requiredAuthType: "oauth", apiKey: "explicit-key" }),
+		).rejects.toMatchObject({ code: "auth" });
+		expect(
+			(await runtime.getAuth("anthropic", { requiredAuthType: "api_key", apiKey: "explicit-key" }))?.auth.apiKey,
+		).toBe("explicit-key");
+		await credentials.modify("anthropic", async () => ({ type: "api_key", key: "stored-key" }));
+		expect((await runtime.getAuth("anthropic", { requiredAuthType: "api_key" }))?.auth.apiKey).toBe("stored-key");
+		await expect(runtime.getAuth("anthropic", { requiredAuthType: "oauth" })).rejects.toMatchObject({ code: "auth" });
+	});
+
 	it("accepts a pi-ai CredentialStore", async () => {
 		const credentials = new InMemoryCredentialStore();
 		await credentials.modify("anthropic", async () => ({ type: "api_key", key: "stored-key" }));

@@ -1,9 +1,15 @@
 import { makeTurnCommandMetadata } from "../../lib/commandMetadata";
-import { enqueueThreadOutboxMessage } from "../../state/thread-outbox";
+import { enqueueThreadOutboxMessage, threadOutboxContent } from "../../state/thread-outbox";
 import {
   getComposerDraftSnapshot,
   clearComposerDraftContent,
+  useComposerDraft,
+  type RejectedComposerDraftSource,
 } from "../../state/use-composer-drafts";
+import { useRejectedComposerRecovery } from "../../state/use-rejected-composer-recovery";
+import { selectRejectedComposerSource } from "../../lib/rejectedComposerSource";
+import { currentThreadOutboxPresentation } from "../../state/thread-outbox-presentation";
+import { restoreOutboxAdmission } from "../../state/thread-outbox-handback";
 import { useWorktreeSetup } from "./use-worktree-setup";
 import { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
 import { ScreenHeader } from "../../components/ScreenHeader";
@@ -282,7 +288,13 @@ export function ThreadRouteScreen(props: ThreadRouteScreenProps) {
   // composer reports loading/syncing, and the composer's connection pill
   // reports connecting/reconnecting status.
   if (selectedThread !== null && selectedThreadKey === routeThreadKey) {
-    return <ThreadRouteContent {...props} selectedThreadDetailState={selectedThreadDetailState} />;
+    return (
+      <ThreadRouteContent
+        {...props}
+        selectedThread={selectedThread}
+        selectedThreadDetailState={selectedThreadDetailState}
+      />
+    );
   }
 
   const stillHydrating = threadRouteIsHydrating({
@@ -319,6 +331,7 @@ export function ThreadRouteScreen(props: ThreadRouteScreenProps) {
 
 function ThreadRouteContent(
   props: ThreadRouteScreenProps & {
+    readonly selectedThread: NonNullable<ReturnType<typeof useThreadSelection>["selectedThread"]>;
     readonly selectedThreadDetailState: ReturnType<typeof useSelectedThreadDetailState>;
   },
 ) {
@@ -328,14 +341,27 @@ function ThreadRouteContent(
     useAdaptiveWorkspaceLayout();
   const { connectionState } = useRemoteConnectionStatus();
   const { onReconnectEnvironment } = useRemoteConnections();
-  const {
-    selectedThread,
-    selectedThreadCreation,
-    selectedThreadProject,
-    selectedEnvironmentConnection,
-  } = useThreadSelection();
+  const { selectedThreadCreation, selectedThreadProject, selectedEnvironmentConnection } =
+    useThreadSelection();
+  const selectedThread = props.selectedThread;
   const selectedThreadDetailState = props.selectedThreadDetailState;
   const selectedThreadDetail = Option.getOrNull(selectedThreadDetailState.data);
+  const weavraTaskScope = useMemo(
+    () =>
+      selectedThreadCreation === null
+        ? {
+            environmentId: selectedThread.environmentId,
+            projectId: selectedThread.projectId,
+            threadId: selectedThread.id,
+          }
+        : null,
+    [
+      selectedThread.environmentId,
+      selectedThread.projectId,
+      selectedThread.id,
+      selectedThreadCreation,
+    ],
+  );
   // "Load earlier turns" header state for windowed (paginated) thread loads.
   const loadEarlierTurns = useMemo(() => {
     if (selectedThread === null || !threadHasOlderTurns(selectedThreadDetailState)) {
@@ -351,7 +377,6 @@ function ThreadRouteContent(
     };
   }, [selectedThread, selectedThreadDetailState]);
   const { selectedThreadCwd } = useSelectedThreadWorktree();
-  const composer = useThreadComposerState();
   const gitState = useSelectedThreadGitState();
   const gitActions = useSelectedThreadGitActions();
   const requests = useSelectedThreadRequests();
@@ -425,6 +450,59 @@ function ThreadRouteContent(
   const routeConnectionState =
     routeEnvironmentRuntime?.connectionState ?? (environmentId ? "available" : connectionState);
   const routeConnectionError = routeEnvironmentRuntime?.connectionError ?? null;
+  const recoveryScope = useMemo(
+    () => ({ environmentId: selectedThread.environmentId, threadId: selectedThread.id }),
+    [selectedThread.environmentId, selectedThread.id],
+  );
+  const recoveredDraft = useComposerDraft(
+    scopedThreadKey(recoveryScope.environmentId, recoveryScope.threadId),
+  );
+  const recoverySource = {
+    scope: recoveryScope,
+    synchronized:
+      selectedThreadCreation === null &&
+      selectedThreadDetailState.status === "live" &&
+      selectedThreadDetail?.id === selectedThread.id &&
+      routeConnectionState === "connected" &&
+      environmentId === selectedThread.environmentId &&
+      threadId === selectedThread.id,
+    messages: selectedThreadDetail?.messages ?? [],
+    activities: selectedThreadDetail?.activities ?? [],
+  };
+  const recovery = useRejectedComposerRecovery({
+    scope: recoveryScope,
+    source: recoverySource,
+    settings: [
+      recoveredDraft.modelSelection ??
+        selectedThreadDetail?.modelSelection ??
+        selectedThread.modelSelection,
+      recoveredDraft.runtimeMode ?? selectedThreadDetail?.runtimeMode ?? selectedThread.runtimeMode,
+      recoveredDraft.interactionMode ??
+        selectedThreadDetail?.interactionMode ??
+        selectedThread.interactionMode,
+      routeEnvironmentRuntime?.serverConfig,
+    ],
+  });
+  const refusalSources = useMemo(() => {
+    const sources = new Map<MessageId, RejectedComposerDraftSource>();
+    if (selectedThreadDetail?.id !== selectedThread.id) return sources;
+    for (const message of selectedThreadDetail.messages) {
+      const source = selectRejectedComposerSource({
+        scope: recoveryScope,
+        messageId: message.id,
+        // Cached evidence is display-only; the action reselects synchronized state.
+        source: {
+          scope: recoveryScope,
+          synchronized: true,
+          messages: selectedThreadDetail.messages,
+          activities: selectedThreadDetail.activities,
+        },
+      });
+      if (source !== null) sources.set(message.id, source);
+    }
+    return sources;
+  }, [recoveryScope, selectedThread.id, selectedThreadDetail]);
+  const composer = useThreadComposerState(recovery);
   const selectedThreadWithDraftSettings = useMemo(
     () =>
       selectedThread
@@ -804,7 +882,7 @@ function ThreadRouteContent(
       StackActions.replace("NewTaskSheet", {
         screen: "NewTaskDraft",
         params: {
-          draftId: restoredNewTaskDraftKey(creation.messageId),
+          draftId: restoredNewTaskDraftKey(creation),
           environmentId: String(creation.environmentId),
           projectId: String(creation.creation.projectId),
           ...(selectedThreadProject ? { title: selectedThreadProject.title } : {}),
@@ -840,6 +918,7 @@ function ThreadRouteContent(
   const [localResendMessageId, setLocalResendMessageId] = useState<string | null>(null);
   const handleWorkLocally = useCallback(async () => {
     if (!selectedThread || !selectedThreadCreation) return;
+    if (currentThreadOutboxPresentation(selectedThreadCreation.message).kind !== "ready") return;
     const result = await cancelWorktreeSetup({
       environmentId: selectedThread.environmentId,
       input: { threadId: selectedThread.id },
@@ -862,7 +941,7 @@ function ThreadRouteContent(
     if (!original.creation) return;
     const metadata = makeTurnCommandMetadata();
     const replacement = {
-      ...original,
+      ...threadOutboxContent(original),
       commandId: CommandId.make(metadata.commandId),
       messageId: MessageId.make(metadata.messageId),
       threadId: ThreadId.make(metadata.threadId),
@@ -874,9 +953,10 @@ function ThreadRouteContent(
         worktreePath: null,
       },
     };
-    void enqueueThreadOutboxMessage(replacement)
+    const admission = enqueueThreadOutboxMessage(replacement);
+    void admission.committed
       .then(() => {
-        const draftKey = restoredNewTaskDraftKey(original.messageId);
+        const draftKey = restoredNewTaskDraftKey(original);
         const restored = getComposerDraftSnapshot(draftKey);
         // Leave any edits made during cancellation in their recovery draft.
         if (
@@ -899,9 +979,20 @@ function ThreadRouteContent(
           }),
         );
       })
-      .catch((error) =>
+      .catch(async (error: unknown) => {
+        await restoreOutboxAdmission({
+          message: replacement,
+          draftKey: restoredNewTaskDraftKey(original),
+          releaseAfterHandback: admission.releaseAfterHandback,
+        });
         Alert.alert(
           "Could not work locally",
+          error instanceof Error ? error.message : String(error),
+        );
+      })
+      .catch((error: unknown) =>
+        Alert.alert(
+          "Could not preserve task",
           error instanceof Error ? error.message : String(error),
         ),
       );
@@ -916,6 +1007,9 @@ function ThreadRouteContent(
         reason: selectedThreadCreation.outcome.reason,
         onEditTask: handleEditFailedCreation,
       };
+    }
+    if (currentThreadOutboxPresentation(selectedThreadCreation.message).kind === "retained") {
+      return { kind: "retained" };
     }
     return {
       kind: "preparing",
@@ -960,7 +1054,14 @@ function ThreadRouteContent(
         }
       >
         <ThreadDetailScreen
+          recovery={{
+            ...recovery,
+            sources: refusalSources,
+            synchronized: recoverySource.synchronized,
+            marker: recoveredDraft.rejectedTurn,
+          }}
           selectedThread={selectedThreadWithDraftSettings ?? selectedThread}
+          weavraTaskScope={weavraTaskScope}
           contentPresentation={contentPresentation}
           screenTone={connectionTone(routeConnectionState)}
           connectionError={routeConnectionError}
@@ -991,7 +1092,9 @@ function ThreadRouteContent(
                   turnStarted: selectedThreadDetail?.latestTurn?.startedAt != null,
                   onCancel: handleCancelWorktreeSetup,
                   onWorkLocally:
-                    selectedThreadCreation?.outcome == null && selectedThreadCreation
+                    selectedThreadCreation?.outcome == null &&
+                    selectedThreadCreation &&
+                    currentThreadOutboxPresentation(selectedThreadCreation.message).kind === "ready"
                       ? handleWorkLocally
                       : null,
                 }

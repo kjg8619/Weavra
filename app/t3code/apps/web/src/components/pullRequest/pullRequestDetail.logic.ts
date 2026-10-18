@@ -36,8 +36,8 @@ import { removeInlineContextReference } from "~/lib/composerContextReferences";
 
 export const PULL_REQUEST_MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, string> = {
   merge: "Merge",
-  squash: "Squash and merge",
-  rebase: "Rebase and merge",
+  squash: "Squash 후 병합",
+  rebase: "Rebase 후 병합",
 };
 
 /** Old environments keep their existing actions; new ones must finish stack discovery first. */
@@ -224,14 +224,14 @@ export function pullRequestPanelContext(
 export function pullRequestHandoffLabels(inThisThread: boolean) {
   return inThisThread
     ? {
-        fixFinding: "Fix in this thread",
-        fixCheck: "Fix in this thread",
-        fixFindings: "Fix findings in this thread",
+        fixFinding: "이 대화에서 수정",
+        fixCheck: "이 대화에서 수정",
+        fixFindings: "이 대화에서 발견 사항 수정",
       }
     : {
-        fixFinding: "Fix in a thread",
+        fixFinding: "대화에서 수정",
         fixCheck: "Fix",
-        fixFindings: "Fix findings in a thread",
+        fixFindings: "대화에서 발견 사항 수정",
       };
 }
 
@@ -485,7 +485,7 @@ export function buildPullRequestTimeline(
       id: commit.oid,
       at: commit.committedDate,
       kind: "commit" as const,
-      title: `Commit ${commit.oid.slice(0, 7)}`,
+      title: `commit ${commit.oid.slice(0, 7)}`,
       body: commit.messageHeadline || null,
       markdown: false,
       url: null,
@@ -519,7 +519,7 @@ export function buildPullRequestTimeline(
             id: "merged",
             at: detail.mergedAt,
             kind: "merged" as const,
-            title: "Pull request merged",
+            title: "PR 병합됨",
             body: null,
             markdown: false,
             url: null,
@@ -539,7 +539,7 @@ export function buildPullRequestTimeline(
             id: "closed",
             at: detail.closedAt,
             kind: "closed" as const,
-            title: "Pull request closed",
+            title: "PR 닫힘",
             body: null,
             markdown: false,
             url: null,

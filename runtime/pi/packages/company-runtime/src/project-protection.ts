@@ -2,7 +2,7 @@ import { lstat, realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RuntimeConfig } from "./config.ts";
-import { resolveVerifierTrustSources } from "./verifier-trust.ts";
+import { type RegisteredCheckLike, resolveVerifierTrustSources } from "./verifier-trust.ts";
 
 function inside(root: string, path: string): boolean {
 	const rel = relative(root, path);
@@ -12,7 +12,10 @@ function inside(root: string, path: string): boolean {
 /** The same Host-owned program/oracle protections apply before workers exist and during execution. */
 export async function resolveProjectProtectedPaths(
 	cwd: string,
-	config: RuntimeConfig,
+	config: {
+		readonly verification: { readonly checks: readonly RegisteredCheckLike[] };
+		readonly code_intelligence?: RuntimeConfig["code_intelligence"];
+	},
 	additional: readonly string[] = [],
 ): Promise<string[]> {
 	const protectedPaths = [...additional];

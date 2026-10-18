@@ -88,6 +88,8 @@ export interface CreateModelRuntimeOptions {
 export interface ModelRuntimeAuthOverrides extends AuthOperationOptions {
 	apiKey?: string;
 	env?: Record<string, string>;
+	/** Checked by the resolver at actual credential selection, before OAuth refresh/toAuth. */
+	requiredAuthType?: AuthType;
 	/** Require this much remaining OAuth-token validity; defaults to five minutes. */
 	minOAuthValidityMs?: number;
 }

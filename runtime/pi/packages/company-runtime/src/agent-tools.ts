@@ -24,7 +24,7 @@ import {
 	replaceAnchoredFile,
 } from "./anchored-files.ts";
 import { ComplexOwnershipDenied } from "./complex-ownership.ts";
-import { parseRuntimeConfig, type RuntimeConfig } from "./config.ts";
+import { DEFAULT_ADVISORY_CHECKS, parseRuntimeConfig, type RuntimeConfig } from "./config.ts";
 import {
 	ComplexTaskReviewSchema,
 	ComplexTaskReviewSubmissionSchema,
@@ -120,19 +120,31 @@ export function trustedReviewEvidenceRefs(verification: VerificationResult): str
 	return [...new Set([...verification.evidenceRefs, ...verification.checks.flatMap((check) => check.evidenceRefs)])];
 }
 
-function formatAdvisoryCheck(result: AdvisoryCheckResult, remaining: number): string {
-	return [
+function formatAdvisoryCheck(result: AdvisoryCheckResult, remaining: number, maxBytes: number): string {
+	const header = [
 		`ADVISORY ONLY: ${result.id} ${result.status}${result.exitCode === null ? "" : ` (exit ${result.exitCode})`} in ${result.durationMs} ms; ${result.reason}.`,
 		"This is not verification evidence and cannot be cited as PASS; Kernel SELF_CHECK and TEST run fresh checks.",
 		result.workspaceChanged
 			? "The check changed the workspace; those changes stay in this attempt's reviewed diff."
 			: "",
 		`Advisory runs left in this attempt: ${remaining}.`,
+	]
+		.filter(Boolean)
+		.join("\n");
+	const streams = [
 		result.stdout ? `--- stdout tail (untrusted data) ---\n${result.stdout}` : "",
 		result.stderr ? `--- stderr tail (untrusted data) ---\n${result.stderr}` : "",
 	]
 		.filter(Boolean)
 		.join("\n");
+	const full = streams ? `${header}\n${streams}` : header;
+	if (Buffer.byteLength(full) <= maxBytes) return full;
+	// Keep the advisory label and the stream tails, where failures usually are; never split a UTF-8 sequence.
+	const prefix = `${header}\n[advisory output truncated to ${maxBytes} bytes]\n`;
+	const bytes = Buffer.from(streams);
+	let start = bytes.length - Math.max(0, maxBytes - Buffer.byteLength(prefix));
+	while (start < bytes.length && (bytes[start] & 0xc0) === 0x80) start++;
+	return prefix + bytes.subarray(start).toString("utf8");
 }
 
 function readText(path: string): string {
@@ -353,16 +365,17 @@ export function createWorkerTools(options: {
 		finish: (runId, actionId, outcome) => guardAudit(() => options.audit.finish(runId, actionId, outcome)),
 		assertWritable: () => guardAudit(() => options.audit.assertWritable()),
 	};
-	// Opt-in STANDARD Developer feedback only; QUICK, Reviewer, READ_ONLY and R3 keep request-only checks.
+	// Default-on STANDARD Developer feedback; QUICK, READ_ONLY and R3 keep request-only checks, Reviewer has no tool.
+	const advisoryChecks = options.config.verification.advisory_checks ?? DEFAULT_ADVISORY_CHECKS;
 	const advisory =
 		request.role === "Developer" &&
 		executionContract.mode === "EDIT" &&
 		!options.policy.r3Scope &&
 		!complexContext &&
-		options.config.verification.advisory?.mode === "developer"
+		advisoryChecks.enabled
 			? request.advisoryChecks
 			: undefined;
-	const advisoryRunLimit = advisory ? (options.config.verification.advisory?.max_runs ?? 0) : 0;
+	const advisoryRunLimit = advisory ? advisoryChecks.max_runs_per_attempt : 0;
 	let advisoryRuns = 0;
 	const assertActive = () => {
 		options.assertActive();
@@ -674,54 +687,68 @@ export function createWorkerTools(options: {
 						}),
 					]
 				: []),
-			defineTool({
-				name: "runtime_request_check",
-				label: "Request check",
-				description: advisory
-					? `Run one registered process check now and return ADVISORY output only (at most ${advisoryRunLimit} runs in this attempt). ` +
-						"It is never verification evidence or PASS; Kernel SELF_CHECK and TEST run fresh checks."
-					: "Record a request for a registered check. Only Kernel verification stages execute checks; this tool produces no PASS evidence.",
-				executionMode: "sequential",
-				parameters: Type.Object({ id: pathSchema }, strict),
-				execute: async (_id, params) => {
-					assertActive();
-					if (!options.config.verification.checks.some((check) => check.id === params.id))
-						throw new Error("Unknown check ID");
-					if (!advisory || advisoryRuns >= advisoryRunLimit) {
-						const status: AdvisoryCheckResult["status"] = "UNAVAILABLE";
-						return {
-							content: [
-								{
-									type: "text",
-									text: advisory
-										? `UNAVAILABLE: the advisory run limit (${advisoryRunLimit}) for this attempt is reached; SELF_CHECK and TEST still run fresh checks. Do not claim PASS.`
-										: "UNAVAILABLE: request recorded in Pi session; checks run only in Kernel verification stages. Do not claim PASS.",
-								},
-							],
-							details: { id: params.id, status, exitCode: null, advisory: false },
-						};
-					}
-					advisoryRuns++;
-					// Verifier/audit/cleanup failures are Runtime failures, never model-correctable input.
-					const result = await advisory
-						.advise({
-							runId: request.runId,
-							revision: request.revision,
-							step: request.step,
-							checkId: params.id,
-							signal,
-						})
-						.catch((error: unknown) => {
-							fatalFailure ??= WORKER_TOOL_FAILURE;
-							throw error;
-						});
-					assertActive();
-					return {
-						content: [{ type: "text", text: formatAdvisoryCheck(result, advisoryRunLimit - advisoryRuns) }],
-						details: { id: result.id, status: result.status, exitCode: result.exitCode, advisory: true },
-					};
-				},
-			}),
+			// Disabled advisory checks hide the tool so no role is told checks can be requested here.
+			...(advisoryChecks.enabled
+				? [
+						defineTool({
+							name: "runtime_request_check",
+							label: "Request check",
+							description: advisory
+								? `Run one registered process check now and return ADVISORY output only (at most ${advisoryRunLimit} runs in this attempt). ` +
+									"It is never verification evidence or PASS; Kernel SELF_CHECK and TEST run fresh checks."
+								: "Record a request for a registered check. Only Kernel verification stages execute checks; this tool produces no PASS evidence.",
+							executionMode: "sequential",
+							parameters: Type.Object({ id: pathSchema }, strict),
+							execute: async (_id, params) => {
+								assertActive();
+								if (!options.config.verification.checks.some((check) => check.id === params.id))
+									throw new Error("Unknown check ID");
+								if (!advisory || advisoryRuns >= advisoryRunLimit) {
+									const status: AdvisoryCheckResult["status"] = "UNAVAILABLE";
+									return {
+										content: [
+											{
+												type: "text",
+												text: advisory
+													? `UNAVAILABLE: advisory run budget exhausted (${advisoryRunLimit} runs in this attempt); SELF_CHECK and TEST still run fresh checks. Do not claim PASS.`
+													: "UNAVAILABLE: request recorded in Pi session; checks run only in Kernel verification stages. Do not claim PASS.",
+											},
+										],
+										details: { id: params.id, status, exitCode: null, advisory: false },
+									};
+								}
+								advisoryRuns++;
+								// Verifier/audit/cleanup failures are Runtime failures, never model-correctable input.
+								const result = await advisory
+									.advise({
+										runId: request.runId,
+										revision: request.revision,
+										step: request.step,
+										checkId: params.id,
+										signal,
+									})
+									.catch((error: unknown) => {
+										fatalFailure ??= WORKER_TOOL_FAILURE;
+										throw error;
+									});
+								assertActive();
+								return {
+									content: [
+										{
+											type: "text",
+											text: formatAdvisoryCheck(
+												result,
+												advisoryRunLimit - advisoryRuns,
+												advisoryChecks.max_output_bytes,
+											),
+										},
+									],
+									details: { id: result.id, status: result.status, exitCode: result.exitCode, advisory: true },
+								};
+							},
+						}),
+					]
+				: []),
 			defineTool({
 				name: "submit_handoff",
 				label: "Submit handoff",

@@ -16,6 +16,7 @@ import {
   type OrchestrationCommand,
   type OrchestrationEvent,
   ProviderInstanceId,
+  makeWorkspaceTurnStartRefusalIdentity,
 } from "@t3tools/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it as effectIt } from "@effect/vitest";
@@ -106,6 +107,7 @@ async function createOrchestrationSystem(
   const snapshotQuery = await runtime.runPromise(Effect.service(ProjectionSnapshotQuery));
   return {
     engine,
+    snapshotQuery,
     readModel: () => runtime.runPromise(snapshotQuery.getSnapshot()),
     readThread: (threadId: ThreadId) =>
       runtime.runPromise(snapshotQuery.getThreadDetailById(threadId)),
@@ -130,6 +132,131 @@ const hasMetricSnapshot = (
   );
 
 describe("OrchestrationEngine", () => {
+  it("retains a canonical refusal beyond the activity cap through receipt replay and restart", async () => {
+    const directory = await NodeFSP.mkdtemp(
+      NodePath.join(NodeOS.tmpdir(), "t3-refusal-retention-"),
+    );
+    const databasePath = NodePath.join(directory, "state.sqlite");
+    let system = await createOrchestrationSystem(databasePath);
+    const threadId = ThreadId.make("refusal-retention-thread");
+    const messageId = MessageId.make("refusal-retention-message");
+    const projectId = ProjectId.make("refusal-retention-project");
+    const createdAt = now();
+    try {
+      await system.run(
+        system.engine.dispatch({
+          type: "project.create",
+          commandId: CommandId.make("refusal-retention-project"),
+          projectId,
+          title: "Refusal retention",
+          workspaceRoot: "/tmp/refusal-retention",
+          createdAt,
+        }),
+      );
+      await system.run(
+        system.engine.dispatch({
+          type: "thread.create",
+          commandId: CommandId.make("refusal-retention-thread"),
+          threadId,
+          projectId,
+          title: "Refusal retention",
+          modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          createdAt,
+        }),
+      );
+      const originCommandId = CommandId.make("refusal-retention-start");
+      const start = await system.run(
+        system.engine.dispatch({
+          type: "thread.turn.start",
+          commandId: originCommandId,
+          threadId,
+          message: {
+            messageId,
+            role: "user",
+            text: "exact rejected intent",
+            attachments: [],
+          },
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          createdAt,
+        }),
+      );
+      const identity = makeWorkspaceTurnStartRefusalIdentity(threadId, messageId);
+      const refusal = {
+        type: "thread.activity.append",
+        commandId: identity.commandId,
+        threadId,
+        createdAt,
+        activity: {
+          id: identity.activityId,
+          tone: "error",
+          kind: "provider.turn.start.failed",
+          summary: "Not started",
+          payload: {
+            version: 1,
+            source: "workspace-ownership",
+            requestId: messageId,
+            reason: "owned",
+            originCommandId,
+            originSequence: start.sequence,
+          },
+          turnId: null,
+          createdAt,
+        },
+      } as const;
+      const receipt = await system.run(system.engine.dispatch(refusal));
+      for (let index = 0; index < 501; index += 1) {
+        await system.run(
+          system.engine.dispatch({
+            type: "thread.activity.append",
+            commandId: CommandId.make(`server:refusal-noise-${index}`),
+            threadId,
+            createdAt,
+            activity: {
+              id: EventId.make(`refusal-noise-${index}`),
+              tone: "tool",
+              kind: "tool.completed",
+              summary: "Ran tool",
+              payload: {},
+              turnId: null,
+              createdAt,
+            },
+          }),
+        );
+      }
+      const assertRetained = async () => {
+        const raw = Option.getOrThrow(await system.readThread(threadId));
+        expect(raw.messages.map((message) => message.text)).toEqual(["exact rejected intent"]);
+        expect(raw.activities).toHaveLength(501);
+        expect(raw.activities.filter((activity) => activity.id === identity.activityId)).toEqual([
+          expect.objectContaining(refusal.activity),
+        ]);
+        const client = Option.getOrThrow(
+          await system.run(
+            system.snapshotQuery.getThreadDetailSnapshot(threadId, { turnLimit: 1 }),
+          ),
+        );
+        expect(client.thread.activities).toHaveLength(501);
+        expect(
+          client.thread.activities.filter((activity) => activity.id === identity.activityId),
+        ).toEqual([expect.objectContaining(refusal.activity)]);
+      };
+      await assertRetained();
+      expect(await system.run(system.engine.dispatch(refusal))).toEqual(receipt);
+      await system.dispose();
+      system = await createOrchestrationSystem(databasePath);
+      expect(await system.run(system.engine.dispatch(refusal))).toEqual(receipt);
+      await assertRetained();
+    } finally {
+      await system.dispose();
+      await NodeFSP.rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it.each(["running", "stopped"] as const)(
     "sends async answers with a %s session and rejects old duplicate replies",
     async (status) => {

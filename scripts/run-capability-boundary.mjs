@@ -28,4 +28,5 @@ try {
   if (result.status !== 0) throw new Error(`Capability boundary failed: ${result.status ?? result.signal}`);
 } finally {
   rmSync(temporary, { recursive: true, force: true });
+  console.log("CAPABILITY HOME CLEANUP PASS: isolated home/tmp removed");
 }

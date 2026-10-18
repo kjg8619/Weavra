@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
+import { readAnchoredSource } from "./anchored-files.ts";
 import { selectR3Scope } from "./approval.ts";
 import { budgetLimitsFromConfig } from "./budget.ts";
 import { capabilityJson } from "./capability-catalog.ts";
 import { classifyRequest, type RiskOverride, selectWorkflow } from "./classification.ts";
 import { assertComplexPlanBinding, complexClaimsDenial, complexPlanLimits } from "./complex-plan.ts";
 import type { ComplexPlan } from "./complex-types.ts";
-import type { RuntimeConfig } from "./config.ts";
+import { DEFAULT_ADVISORY_CHECKS, parseRuntimeConfig, type RuntimeConfig } from "./config.ts";
 import {
 	type AnalysisContext,
 	analysisContextDigest,
@@ -24,6 +25,7 @@ import {
 	type ExecutionMode,
 	proposeExecutionMode,
 } from "./execution-contract.ts";
+import { fingerprint } from "./fingerprint.ts";
 import { CompanyKernel } from "./kernel.ts";
 import { LspManager } from "./lsp/manager.ts";
 import { serializedLspPort } from "./lsp/serial.ts";
@@ -324,6 +326,20 @@ export class StandardWorkflow {
 				taskContractDigest: taskContractDigest(this.options.taskContract),
 				...(this.options.recipe ? { recipe: this.options.recipe } : {}),
 			});
+			// Root .ai/ edits no longer fail the clean start, so recheck the frozen configuration like the Host
+			// does (docs/operations/LOCAL_TEAM_PILOT.md): a changed config needs a new preview before any worker.
+			let currentConfig: string;
+			try {
+				currentConfig = fingerprint(
+					parseRuntimeConfig(readAnchoredSource(this.options.cwd, ".ai/config.yaml").text),
+				);
+			} catch {
+				currentConfig = "unavailable";
+			}
+			if (currentConfig !== fingerprint(this.options.config))
+				throw new Error(
+					"Dirty workspace: .ai/config.yaml differs from the confirmed configuration; preview and confirm again. No automatic cleanup was performed",
+				);
 			workspace = await GitWorkspace.open(
 				this.options.cwd,
 				agents.policy,
@@ -404,10 +420,12 @@ export class StandardWorkflow {
 				startFailureReason = "STALE_PREPARATION";
 				throw new Error("Symptom registration differs from the confirmed preview");
 			}
-			// Opt-in Developer feedback through the same frozen verifier; results never reach the Kernel.
+			// Default-on Developer feedback through the same frozen verifier; results never reach the Kernel.
 			// COMPLEX has none: an unaccounted advisory side effect would break the expected-image ledger.
 			const advisoryChecks =
-				this.options.config.verification.advisory?.mode === "developer" && !complexPlan ? verifier : undefined;
+				(this.options.config.verification.advisory_checks ?? DEFAULT_ADVISORY_CHECKS).enabled && !complexPlan
+					? verifier
+					: undefined;
 			const settledVerifier = verifier;
 			const settledWorkspace = workspace;
 			signal.throwIfAborted();

@@ -553,7 +553,7 @@ describe("pull request timeline", () => {
   it("calls a comment markdown and a commit headline plain text", () => {
     const events = buildPullRequestTimeline(TIMELINE_SOURCE);
     // A headline reading `fix: drop *legacy* path` is not asking for emphasis.
-    expect(events.map((event) => [event.title.startsWith("Commit"), event.markdown])).toEqual(
+    expect(events.map((event) => [event.title.startsWith("commit "), event.markdown])).toEqual(
       expect.arrayContaining([[true, false]]),
     );
     expect(events.find((event) => event.id === "c1")?.markdown).toBe(true);

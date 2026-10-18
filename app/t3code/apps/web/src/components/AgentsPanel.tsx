@@ -36,16 +36,16 @@ import { Button } from "~/components/ui/button";
  * user problem). Only settled states differentiate.
  */
 const STATUS_VISUALS: Record<RuntimeSubagent["status"], { dotClass: string; label: string }> = {
-  pending: { dotClass: "bg-info", label: "Working" },
-  running: { dotClass: "bg-info", label: "Working" },
-  waiting: { dotClass: "bg-info", label: "Working" },
+  pending: { dotClass: "bg-info", label: "작업 중" },
+  running: { dotClass: "bg-info", label: "작업 중" },
+  waiting: { dotClass: "bg-info", label: "작업 중" },
   // Idle reads as settled (muted, not sky): a resting Codex child looks done
   // unless resumed — live-test: sky idle dots read as stuck in-progress.
-  idle: { dotClass: "bg-muted-foreground/50", label: "Idle · resumable" },
-  completed: { dotClass: "bg-success", label: "Completed" },
-  failed: { dotClass: "bg-destructive", label: "Failed" },
-  cancelled: { dotClass: "bg-muted-foreground/60", label: "Stopped" },
-  interrupted: { dotClass: "bg-muted-foreground/60", label: "Stopped" },
+  idle: { dotClass: "bg-muted-foreground/50", label: "대기 · 재개 가능" },
+  completed: { dotClass: "bg-success", label: "완료" },
+  failed: { dotClass: "bg-destructive", label: "실패" },
+  cancelled: { dotClass: "bg-muted-foreground/60", label: "중지됨" },
+  interrupted: { dotClass: "bg-muted-foreground/60", label: "중지됨" },
 };
 
 function StatusDot({ status }: { status: RuntimeSubagent["status"] }) {
@@ -288,7 +288,7 @@ function WorkflowScriptView({
           size="icon-micro"
           variant="ghost-muted"
           onClick={onClose}
-          aria-label="Close script"
+          aria-label="스크립트 닫기"
           className="ml-auto"
         >
           <X aria-hidden className="size-3" />
@@ -424,7 +424,7 @@ function ExpandedWorkflowSection({
           size="icon-micro"
           variant="ghost-muted"
           onClick={onCollapse}
-          aria-label="Collapse workflow"
+          aria-label="워크플로 접기"
         >
           <ChevronDown aria-hidden className="size-3" />
         </Button>
@@ -534,7 +534,7 @@ export function AgentsPanel({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <Bot aria-hidden className="size-6 text-muted-foreground/60" />
-        <p className="text-sm font-medium">No agents yet</p>
+        <p className="text-sm font-medium">아직 에이전트가 없어요</p>
         <p className="max-w-56 text-xs text-muted-foreground">
           When this thread spawns subagents or runs a workflow, they show up here with live status,
           activity, and token usage.
@@ -558,7 +558,7 @@ export function AgentsPanel({
           {model.directAgents.length > 0 ? (
             <section>
               <div className="px-1.5 pt-1 text-[.65rem] font-medium uppercase tracking-wider text-muted-foreground">
-                Direct spawns
+                직접 실행
               </div>
               {model.directAgents.map((agent) => (
                 <AgentRow key={agent.id} agent={agent} />

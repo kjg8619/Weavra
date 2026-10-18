@@ -164,8 +164,8 @@ describe("RightPanelTabs preview favicon", () => {
 
 describe("surface shortcuts", () => {
   const actions = [
-    { shortcut: "B", available: true, label: "Browser" },
-    { shortcut: "D", available: false, label: "Diff" },
+    { shortcut: "B", available: true, label: "브라우저" },
+    { shortcut: "D", available: false, label: "변경 사항" },
   ] as const;
 
   it("matches available surface shortcuts case-insensitively", () => {
@@ -261,25 +261,25 @@ describe("tabMuteMenuItem", () => {
     // The server session id resolves before the preview manager finishes
     // createTab. Muting in that window fails with an error nobody surfaces.
     expect(tabMuteMenuItem({ overlay: null, canResolveRuntimeTabId: true })).toEqual({
-      label: "Mute tab",
+      label: "탭 소리 끄기",
       disabled: true,
     });
   });
 
   it("stays disabled when no runtime tab id can be resolved", () => {
     expect(tabMuteMenuItem({ overlay: overlay(false), canResolveRuntimeTabId: false })).toEqual({
-      label: "Mute tab",
+      label: "탭 소리 끄기",
       disabled: true,
     });
   });
 
   it("offers mute and unmute once the tab is addressable", () => {
     expect(tabMuteMenuItem({ overlay: overlay(false), canResolveRuntimeTabId: true })).toEqual({
-      label: "Mute tab",
+      label: "탭 소리 끄기",
       disabled: false,
     });
     expect(tabMuteMenuItem({ overlay: overlay(true), canResolveRuntimeTabId: true })).toEqual({
-      label: "Unmute tab",
+      label: "탭 소리 켜기",
       disabled: false,
     });
   });

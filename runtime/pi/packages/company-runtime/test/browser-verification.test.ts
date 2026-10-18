@@ -785,10 +785,24 @@ describe("C08 frozen identity and lifecycle regressions", () => {
 	it("rejects changed Host helper sources before capture", async () => {
 		const helper = browserFixture();
 		writeFileSync(join(helper.directory, "reader.ts"), "export const reader = 1;\n");
-		vi.spyOn(verifierTrust, "snapshotBrowserImplementation").mockImplementation(() => ({
+		const runtimeSources = {
 			root: helper.directory,
 			sources: verifierTrust.snapshotVerifierSources(helper.directory, ["reader.ts"]),
-		}));
+		};
+		const snapshotCheckTrust = verifierTrust.snapshotCheckTrust;
+		vi.spyOn(verifierTrust, "snapshotCheckTrust").mockImplementation((cwd, input) => {
+			const snapshot = snapshotCheckTrust(cwd, input);
+			return {
+				...snapshot,
+				runtimeSources,
+				registrationDigest: verifierTrust.registrationDigestOf({
+					...input,
+					executable: snapshot.executable,
+					sources: snapshot.sources,
+					runtimeSources,
+				}),
+			};
+		});
 		const fixture = await registeredFixture();
 		writeFileSync(join(helper.directory, "reader.ts"), "export const reader = 2;\n");
 		expect((await fixture.verifier.verify(fixture.request)).checks[0]).toMatchObject({

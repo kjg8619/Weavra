@@ -104,7 +104,7 @@ export function resolveLinkPullRequestInput(input: {
   const number = Number(parsed);
   if (!Number.isSafeInteger(number) || number < 1) return null;
   if (input.project === null) {
-    return { error: "Paste a full URL to link a pull request from another repository." };
+    return { error: "다른 저장소의 PR을 연결하려면 전체 URL을 붙여 넣어 주세요." };
   }
   const webUrl = input.project.webUrl(number);
   const webReference = webUrl === null ? null : parseChangeRequestUrl(webUrl);
@@ -180,7 +180,7 @@ function LinkPullRequestDialog({
     try {
       await linking.changeLink(threadRef, resolved.link.url, true);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Could not link the pull request.");
+      setSubmitError(error instanceof Error ? error.message : "PR을 연결하지 못했어요.");
       return;
     } finally {
       setPending(false);
@@ -202,16 +202,16 @@ function LinkPullRequestDialog({
     <Dialog open={open} onOpenChange={(next) => (pending ? undefined : onOpenChange(next))}>
       <DialogPopup className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Link pull request</DialogTitle>
+          <DialogTitle>PR 연결</DialogTitle>
           <DialogDescription>
-            Attach a pull request to this thread. A full URL can point at any repository on a host
-            this environment has a project for.
+            이 대화에 PR을 연결해요. 전체 URL은 이 환경에 프로젝트가 있는 host의 어느 저장소든
+            가리킬 수 있어요.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel className="space-y-3">
           <Input
             ref={inputRef}
-            placeholder="Pull request URL or #42"
+            placeholder="PR URL 또는 #42"
             value={reference}
             onChange={(event) => {
               setDirty(true);
@@ -240,7 +240,7 @@ function LinkPullRequestDialog({
             onClick={() => onOpenChange(false)}
             disabled={pending}
           >
-            Cancel
+            취소
           </Button>
           <Button
             type="button"

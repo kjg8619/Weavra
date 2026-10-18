@@ -11,6 +11,14 @@ export { snoozeWakeLabel, type SnoozePreset };
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
+const PRESET_LABELS: Readonly<Record<string, string>> = {
+  hour: "1시간 뒤",
+  "three-hours": "3시간 뒤",
+  evening: "오늘 저녁",
+  tomorrow: "내일",
+  "next-week": "다음 주",
+};
+
 function timeOfDayLabel(date: Date, timestampFormat: TimestampFormat): string {
   return formatShortTimestamp(date.toISOString(), timestampFormat);
 }
@@ -21,10 +29,12 @@ export function resolveSnoozePresets(
 ): ReadonlyArray<SnoozePreset> {
   return resolveSharedSnoozePresets(now).map((preset) => {
     const wake = parseTimestampDate(preset.snoozedUntil);
-    if (wake === null) return preset;
+    const label = PRESET_LABELS[preset.id] ?? preset.label;
+    if (wake === null) return { ...preset, label };
     const time = timeOfDayLabel(wake, timestampFormat);
     return {
       ...preset,
+      label,
       whenLabel:
         preset.id === "next-week"
           ? `${wake.toLocaleDateString(undefined, { weekday: "short" })} ${time}`
@@ -49,7 +59,7 @@ export function snoozeWakeDescription(
   startOfToday.setHours(0, 0, 0, 0);
   const dayDelta = Math.floor((wake.getTime() - startOfToday.getTime()) / DAY_MS);
   if (dayDelta === 0) return time;
-  if (dayDelta === 1) return `tomorrow ${time}`;
+  if (dayDelta === 1) return `내일 ${time}`;
   const weekday = wake.toLocaleDateString(undefined, { weekday: "short" });
   if (dayDelta < 7) return `${weekday} ${time}`;
   const date = wake.toLocaleDateString(undefined, { month: "short", day: "numeric" });

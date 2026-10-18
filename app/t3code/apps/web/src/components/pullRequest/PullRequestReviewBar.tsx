@@ -28,20 +28,20 @@ const VERDICTS: ReadonlyArray<{
 }> = [
   {
     value: "comment",
-    label: "Comment",
-    sent: "Review submitted",
+    label: "댓글",
+    sent: "리뷰를 제출했어요",
     icon: <MessageSquareIcon className="size-3" />,
   },
   {
     value: "approve",
-    label: "Approve",
-    sent: "Pull request approved",
+    label: "승인",
+    sent: "PR을 승인했어요",
     icon: <CheckIcon className="size-3" />,
   },
   {
     value: "request-changes",
-    label: "Request changes",
-    sent: "Changes requested",
+    label: "변경 요청",
+    sent: "변경 요청됨",
     icon: <XCircleIcon className="size-3" />,
   },
 ];
@@ -94,7 +94,7 @@ export function PullRequestReviewBar({
     setPending(false);
     if (result._tag === "Failure") {
       // The draft is kept: whatever went wrong, retyping the review is not the answer.
-      toastManager.add({ type: "error", title: "The review could not be submitted" });
+      toastManager.add({ type: "error", title: "리뷰를 제출하지 못했어요" });
       return;
     }
     // More remarks may have been added while the host was accepting this snapshot. Leave those,
@@ -119,12 +119,12 @@ export function PullRequestReviewBar({
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span>
           {comments.length === 0
-            ? "No line comments yet"
+            ? "아직 줄 댓글이 없어요"
             : `${comments.length} ${comments.length === 1 ? "comment" : "comments"} pending`}
         </span>
         {comments.length > 0 ? (
           <Button size="xs" variant="ghost" disabled={pending} onClick={() => clear(reviewKey)}>
-            Discard
+            버리기
           </Button>
         ) : null}
       </div>
@@ -137,7 +137,7 @@ export function PullRequestReviewBar({
             ? "Summarize your review (required to request changes)"
             : "Summarize your review (optional)"
         }
-        aria-label="Review summary"
+        aria-label="리뷰 요약"
         onChange={(event) => setSummary(reviewKey, event.target.value)}
       />
       <div className="mt-2 flex flex-wrap justify-end gap-2">

@@ -59,7 +59,7 @@ export interface HostGraphSummary {
 	runId: string;
 	stateRevision: number;
 	status: Run["status"];
-	nodes: Array<Pick<GraphNode, "id" | "kind" | "status" | "stepId" | "attempt" | "role" | "parentId">>;
+	nodes: Array<Pick<GraphNode, "id" | "kind" | "status" | "stepId" | "attempt" | "role" | "parentId" | "wave">>;
 	edges: GraphEdge[];
 }
 export interface HostEvidenceSummary {

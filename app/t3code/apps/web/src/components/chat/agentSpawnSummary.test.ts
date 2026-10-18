@@ -9,14 +9,14 @@ describe("deriveAgentSpawnSummary", () => {
   it("counts a native batch without claiming the number of children", () => {
     expect(deriveAgentSpawnSummary({ agents: [batch("running")], agentCount: 1 })).toEqual({
       live: true,
-      lead: "Launched 1 subagent batch",
-      status: "1 working",
+      lead: "하위 에이전트 배치 1개 실행",
+      status: "1개 작업 중",
       tone: "working",
     });
     expect(deriveAgentSpawnSummary({ agents: [batch("idle")], agentCount: 1 })).toEqual({
       live: false,
-      lead: "Launched 1 subagent batch",
-      status: "1 idle",
+      lead: "하위 에이전트 배치 1개 실행",
+      status: "1개 대기",
       tone: "inactive",
     });
   });
@@ -27,15 +27,15 @@ describe("deriveAgentSpawnSummary", () => {
         agents: [agent("running"), batch("running"), batch("idle")],
         agentCount: 3,
       }).lead,
-    ).toBe("Launched 1 subagent and 2 batches");
+    ).toBe("하위 에이전트 1개, 배치 2개 실행");
   });
 
   it.each([
-    ["idle", "1 idle", "inactive"],
-    ["cancelled", "1 stopped", "inactive"],
-    ["interrupted", "1 stopped", "inactive"],
-    ["failed", "1 failed", "failed"],
-    ["completed", "✓ completed", "completed"],
+    ["idle", "1개 대기", "inactive"],
+    ["cancelled", "1개 중지됨", "inactive"],
+    ["interrupted", "1개 중지됨", "inactive"],
+    ["failed", "1개 실패", "failed"],
+    ["completed", "✓ 완료", "completed"],
   ] as const)("reports %s accurately alongside a completed agent", (state, status, tone) => {
     expect(
       deriveAgentSpawnSummary({ agents: [agent("completed"), agent(state)], agentCount: 2 }),
@@ -44,7 +44,7 @@ describe("deriveAgentSpawnSummary", () => {
 
   it("does not claim completion when the roster is missing a member", () => {
     expect(deriveAgentSpawnSummary({ agents: [agent("completed")], agentCount: 2 })).toMatchObject({
-      status: "Status unavailable",
+      status: "상태를 확인할 수 없어요",
       tone: "inactive",
     });
   });
@@ -56,12 +56,12 @@ describe("deriveAgentSpawnSummary", () => {
         agentCount: 1,
         coordinatorStatus: "running",
       }),
-    ).toMatchObject({ live: true, status: "working", tone: "working" });
+    ).toMatchObject({ live: true, status: "작업 중", tone: "working" });
   });
 
   it.each([
-    ["failed", "Workflow failed", "failed"],
-    ["cancelled", "Workflow stopped", "inactive"],
+    ["failed", "워크플로 실패", "failed"],
+    ["cancelled", "워크플로 중지됨", "inactive"],
   ] as const)(
     "preserves a %s workflow outcome when its children completed",
     (coordinatorStatus, status, tone) => {

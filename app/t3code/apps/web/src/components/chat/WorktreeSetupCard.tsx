@@ -104,15 +104,15 @@ function ShimmerOverlay({ children }: { children: ReactNode }) {
 function headerLabel(snapshot: WorktreeSetupSnapshot): string {
   switch (snapshot.phase) {
     case "running":
-      return "Setting up worktree…";
+      return "worktree를 설정하는 중…";
     case "done":
       return snapshot.stages.some((stage) => stage.status === "failed")
         ? "Worktree ready, setup script failed"
-        : "Worktree ready";
+        : "worktree 준비됨";
     case "failed":
-      return "Worktree setup failed";
+      return "worktree 설정 실패";
     case "cancelled":
-      return "Worktree setup cancelled";
+      return "worktree 설정 취소됨";
   }
 }
 
@@ -259,25 +259,25 @@ function SetupDetails({ snapshot }: { snapshot: WorktreeSetupSnapshot }) {
     <dl className="mt-1 mb-1.5 ml-8 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
       {snapshot.branch ? (
         <>
-          <dt className="text-foreground/80">Branch</dt>
+          <dt className="text-foreground/80">branch</dt>
           <dd className="truncate font-mono">{snapshot.branch}</dd>
         </>
       ) : null}
       {snapshot.baseRef ? (
         <>
-          <dt className="text-foreground/80">Base</dt>
+          <dt className="text-foreground/80">base</dt>
           <dd className="truncate font-mono">{snapshot.baseRef}</dd>
         </>
       ) : null}
       {snapshot.worktreePath ? (
         <>
-          <dt className="text-foreground/80">Path</dt>
+          <dt className="text-foreground/80">경로</dt>
           <dd className="truncate font-mono">{snapshot.worktreePath}</dd>
         </>
       ) : null}
       {snapshot.setupScript ? (
         <>
-          <dt className="text-foreground/80">Setup</dt>
+          <dt className="text-foreground/80">설정</dt>
           <dd className="truncate font-mono">{snapshot.setupScript.command}</dd>
         </>
       ) : null}
@@ -352,7 +352,7 @@ export function WorktreeSetupCard({
   const showTerminal = onOpenTerminal && setupStage && setupStage.status !== "pending";
   const collapsed = embedded && !running;
   // While running, the timeline's working row above the card carries the
-  // "Setting up worktree…" label (and keeps that slot when the agent takes
+  // "worktree를 설정하는 중…" label (and keeps that slot when the agent takes
   // over). The card only brings its own header for a settled outcome that
   // has no working row to sit under.
   const showHeader = !embedded && !running;
@@ -364,7 +364,7 @@ export function WorktreeSetupCard({
     setupStage !== undefined && (setupStage.status === "running" || setupStage.status === "failed");
 
   return (
-    <section aria-label="Worktree setup" data-worktree-setup-phase={snapshot.phase}>
+    <section aria-label="worktree 설정" data-worktree-setup-phase={snapshot.phase}>
       {showHeader ? <SetupHeaderRow snapshot={snapshot} totalElapsed={totalElapsed} /> : null}
       {collapsed ? (
         <CollapsedSummaryRow snapshot={snapshot} totalElapsed={totalElapsed} />
@@ -402,24 +402,24 @@ export function WorktreeSetupCard({
           onClick={() => setDetailsOpen((open) => !open)}
         >
           {detailsOpen ? <ChevronDownIcon aria-hidden /> : <ChevronRightIcon aria-hidden />}
-          Details
+          자세히
         </Button>
         {showTerminal ? (
           <Button type="button" size="xs" variant="ghost-muted" onClick={onOpenTerminal}>
             <TerminalIcon aria-hidden />
-            Open terminal
+            터미널 열기
           </Button>
         ) : null}
         {onWorkLocally ? (
           <Button type="button" size="xs" variant="ghost-muted" onClick={onWorkLocally}>
             <LaptopIcon aria-hidden />
-            Work locally
+            로컬에서 작업
           </Button>
         ) : null}
         {onCancel && running ? (
           <Button type="button" size="xs" variant="ghost-muted" onClick={onCancel}>
             <XIcon aria-hidden />
-            Cancel
+            취소
           </Button>
         ) : null}
       </div>

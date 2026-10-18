@@ -128,7 +128,7 @@ describe("formatContextWindowCompactionMessage", () => {
 
   it("uses neutral copy when the model is unavailable", () => {
     expect(formatContextWindowCompactionMessage(null)).toBe(
-      "Context compacts automatically when needed.",
+      "필요하면 컨텍스트를 자동으로 압축해요.",
     );
   });
 

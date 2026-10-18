@@ -37,6 +37,8 @@ import { relativeTime } from "../../lib/time";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 import { useThreadPr } from "../../state/use-thread-pr";
+import { currentThreadOutboxPresentation } from "../../state/thread-outbox-presentation";
+import { RetainedThreadLabel } from "./RetainedWorkNotice";
 import { ThreadSwipeable } from "../home/thread-swipe-actions";
 import { buildThreadTitleRegenerationMenuItems } from "./thread-title-regeneration-menu";
 import {
@@ -283,6 +285,8 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
   const { pendingTask, onSelectPendingTask, onDeletePendingTask } = props;
   const sidebarPane = props.pane === "sidebar";
   const isDraft = pendingTask.kind === "draft";
+  const presentation =
+    pendingTask.kind === "pending" ? currentThreadOutboxPresentation(pendingTask.message) : null;
   const projectTitle = props.projectTitle ?? props.project?.title ?? pendingTask.projectTitle ?? "";
   const branch = pendingTask.branch;
 
@@ -331,7 +335,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
               sidebarPane && "text-drawer-foreground-muted",
             )}
           >
-            Sends on reconnect
+            {presentation?.label}
           </Text>
         )}
       </View>
@@ -396,7 +400,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
   return (
     <>
       {props.showPendingDivider ? (
-        <ThreadListV2SectionDivider label="Unsent" pane={props.pane} />
+        <ThreadListV2SectionDivider label="Local work" pane={props.pane} />
       ) : null}
       <ControlPillMenu
         actions={isDraft ? DRAFT_TASK_MENU_ACTIONS : PENDING_TASK_MENU_ACTIONS}
@@ -407,7 +411,9 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
           accessibilityHint={
             isDraft
               ? "Opens the draft in the new task composer"
-              : "Sends when the environment reconnects. Opens the task for editing"
+              : presentation?.kind === "ready"
+                ? "Sends when the environment reconnects. Opens the task for editing"
+                : "Opens retained work without sending or editing"
           }
           accessibilityLabel={pendingTask.title}
           accessibilityRole="button"
@@ -879,6 +885,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       >
         {thread.title}
       </Text>
+      <RetainedThreadLabel environmentId={thread.environmentId} threadId={thread.id} />
       {props.searchMatch ? (
         <View className="mt-1">
           <ThreadSearchMatchExcerpt
@@ -1083,6 +1090,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
             >
               {thread.title}
             </Text>
+            <RetainedThreadLabel environmentId={thread.environmentId} threadId={thread.id} />
             {props.searchMatch ? (
               <ThreadSearchMatchExcerpt
                 sidebar={sidebarPane}

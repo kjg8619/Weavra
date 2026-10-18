@@ -150,6 +150,9 @@ async function loadArchive(project: string, entry: ArchivedRun): Promise<{ run: 
 		[directory, join(directory, "runs")],
 		join(directory, "runs", `${entry.runId}.json`),
 	).catch(() => undefined);
+	return verifiedArchive(entry, text);
+}
+function verifiedArchive(entry: ArchivedRun, text: string | undefined): { run: Run; actions: ActionRecord[] } {
 	if (text === undefined || archiveDigest(text) !== entry.digest) throw new StateStoreError("archived run integrity");
 	const archive = validateContract(RunArchiveSchema, JSON.parse(text));
 	if (
@@ -708,6 +711,19 @@ export class FileStateStore implements StateStore, ActionAudit {
 			assertState(JSON.parse(readAnchoredSource(projectPath, ".ai/state.json", OBSERVATION_MAX_BYTES).text))
 				.projectFacts ?? []
 		);
+	}
+	/** Synchronous final-use lookup of an inline or digest-checked archived Run; no lock, recovery or repair. */
+	static readRun(projectPath: string, runId: string): Run | undefined {
+		const state = assertState(
+			JSON.parse(readAnchoredSource(projectPath, ".ai/state.json", OBSERVATION_MAX_BYTES).text),
+		);
+		const inline = state.runs.find((run) => run.runId === runId);
+		if (inline) return inline;
+		const entry = state.archivedRuns?.find((item) => item.runId === runId);
+		return entry
+			? verifiedArchive(entry, readAnchoredSource(projectPath, `.ai/runs/${entry.runId}.json`, STATE_MAX_BYTES).text)
+					.run
+			: undefined;
 	}
 	/** Reads a point-in-time atomic source snapshot without acquiring/stealing a writer or repairing projections. */
 	static async readSnapshot(

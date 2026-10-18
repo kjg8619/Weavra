@@ -488,10 +488,10 @@ function ProjectDetail({
             workspaceRoot={group.memberProjects[0]!.workspaceRoot}
           />
         ) : (
-          <SettingsSection title="Weavra · Read-only">
+          <SettingsSection title="Weavra · 읽기 전용">
             <p className="text-sm text-muted-foreground">
-              Select one machine and checkout in the settings scope to observe its Weavra Run. Runs
-              from different checkouts are never combined.
+              설정 범위에서 기기와 checkout을 하나 선택하면 Weavra Run을 조회할 수 있어요. 서로 다른
+              checkout의 Run은 합치지 않아요.
             </p>
           </SettingsSection>
         )}

@@ -114,6 +114,8 @@ function review(verdict: Review["result"] = "PASS") {
 	};
 }
 function create(taskGoal = goal, wrongBinding = false) {
+	// Tests adjust config in memory; the run's frozen config must match .ai/config.yaml (start recheck).
+	writeFileSync(join(cwd, ".ai/config.yaml"), JSON.stringify(config));
 	workflow = new StandardWorkflow({
 		executionMode: "EDIT",
 		cwd,
@@ -473,10 +475,13 @@ describe("S5B STANDARD/R2 with actual file Policy/checks and independent faux re
 				model.id === "review" ? undefined : auth(model, options),
 			);
 		}
-		const report = await create().execute();
+		const pending = create();
+		// The fixture's own .ai/config.yaml edit (model mode) is the baseline; the run must change nothing.
+		const before = git("diff");
+		const report = await pending.execute();
 		expect(report.run).toBeUndefined();
 		expect(harness.faux.state.callCount).toBe(0);
-		expect(git("diff")).toBe("");
+		expect(git("diff")).toBe(before);
 		expect(existsSync(join(cwd, ".ai/writer.lock"))).toBe(false);
 	});
 	it.each(["natural-language", "missing-reference", "reused-session", "provider-failure", "stale-review"])(

@@ -30,6 +30,8 @@ import { buildThreadTitleRegenerationMenuItems } from "./thread-title-regenerati
 import { QueuedMessageIcon } from "./queued-message-icon";
 import { resolveThreadStatus } from "./threadPresentation";
 import { ThreadSearchMatchExcerpt } from "./thread-search-match";
+import { currentThreadOutboxPresentation } from "../../state/thread-outbox-presentation";
+import { RetainedThreadLabel } from "./RetainedWorkNotice";
 
 /**
  * Shared presentation for the thread lists: the compact (phone) Home list and
@@ -298,14 +300,14 @@ export const PendingTaskListRow = memo(function PendingTaskListRow(props: {
 
   const { pendingTask, onSelectPendingTask, onDeletePendingTask } = props;
   const isDraft = pendingTask.kind === "draft";
+  const presentation =
+    pendingTask.kind === "pending" ? currentThreadOutboxPresentation(pendingTask.message) : null;
   const timestamp = isDraft ? null : relativeTime(pendingTask.createdAt);
   // The pill only has room for one word, so what happens next goes in the
   // subtitle: a queued task sends itself, a draft waits for the user.
-  const subtitleParts = [
-    isDraft ? null : "Sends on reconnect",
-    props.environmentLabel,
-    pendingTask.branch,
-  ].filter((part): part is string => Boolean(part));
+  const subtitleParts = [presentation?.label, props.environmentLabel, pendingTask.branch].filter(
+    (part): part is string => Boolean(part),
+  );
 
   const handleMenuAction = useCallback(
     ({ nativeEvent }: { readonly nativeEvent: { readonly event: string } }) => {
@@ -326,7 +328,11 @@ export const PendingTaskListRow = memo(function PendingTaskListRow(props: {
           !compact && "text-drawer-foreground-muted",
         )}
       >
-        Pending
+        {presentation?.kind === "retained"
+          ? "Retained"
+          : presentation?.kind === "saving"
+            ? "Saving"
+            : "Pending"}
       </Text>
     </View>
   );
@@ -362,7 +368,9 @@ export const PendingTaskListRow = memo(function PendingTaskListRow(props: {
 
   const accessibilityHint = isDraft
     ? "Opens the draft in the new task composer"
-    : "Sends when the environment reconnects. Opens the task for editing";
+    : presentation?.kind === "ready"
+      ? "Sends when the environment reconnects. Opens the task for editing"
+      : "Opens retained work without sending or editing";
 
   const rowContent = compact ? (
     <RowPressable
@@ -723,6 +731,7 @@ export const ThreadListRow = memo(function ThreadListRow(props: {
                 />
               </View>
             </View>
+            <RetainedThreadLabel environmentId={thread.environmentId} threadId={thread.id} />
             {props.searchMatch ? (
               <ThreadSearchMatchExcerpt
                 compact
@@ -793,6 +802,7 @@ export const ThreadListRow = memo(function ThreadListRow(props: {
               </Text>
             </View>
           </View>
+          <RetainedThreadLabel environmentId={thread.environmentId} threadId={thread.id} />
           {props.searchMatch ? (
             <ThreadSearchMatchExcerpt
               sidebar={!compact}

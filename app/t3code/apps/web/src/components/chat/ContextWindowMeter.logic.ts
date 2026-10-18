@@ -106,7 +106,7 @@ export function formatContextWindowCompactionMessage(
   }
   return modelDisplayName
     ? `Context for ${modelDisplayName} compacts automatically when needed.`
-    : "Context compacts automatically when needed.";
+    : "필요하면 컨텍스트를 자동으로 압축해요.";
 }
 
 /**

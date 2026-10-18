@@ -100,11 +100,11 @@ describe("ComposerPrimaryActions", () => {
   });
 
   it("offers Stop generation while a running turn is waiting for user input", () => {
-    expect(renderPendingActions(true)).toContain('aria-label="Stop generation"');
+    expect(renderPendingActions(true)).toContain('aria-label="생성 중지"');
   });
 
   it("does not offer Stop generation for a pending request without a running turn", () => {
-    expect(renderPendingActions(false)).not.toContain('aria-label="Stop generation"');
+    expect(renderPendingActions(false)).not.toContain('aria-label="생성 중지"');
   });
 
   it("renders stage artwork inside the send button when artwork identification is active", () => {
@@ -127,15 +127,15 @@ describe("ComposerPrimaryActions", () => {
   it("renders a queue action alongside stop while running with a sendable draft", () => {
     const markup = renderRunningActions(true);
 
-    expect(markup).toContain('aria-label="Stop generation"');
-    expect(markup).toContain('aria-label="Queue message"');
+    expect(markup).toContain('aria-label="생성 중지"');
+    expect(markup).toContain('aria-label="대기열에 메시지 추가"');
     expect(markup).toContain('type="submit"');
   });
 
   it("keeps stop as the only action while running with an empty composer", () => {
     const markup = renderRunningActions(false);
 
-    expect(markup).toContain('aria-label="Stop generation"');
-    expect(markup).not.toContain('aria-label="Queue message"');
+    expect(markup).toContain('aria-label="생성 중지"');
+    expect(markup).not.toContain('aria-label="대기열에 메시지 추가"');
   });
 });

@@ -35,6 +35,8 @@ import {
   ThreadPullRequestSnapshot,
   ThreadPullRequestStack,
   type ThreadPullRequestLink,
+  decodeWorkspaceTurnStartRefusalPayload,
+  makeWorkspaceTurnStartRefusalIdentity,
 } from "@t3tools/contracts";
 import { legacyLinkedPullRequestOf } from "@t3tools/shared/threadPullRequests";
 import * as Arr from "effect/Array";
@@ -219,6 +221,7 @@ const ThreadActivityKindsLookupInput = Schema.Struct({
   activityKinds: Schema.Array(Schema.String),
 });
 const ThreadActivityIdsLookupInput = Schema.Struct({
+  threadId: ThreadId,
   activityIds: Schema.Array(ProjectionThreadActivity.fields.activityId),
 });
 // Windowed reads order turns by the stable keyset (anchor, turn key), where
@@ -1543,7 +1546,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
   const listThreadActivityRowsByIds = SqlSchema.findAll({
     Request: ThreadActivityIdsLookupInput,
     Result: ProjectionThreadActivityDbRowSchema,
-    execute: ({ activityIds }) =>
+    execute: ({ threadId, activityIds }) =>
       sql`
         SELECT
           activity_id AS "activityId",
@@ -1556,9 +1559,8 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           sequence,
           created_at AS "createdAt"
         FROM projection_thread_activities
-        -- The selectors already scoped these globally unique ids to the
-        -- thread inside this transaction. Keep this as a primary-key lookup.
-        WHERE ${sql.in("activity_id", activityIds)}
+        WHERE thread_id = ${threadId}
+          AND ${sql.in("activity_id", activityIds)}
       `,
   });
 
@@ -3391,7 +3393,10 @@ pending_approval_requests AS (
         offset,
         offset + THREAD_DETAIL_ACTIVITY_PAYLOAD_BATCH_SIZE,
       );
-      const batchRows = yield* listThreadActivityRowsByIds({ activityIds: batchIds }).pipe(
+      const batchRows = yield* listThreadActivityRowsByIds({
+        threadId,
+        activityIds: batchIds,
+      }).pipe(
         Effect.mapError(
           toPersistenceSqlOrDecodeError(
             "ProjectionSnapshotQuery.getThreadDetailById:listActivityPayloadBatch:query",
@@ -3545,6 +3550,62 @@ pending_approval_requests AS (
         return Option.none<OrchestrationThread>();
       }
 
+      const retainedActivities = new Map(activities.map((activity) => [activity.id, activity]));
+      if (activityRead.mode === "client" || activityRead.query?.activityKinds === undefined) {
+        // Refusal timestamps can fall outside the requested message window.
+        // Resolve only canonical ids for this page's user messages, rather
+        // than fetching the thread's failure history.
+        const userMessageIds = new Set(
+          messageRows.filter((row) => row.role === "user").map((row) => row.messageId),
+        );
+        const refusalIds = [...userMessageIds]
+          .map((messageId) => makeWorkspaceTurnStartRefusalIdentity(threadId, messageId).activityId)
+          .filter((activityId) => !retainedActivities.has(activityId));
+        for (
+          let offset = 0;
+          offset < refusalIds.length;
+          offset += THREAD_DETAIL_ACTIVITY_PAYLOAD_BATCH_SIZE
+        ) {
+          const rows = yield* listThreadActivityRowsByIds({
+            threadId,
+            activityIds: refusalIds.slice(
+              offset,
+              offset + THREAD_DETAIL_ACTIVITY_PAYLOAD_BATCH_SIZE,
+            ),
+          }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadDetailById:listMessageRefusals:query",
+                "ProjectionSnapshotQuery.getThreadDetailById:listMessageRefusals:decodeRows",
+              ),
+            ),
+          );
+          for (const row of rows) {
+            if (
+              row.kind !== "provider.turn.start.failed" ||
+              row.tone !== "error" ||
+              row.turnId !== null
+            ) {
+              continue;
+            }
+            const refusal = decodeWorkspaceTurnStartRefusalPayload(row.payload);
+            if (
+              Option.isNone(refusal) ||
+              !userMessageIds.has(refusal.value.requestId) ||
+              row.activityId !==
+                makeWorkspaceTurnStartRefusalIdentity(threadId, refusal.value.requestId).activityId
+            ) {
+              continue;
+            }
+            const activity = mapThreadActivityRow(row);
+            retainedActivities.set(
+              activity.id,
+              activityRead.mode === "client" ? projectActivityPayload(activity) : activity,
+            );
+          }
+        }
+      }
+
       const thread = {
         id: threadRow.value.threadId,
         projectId: threadRow.value.projectId,
@@ -3597,7 +3658,12 @@ pending_approval_requests AS (
           return message;
         }),
         proposedPlans: proposedPlanRows.map(mapProposedPlanRow),
-        activities,
+        activities: [...retainedActivities.values()].toSorted(
+          (left, right) =>
+            (left.sequence ?? -1) - (right.sequence ?? -1) ||
+            left.createdAt.localeCompare(right.createdAt) ||
+            left.id.localeCompare(right.id),
+        ),
         checkpoints: checkpointRows.map((row) => ({
           turnId: row.turnId,
           checkpointTurnCount: row.checkpointTurnCount,

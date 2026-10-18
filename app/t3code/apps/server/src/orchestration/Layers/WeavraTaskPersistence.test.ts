@@ -167,6 +167,52 @@ it.effect("persists one task and exact receipts across SQLite close and reload",
   }).pipe(Effect.provide(NodeServices.layer)),
 );
 
+it.effect("re-binds only an unprepared analysis task to a new HEAD of the same checkout", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* fs.makeTempDirectoryScoped({ prefix: "weavra-task-rebind-" });
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        yield* seed;
+        const engine = yield* OrchestrationEngineService;
+        const query = yield* ProjectionSnapshotQuery;
+        yield* engine.dispatch(create);
+        const step = (commandId: string, task: WeavraTask): WeavraTaskSetCommand => ({
+          ...create,
+          commandId: CommandId.make(commandId),
+          expectedRevision: task.revision - 1,
+          expectedOwnershipGeneration: task.ownership.generation - 1,
+          task,
+        });
+        const advanced = (fields: Partial<WeavraTask>) =>
+          decodeTask({
+            ...initialTask,
+            revision: 2,
+            ownership: { generation: 2, state: "analysis" },
+            ...fields,
+          });
+        const baseline = {
+          ...initialTask.checkout,
+          headCommit: "b".repeat(40),
+          workspaceDigest: `sha256:${"b".repeat(64)}`,
+        };
+        // Another checkout root or a non-analysis phase is still refused.
+        for (const task of [
+          advanced({ checkout: { ...baseline, canonicalCwd: "/elsewhere" } }),
+          advanced({ checkout: baseline, phase: "preparing" }),
+        ]) {
+          const result = yield* Effect.result(engine.dispatch(step(`refused-${task.phase}`, task)));
+          assert.equal(result._tag, "Failure");
+        }
+        const rebound = advanced({ checkout: baseline });
+        yield* engine.dispatch(step("baseline-rebind", rebound));
+        assert.deepStrictEqual((yield* query.getSnapshot()).weavraTasks, [rebound]);
+      }).pipe(Effect.provide(systemLayer(path.join(directory, "state.sqlite")))),
+    );
+  }).pipe(Effect.provide(NodeServices.layer)),
+);
+
 it.effect("rejects same-command binding conflicts and stale ownership without false success", () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

@@ -37,7 +37,7 @@ export const MessageCopyButton = memo(function MessageCopyButton({
       <TooltipTrigger
         render={
           <Button
-            aria-label="Copy link"
+            aria-label="링크 복사"
             disabled={isCopied}
             onClick={() => copyToClipboard(text)}
             ref={ref}
@@ -51,7 +51,7 @@ export const MessageCopyButton = memo(function MessageCopyButton({
         {isCopied ? <CheckIcon className="size-3 text-primary" /> : <CopyIcon className="size-3" />}
       </TooltipTrigger>
       <TooltipPopup>
-        <p>Copy to clipboard</p>
+        <p>클립보드에 복사</p>
       </TooltipPopup>
     </Tooltip>
   );

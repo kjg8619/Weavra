@@ -77,7 +77,7 @@ describe("ProviderStatusBanner", () => {
     );
 
     expect(markup).toContain('role="alert"');
-    expect(markup).toContain('aria-label="Dismiss Codex provider warning"');
+    expect(markup).toContain('aria-label="Codex 공급자 경고 닫기"');
   });
 
   it("labels error dismiss controls with the correct severity", () => {
@@ -88,7 +88,7 @@ describe("ProviderStatusBanner", () => {
       />,
     );
 
-    expect(markup).toContain('aria-label="Dismiss Codex provider error"');
+    expect(markup).toContain('aria-label="Codex 공급자 오류 닫기"');
   });
 });
 
@@ -115,7 +115,7 @@ describe("getProviderStatusMessage", () => {
         auth: { status: "unauthenticated" },
         message: "",
       }),
-    ).toBe("Open provider setup to sign in with Google.");
+    ).toBe("공급자 설정을 열어 Google로 로그인해 주세요.");
   });
 
   it("requires installation on the environment before sign-in", () => {
@@ -140,6 +140,6 @@ describe("getProviderStatusMessage", () => {
         auth: { status: "unauthenticated" },
         message: "",
       }),
-    ).toBe("Sign in via the CLI to authenticate again.");
+    ).toBe("CLI로 다시 로그인해 주세요.");
   });
 });

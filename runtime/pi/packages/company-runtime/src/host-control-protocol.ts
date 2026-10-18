@@ -25,6 +25,7 @@ import {
 	TaskRunMetadataSchema,
 } from "./contracts.ts";
 import type { HostBridgeIdentity, HostSnapshotSummary } from "./host-bridge-protocol.ts";
+import type { MemoryCandidate } from "./memory-candidates.ts";
 import type { ModelRoute } from "./model-routing.ts";
 import type { ProjectFactsProjection } from "./project-fact-types.ts";
 
@@ -67,7 +68,19 @@ export const HOST_TASK_RECOVERY_COMMANDS = ["workflow.recover"] as const;
 export const HOST_EVIDENCE_COMMANDS = ["workflow.evidence"] as const;
 /** Advertised only by checkoutIdentity; older strict command tuples remain byte-for-byte unchanged. */
 export const HOST_CHECKOUT_COMMANDS = ["workflow.checkout"] as const;
+/** Read-only, advertised only by factCandidates; older strict command tuples remain byte-for-byte unchanged. */
+export const HOST_FACT_CANDIDATE_COMMANDS = ["facts.candidates"] as const;
 export const HOST_EVIDENCE_PAGE_RECORD_LIMIT = 50;
+/** Shared budget for one FAIL check's display-only stderr+stdout tail. */
+export const HOST_EVIDENCE_OUTPUT_TAIL_LINES = 20;
+export const HOST_EVIDENCE_OUTPUT_TAIL_BYTES = 2048;
+export const HOST_EVIDENCE_REVIEW_SUMMARY_CHARS = 500;
+/**
+ * Display-only Run diff (`run-diff` evidence): one file's patch, JSON-encoded, and all patches together. A page is a
+ * normal evidence response, so it never exceeds HOST_CONTROL_MAX_RESPONSE_BYTES (64 KiB).
+ */
+export const HOST_RUN_DIFF_FILE_MAX_BYTES = 32768;
+export const HOST_RUN_DIFF_TOTAL_MAX_BYTES = 262144;
 const strict = { additionalProperties: false } as const;
 const identifier = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" });
 const counter = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
@@ -99,9 +112,35 @@ export const HostTaskReceiptRequestSchema = Type.Object(
 	strict,
 );
 export type HostTaskReceiptRequest = Static<typeof HostTaskReceiptRequestSchema>;
-export const HostTaskReceiptDataSchema = Type.Object(
-	{ kind: Type.Literal("task-receipt"), receipt: TaskReceiptSchema },
-	strict,
+export const HostTaskReceiptDataSchema = Refine(
+	Type.Object(
+		{
+			kind: Type.Literal("task-receipt"),
+			receipt: TaskReceiptSchema,
+			failureSummary: Type.Optional(
+				Type.Object(
+					{
+						code: Type.Enum(["RUN_FAILED", "CHECK_FAILED", "RUN_BLOCKED", "RUN_CANCELLED", "RUN_INTERRUPTED"]),
+						nextAction: Type.Enum([
+							"REVIEW_RUN_FAILURE",
+							"REVIEW_CHECK_FAILURE",
+							"REVIEW_BLOCKED_RUN",
+							"REVIEW_CANCELLED_RUN",
+							"REVIEW_INTERRUPTED_RUN",
+						]),
+					},
+					strict,
+				),
+			),
+		},
+		strict,
+	),
+	(data) =>
+		data.failureSummary === undefined ||
+		(data.receipt.status === "FOUND" &&
+			data.receipt.run !== null &&
+			data.receipt.run.status !== "COMPLETED" &&
+			data.receipt.admission.cleanup === "CONFIRMED"),
 );
 export type HostTaskReceiptData = Static<typeof HostTaskReceiptDataSchema>;
 export const HostTaskRecoveryRequestSchema = Type.Object(
@@ -140,7 +179,18 @@ export const HostCheckoutIdentityDataSchema = Type.Object(
 	strict,
 );
 export type HostCheckoutIdentityData = Static<typeof HostCheckoutIdentityDataSchema>;
-export const HostEvidenceCategorySchema = Type.Enum(["criteria", "checks", "changed-files", "trust-sources"]);
+export const HostFactCandidatesRequestSchema = Type.Object(
+	{ ...envelope, type: Type.Literal("facts.candidates") },
+	strict,
+);
+export type HostFactCandidatesRequest = Static<typeof HostFactCandidatesRequestSchema>;
+export const HostEvidenceCategorySchema = Type.Enum([
+	"criteria",
+	"checks",
+	"changed-files",
+	"trust-sources",
+	"run-diff",
+]);
 export type HostEvidenceCategory = Static<typeof HostEvidenceCategorySchema>;
 export const HostEvidenceBindingSchema = Type.Object(
 	{
@@ -235,6 +285,7 @@ export const HostControlRequestSchema = Refine(
 		HostTaskReceiptRequestSchema,
 		HostTaskRecoveryRequestSchema,
 		HostCheckoutIdentityRequestSchema,
+		HostFactCandidatesRequestSchema,
 		HostEvidenceDetailsRequestSchema,
 		Type.Object(
 			{
@@ -284,6 +335,10 @@ export const HOST_CONTROL_ERROR_CODES = [
 	"UNSUPPORTED_COMMAND",
 	"HANDSHAKE_REQUIRED",
 	"CONTROL_UNAVAILABLE",
+	"PROJECT_NOT_CONFIGURED",
+	"WORKSPACE_EVIDENCE_CAPACITY",
+	"WORKSPACE_EVIDENCE_UNSUPPORTED",
+	"WORKSPACE_EVIDENCE_UNAVAILABLE",
 	"OWNER_CHANGED",
 	"PROJECT_CHANGED",
 	"STATE_UNAVAILABLE",
@@ -329,6 +384,18 @@ export const HOST_CONTROL_ERROR_CODES = [
 	"RERUN_NOT_APPLICABLE",
 ] as const;
 export type HostControlErrorCode = (typeof HOST_CONTROL_ERROR_CODES)[number];
+/** Bounds of the dirty path names a `DIRTY_WORKSPACE` refusal carries: count, and JSON-encoded UTF-8 bytes. */
+export const HOST_DIRTY_WORKSPACE_MAX_FILES = 50;
+export const HOST_DIRTY_WORKSPACE_MAX_BYTES = 16384;
+/**
+ * Why a task-bound `workflow.prepare`/`workflow.confirm` was refused as PROJECT_CHANGED: the clean-start check found
+ * changes outside `.ai/`. Sorted path names only, never contents or diffs; `truncated` when more were found.
+ */
+export interface HostDirtyWorkspaceDetails {
+	reason: "DIRTY_WORKSPACE";
+	files: string[];
+	truncated: boolean;
+}
 
 /** V0.8C re-run contract (COMPLEX_RERUN.md §6): advertised in `control.hello`; advertisement is not permission. */
 export const RERUN_CONTRACT_VERSION = 1;
@@ -549,6 +616,7 @@ export interface HostControlCapabilities {
 	analysisContext?: 1;
 	evidenceDetails?: 1;
 	checkoutIdentity?: 1;
+	factCandidates?: 1;
 }
 export interface HostEvidenceSnapshotIdentity {
 	executionId: string;
@@ -602,6 +670,9 @@ export interface HostEvidenceCheckRecord {
 		backendVersion: string;
 		policyDigest: string;
 	} | null;
+	/** FAIL checks only: masked, bounded output excerpt for display; never completion evidence. */
+	stdoutTail?: string;
+	stderrTail?: string;
 }
 export interface HostEvidenceChangedFileRecord {
 	category: "changed-files";
@@ -617,11 +688,26 @@ export interface HostEvidenceTrustSourceRecord {
 	path: string;
 	digest: string;
 }
+/**
+ * One recorded changed file of the Run as a unified base..result patch, in `changed-files` order. Display-only: never
+ * read by completion, review or Policy. `patch` is null when `omitted` names why.
+ */
+export interface HostEvidenceRunDiffRecord {
+	category: "run-diff";
+	index: number;
+	path: string;
+	change: "added" | "modified" | "deleted";
+	patch: string | null;
+	omitted: "DIFF_TOO_LARGE" | "NOT_TEXT" | null;
+}
+/** Why the whole Run diff is refused: workspace no longer the recorded result, base unproven, or over the total. */
+export type HostRunDiffRefusal = "DIFF_STALE" | "DIFF_UNVERIFIED" | "DIFF_TOO_LARGE";
 export type HostEvidenceRecord =
 	| HostEvidenceCriterionRecord
 	| HostEvidenceCheckRecord
 	| HostEvidenceChangedFileRecord
-	| HostEvidenceTrustSourceRecord;
+	| HostEvidenceTrustSourceRecord
+	| HostEvidenceRunDiffRecord;
 interface HostEvidenceDetailsBase {
 	snapshot: HostEvidenceSnapshotIdentity;
 	completeness: HostEvidenceCompleteness;
@@ -637,6 +723,8 @@ interface HostEvidenceDetailsBase {
 		revision: number;
 		diffDigest: string;
 		criteriaCount: number;
+		/** REVISE only: bounded summary of the structured review issues for display; never a decision input. */
+		reviseSummary?: string;
 	} | null;
 	cursor: HostEvidenceCursor;
 }
@@ -647,7 +735,7 @@ export interface HostEvidenceDetailsPage extends HostEvidenceDetailsBase {
 }
 export interface HostEvidenceDetailsUnavailable extends HostEvidenceDetailsBase {
 	kind: "evidence-detail-unavailable";
-	reason: "CATEGORY_UNAVAILABLE" | "RECORD_TOO_LARGE";
+	reason: "CATEGORY_UNAVAILABLE" | "RECORD_TOO_LARGE" | HostRunDiffRefusal;
 	recordIndex: number;
 }
 export type HostControlData =
@@ -664,6 +752,12 @@ export type HostControlData =
 	| { kind: "browser-registered"; check: RegisteredBrowserCheck }
 	| { kind: "fact-prepared"; preview: HostFactPreview }
 	| { kind: "fact-confirmed"; factId: string }
+	| {
+			/** Unreviewed suggestions only: never injected anywhere until a user prepares and confirms a fact. */
+			kind: "fact-candidates";
+			projectRevision: number;
+			candidates: MemoryCandidate[];
+	  }
 	| {
 			kind: "accepted";
 			requestId: string;
@@ -704,4 +798,7 @@ export type HostControlResponse = HostBridgeIdentity & {
 	id: string | null;
 	command: string | null;
 	ownerId: string;
-} & ({ success: true; data: HostControlData } | { success: false; error: { code: HostControlErrorCode } });
+} & (
+		| { success: true; data: HostControlData }
+		| { success: false; error: { code: HostControlErrorCode; details?: HostDirtyWorkspaceDetails } }
+	);

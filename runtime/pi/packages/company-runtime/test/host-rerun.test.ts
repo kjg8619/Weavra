@@ -647,7 +647,7 @@ describe("§4–§5 derivation over a real checkout (R01, R05)", () => {
 		// Without a configuration there is no dry run to report: the derive is refused, never answered in part.
 		const inspect = vi.spyOn(FilePolicyPathInspector, "open");
 		await rm(join(p.cwd, ".ai/config.yaml"));
-		expect(failure(await derive(client, run.runId))).toBe("CONTROL_UNAVAILABLE");
+		expect(failure(await derive(client, run.runId))).toBe("PROJECT_NOT_CONFIGURED");
 		expect(inspect).not.toHaveBeenCalled();
 	});
 });
@@ -836,7 +836,7 @@ describe("§3 eligibility, in the contract's order and before any project file i
 });
 
 describe("§5 leftovers", () => {
-	it("lists exactly what fails the clean start: Runtime-owned and generated observation paths are excluded", async () => {
+	it("lists exactly what fails the clean start: all project metadata and generated observation paths are excluded", async () => {
 		const p = await gitProject({ ignoreAi: false });
 		const run = await r01(p);
 		// Runtime-owned: state, projection, lock, recovery guard and archives. Generated: an owned decisions view.
@@ -849,7 +849,7 @@ describe("§5 leftovers", () => {
 			join(p.cwd, ".ai/decisions.md"),
 			`<!-- pi-company-runtime decisions v1 ${createHash("sha256").update(body).digest("hex")} -->\n${body}`,
 		);
-		// Not Runtime-owned: a user note and a hand-edited check log.
+		// Other project metadata is also exempt, regardless of generated-content markers.
 		await writeFile(join(p.cwd, ".ai/notes.md"), "mine\n");
 		await mkdir(join(p.cwd, ".ai/logs"));
 		await writeFile(join(p.cwd, ".ai/logs/checks.json"), "{}\n");
@@ -860,11 +860,11 @@ describe("§5 leftovers", () => {
 		const data = derived(await derive(client, run.runId));
 		expect(data.leftovers).toEqual({
 			clean: false,
-			paths: [".ai/logs/checks.json", ".ai/notes.md", "src/app.ts", "src/new.ts"],
+			paths: ["src/app.ts", "src/new.ts"],
 			truncated: false,
 		});
 		// Resolved in the user's own tools: then the checkout is clean for the start check.
-		p.git("add", "--", "src/app.ts", ".ai/notes.md", ".ai/logs/checks.json");
+		p.git("add", "--", "src/app.ts");
 		p.git("commit", "-qm", "keep");
 		await rm(join(p.cwd, "src/new.ts"));
 		expect(derived(await derive(client, run.runId)).leftovers).toEqual({ clean: true, paths: [], truncated: false });

@@ -40,6 +40,40 @@ function draft(
 }
 
 describe("buildPendingNewTasks", () => {
+  it("keeps same-ID tasks in different environments or threads distinct", () => {
+    const original = queuedCreation("same", "2026-10-04T00:00:00.000Z");
+    const messages = [
+      original,
+      { ...original, environmentId: EnvironmentId.make("env-2") },
+      { ...original, threadId: ThreadId.make("another-thread") },
+    ];
+
+    const tasks = buildPendingNewTasks({ queuedMessages: messages, drafts: {} });
+
+    expect(tasks).toHaveLength(3);
+    expect(new Set(tasks.map((task) => task.key)).size).toBe(3);
+  });
+
+  it("keeps a pending row key stable when its transport is retargeted", () => {
+    const original = queuedCreation("same", "2026-10-04T00:00:00.000Z");
+    const retargeted = {
+      ...original,
+      environmentId: EnvironmentId.make("env-2"),
+      threadId: ThreadId.make("another-thread"),
+      storageIdentity: {
+        environmentId: original.environmentId,
+        threadId: original.threadId,
+        messageId: original.messageId,
+      },
+    };
+    const first = buildPendingNewTasks({ queuedMessages: [original], drafts: {} });
+
+    const next = buildPendingNewTasks({ queuedMessages: [retargeted], drafts: {} });
+
+    expect(next[0]?.key).toBe(first[0]?.key);
+    expect(next[0]?.environmentId).toBe(retargeted.environmentId);
+  });
+
   it("surfaces every new-task draft with content alongside queued creations", () => {
     const tasks = buildPendingNewTasks({
       queuedMessages: [queuedCreation("a", "2026-09-05T10:00:00.000Z")],

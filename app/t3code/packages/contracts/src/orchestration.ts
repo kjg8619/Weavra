@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { WeavraTaskId } from "./weavraTask.ts";
 import * as SchemaIssue from "effect/SchemaIssue";
@@ -651,6 +652,131 @@ export const OrchestrationThreadActivity = Schema.Struct({
   createdAt: IsoDateTime,
 });
 export type OrchestrationThreadActivity = typeof OrchestrationThreadActivity.Type;
+
+// Check raw values before Struct decoding can strip excess fields, including
+// fields nested inside a logical attempt. These codecs are data, not admission.
+function closedWorkspaceActivityPayload<S extends Schema.ConstraintDecoder<unknown>>(schema: S) {
+  const decode = Schema.decodeUnknownOption(schema, { onExcessProperty: "error" });
+  return Schema.Unknown.check(Schema.makeFilter((value) => Option.isSome(decode(value)))).pipe(
+    Schema.decodeTo(schema),
+  );
+}
+
+export const WorkspaceTurnStartRefusalReason = Schema.Literals([
+  "owned",
+  "stale",
+  "unavailable",
+  "terminal-active",
+  "provider-conflict",
+  "not-drained",
+  "cleanup-unproven",
+  "target-changed",
+]);
+export type WorkspaceTurnStartRefusalReason = typeof WorkspaceTurnStartRefusalReason.Type;
+
+export const WorkspaceTurnStartRefusalPayload = Schema.Struct({
+  version: Schema.Literal(1),
+  source: Schema.Literal("workspace-ownership"),
+  requestId: MessageId,
+  reason: WorkspaceTurnStartRefusalReason,
+  originCommandId: CommandId,
+  originSequence: NonNegativeInt,
+}).pipe(closedWorkspaceActivityPayload);
+export type WorkspaceTurnStartRefusalPayload = typeof WorkspaceTurnStartRefusalPayload.Type;
+
+export const WorkspaceTurnAdmissionAttempt = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("initial") }),
+  Schema.Struct({
+    kind: Schema.Literal("compaction"),
+    permitId: EventId,
+  }),
+]).pipe(closedWorkspaceActivityPayload);
+export type WorkspaceTurnAdmissionAttempt = typeof WorkspaceTurnAdmissionAttempt.Type;
+
+const WorkspaceTurnClaimantNonce = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+);
+
+export const WorkspaceTurnAdmissionClaimPayload = Schema.Struct({
+  version: Schema.Literal(1),
+  source: Schema.Literal("workspace-admission"),
+  requestId: MessageId,
+  originCommandId: CommandId,
+  originSequence: NonNegativeInt,
+  attempt: WorkspaceTurnAdmissionAttempt,
+  claimantNonce: WorkspaceTurnClaimantNonce,
+}).pipe(closedWorkspaceActivityPayload);
+export type WorkspaceTurnAdmissionClaimPayload = typeof WorkspaceTurnAdmissionClaimPayload.Type;
+
+export const WorkspaceTurnCompactionContinuationPayload = Schema.Struct({
+  version: Schema.Literal(1),
+  source: Schema.Literal("workspace-admission"),
+  requestId: MessageId,
+  originCommandId: CommandId,
+  originSequence: NonNegativeInt,
+  parentClaimId: EventId,
+  compactionRequestId: MessageId,
+  compactionEventId: EventId,
+  compactionSequence: NonNegativeInt,
+}).pipe(closedWorkspaceActivityPayload);
+export type WorkspaceTurnCompactionContinuationPayload =
+  typeof WorkspaceTurnCompactionContinuationPayload.Type;
+
+export const decodeWorkspaceTurnStartRefusalPayload = Schema.decodeUnknownOption(
+  WorkspaceTurnStartRefusalPayload,
+);
+export const decodeWorkspaceTurnAdmissionClaimPayload = Schema.decodeUnknownOption(
+  WorkspaceTurnAdmissionClaimPayload,
+);
+export const decodeWorkspaceTurnCompactionContinuationPayload = Schema.decodeUnknownOption(
+  WorkspaceTurnCompactionContinuationPayload,
+);
+
+// IDs live in an environment-local store. The enclosing connection/thread,
+// rather than an environment field supplied in a payload, provides scope.
+export function makeWorkspaceTurnStartRefusalIdentity(threadId: ThreadId, messageId: MessageId) {
+  const key = JSON.stringify(["workspace-refusal-v1", threadId, messageId]);
+  return { commandId: CommandId.make(`server:${key}`), activityId: EventId.make(key) };
+}
+
+export function makeWorkspaceTurnAdmissionClaimIdentity(
+  threadId: ThreadId,
+  messageId: MessageId,
+  attempt: WorkspaceTurnAdmissionAttempt,
+) {
+  let key: string;
+  switch (attempt.kind) {
+    case "initial":
+      key = JSON.stringify(["workspace-admission-v1", threadId, messageId, "initial"]);
+      break;
+    case "compaction":
+      key = JSON.stringify([
+        "workspace-admission-v1",
+        threadId,
+        messageId,
+        "compaction",
+        attempt.permitId,
+      ]);
+      break;
+  }
+  return { commandId: CommandId.make(`server:${key}`), activityId: EventId.make(key) };
+}
+
+export function makeWorkspaceTurnCompactionContinuationIdentity(
+  threadId: ThreadId,
+  messageId: MessageId,
+  parentClaimId: EventId,
+  compactionEventId: EventId,
+) {
+  const key = JSON.stringify([
+    "workspace-compaction-continuation-v1",
+    threadId,
+    messageId,
+    parentClaimId,
+    compactionEventId,
+  ]);
+  return { commandId: CommandId.make(`server:${key}`), activityId: EventId.make(key) };
+}
 
 const OrchestrationLatestTurnState = Schema.Literals([
   "running",

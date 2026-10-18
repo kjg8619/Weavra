@@ -16,24 +16,24 @@ export const ComposerPendingApprovalPanel = memo(function ComposerPendingApprova
   const Detail = approval.requestKind === "mcp-elicitation" ? "span" : "code";
   const fallbackLabel =
     approval.requestKind === "mcp-elicitation"
-      ? "App access approval"
+      ? "앱 접근 승인"
       : approval.requestKind === "command"
-        ? "Command approval"
+        ? "명령 승인"
         : approval.requestKind === "file-read"
-          ? "File read approval"
+          ? "파일 읽기 승인"
           : approval.requestKind === "permission"
-            ? "App permission approval"
-            : "File change approval";
+            ? "앱 권한 승인"
+            : "파일 변경 승인";
   const detailAriaLabel =
     approval.requestKind === "mcp-elicitation"
-      ? "App access request"
+      ? "앱 접근 요청"
       : approval.requestKind === "command"
         ? "Command"
         : approval.requestKind === "file-read"
-          ? "File to read"
+          ? "읽을 파일"
           : approval.requestKind === "permission"
-            ? "Permission request"
-            : "File change";
+            ? "권한 요청"
+            : "파일 변경";
 
   return (
     <span

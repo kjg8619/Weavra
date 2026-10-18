@@ -14,10 +14,10 @@ describe("ComposerPendingApprovalActions", () => {
       />,
     );
 
-    expect(markup).toContain(">Decline<");
-    expect(markup).toContain(">Approve<");
-    expect(markup).not.toContain(">Cancel<");
-    expect(markup).not.toContain("Always allow this session");
+    expect(markup).toContain(">거절<");
+    expect(markup).toContain(">승인<");
+    expect(markup).not.toContain(">취소<");
+    expect(markup).not.toContain("이 세션에서 항상 허용");
   });
 
   it("keeps secondary provider labels out of the compact action row", () => {
@@ -26,17 +26,17 @@ describe("ComposerPendingApprovalActions", () => {
         requestId={ApprovalRequestId.make("approval-safari")}
         isResponding={false}
         options={[
-          { decision: "decline", label: "Decline" },
+          { decision: "decline", label: "거절" },
           { decision: "acceptAlways", label: "Always allow Safari" },
-          { decision: "accept", label: "Approve" },
+          { decision: "accept", label: "승인" },
         ]}
         onRespondToApproval={async () => undefined}
       />,
     );
 
     expect(markup).not.toContain("Always allow Safari");
-    expect(markup).toContain(">Approve<");
-    expect(markup).not.toContain("Always allow this session");
+    expect(markup).toContain(">승인<");
+    expect(markup).not.toContain("이 세션에서 항상 허용");
   });
 
   it("preserves provider labels for the main decisions", () => {
@@ -54,7 +54,7 @@ describe("ComposerPendingApprovalActions", () => {
 
     expect(markup).toContain("Allow once");
     expect(markup).toContain("Deny");
-    expect(markup).not.toContain(">Approve<");
-    expect(markup).not.toContain(">Decline<");
+    expect(markup).not.toContain(">승인<");
+    expect(markup).not.toContain(">거절<");
   });
 });

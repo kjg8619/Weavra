@@ -320,6 +320,55 @@ describe("bounded canonical evidence detail projection", () => {
 		},
 	);
 
+	it("carries a masked, bounded output tail only for a FAIL check", () => {
+		const run = boundRun();
+		const workspace = run.workspace;
+		const first = run.verification[0];
+		if (!workspace || !first) throw new Error("Missing check fixture");
+		const stdout = Array.from({ length: 400 }, (_, index) => `stdout line ${index} ${"가".repeat(7)}`).join("\n");
+		const stderr = `boot\napi_key=sk-${"z".repeat(24)}\n\u001b[31mAssertionError: expected Hello\n`;
+		run.verification = [
+			{ ...first, diffDigest: workspace.diffDigest, status: "PASS", stdout, stderr },
+			{ ...first, diffDigest: workspace.diffDigest, status: "FAIL", exitCode: 1, stdout, stderr },
+			{ ...first, diffDigest: workspace.diffDigest, status: "FAIL", exitCode: 1, stdout: "x".repeat(16_000) },
+		];
+		const [passed, failed, wide] = collect(run, "checks").flatMap((page) => page.records);
+		expect(passed).not.toHaveProperty("stdoutTail");
+		expect(passed).not.toHaveProperty("stderrTail");
+		if (failed?.category !== "checks" || wide?.category !== "checks") throw new Error("Missing check records");
+		expect(failed.stderrTail).toBe("boot\n[redacted]\n\\u001b[31mAssertionError: expected Hello");
+		expect(failed.stdoutTail?.split("\n")).toHaveLength(17);
+		expect(failed.stdoutTail?.endsWith(`stdout line 399 ${"가".repeat(7)}`)).toBe(true);
+		for (const record of [failed, wide]) {
+			const tail = `${record.stderrTail ?? ""}${record.stdoutTail ?? ""}`;
+			expect(Buffer.byteLength(tail)).toBeLessThanOrEqual(2048);
+			expect(tail.includes("\uFFFD")).toBe(false);
+		}
+		expect(Buffer.byteLength(wide.stdoutTail ?? "")).toBe(2048);
+		expect(JSON.stringify(failed)).not.toContain("sk-z");
+	});
+
+	it("summarizes REVISE from structured review issues within 500 characters", () => {
+		const run = boundRun();
+		const review = run.review;
+		if (!review) throw new Error("Missing review fixture");
+		run.review = {
+			...review,
+			result: "REVISE",
+			issues: [
+				{ severity: "blocker", file: "src/app.ts", description: "Greeting is wrong", recommendation: "Use Hello" },
+				{ severity: "warning", file: null, description: "설명 ".repeat(200), recommendation: "줄이기" },
+			],
+		};
+		const summary = project(run, { category: "checks", index: 0 }).review?.reviseSummary ?? "";
+		expect(summary.startsWith("[blocker] src/app.ts: Greeting is wrong -> Use Hello / [warning] 설명")).toBe(true);
+		expect(summary.length).toBe(500);
+		run.review = { ...run.review, result: "PASS" };
+		expect(project(run, { category: "checks", index: 0 }).review).not.toHaveProperty("reviseSummary");
+		run.review = { ...run.review, result: "REVISE", issues: [] };
+		expect(project(run, { category: "checks", index: 0 }).review).not.toHaveProperty("reviseSummary");
+	});
+
 	it("excludes raw output, sessions, prompts, reasons and hidden worker material", () => {
 		const secret = "SECRET_SENTINEL_DO_NOT_PROJECT";
 		const run = boundRun();

@@ -410,7 +410,7 @@ describe("§4 derivation", () => {
 });
 
 describe("§5 leftovers", () => {
-	it("parses the clean-start status: every entry, both names of a rename, minus Runtime-owned and generated paths", () => {
+	it("parses the clean-start status: every entry, both names of a rename, minus root .ai/ metadata and generated paths", () => {
 		const status = [
 			" M src/app.ts",
 			"?? src/new.ts",
@@ -428,14 +428,20 @@ describe("§5 leftovers", () => {
 			"?? .ai/logs/checks.json",
 			"?? .ai/notes.md",
 			"?? src/app.ts",
+			"?? .ai-other/x.md",
+			"?? nested/.ai/x.md",
+			"R  .ai/moved.ts",
+			"src/moved.ts",
 			"",
 		].join("\0");
+		// The owner-approved 2026-10-15 rule excludes all of root .ai/; look-alike, nested and moved-out paths still block.
 		expect(cleanStartBlockers(status, new Set([".ai/decisions.md"]))).toEqual([
-			".ai/logs/checks.json",
-			".ai/notes.md",
+			".ai-other/x.md",
+			"nested/.ai/x.md",
 			"src/app.ts",
 			"src/copy.ts",
 			"src/deleted.ts",
+			"src/moved.ts",
 			"src/new.ts",
 			"src/original.ts",
 			"src/renamed.ts",

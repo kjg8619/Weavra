@@ -453,6 +453,32 @@ describe("capability-gated evidence detail wire contracts", () => {
     ).toThrow();
   });
 
+  it("passes through bounded check output tails and a REVISE summary", () => {
+    const response = {
+      ...responseBase,
+      data: {
+        kind: "evidence-details",
+        ...pageBase,
+        review: {
+          result: "REVISE",
+          independent: true,
+          revision: 1,
+          diffDigest: "d".repeat(64),
+          criteriaCount: 1,
+          reviseSummary: "[blocker] src/value.ts: wrong value -> fix it",
+        },
+        records: [{ ...check, stdoutTail: "not ok 1", stderrTail: "AssertionError" }],
+        nextCursor: null,
+      },
+    };
+    expect(decodeResponse(response)).toEqual(response);
+    for (const data of [
+      { ...response.data, records: [{ ...check, stdoutTail: "x".repeat(2049) }] },
+      { ...response.data, review: { ...response.data.review, reviseSummary: "x".repeat(501) } },
+    ])
+      expect(() => decodeResponse({ ...response, data })).toThrow();
+  });
+
   it("rejects nonprogressing, miscategorized and contradictory evidence pages", () => {
     const data = { kind: "evidence-details", ...pageBase, records: [check], nextCursor: null };
     for (const patch of [
@@ -510,6 +536,46 @@ describe("capability-gated evidence detail wire contracts", () => {
       },
     };
     expect(decodeResponse(unavailable)).toEqual(unavailable);
+  });
+
+  it("decodes a bounded Run diff page and whole-diff refusals only for run-diff", () => {
+    const record = {
+      category: "run-diff",
+      index: 0,
+      path: "src/value.ts",
+      change: "modified",
+      patch: "diff --git a/src/value.ts b/src/value.ts\n@@ -1,1 +1,1 @@\n-0\n+1\n",
+      omitted: null,
+    };
+    const page = {
+      ...responseBase,
+      data: {
+        kind: "evidence-details",
+        ...pageBase,
+        cursor: { category: "run-diff", index: 0 },
+        records: [record],
+        nextCursor: null,
+      },
+    };
+    expect(decodeResponse(page)).toEqual(page);
+    for (const bad of [
+      { ...record, patch: null },
+      { ...record, omitted: "NOT_TEXT" },
+      { ...record, patch: "x".repeat(32_769), omitted: null },
+    ])
+      expect(() => decodeResponse({ ...page, data: { ...page.data, records: [bad] } })).toThrow();
+    const refusal = (category: string) => ({
+      ...responseBase,
+      data: {
+        kind: "evidence-detail-unavailable",
+        ...pageBase,
+        cursor: { category, index: 0 },
+        reason: "DIFF_STALE",
+        recordIndex: 0,
+      },
+    });
+    expect(decodeResponse(refusal("run-diff"))).toEqual(refusal("run-diff"));
+    expect(() => decodeResponse(refusal("changed-files"))).toThrow();
   });
 
   it("rejects an evidence response whose complete multibyte envelope exceeds the budget", () => {
@@ -821,6 +887,48 @@ describe("Weavra control has a closed Runtime authority boundary", () => {
     expect(() =>
       decode({ ...response, error: { ...response.error, reason: "PRIVATE_CREDENTIAL_MARKER" } }),
     ).toThrow();
+  });
+  it("carries dirty workspace paths only on a PROJECT_CHANGED refusal", () => {
+    const decode = Schema.decodeUnknownSync(WeavraControlResponse, { onExcessProperty: "error" });
+    const details = {
+      reason: "DIRTY_WORKSPACE",
+      files: [".gitignore", "notes.txt"],
+      truncated: false,
+    };
+    const refused = {
+      protocolVersion: 1,
+      type: "control_response",
+      id: "owner:3",
+      command: "workflow.prepare",
+      ownerId: "owner",
+      runId: null,
+      stateRevision: null,
+      projectRevision: null,
+      eventId: null,
+      timestamp: 1,
+      success: false,
+      error: { code: "PROJECT_CHANGED", details },
+    };
+    expect(decode(refused)).toEqual(refused);
+    const { details: _details, ...plain } = refused.error;
+    expect(decode({ ...refused, error: plain })).toEqual({ ...refused, error: plain });
+    const capped = {
+      ...details,
+      files: Array.from({ length: 50 }, (_, i) => `f${i}`),
+      truncated: true,
+    };
+    expect(
+      decode({ ...refused, error: { code: "PROJECT_CHANGED", details: capped } }),
+    ).toBeTruthy();
+    for (const error of [
+      { code: "STALE_PROJECT", details },
+      { code: "PROJECT_CHANGED", details: { ...details, reason: "OTHER" } },
+      { code: "PROJECT_CHANGED", details: { ...capped, files: [...capped.files, "f50"] } },
+      { code: "PROJECT_CHANGED", details: { ...details, files: [""] } },
+      { code: "PROJECT_CHANGED", details: { ...details, contents: "secret" } },
+    ]) {
+      expect(() => decode({ ...refused, error })).toThrow();
+    }
   });
   it("accepts browser inspection, registration preparation and Runtime preview confirmation", () => {
     for (const browserRequest of [
@@ -2356,5 +2464,55 @@ describe("V0.8C re-run wire shapes", () => {
     };
     const large = sized(accepted, WEAVRA_RERUN_MAX_DERIVED_RESPONSE_BYTES + 1);
     expect(decodeResponse(large)).toEqual(large);
+  });
+});
+
+describe("read-only fact candidates", () => {
+  const wire = { protocolVersion: 1, id: "read:candidates", type: "facts.candidates" } as const;
+  const candidate = {
+    id: `sha256:${"b".repeat(64)}`,
+    source: { runId: "run-1", kind: "policy_denied" },
+    statement:
+      "검사 lint는 실행 정책에 막혀 실행되지 않았으므로 정책이 허용하는 명령 형태로 등록해야 한다.",
+    evidenceRef: "check:run-1:lint",
+    sourceRef: `run:run-1#sha256:${"b".repeat(64)}`,
+  } as const;
+  const response = {
+    protocolVersion: 1,
+    type: "control_response",
+    id: wire.id,
+    ownerId: "owner",
+    command: wire.type,
+    runId: null,
+    stateRevision: null,
+    projectRevision: 3,
+    eventId: null,
+    timestamp: 100,
+    success: true,
+    data: { kind: "fact-candidates", projectRevision: 3, candidates: [candidate] },
+  } as const;
+  it("matches the Runtime envelope on the wire and binds the App RPC form to the observed owner", () => {
+    expect(decodeWire(wire)).toEqual(wire);
+    const rpc = { ...browserMutation, type: "facts.candidates" } as const;
+    expect(decodeRpc({ projectId: "project", request: rpc }).request).toEqual(rpc);
+    for (const extra of [{ statement: "forged" }, { sourceRef: "src/a.ts" }, { cwd: "/other" }]) {
+      expect(() => decodeWire({ ...wire, ...extra })).toThrow();
+      expect(() => decodeRpc({ projectId: "project", request: { ...rpc, ...extra } })).toThrow();
+    }
+  });
+  it("decodes bounded candidates and rejects unknown kinds, extra fields and more than 16 rows", () => {
+    expect(decodeCheckoutResponse(response)).toEqual(response);
+    const withData = (data: object) => ({ ...response, data: { ...response.data, ...data } });
+    expect(() =>
+      decodeCheckoutResponse(
+        withData({ candidates: [{ ...candidate, source: { runId: "run-1", kind: "guess" } }] }),
+      ),
+    ).toThrow();
+    expect(() =>
+      decodeCheckoutResponse(withData({ candidates: [{ ...candidate, confirmed: true }] })),
+    ).toThrow();
+    expect(() =>
+      decodeCheckoutResponse(withData({ candidates: Array.from({ length: 17 }, () => candidate) })),
+    ).toThrow();
   });
 });

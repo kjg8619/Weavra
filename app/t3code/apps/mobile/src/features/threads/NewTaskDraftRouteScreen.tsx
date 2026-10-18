@@ -23,6 +23,7 @@ type NewTaskDraftRouteParams = {
   readonly title?: string | string[];
   /** Set by Add Project when this draft opens while the project's clone runs. */
   readonly cloning?: string | string[];
+  /** Immutable scoped pending-task key; legacy raw IDs resolve only when unique. */
   readonly pendingTaskId?: string | string[];
   readonly draftId?: string | string[];
   readonly incomingShareId?: string | string[];

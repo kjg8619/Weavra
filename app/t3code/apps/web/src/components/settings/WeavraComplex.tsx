@@ -1,3 +1,4 @@
+import { weavraLabel } from "../weavraLabels";
 import type {
   WeavraComplexExecution,
   WeavraComplexPlan,
@@ -7,19 +8,19 @@ import { Badge } from "../ui/badge";
 
 type Run = NonNullable<WeavraControlState["snapshot"]["status"]["run"]>;
 type Row = WeavraComplexExecution["tasks"][number];
-const known = (value: number | null) => (value === null ? "unknown" : String(value));
+const known = (value: number | null) => (value === null ? "확인 안 됨" : String(value));
 /** Contract v1 plans have no parallel limit: they run one task at a time. */
 const maxParallelOf = (plan: WeavraComplexPlan) =>
   plan.schemaVersion === 2 ? plan.limits.maxParallel : 1;
 /** What a Runtime-reported status or failure means; never a transition the App makes. */
 const statusNote: Partial<Record<Row["status"], string>> = {
-  HANDED_OFF: "Implemented; waiting for its verification turn (one task at a time, in plan order).",
-  STOPPING: "Stopping with the Run; waiting for every live task to settle.",
+  HANDED_OFF: "구현을 마치고 검증 차례를 기다리고 있어요. 계획 순서대로 하나씩 검증해요.",
+  STOPPING: "Run과 함께 중단 중이며 실행 중인 모든 작업의 종료를 기다리고 있어요.",
 };
 const failureNote: Partial<Record<NonNullable<Row["failureCode"]>, string>> = {
-  RUN_STOPPED: "stopped because a sibling task failed or the Run stopped",
-  CANCELLED: "cancelled with the Run",
-  OWNER_LOST: "the Runtime owner was lost; nothing resumes automatically",
+  RUN_STOPPED: "다른 작업이 실패했거나 Run이 중단되어 멈췄어요",
+  CANCELLED: "Run과 함께 취소됐어요",
+  OWNER_LOST: "Runtime 소유 프로세스가 종료됐어요. 자동 재개는 없어요",
 };
 
 /** Read-only frozen COMPLEX plan. Display only: nothing here schedules, edits or verifies work. */
@@ -37,9 +38,9 @@ export function ComplexPlanView({
       <dl className="grid gap-2 sm:grid-cols-2">
         {[
           ["Plan", plan.planId],
-          ["Plan digest", plan.complexPlanDigest],
-          ["Parent Task Contract", plan.parentTaskId],
-          ["Parent digest", plan.parentTaskContractDigest],
+          ["계획 digest", plan.complexPlanDigest],
+          ["상위 작업 계약", plan.parentTaskId],
+          ["상위 digest", plan.parentTaskContractDigest],
         ].map(([label, value]) => (
           <div key={label}>
             <dt className="text-muted-foreground">{label}</dt>
@@ -47,54 +48,51 @@ export function ComplexPlanView({
           </div>
         ))}
       </dl>
-      <ol aria-label="Ordered COMPLEX tasks" className="space-y-2">
+      <ol aria-label="순서가 정해진 COMPLEX 작업" className="space-y-2">
         {plan.tasks.map((task) => (
           <li key={task.id} className="space-y-1 rounded-md border border-border p-3">
             <p className="font-medium">
               {task.id} · {task.title}
             </p>
             <p className="whitespace-pre-wrap break-words">{task.goal}</p>
-            <p>Depends on: {task.dependsOn.join(", ") || "none"}</p>
+            <p>선행 작업: {task.dependsOn.join(", ") || "없음"}</p>
             <ul className="space-y-0.5">
               {task.criterionIds.map((id) => (
                 <li key={id} className="break-words">
-                  {id} · {statements.get(id) ?? "statement unavailable"}
+                  {id} · {statements.get(id) ?? "설명 확인 불가"}
                 </li>
               ))}
             </ul>
             <p className="break-all">
-              Exact file claims:{" "}
+              정확한 파일 담당 범위:{" "}
               {task.ownership.length === 0
-                ? "none (read-only contribution)"
+                ? "없음(읽기 전용 작업)"
                 : task.ownership.map((claim) => `${claim.operation} ${claim.path}`).join(", ")}
             </p>
             <p>
-              Task checks: {task.checkIds.join(", ")} · local revision cycles ≤{" "}
-              {task.maxRevisionCycles}
+              작업 검사: {task.checkIds.join(", ")} · 작업별 수정 횟수 ≤ {task.maxRevisionCycles}
             </p>
           </li>
         ))}
       </ol>
       <p>
-        Integration: criteria {plan.integration.criterionIds.join(", ")} · all registered checks{" "}
-        {plan.integration.checkIds.join(", ")} · independent final review and fresh final checks
-        required.
+        통합 검증: 수용 기준 {plan.integration.criterionIds.join(", ")} · 모든 등록 검사{" "}
+        {plan.integration.checkIds.join(", ")} · 독립적인 최종 검토와 새 최종 검사가 필요해요.
       </p>
       <p>
-        Limits: {plan.limits.maxTasks} tasks · {plan.limits.maxWorkerInvocations} worker invocations
-        · {plan.limits.maxReportedTokens} provider-reported tokens ·{" "}
-        {plan.limits.maxTotalRevisionCycles} total revision cycles
+        한도: {plan.limits.maxTasks} 개 작업 · {plan.limits.maxWorkerInvocations} 회 worker 호출 ·{" "}
+        {plan.limits.maxReportedTokens} 개 프로바이더 보고 토큰 ·{" "}
+        {plan.limits.maxTotalRevisionCycles} 회 전체 수정
         {plan.schemaVersion === 2
-          ? ` · at most ${maxParallel} ${maxParallel === 1 ? "task" : "tasks"} implemented at once (Runtime configuration, read-only)`
+          ? ` · 최대 ${maxParallel}개 작업 동시 구현(Runtime 설정, 읽기 전용)`
           : ""}
         .
       </p>
       <p className="text-muted-foreground">
         {maxParallel > 1
-          ? `Tasks whose dependencies are COMPLETED are implemented together, up to ${maxParallel} at once; checks and reviews then run one task at a time in this order, all under one Runtime-owned Run.`
-          : "Tasks run one at a time in this order under one Runtime-owned Run."}{" "}
-        File claims narrow responsibility; they are not filesystem permission, Policy ALLOW or
-        approval.
+          ? `선행 작업이 COMPLETED인 작업을 최대 ${maxParallel}개씩 함께 구현하고 이 순서대로 하나씩 검사·검토해요. 모두 하나의 Runtime 소유 Run에서 진행해요.`
+          : "하나의 Runtime 소유 Run에서 이 순서대로 하나씩 진행해요."}{" "}
+        파일 담당 범위는 책임을 제한해요. 파일 접근 권한·Policy ALLOW·승인은 아니에요.
       </p>
     </div>
   );
@@ -124,80 +122,81 @@ export function ComplexExecutionView({
   const { integration, budget, plan } = execution;
   // Wave membership is only what the Runtime reports; nothing is inferred from dependencies.
   const wave = execution.schemaVersion === 2 ? execution.activeTaskIds : null;
-  const label = (id: string) => `${id} · ${tasks.get(id)?.title ?? "unknown task"}`;
+  const label = (id: string) => `${id} · ${tasks.get(id)?.title ?? "작업 미확인"}`;
   return (
     <section
-      aria-label="COMPLEX execution"
+      aria-label="COMPLEX 실행"
       className="space-y-3 rounded-md border border-border p-3 text-xs"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-medium">COMPLEX execution · Runtime projection</h4>
+        <h4 className="text-sm font-medium">COMPLEX 실행 · Runtime 제공 상태</h4>
         <div className="flex flex-wrap gap-2">
           <Badge variant={current ? "info" : "warning"}>
-            {current ? "CURRENT OBSERVATION" : "HISTORICAL · NOT CURRENT"}
+            {current ? "현재 관찰" : "과거 정보 · 현재 상태 아님"}
           </Badge>
-          {!owned && <Badge variant="outline">DISPLAY ONLY · NOT OWNED</Badge>}
+          {!owned && <Badge variant="outline">표시 전용 · 소유하지 않음</Badge>}
         </div>
       </div>
       {!current && (
         <p>
-          Last checked observation:{" "}
-          {observedAt === null ? "time unknown" : new Date(observedAt).toLocaleString()}. Historical
-          data is not current execution state and enables no action.
+          마지막으로 확인한 관찰:{" "}
+          {observedAt === null ? "시각 미확인" : new Date(observedAt).toLocaleString()}. 과거
+          데이터는 현재 실행 상태가 아니며 동작을 허용하지 않아요.
         </p>
       )}
       <p>
-        Canonical Run outcome: <strong>{run.status}</strong> · phase {execution.phase}
-        {execution.schemaVersion === 1 ? ` · active task ${execution.activeTaskId ?? "none"}` : ""}
+        공식 Run 결과: <strong>{weavraLabel(run.status)}</strong> · 단계{" "}
+        {weavraLabel(execution.phase)}
+        {execution.schemaVersion === 1 ? ` · 활성 작업 ${execution.activeTaskId ?? "없음"}` : ""}
       </p>
       {wave !== null && (
         <p>
-          Current wave, as reported by Runtime:{" "}
-          {wave.length === 0 ? "none" : wave.map(label).join(", ")} · at most {maxParallelOf(plan)}{" "}
-          implemented at once; checks and reviews run one task at a time.
+          Runtime이 보고한 현재 병렬 작업 묶음:{" "}
+          {wave.length === 0 ? "없음" : wave.map(label).join(", ")} · 최대 {maxParallelOf(plan)}{" "}
+          개를 동시에 구현하며 검사와 검토는 하나씩 진행해요.
         </p>
       )}
       {(cancelling || execution.phase === "STOPPING") && (
         <p>
-          {`${cancelling ? "Cancel requested" : "Stopping"}: Runtime stops every live task and waits for all of them to settle before it records the outcome. Cleanup: ${execution.cleanup}.`}
+          {`${cancelling ? "취소 요청됨" : "중단 중"}: Runtime이 모든 활성 작업을 멈추고 종료를 확인한 뒤 결과를 기록해요. 정리 상태: ${execution.cleanup}.`}
         </p>
       )}
       <p>
-        Task contributions completed: {completed} / {execution.tasks.length}.{" "}
+        완료한 개별 작업: {completed} / {execution.tasks.length}.{" "}
         {allTasksCompleted && run.status !== "COMPLETED"
-          ? "Completed tasks do not complete the Run: fresh integration checks, an independent final review, fresh final checks and Kernel completion still decide."
-          : "Task completion is not Run completion; only the canonical Run status above is the outcome."}
+          ? "개별 작업 완료는 Run 완료가 아니에요. 새 통합 검사·독립적인 최종 검토·새 최종 검사와 Kernel 판정이 필요해요."
+          : "개별 작업 완료는 Run 완료가 아니에요. 위의 공식 Run 상태만 결과로 판단해요."}
       </p>
-      <ol aria-label="COMPLEX task states" className="space-y-2">
+      <ol aria-label="COMPLEX 작업 상태" className="space-y-2">
         {execution.tasks.map((task) => (
           <li key={task.id} className="space-y-1 rounded-md border border-border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium">{label(task.id)}</span>
               <div className="flex flex-wrap gap-2">
-                {wave?.includes(task.id) && <Badge variant="outline">CURRENT WAVE</Badge>}
-                <Badge variant="outline">{task.status}</Badge>
+                {wave?.includes(task.id) && <Badge variant="outline">현재 병렬 묶음</Badge>}
+                <Badge variant="outline">{weavraLabel(task.status)}</Badge>
               </div>
             </div>
             {statusNote[task.status] && <p>{statusNote[task.status]}</p>}
-            <p>Depends on: {tasks.get(task.id)?.dependsOn.join(", ") || "none"}</p>
+            <p>선행 작업: {tasks.get(task.id)?.dependsOn.join(", ") || "없음"}</p>
             <p>
-              Attempt {task.attempt} · local revision cycle {task.revisionCycle} · worker
-              invocations {task.workerInvocations} · reported tokens {known(task.reportedTokens)}
+              시도 {task.attempt} · 작업별 수정 횟수 {task.revisionCycle} · worker 호출{" "}
+              {task.workerInvocations} · 보고된 토큰 {known(task.reportedTokens)}
             </p>
             <p>
-              Self-check {task.selfCheck} · review {task.review} · test {task.test} · evidence{" "}
+              자체 검사 {task.selfCheck} · 검토 {task.review} · 테스트 {task.test} · 증거{" "}
               {task.evidenceFreshness}
               {task.status === "COMPLETED" && task.evidenceFreshness !== "CURRENT"
-                ? " (historical contribution, not current completion evidence)"
+                ? " (과거 작업 기록이며 현재 완료 증거가 아니에요)"
                 : ""}
             </p>
             <p className="break-all">
-              Changed files: {task.changedFiles.join(", ") || "none recorded"}
-              {task.changesUnknown ? " · additional changes UNKNOWN" : ""}
+              변경 파일: {task.changedFiles.join(", ") || "기록 없음"}
+              {task.changesUnknown ? " · 추가 변경 미확인" : ""}
             </p>
             {task.failureCode && (
               <p>
-                Failure: {task.failureCode}
+                실패: {task.failureCode}
                 {failureNote[task.failureCode] ? ` — ${failureNote[task.failureCode]}` : ""}
               </p>
             )}
@@ -208,33 +207,30 @@ export function ComplexExecutionView({
         {[
           [
             "Integration",
-            `check ${integration.check} · final review ${integration.review} · final test ${integration.test} · evidence ${integration.evidenceFreshness}`,
+            `검사 ${integration.check} · 최종 검토 ${integration.review} · 최종 테스트 ${integration.test} · 증거 ${integration.evidenceFreshness}`,
           ],
-          ["Integration workspace", integration.workspaceDigest ?? "not captured"],
-          ["Integration failure", integration.failureCode ?? "none"],
+          ["통합 작업 공간", integration.workspaceDigest ?? "수집되지 않음"],
+          ["통합 실패", integration.failureCode ?? "없음"],
+          ["worker 호출", `${budget.workerInvocations} / ${plan.limits.maxWorkerInvocations}`],
           [
-            "Worker invocations",
-            `${budget.workerInvocations} / ${plan.limits.maxWorkerInvocations}`,
-          ],
-          [
-            "Provider-reported tokens",
+            "프로바이더가 보고한 토큰",
             `${known(budget.reportedTokens)} / ${plan.limits.maxReportedTokens}`,
           ],
           [
-            "Global work cycle (revisions)",
+            "전체 작업 횟수(revision)",
             `${budget.totalRevisionCycles} / ${plan.limits.maxTotalRevisionCycles}`,
           ],
           ["Budget", budget.status],
           [
-            "Cleanup / writer present",
+            "정리 상태 / 쓰기 잠금 존재",
             `${execution.cleanup} / ${writerPresent === null ? "UNKNOWN" : String(writerPresent)}`,
           ],
           [
-            "Workspace changes",
-            `${execution.partialChanges ? "partial changes retained" : "no partial changes reported"}${execution.changesUnknown ? " · change set UNKNOWN" : ""}`,
+            "작업 공간 변경",
+            `${execution.partialChanges ? "일부 변경 보존됨" : "일부 변경 보고 없음"}${execution.changesUnknown ? " · 변경 집합 미확인" : ""}`,
           ],
-          ["Run failure", execution.failureCode ?? "none"],
-          ["Parent Task Contract", `${execution.parent.id} · ${execution.parent.status}`],
+          ["Run 실패", execution.failureCode ?? "없음"],
+          ["상위 작업 계약", `${execution.parent.id} · ${execution.parent.status}`],
         ].map(([label, value]) => (
           <div key={label}>
             <dt className="text-muted-foreground">{label}</dt>
@@ -244,14 +240,13 @@ export function ComplexExecutionView({
       </dl>
       {execution.cleanup === "UNCONFIRMED" && (
         <p>
-          Cleanup is unconfirmed: the writer stays retained for manual inspection. There is no
-          automatic resume, cleanup retry or rollback.
+          정리가 확인되지 않아 직접 점검할 때까지 쓰기 잠금을 유지해요. 자동 재개·정리
+          재시도·되돌리기는 없어요.
         </p>
       )}
       <p className="text-muted-foreground">
-        Partial workspace changes, including those of completed tasks, are never rolled back
-        automatically. The plan is frozen; tasks cannot be retried, skipped, reordered or completed
-        from here.
+        완료한 작업을 포함해 일부 변경을 자동으로 되돌리지 않아요. 계획이 확정돼 있어 이 화면에서
+        작업을 재시도·건너뛰기·순서 변경·완료 처리할 수 없어요.
       </p>
       <ComplexPlanView plan={plan} criteria={execution.parent.acceptanceCriteria} />
     </section>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useAtomValue } from "@effect/atom-react";
 import { Keyboard, View } from "react-native";
 import {
   CommonActions,
@@ -13,8 +14,8 @@ import { useConnectionController } from "../connection/useConnectionController";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import type { MobileThemeId } from "../../lib/mobileTheme";
 import { useProjects, useThreadShells } from "../../state/entities";
-import { enqueueThreadOutboxMessage } from "../../state/thread-outbox";
-import { holdEditingQueuedMessage } from "../../state/use-thread-outbox";
+import { appAtomRegistry } from "../../state/atom-registry";
+import { showcasePendingTasksAtom } from "./showcase-pending-tasks";
 import { useWorkspaceState } from "../../state/workspace";
 import {
   applyNativeShowcaseOrientation,
@@ -67,9 +68,9 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
   const projects = useProjects();
   const threads = useThreadShells();
   const attemptedPairingRef = useRef(new Set<string>());
-  const seededPendingTaskIdsRef = useRef(new Set<string>());
   const [pairingUrls, setPairingUrls] = useState<ReadonlyArray<string>>([]);
-  const [pendingTasksReady, setPendingTasksReady] = useState(false);
+  const pendingTasks = useAtomValue(showcasePendingTasksAtom);
+  const pendingTasksReady = pendingTasks.length === SHOWCASE_PENDING_TASK_DEFINITIONS.length;
   const [requestedScene, setRequestedScene] = useState<ShowcaseScene | null>(null);
   const [requestedTheme, setRequestedTheme] = useState<MobileThemeId | null>(null);
   const [themeRequestSettled, setThemeRequestSettled] = useState(false);
@@ -191,30 +192,10 @@ export function ShowcaseCaptureCoordinator(props: { readonly pathname: string })
     const pendingTasks = buildShowcasePendingTasks(projects, Date.now());
     if (pendingTasks.length !== SHOWCASE_PENDING_TASK_DEFINITIONS.length) return;
 
-    let cancelled = false;
-    for (const task of pendingTasks) holdEditingQueuedMessage(task.messageId);
-    void (async () => {
-      const results = await Promise.all(
-        pendingTasks.map(async (task) => {
-          const messageId = String(task.messageId);
-          if (seededPendingTaskIdsRef.current.has(messageId)) return true;
-          const seeded = await retryShowcaseOperation(
-            async () => {
-              await enqueueThreadOutboxMessage(task);
-              return true;
-            },
-            { isCancelled: () => cancelled },
-          );
-          if (seeded) seededPendingTaskIdsRef.current.add(messageId);
-          return seeded;
-        }),
-      );
-      if (!cancelled && results.every(Boolean)) setPendingTasksReady(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    appAtomRegistry.set(showcasePendingTasksAtom, pendingTasks);
   }, [hasServerFixture, pendingTasksReady, projects]);
+
+  useEffect(() => () => appAtomRegistry.set(showcasePendingTasksAtom, []), []);
 
   useEffect(() => {
     if (!SHOWCASE_ENABLED || requestedScene === null || !hasFixture || !showcaseThread) return;

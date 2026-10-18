@@ -9,28 +9,28 @@ describe("resolvePullRequestState", () => {
       "open",
       { state: "open", isDraft: false },
       PullRequestGlyph.pullRequest,
-      "Open",
+      "열림",
       "text-emerald-600 dark:text-emerald-300/90",
     ],
     [
       "draft",
       { state: "open", isDraft: true },
       PullRequestGlyph.draft,
-      "Draft",
+      "초안",
       "text-zinc-500 dark:text-zinc-400/80",
     ],
     [
       "closed",
       { state: "closed", isDraft: false },
       PullRequestGlyph.closed,
-      "Closed",
+      "닫힘",
       "text-red-600 dark:text-red-300/90",
     ],
     [
       "merged",
       { state: "merged", isDraft: false },
       PullRequestGlyph.merged,
-      "Merged",
+      "병합됨",
       "text-violet-600 dark:text-violet-300/90",
     ],
   ] as const)(
@@ -47,14 +47,14 @@ describe("resolvePullRequestState", () => {
   it("keeps a merged pull request merged when stale draft metadata is also present", () => {
     expect(resolvePullRequestState({ state: "merged", isDraft: true })).toMatchObject({
       Icon: PullRequestGlyph.merged,
-      label: "Merged",
+      label: "병합됨",
     });
   });
 
   it("keeps a closed pull request closed when stale draft metadata is also present", () => {
     expect(resolvePullRequestState({ state: "closed", isDraft: true })).toMatchObject({
       Icon: PullRequestGlyph.closed,
-      label: "Closed",
+      label: "닫힘",
     });
   });
 
@@ -68,11 +68,11 @@ describe("resolvePullRequestState", () => {
 
     expect(resolvePullRequestState(input)).toMatchObject({
       Icon: PullRequestGlyph.pullRequest,
-      label: "Open",
+      label: "열림",
     });
     expect(resolvePullRequestConflict(input)).toMatchObject({
       Icon: PullRequestGlyph.conflicting,
-      label: "Conflicts with main",
+      label: "충돌: main",
       toneClassName: "text-destructive",
     });
   });
@@ -118,7 +118,7 @@ describe("resolvePullRequestConflict", () => {
       }),
     ).toEqual({
       Icon: PullRequestGlyph.conflicting,
-      label: "Conflicts with main",
+      label: "충돌: main",
       toneClassName: "text-destructive",
     });
   });
@@ -132,7 +132,7 @@ describe("resolvePullRequestConflict", () => {
       }),
     ).toEqual({
       Icon: PullRequestGlyph.conflicting,
-      label: "Has conflicts",
+      label: "충돌이 있어요",
       toneClassName: "text-destructive",
     });
   });

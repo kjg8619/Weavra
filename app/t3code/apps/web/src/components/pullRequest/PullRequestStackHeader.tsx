@@ -16,7 +16,7 @@ export function PullRequestStackHeader({
       {notice ? (
         <Tooltip>
           <TooltipTrigger render={<span role="status" className="text-xs font-normal" />}>
-            {stale ? "May be stale" : "Refreshing…"}
+            {stale ? "오래된 정보일 수 있어요" : "새로고침 중…"}
           </TooltipTrigger>
           <TooltipPopup>{notice}</TooltipPopup>
         </Tooltip>

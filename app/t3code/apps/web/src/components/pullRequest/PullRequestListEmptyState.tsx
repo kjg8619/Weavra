@@ -103,7 +103,7 @@ export function PullRequestListEmptyState({
       <Empty className="py-16">
         <BranchMark joined={false} />
         <EmptyHeader>
-          <EmptyTitle>No projects in this workspace</EmptyTitle>
+          <EmptyTitle>이 작업 공간에 프로젝트가 없어요</EmptyTitle>
           <EmptyDescription>
             Add a project, and the pull requests from its repository appear here.
           </EmptyDescription>
@@ -111,7 +111,7 @@ export function PullRequestListEmptyState({
         <EmptyContent>
           <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
             <PlusIcon className="size-3.5" />
-            Add project
+            프로젝트 추가
           </Button>
         </EmptyContent>
       </Empty>
@@ -145,13 +145,13 @@ export function PullRequestListEmptyState({
         <EmptyContent className="flex-row flex-wrap justify-center gap-2">
           <Button size="sm" variant="outline" onClick={onClearQuery}>
             <SearchIcon className="size-3.5" />
-            Clear search
+            검색 지우기
           </Button>
           {/* The hosts answered this query once; a pull request opened since then would answer
               differently, and nothing on screen says which of the two the reader is looking at. */}
           <Button size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
             <RefreshIcon className="size-3.5" refreshing={refreshing} />
-            {refreshing ? "Checking..." : "Check again"}
+            {refreshing ? "확인 중..." : "다시 확인"}
           </Button>
         </EmptyContent>
       </Empty>
@@ -162,22 +162,22 @@ export function PullRequestListEmptyState({
     <Empty className="py-16">
       <BranchMark joined={false} />
       <EmptyHeader>
-        <EmptyTitle>{filtered ? "Nothing under these filters" : "No pull requests"}</EmptyTitle>
+        <EmptyTitle>{filtered ? "이 필터에 맞는 항목이 없어요" : "PR이 없어요"}</EmptyTitle>
         <EmptyDescription>
           {filtered
             ? "Widen the state, involvement or project filter to see more."
-            : "Pull requests from every project in this workspace appear here."}
+            : "이 작업 공간의 모든 프로젝트 PR이 여기에 나와요."}
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent className="flex-row flex-wrap justify-center gap-2">
         {canLoadMore ? (
           <Button size="sm" variant="outline" disabled={loadingMore} onClick={onLoadMore}>
-            {loadingMore ? "Loading..." : "Load more pull requests"}
+            {loadingMore ? "불러오는 중..." : "PR 더 불러오기"}
           </Button>
         ) : null}
         <Button size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
           <RefreshIcon className="size-3.5" refreshing={refreshing} />
-          {refreshing ? "Checking..." : "Check again"}
+          {refreshing ? "확인 중..." : "다시 확인"}
         </Button>
       </EmptyContent>
     </Empty>

@@ -92,6 +92,7 @@ import {
 import { useScaledTextRole } from "../settings/appearance/useScaledTextRole";
 import {
   clearComposerDraftContent,
+  sameComposerDraftState,
   captureComposerDraftInsertion,
   countComposerDraftAttachmentsAfterSelection,
   getComposerDraftSnapshot,
@@ -113,6 +114,8 @@ import {
   resolveSelectableModelSelection,
 } from "../../lib/modelOptions";
 import { enqueueThreadOutboxMessage } from "../../state/thread-outbox";
+import { pendingTaskDraftKey } from "../../state/pending-task-identity";
+import { restoreOutboxAdmission } from "../../state/thread-outbox-handback";
 import { useRemoteConnectionStatus } from "../../state/use-remote-environment-registry";
 import { useNewTaskFlow } from "./new-task-flow-provider";
 import { resolveProjectThreadCreationBranch } from "./projectThreadCreationValidation";
@@ -585,7 +588,10 @@ export function NewTaskDraftScreen(props: {
 
   const attemptedPendingTaskIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!props.pendingTaskId || editingPendingTask?.messageId === props.pendingTaskId) {
+    if (
+      !props.pendingTaskId ||
+      (editingPendingTask && pendingTaskDraftKey(editingPendingTask) === props.pendingTaskId)
+    ) {
       return;
     }
     // Attempt each pending task once: after it is delivered or deleted the
@@ -594,11 +600,22 @@ export function NewTaskDraftScreen(props: {
       return;
     }
     attemptedPendingTaskIdRef.current = props.pendingTaskId;
-    if (!beginEditingPendingTask(props.pendingTaskId)) {
-      // The queued task no longer exists (sent or deleted before opening).
-      navigation.dispatch(StackActions.replace("NewTask"));
-    }
-  }, [beginEditingPendingTask, editingPendingTask?.messageId, navigation, props.pendingTaskId]);
+    let current = true;
+    void beginEditingPendingTask(props.pendingTaskId)
+      .then((opened) => {
+        if (current && !opened) navigation.dispatch(StackActions.replace("NewTask"));
+      })
+      .catch((error: unknown) => {
+        if (current)
+          Alert.alert(
+            "Could not open pending task",
+            error instanceof Error ? error.message : "The retained draft could not be loaded.",
+          );
+      });
+    return () => {
+      current = false;
+    };
+  }, [beginEditingPendingTask, editingPendingTask, navigation, props.pendingTaskId]);
 
   useEffect(() => {
     if (!props.pendingTaskId) return;
@@ -1265,9 +1282,35 @@ export function NewTaskDraftScreen(props: {
     // Persist before clearing the draft or leaving its editor. This only waits
     // for the local outbox write; server and worktree setup run on the thread.
     flow.setSubmitting(true);
+    const draftSnapshot = getComposerDraftSnapshot(draftKey);
+    const admission = editingPendingTask ? null : enqueueThreadOutboxMessage(message);
     try {
-      await enqueueThreadOutboxMessage(message);
+      if (editingPendingTask) {
+        const saved = await flow.savePendingTask(message);
+        if (!saved) return;
+      } else {
+        await admission?.committed;
+      }
     } catch (error) {
+      // This path has not cleared the draft. Flush its ownership before
+      // releasing the failed admission's hidden files/upload references.
+      if (admission) {
+        try {
+          await restoreOutboxAdmission({
+            message,
+            draftKey,
+            releaseAfterHandback: admission.releaseAfterHandback,
+          });
+        } catch (restoreError) {
+          Alert.alert(
+            "Task content retained",
+            restoreError instanceof Error
+              ? restoreError.message
+              : "The draft could not be restored. Its files are still retained.",
+          );
+          return;
+        }
+      }
       Alert.alert(
         "Could not queue task",
         error instanceof Error ? error.message : "The task could not be saved to the outbox.",
@@ -1276,10 +1319,9 @@ export function NewTaskDraftScreen(props: {
     } finally {
       flow.setSubmitting(false);
     }
-    const draftSnapshot = getComposerDraftSnapshot(draftKey);
     if (editingPendingTask) {
       flow.finishEditingPendingTask();
-    } else {
+    } else if (sameComposerDraftState(draftSnapshot, getComposerDraftSnapshot(draftKey))) {
       // Drop draft-local model/workspace selections with the content. The
       // next task re-resolves project defaults before sticky app defaults.
       // The queued message owns the attachments now, so the sweep is deferred

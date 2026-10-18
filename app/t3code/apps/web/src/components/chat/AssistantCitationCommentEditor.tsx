@@ -44,10 +44,10 @@ export function AssistantCitationCommentEditor({
     >
       <textarea
         ref={inputRef}
-        aria-label="Comment on selected text"
-        aria-description="Enter to save the citation comment; Command/Ctrl+Enter to save and send; Shift+Enter for a new line."
+        aria-label="선택한 텍스트에 댓글"
+        aria-description="Enter로 인용 댓글을 저장하고, Command/Ctrl+Enter로 저장 후 보내고, Shift+Enter로 줄을 바꿔요."
         aria-invalid={commentTooLong || undefined}
-        placeholder="Add an optional comment..."
+        placeholder="댓글을 추가할 수 있어요..."
         rows={2}
         className="field-sizing-content block max-h-40 min-h-16 w-full resize-none bg-transparent px-1 py-1.5 text-base outline-none placeholder:text-muted-foreground sm:text-sm"
         value={comment}
@@ -81,7 +81,7 @@ export function AssistantCitationCommentEditor({
           onPointerDown={(event) => event.preventDefault()}
           onClick={onCancel}
         >
-          Cancel
+          취소
         </Button>
         <Button
           size="xs"
@@ -89,7 +89,7 @@ export function AssistantCitationCommentEditor({
           onPointerDown={(event) => event.preventDefault()}
           onClick={submit}
         >
-          {commentTooLong ? "Shorten comment" : "Save"}
+          {commentTooLong ? "댓글 줄이기" : "저장"}
         </Button>
       </div>
     </div>

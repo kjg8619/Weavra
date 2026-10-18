@@ -13,7 +13,7 @@ import {
 import { PullRequestGlyph } from "./pullRequestIcons";
 
 export function PullRequestsUnavailableState({
-  title = "Could not load pull requests",
+  title = "PR을 불러오지 못했어요",
   error,
   onRetry,
   refreshing = false,
@@ -47,7 +47,7 @@ export function PullRequestsUnavailableState({
               aria-busy={refreshing}
             >
               <RefreshIcon className="size-3.5" refreshing={refreshing} />
-              Retry
+              다시 시도
             </Button>
           ) : null}
           {gitHubUrl ? (
@@ -57,7 +57,7 @@ export function PullRequestsUnavailableState({
               render={<a href={gitHubUrl} target="_blank" rel="noopener noreferrer" />}
             >
               <ExternalLinkIcon aria-hidden className="size-3.5" />
-              Open on GitHub
+              GitHub에서 열기
             </Button>
           ) : null}
         </EmptyContent>

@@ -65,6 +65,8 @@ function handoff(context: Context, override: Partial<ExecutorHandoff> = {}) {
 }
 const submit = (context: Context) => handoff(context);
 function create(taskGoal = goal) {
+	// Tests adjust config in memory; the run's frozen config must match .ai/config.yaml (start recheck).
+	writeFileSync(join(cwd, ".ai/config.yaml"), JSON.stringify(config));
 	workflow = new StandardWorkflow({
 		executionMode: taskGoal.startsWith("Explain") ? "READ_ONLY" : "EDIT",
 		cwd,

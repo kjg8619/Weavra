@@ -5,6 +5,10 @@ import {
   ProviderDriverKind,
   ThreadId,
   type OrchestrationEvent,
+  MessageId,
+  ProviderInstanceId,
+  WORKTREE_SETUP_ACTIVITY_KIND,
+  makeWorkspaceTurnStartRefusalIdentity,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import { it as effectIt } from "@effect/vitest";
@@ -40,6 +44,203 @@ function makeEvent(input: {
 }
 
 describe("orchestration projector", () => {
+  effectIt.effect("pins bounded message refusals without replacing existing retention", () =>
+    Effect.gen(function* () {
+      const now = "2026-01-01T00:00:00.000Z";
+      const threadId = ThreadId.make("refusal-thread");
+      const requestId = MessageId.make("refused-message");
+      const identity = makeWorkspaceTurnStartRefusalIdentity(threadId, requestId);
+      const fields = {
+        aggregateKind: "thread" as const,
+        aggregateId: threadId,
+        occurredAt: now,
+        commandId: null,
+      };
+      let model = yield* projectEvent(
+        createEmptyReadModel(now),
+        makeEvent({
+          ...fields,
+          sequence: 1,
+          type: "thread.created",
+          payload: {
+            threadId,
+            projectId: ProjectId.make("refusal-project"),
+            title: "Refusal",
+            modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+            runtimeMode: "full-access",
+            interactionMode: "default",
+            branch: null,
+            worktreePath: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        }),
+      );
+      const messages = Array.from({ length: 2000 }, (_, index) => ({
+        id: index === 0 ? requestId : MessageId.make(`message-${index}`),
+        role: "user" as const,
+        text: `intent-${index}`,
+        turnId: null,
+        streaming: false,
+        createdAt: now,
+        updatedAt: now,
+      }));
+      model = {
+        ...model,
+        threads: model.threads.map((thread) => ({ ...thread, messages })),
+      };
+      const refusalPayload = {
+        version: 1,
+        source: "workspace-ownership",
+        requestId,
+        reason: "owned",
+        originCommandId: CommandId.make("original-start"),
+        originSequence: 1,
+      };
+      const retained = [
+        {
+          id: identity.activityId,
+          tone: "error" as const,
+          kind: "provider.turn.start.failed",
+          summary: "Not started",
+          payload: refusalPayload,
+          turnId: null,
+          sequence: 2,
+          createdAt: now,
+        },
+        {
+          id: EventId.make("pending-question"),
+          tone: "approval" as const,
+          kind: "user-input.requested",
+          summary: "Question",
+          payload: { requestId: "question", responseMode: "message" },
+          turnId: null,
+          sequence: 3,
+          createdAt: now,
+        },
+        {
+          id: EventId.make("worktree-setup"),
+          tone: "info" as const,
+          kind: WORKTREE_SETUP_ACTIVITY_KIND,
+          summary: "Setup",
+          payload: {},
+          turnId: null,
+          sequence: 4,
+          createdAt: now,
+        },
+        {
+          id: makeWorkspaceTurnStartRefusalIdentity(ThreadId.make("foreign-thread"), requestId)
+            .activityId,
+          tone: "error" as const,
+          kind: "provider.turn.start.failed",
+          summary: "Foreign identity",
+          payload: refusalPayload,
+          turnId: null,
+          sequence: 5,
+          createdAt: now,
+        },
+        {
+          id: makeWorkspaceTurnStartRefusalIdentity(threadId, MessageId.make("missing-message"))
+            .activityId,
+          tone: "error" as const,
+          kind: "provider.turn.start.failed",
+          summary: "Missing message",
+          payload: { ...refusalPayload, requestId: "missing-message" },
+          turnId: null,
+          sequence: 6,
+          createdAt: now,
+        },
+        {
+          id: makeWorkspaceTurnStartRefusalIdentity(threadId, MessageId.make("message-1"))
+            .activityId,
+          tone: "error" as const,
+          kind: "provider.turn.start.failed",
+          summary: "Malformed payload",
+          payload: { ...refusalPayload, requestId: "message-1", detail: "/foreign" },
+          turnId: null,
+          sequence: 7,
+          createdAt: now,
+        },
+      ];
+      for (const activity of retained) {
+        model = yield* projectEvent(
+          model,
+          makeEvent({
+            ...fields,
+            sequence: activity.sequence,
+            type: "thread.activity-appended",
+            payload: { threadId, activity },
+          }),
+        );
+      }
+      for (let index = 0; index < 500; index += 1) {
+        model = yield* projectEvent(
+          model,
+          makeEvent({
+            ...fields,
+            sequence: index + 10,
+            type: "thread.activity-appended",
+            payload: {
+              threadId,
+              activity: {
+                id: EventId.make(`recent-${index}`),
+                tone: "tool",
+                kind: "tool.completed",
+                summary: "Ran tool",
+                payload: {},
+                turnId: null,
+                sequence: index + 10,
+                createdAt: now,
+              },
+            },
+          }),
+        );
+      }
+      expect(model.threads[0]?.activities).toHaveLength(503);
+      expect(model.threads[0]?.activities.slice(0, 3)).toEqual(retained.slice(0, 3));
+
+      model = yield* projectEvent(
+        model,
+        makeEvent({
+          ...fields,
+          sequence: 600,
+          type: "thread.activity-appended",
+          payload: { threadId, activity: retained[0] },
+        }),
+      );
+      expect(model.threads[0]?.activities).toHaveLength(503);
+      expect(
+        model.threads[0]?.activities.filter((activity) => activity.id === identity.activityId),
+      ).toHaveLength(1);
+
+      model = yield* projectEvent(
+        model,
+        makeEvent({
+          ...fields,
+          sequence: 601,
+          type: "thread.message-sent",
+          payload: {
+            threadId,
+            messageId: MessageId.make("new-message"),
+            role: "user",
+            text: "new intent",
+            turnId: null,
+            streaming: false,
+            createdAt: now,
+            updatedAt: now,
+          },
+        }),
+      );
+      expect(model.threads[0]?.messages).toHaveLength(2000);
+      expect(model.threads[0]?.messages.some((message) => message.id === requestId)).toBe(false);
+      expect(model.threads[0]?.activities).toHaveLength(502);
+      expect(
+        model.threads[0]?.activities.some((activity) => activity.id === identity.activityId),
+      ).toBe(false);
+      expect(model.threads[0]?.activities.slice(0, 2)).toEqual(retained.slice(1, 3));
+    }),
+  );
+
   it("applies thread.created events", async () => {
     const now = "2026-01-01T00:00:00.000Z";
     const model = createEmptyReadModel(now);

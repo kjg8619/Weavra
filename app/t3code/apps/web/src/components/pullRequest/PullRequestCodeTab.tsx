@@ -198,7 +198,7 @@ function PullRequestCodeTab({
   selectedCommitOid,
   onSelectedCommitChange,
   pendingFinding,
-  fixFindingLabel = "Fix in a thread",
+  fixFindingLabel = "대화에서 수정",
   onFixFinding,
   onAddToAgentSelection,
   onRefresh,
@@ -757,13 +757,13 @@ function PullRequestCodeTab({
         >
           {diffQuery.error !== null ? (
             <>
-              <span>The rest of this diff could not be loaded.</span>
+              <span>나머지 변경 사항을 불러오지 못했어요.</span>
               <Button size="xs" variant="outline" onClick={() => diffQuery.refresh()}>
-                Retry
+                다시 시도
               </Button>
             </>
           ) : diffQuery.isPending ? (
-            "Loading more files..."
+            "파일을 더 불러오는 중..."
           ) : null}
         </div>
       ),
@@ -780,7 +780,7 @@ function PullRequestCodeTab({
           size="icon-micro"
           variant="ghost-muted"
           aria-expanded={!collapsed}
-          aria-label={collapsed ? "Expand diff" : "Collapse diff"}
+          aria-label={collapsed ? "변경 사항 펼치기" : "변경 사항 접기"}
           className="mr-1 rounded hover:bg-transparent"
           onClick={(event) => {
             event.stopPropagation();
@@ -842,17 +842,17 @@ function PullRequestCodeTab({
             onClick={(event) => event.stopPropagation()}
           >
             <Checkbox
-              aria-label={stale ? "Changed" : "Viewed"}
+              aria-label={stale ? "바뀜" : "Viewed"}
               checked={viewed}
               onCheckedChange={(next) => setFileViewedRef.current(item.id, path, next === true)}
             />
             {stale ? (
               <Tooltip>
                 <TooltipTrigger render={<span className="text-amber-600 dark:text-amber-500" />}>
-                  Changed
+                  바뀜
                 </TooltipTrigger>
                 <TooltipPopup side="bottom">
-                  This file has been pushed to since you marked it viewed.
+                  확인 표시한 뒤 이 파일에 새 push가 있었어요.
                 </TooltipPopup>
               </Tooltip>
             ) : (
@@ -931,14 +931,14 @@ function PullRequestCodeTab({
           if (result._tag === "Failure") {
             toastManager.add({
               type: "error",
-              title: "More comments could not be loaded",
+              title: "댓글을 더 불러오지 못했어요",
             });
             return null;
           }
           return result.value;
         }}
         onReply={(body) =>
-          runThreadCommand("Reply could not be posted", () =>
+          runThreadCommand("답글을 올리지 못했어요", () =>
             replyToThread({
               environmentId,
               input: { ...reference, threadId: thread.id, body },
@@ -950,7 +950,7 @@ function PullRequestCodeTab({
           canEditPullRequestComment(detail, { author: comment.author, kind: "review-comment" })
         }
         onEditComment={(commentId, body) =>
-          runThreadCommand("The comment could not be saved", () =>
+          runThreadCommand("댓글을 저장하지 못했어요", () =>
             updateComment({
               environmentId,
               input: { ...reference, commentId, kind: "review-comment", body },
@@ -958,7 +958,7 @@ function PullRequestCodeTab({
           )
         }
         onToggleResolved={() =>
-          void runThreadCommand("The conversation could not be updated", () =>
+          void runThreadCommand("대화를 업데이트하지 못했어요", () =>
             setThreadResolution({
               environmentId,
               input: { ...reference, threadId: thread.id, resolved: !thread.isResolved },
@@ -1003,11 +1003,11 @@ function PullRequestCodeTab({
             kind="draft"
             rangeLabel={`${draft.path}:${getReviewPositionAnchor(draft.position).line}`}
             text=""
-            submitLabel="Add to review"
+            submitLabel="리뷰에 추가"
             {...(onAddToAgentSelection
               ? {
                   secondaryAction: {
-                    label: "Add to agent",
+                    label: "에이전트에 추가",
                     onAction: (text: string) =>
                       finishSelection(draft, text, (comment) =>
                         onAddToAgentSelection({ comment, request: text }),
@@ -1069,7 +1069,7 @@ function PullRequestCodeTab({
               type="button"
               size="icon-sm"
               variant="ghost"
-              aria-label="Close review"
+              aria-label="리뷰 닫기"
               className="absolute right-2 top-2"
               onClick={() => setReviewOpen(false)}
             >
@@ -1099,7 +1099,7 @@ function PullRequestCodeTab({
             variant="glass"
           >
             <MessageSquareIcon className="size-3.5" />
-            Review
+            리뷰
             {pendingComments.length > 0 ? (
               <span className="flex size-4 items-center justify-center rounded-full bg-accent text-[10px] tabular-nums text-accent-foreground">
                 {pendingComments.length}
@@ -1122,7 +1122,7 @@ function PullRequestCodeTab({
       onSelectedCommitChange(null);
     }
   }, [commit, onSelectedCommitChange, selectedCommit]);
-  const scopeLabel = selectedCommit ? selectedCommit.messageHeadline : "All commits";
+  const scopeLabel = selectedCommit ? selectedCommit.messageHeadline : "모든 commit";
   /**
    * The same controls the thread diff panel carries, in the same order, minus the
    * ignore-whitespace toggle: that is `git diff -w` on the server, and no host's pull request
@@ -1137,7 +1137,7 @@ function PullRequestCodeTab({
           <DropdownMenu>
             <DropdownMenuTrigger
               className="inline-flex h-6 min-w-0 max-w-64 items-center gap-1 rounded-md bg-accent px-2 text-xs font-medium text-accent-foreground outline-none transition-colors hover:bg-accent/80 focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={`Diff scope: ${scopeLabel}`}
+              aria-label={`변경 범위: ${scopeLabel}`}
             >
               <span className="truncate">{scopeLabel}</span>
               <ChevronDownIcon className="size-3.5 shrink-0 opacity-70" />
@@ -1147,7 +1147,7 @@ function PullRequestCodeTab({
                 className={commit === null ? "bg-foreground/[0.08]" : undefined}
                 onClick={() => onSelectedCommitChange(null)}
               >
-                <span>All commits</span>
+                <span>모든 commit</span>
               </DropdownMenuItem>
               {orderedCommits.slice(0, visibleCommitCount).map((entry) => (
                 <DropdownMenuItem
@@ -1205,7 +1205,7 @@ function PullRequestCodeTab({
                 <Tooltip>
                   <TooltipTrigger render={<span className="flex shrink-0 items-center" />}>
                     <InfoIcon
-                      aria-label="These ticks are kept here, not on the host"
+                      aria-label="이 체크 표시는 host가 아니라 여기에만 저장돼요"
                       className="text-muted-foreground size-3.5"
                     />
                   </TooltipTrigger>
@@ -1220,7 +1220,7 @@ function PullRequestCodeTab({
                 <Tooltip>
                   <TooltipTrigger render={<span className="flex shrink-0 items-center" />}>
                     <TriangleAlertIcon
-                      aria-label="Your ticks could not be read"
+                      aria-label="체크 표시를 읽지 못했어요"
                       className="size-3.5 text-amber-600 dark:text-amber-500"
                     />
                   </TooltipTrigger>
@@ -1234,7 +1234,7 @@ function PullRequestCodeTab({
                 <Tooltip>
                   <TooltipTrigger render={<span className="flex shrink-0 items-center" />}>
                     <TriangleAlertIcon
-                      aria-label="This count covers only part of the change"
+                      aria-label="이 숫자는 변경의 일부만 반영해요"
                       className="size-3.5 text-amber-600 dark:text-amber-500"
                     />
                   </TooltipTrigger>
@@ -1250,7 +1250,7 @@ function PullRequestCodeTab({
             <Tooltip>
               <TooltipTrigger render={<span className="flex shrink-0 items-center" />}>
                 <TriangleAlertIcon
-                  aria-label="Some of this diff was not shown"
+                  aria-label="변경 사항 일부를 보여 주지 못했어요"
                   className="size-3.5 text-amber-600 dark:text-amber-500"
                 />
               </TooltipTrigger>
@@ -1264,7 +1264,7 @@ function PullRequestCodeTab({
             <Tooltip>
               <TooltipTrigger render={<span className="flex shrink-0 items-center" />}>
                 <MessageSquareOffIcon
-                  aria-label="Line comments are written from the whole change"
+                  aria-label="줄 댓글은 전체 변경 기준으로 작성돼요"
                   className="size-3.5"
                 />
               </TooltipTrigger>
@@ -1284,7 +1284,7 @@ function PullRequestCodeTab({
                   type="button"
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={allFilesCollapsed ? "Expand all files" : "Collapse all files"}
+                  aria-label={allFilesCollapsed ? "모든 파일 펼치기" : "모든 파일 접기"}
                   onClick={toggleAllFiles}
                 />
               }
@@ -1296,12 +1296,12 @@ function PullRequestCodeTab({
               )}
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {allFilesCollapsed ? "Expand all files" : "Collapse all files"}
+              {allFilesCollapsed ? "모든 파일 펼치기" : "모든 파일 접기"}
             </TooltipPopup>
           </Tooltip>
         ) : null}
         <ToggleGroup
-          aria-label="Diff layout"
+          aria-label="변경 사항 보기 방식"
           className="shrink-0"
           variant="segmented"
           value={[diffLayout]}
@@ -1312,10 +1312,10 @@ function PullRequestCodeTab({
             }
           }}
         >
-          <Toggle aria-label="Stacked diff view" value="stacked">
+          <Toggle aria-label="위아래로 보기" value="stacked">
             <Rows3Icon className="size-3.5" />
           </Toggle>
-          <Toggle aria-label="Split diff view" value="split">
+          <Toggle aria-label="나란히 보기" value="split">
             <Columns2Icon className="size-3.5" />
           </Toggle>
         </ToggleGroup>
@@ -1323,7 +1323,7 @@ function PullRequestCodeTab({
           <TooltipTrigger
             render={
               <Toggle
-                aria-label={wordWrap ? "Disable diff line wrapping" : "Enable diff line wrapping"}
+                aria-label={wordWrap ? "변경 사항 줄바꿈 끄기" : "변경 사항 줄바꿈 켜기"}
                 variant="ghost"
                 size="sm"
                 pressed={wordWrap}
@@ -1335,16 +1335,14 @@ function PullRequestCodeTab({
           >
             <TextWrapIcon className="size-3.5" />
           </TooltipTrigger>
-          <TooltipPopup side="top">
-            {wordWrap ? "Disable line wrapping" : "Enable line wrapping"}
-          </TooltipPopup>
+          <TooltipPopup side="top">{wordWrap ? "줄바꿈 끄기" : "줄바꿈 켜기"}</TooltipPopup>
         </Tooltip>
         {fileKeys.length > 0 ? (
           <Tooltip>
             <TooltipTrigger
               render={
                 <Toggle
-                  aria-label={fileTreeOpen ? "Hide file tree" : "Show file tree"}
+                  aria-label={fileTreeOpen ? "파일 트리 숨기기" : "파일 트리 보기"}
                   variant="ghost"
                   size="sm"
                   pressed={fileTreeOpen}
@@ -1355,7 +1353,7 @@ function PullRequestCodeTab({
               <FolderTreeIcon className="size-3.5" />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {fileTreeOpen ? "Hide file tree" : "Show file tree"}
+              {fileTreeOpen ? "파일 트리 숨기기" : "파일 트리 보기"}
             </TooltipPopup>
           </Tooltip>
         ) : null}
@@ -1380,7 +1378,7 @@ function PullRequestCodeTab({
   // Under the toolbar rather than in place of it, so choosing a commit does not take the
   // dropdown that was just used off the screen while its diff loads.
   if (diffQuery.isPending && loadedSlices.length === 0) {
-    return withReviewBar(<DiffPanelLoadingState label="Loading pull request diff..." />);
+    return withReviewBar(<DiffPanelLoadingState label="PR 변경 사항을 불러오는 중..." />);
   }
 
   // A slice that fails once there are files on screen is reported at the end of them instead:
@@ -1415,9 +1413,7 @@ function PullRequestCodeTab({
   if (items.length === 0 && nextCursor === null) {
     return withReviewBar(
       <p className="px-4 py-5 text-sm text-muted-foreground">
-        {commit === null
-          ? "This pull request has no file changes."
-          : "This commit has no file changes."}
+        {commit === null ? "이 PR에는 파일 변경이 없어요." : "이 commit에는 파일 변경이 없어요."}
       </p>,
     );
   }
@@ -1466,8 +1462,8 @@ function PullRequestCodeTab({
                     that has not landed yet, which is not the same as being off the diff. */}
               <span>
                 {nextCursor === null
-                  ? "Conversations not on the current diff"
-                  : "Conversations not on the diff loaded so far"}
+                  ? "현재 변경 사항에 없는 대화"
+                  : "지금까지 불러온 변경 사항에 없는 대화"}
               </span>
               <ChevronRightIcon
                 aria-hidden
@@ -1499,7 +1495,7 @@ function PullRequestCodeTab({
                     {threads.map((thread) => (
                       <div key={thread.id}>
                         {thread.line === null ? null : (
-                          <p className="px-3 text-xs text-muted-foreground">Line {thread.line}</p>
+                          <p className="px-3 text-xs text-muted-foreground">{thread.line}번째 줄</p>
                         )}
                         {renderThreadCard(thread)}
                       </div>
@@ -1589,10 +1585,10 @@ function PullRequestCodeTab({
                       onClick={diffQuery.error !== null ? () => diffQuery.refresh() : loadNextSlice}
                     >
                       {diffQuery.error !== null
-                        ? "Retry"
+                        ? "다시 시도"
                         : diffQuery.isPending
-                          ? "Loading more files..."
-                          : "Load more files"}
+                          ? "파일을 더 불러오는 중..."
+                          : "파일 더 불러오기"}
                     </Button>
                   </div>
                 )

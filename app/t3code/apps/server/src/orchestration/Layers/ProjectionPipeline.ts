@@ -1289,6 +1289,12 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           return;
 
         case "thread.activity-appended":
+          // Admission proofs remain in the event store, not the user activity feed.
+          if (
+            event.payload.activity.kind === "provider.turn.admission.claimed" ||
+            event.payload.activity.kind === "provider.turn.compaction.continuation"
+          )
+            return;
           yield* projectionThreadActivityRepository.upsert({
             activityId: event.payload.activity.id,
             threadId: event.payload.threadId,

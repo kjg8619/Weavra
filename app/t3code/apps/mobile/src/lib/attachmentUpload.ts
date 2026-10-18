@@ -197,7 +197,11 @@ function uploadedReference(
   // A picture picked through Files is typed as a plain file; uploading it as one leaves the
   // chat view with nothing to show a thumbnail from, on every client.
   return isComposerImageAttachment(attachment)
-    ? { type: "image", ...fields }
+    ? {
+        type: "image",
+        ...fields,
+        ...(attachment.type === "image" && attachment.source ? { source: attachment.source } : {}),
+      }
     : {
         type: "file",
         ...fields,
@@ -227,6 +231,7 @@ async function toUploadChatImageAttachments(
       mimeType: attachment.mimeType,
       sizeBytes: attachment.sizeBytes,
       dataUrl: await composerImageAttachmentDataUrl(attachment),
+      ...(attachment.source ? { source: attachment.source } : {}),
     })),
   );
 }
@@ -257,9 +262,13 @@ async function composerImageAttachmentDataUrl(
 async function uploadFileBytes(
   attachment: DraftComposerAttachment,
   url: string,
-  signal: AbortSignal,
-  onProgress?: (progress: number) => void,
+  options: {
+    readonly signal: AbortSignal;
+    readonly canUpload?: () => boolean;
+    readonly onProgress?: (progress: number) => void;
+  },
 ): Promise<void> {
+  const { signal, canUpload, onProgress } = options;
   const { File, Paths, UploadType } = await import("expo-file-system");
   if (signal.aborted) throw new Error("Upload cancelled.");
   // Legacy image drafts persisted inline bytes and stage them in a temp cache
@@ -280,6 +289,7 @@ async function uploadFileBytes(
         encoding: "base64",
       });
     }
+    if (signal.aborted || canUpload?.() === false) throw new Error("Upload cancelled.");
     const result = await file.upload(url, {
       httpMethod: "POST",
       uploadType: UploadType.BINARY_CONTENT,
@@ -316,6 +326,8 @@ export async function prepareTurnAttachments(input: {
   readonly attachments: ReadonlyArray<DraftComposerAttachment>;
   /** Older environments continue to receive inline images. */
   readonly supportsImageUploads?: boolean;
+  /** Live outbox eligibility, checked before each preparation effect. */
+  readonly canUpload?: () => boolean;
   readonly signal?: AbortSignal;
   readonly onUploadProgress?: (attachmentId: string, progress: number) => void;
   readonly persistUploadedReferences?: (
@@ -323,7 +335,7 @@ export async function prepareTurnAttachments(input: {
   ) => Promise<"persisted" | "abandon">;
 }): Promise<PrepareTurnAttachmentsResult> {
   const { environmentId } = input;
-  if (input.signal?.aborted) return { status: "abandoned" };
+  if (input.signal?.aborted || input.canUpload?.() === false) return { status: "abandoned" };
   const files = input.attachments.filter((attachment) => attachment.type === "file");
   const ready = (
     attachments: ReadonlyArray<UploadedMobileAttachment>,
@@ -359,12 +371,16 @@ export async function prepareTurnAttachments(input: {
   const uploadedAttachments: UploadedMobileAttachment[] = [];
   const pendingAttachmentIds: string[] = [];
   const createdAttachmentIds: string[] = [];
+  let referencesHandedOff = false;
   const controller = new AbortController();
   const abort = () => controller.abort();
   input.signal?.addEventListener("abort", abort, { once: true });
   try {
     for (const attachment of input.attachments) {
-      if (controller.signal.aborted) throw new Error("Upload cancelled.");
+      if (controller.signal.aborted || input.canUpload?.() === false) {
+        controller.abort();
+        throw new Error("Upload cancelled.");
+      }
       if (attachment.type === "image" && !input.supportsImageUploads) {
         uploadedAttachments.push(...(await toUploadChatImageAttachments([attachment])));
         continue;
@@ -382,6 +398,10 @@ export async function prepareTurnAttachments(input: {
           environmentId,
           attachmentId: attachment.uploadedAttachmentId,
         });
+        if (input.canUpload?.() === false) {
+          controller.abort();
+          throw new Error("Upload cancelled.");
+        }
         if (verification.status === "failed") {
           throw verification.error;
         }
@@ -405,23 +425,22 @@ export async function prepareTurnAttachments(input: {
           const currentConnection = appAtomRegistry.get(
             environmentSession.preparedConnectionValueAtom(environmentId),
           );
-          return Option.isNone(currentConnection)
+          return input.canUpload?.() === false || Option.isNone(currentConnection)
             ? null
             : resolveAssetUrl(currentConnection.value.httpBaseUrl, relativeUrl);
         },
         transport: (url) => ({
-          done: uploadFileBytes(
-            attachment,
-            url,
-            controller.signal,
-            input.onUploadProgress
-              ? (progress) => input.onUploadProgress?.(attachment.id, progress)
-              : undefined,
-          ),
+          done: uploadFileBytes(attachment, url, {
+            signal: controller.signal,
+            ...(input.canUpload ? { canUpload: input.canUpload } : {}),
+            ...(input.onUploadProgress
+              ? { onProgress: (progress) => input.onUploadProgress?.(attachment.id, progress) }
+              : {}),
+          }),
           abort,
         }),
         onMinted: (attachmentId) => {
-          if (controller.signal.aborted) return "cancel";
+          if (controller.signal.aborted || input.canUpload?.() === false) return "cancel";
           pendingAttachmentIds.push(attachmentId);
           createdAttachmentIds.push(attachmentId);
           return "continue";
@@ -446,6 +465,9 @@ export async function prepareTurnAttachments(input: {
       (attachment, index) => attachment !== input.attachments[index],
     );
     if (referencesChanged && input.persistUploadedReferences) {
+      // A reported persistence failure may have committed. Its durable owner
+      // must reconcile; deleting these uploads here could destroy that content.
+      referencesHandedOff = true;
       if ((await input.persistUploadedReferences(draftAttachments)) === "abandon") {
         await releaseCreatedUploadsQuietly(environmentId, createdAttachmentIds);
         return { status: "abandoned" };
@@ -453,7 +475,8 @@ export async function prepareTurnAttachments(input: {
     }
     return ready(uploadedAttachments, pendingAttachmentIds, draftAttachments);
   } catch (error) {
-    await releaseCreatedUploadsQuietly(environmentId, createdAttachmentIds);
+    if (!referencesHandedOff)
+      await releaseCreatedUploadsQuietly(environmentId, createdAttachmentIds);
     if (controller.signal.aborted) return { status: "abandoned" };
     throw error;
   } finally {

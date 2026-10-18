@@ -1,6 +1,6 @@
 import { execFileSync, fork } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,7 @@ import { CompanyKernel } from "../src/kernel.ts";
 import { isPolicyPath } from "../src/policy.ts";
 import { resolveExecutable, runProcess, verificationEnvironment } from "../src/process-runner.ts";
 import { FileStateStore } from "../src/state-store.ts";
+import { snapshotCheckTrust } from "../src/verifier-trust.ts";
 import { testContract } from "./fixture-contract.ts";
 
 let cwd: string;
@@ -65,6 +66,123 @@ describe("S6 process and platform failure boundaries", () => {
 		await writeFile(path, "noop");
 		await chmod(path, 0o600);
 		await expect(resolveExecutable(path, "")).rejects.toThrow("unavailable");
+	});
+	describe("project-relative check scripts", () => {
+		const script = async (path: string, content = "#!/bin/sh\nexit 0\n", mode = 0o755) => {
+			await writeFile(path, content);
+			await chmod(path, mode);
+		};
+		let project: string;
+		beforeEach(async () => {
+			project = join(cwd, "project");
+			await mkdir(join(project, "tools"), { recursive: true });
+		});
+
+		it("resolves an executable in-project script with a shebang to its real path", async () => {
+			await script(join(project, "tools/check.sh"));
+			const executable = await resolveExecutable("tools/check.sh", "", { root: project, cwd: "." });
+			expect(executable).toBe(await realpath(join(project, "tools/check.sh")));
+			const result = await runProcess({
+				executable,
+				argv: [],
+				cwd: project,
+				env: verificationEnvironment(),
+				timeoutMs: 2000,
+			});
+			expect(result.exitCode).toBe(0);
+		});
+		it("never resolves a relative path without a project root or through PATH", async () => {
+			await script(join(project, "tools/check.sh"));
+			await expect(resolveExecutable("tools/check.sh", project)).rejects.toThrow("unavailable");
+		});
+		it("rejects a parent-relative script outside the project", async () => {
+			await script(join(cwd, "x.sh"));
+			await expect(resolveExecutable("../x.sh", "", { root: project, cwd: "." })).rejects.toThrow("unavailable");
+			await expect(resolveExecutable("tools/../../x.sh", "", { root: project, cwd: "." })).rejects.toThrow(
+				"unavailable",
+			);
+		});
+		it("rejects a symlink that escapes the project", async () => {
+			await script(join(cwd, "outside.sh"));
+			await symlink(join(cwd, "outside.sh"), join(project, "tools/check.sh"));
+			await expect(resolveExecutable("tools/check.sh", "", { root: project, cwd: "." })).rejects.toThrow(
+				"unavailable",
+			);
+			await mkdir(join(cwd, "outside"));
+			await script(join(cwd, "outside/check.sh"));
+			await symlink(join(cwd, "outside"), join(project, "linked"));
+			await expect(resolveExecutable("linked/check.sh", "", { root: project, cwd: "." })).rejects.toThrow(
+				"unavailable",
+			);
+		});
+		it("rejects a symlink to a system shell", async () => {
+			await symlink("/bin/sh", join(project, "tools/check.sh"));
+			await expect(resolveExecutable("tools/check.sh", "", { root: project, cwd: "." })).rejects.toThrow(
+				"unavailable",
+			);
+		});
+		it.each([
+			["no execute bit", "#!/bin/sh\n", 0o644],
+			["no shebang", "exit 0\n", 0o755],
+		])("rejects an in-project script with %s", async (_name, content, mode) => {
+			await script(join(project, "tools/check.sh"), content, mode);
+			await expect(resolveExecutable("tools/check.sh", "", { root: project, cwd: "." })).rejects.toThrow(
+				"unavailable",
+			);
+		});
+		it("resolves from the check cwd to the same real path the trust snapshot freezes", async () => {
+			await mkdir(join(project, "sub/tools"), { recursive: true });
+			await script(join(project, "sub/tools/t.sh"));
+			await script(join(project, "tools/t.sh"), "#!/bin/sh\nexit 1\n");
+			const executable = await resolveExecutable("tools/t.sh", "", { root: project, cwd: "sub" });
+			expect(executable).toBe(await realpath(join(project, "sub/tools/t.sh")));
+			const snapshot = snapshotCheckTrust(project, {
+				check: {
+					id: "tool",
+					kind: "custom",
+					required: true,
+					executable: "tools/t.sh",
+					args: [],
+					cwd: "sub",
+					timeout_ms: 1000,
+				},
+				executable,
+				configDigest: "fixture",
+				trustMode: "strict",
+				environment: verificationEnvironment(),
+			});
+			expect(snapshot.executable.path).toBe(executable);
+			expect(snapshot.sources.map((source) => source.path)).toEqual(["sub/tools/t.sh"]);
+		});
+		it("rejects a parent-relative script from a check cwd even when its target exists in the project", async () => {
+			await mkdir(join(project, "sub"));
+			await script(join(project, "tools/t.sh"));
+			await expect(resolveExecutable("../tools/t.sh", "", { root: project, cwd: "sub" })).rejects.toThrow(
+				"unavailable",
+			);
+			await expect(resolveExecutable("tools/t.sh", "", { root: project, cwd: "sub/.." })).rejects.toThrow(
+				"unavailable",
+			);
+		});
+		it("rejects a check cwd symlink that escapes the project", async () => {
+			await mkdir(join(cwd, "outside/tools"), { recursive: true });
+			await script(join(cwd, "outside/tools/t.sh"));
+			await symlink(join(cwd, "outside"), join(project, "sub"));
+			await expect(resolveExecutable("tools/t.sh", "", { root: project, cwd: "sub" })).rejects.toThrow(
+				"unavailable",
+			);
+		});
+		it("rejects a directory and a protected path", async () => {
+			await mkdir(join(project, "tools/dir.sh"));
+			await expect(resolveExecutable("tools/dir.sh", "", { root: project, cwd: "." })).rejects.toThrow(
+				"unavailable",
+			);
+			await mkdir(join(project, ".git"));
+			await script(join(project, ".git/check.sh"));
+			await expect(resolveExecutable(".git/check.sh", "", { root: project, cwd: "." })).rejects.toThrow(
+				"unavailable",
+			);
+		});
 	});
 	it.each([
 		"C:\\project\\file.ts",

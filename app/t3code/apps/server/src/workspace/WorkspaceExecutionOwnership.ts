@@ -72,6 +72,8 @@ export interface WorkspaceOperationInput {
   /** Worktree operations affect both their repository metadata and destination. */
   readonly additionalPaths?: ReadonlyArray<string>;
   readonly sharedGitMetadata?: boolean;
+  /** Server-owned repository preparation must not overlap another operation. */
+  readonly exclusive?: boolean;
   /** An actual file target, not its enclosing checkout (ordinary sibling saves stay free). */
   readonly sharedMetadataTarget?: string;
   /** Captured before a command enters a queue, never supplied by a network client. */
@@ -326,6 +328,16 @@ export const make = Effect.gen(function* () {
               operation !== undefined &&
               paths.every((target) => operation.paths.some((root) => inside(root, target))),
           );
+        for (const operation of operations.values()) {
+          if (operation.token.id === parent?.token.id) continue;
+          if (!input.exclusive && !operation.input.exclusive) continue;
+          if (paths.some((target) => operation.paths.some((root) => overlaps(root, target))))
+            return yield* fail(
+              cwd,
+              "owned",
+              "Repository preparation cannot overlap an active workspace operation.",
+            );
+        }
         if (
           (analysis !== undefined || parent?.controlledAnalysis !== undefined) &&
           input.kind !== "provider" &&
@@ -404,19 +416,30 @@ export const make = Effect.gen(function* () {
             WHERE sequence > ${input.eventSequence} AND event_type = 'thread.weavra-task-set'
               AND json_extract(payload_json, '$.task.environmentId') = ${environmentId}
           `.pipe(Effect.mapError(unavailable(cwd)));
-          if (
-            changes.some(
-              (change) =>
-                !parent?.paths.some((root) => overlaps(root, change.cwd)) &&
-                (change.threadId === input.threadId ||
-                  paths.some((target) => overlaps(change.cwd, target))),
-            )
-          )
-            return yield* fail(
-              cwd,
-              "stale",
-              "This queued command predates an ownership generation change.",
-            );
+          for (const change of changes) {
+            if (parent?.paths.some((root) => overlaps(root, change.cwd))) continue;
+            let relevantChange =
+              change.threadId === input.threadId ||
+              paths.some((target) => overlaps(change.cwd, target));
+            if (!relevantChange && commonDir !== null) {
+              const changedCommonDir = yield* commonDirectory(change.cwd);
+              if (changedCommonDir === null) {
+                return yield* fail(
+                  cwd,
+                  "unavailable",
+                  "The repository of an ownership change could not be established.",
+                );
+              }
+              relevantChange = changedCommonDir === commonDir;
+            }
+            if (relevantChange) {
+              return yield* fail(
+                cwd,
+                "stale",
+                "This queued command predates an ownership generation change.",
+              );
+            }
+          }
         }
         const currentGenerations = rows.filter((owner) =>
           paths.some((target) => overlaps(owner.canonicalCwd, target)),

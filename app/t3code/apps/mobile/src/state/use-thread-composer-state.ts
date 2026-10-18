@@ -42,7 +42,10 @@ import {
 import type { DraftComposerImageAttachment } from "../lib/composerImages";
 import { scopedThreadKey } from "../lib/scopedEntities";
 import { buildThreadFeed } from "../lib/threadActivity";
-import { acknowledgedThreadMessagesAtom } from "./acknowledged-thread-messages";
+import {
+  acknowledgedThreadMessagesAtom,
+  forgetAcknowledgedThreadEchoes,
+} from "./acknowledged-thread-messages";
 import { appendPendingThreadMessages } from "../features/threads/pending-thread-feed";
 import { appAtomRegistry } from "../state/atom-registry";
 import { pendingThreadCreationMessage } from "./pending-thread-creation";
@@ -57,7 +60,6 @@ import {
   composerContextImportsAtom,
   ensureComposerDraftsLoaded,
   getComposerDraftSnapshot,
-  mergeComposerDraftContent,
   removeComposerDraftAttachment,
   scheduleUnusedComposerAttachmentCleanup,
   setComposerDraftText,
@@ -67,7 +69,10 @@ import {
 import { setPendingConnectionError } from "../state/use-remote-environment-registry";
 import { useSelectedThreadDetail } from "../state/use-thread-detail";
 import { useThreadSelection } from "../state/use-thread-selection";
-import { enqueueThreadOutboxMessage } from "./thread-outbox";
+import { enqueueThreadOutboxMessage, threadOutboxStorageIdentity } from "./thread-outbox";
+import { restoreOutboxAdmission } from "./thread-outbox-handback";
+import { sendRejectedComposer, type RejectedComposerOwner } from "./rejected-composer-operations";
+import { currentThreadOutboxPresentation } from "./thread-outbox-presentation";
 import { dispatchingQueuedMessageIdAtom, useThreadOutboxMessages } from "./use-thread-outbox";
 import { threadEnvironment } from "./threads";
 import { useAtomCommand } from "./use-atom-command";
@@ -123,7 +128,9 @@ export function useThreadDraftForThread(input: {
   };
 }
 
-export function useThreadComposerState() {
+export function useThreadComposerState(recovery?: {
+  readonly capture: () => RejectedComposerOwner;
+}) {
   const {
     selectedThread: selectedThreadShell,
     selectedThreadCreation,
@@ -171,7 +178,9 @@ export function useThreadComposerState() {
     () =>
       selectedThreadKey
         ? (queuedMessagesByThreadKey[selectedThreadKey] ?? []).filter(
-            (message) => message.creation === undefined,
+            (message) =>
+              message.creation === undefined ||
+              currentThreadOutboxPresentation(message).kind === "retained",
           )
         : [],
     [queuedMessagesByThreadKey, selectedThreadKey],
@@ -228,21 +237,29 @@ export function useThreadComposerState() {
     acknowledgedMessages,
   ]);
   useEffect(() => {
+    if (!selectedThreadShell) return;
     const echoedIds = new Set(selectedThreadMessages?.map((message) => message.id));
-    if (acknowledgedMessages.some((message) => echoedIds.has(message.messageId))) {
-      appAtomRegistry.set(
-        acknowledgedThreadMessagesAtom,
-        appAtomRegistry
-          .get(acknowledgedThreadMessagesAtom)
-          .filter((message) => !echoedIds.has(message.messageId)),
-      );
-    }
-  }, [acknowledgedMessages, selectedThreadMessages]);
+    if (
+      !acknowledgedMessages.some(
+        (message) =>
+          message.environmentId === selectedThreadShell.environmentId &&
+          message.threadId === selectedThreadShell.id &&
+          echoedIds.has(message.messageId),
+      )
+    )
+      return;
+    forgetAcknowledgedThreadEchoes({
+      scope: { environmentId: selectedThreadShell.environmentId, threadId: selectedThreadShell.id },
+      messageIds: echoedIds,
+    });
+  }, [acknowledgedMessages, selectedThreadMessages, selectedThreadShell]);
 
   const selectedDraft = selectedThreadKey ? composerDrafts[selectedThreadKey] : null;
   const draftMessage = selectedDraft?.text ?? "";
   const draftAttachments = selectedDraft?.attachments ?? [];
-  const selectedThreadQueueCount = selectedThreadQueuedMessages.length;
+  const selectedThreadQueueCount = selectedThreadQueuedMessages.filter(
+    (message) => currentThreadOutboxPresentation(message).kind === "ready",
+  ).length;
   const selectedThread = selectedThreadDetail ?? selectedThreadShell;
   const modelSelection = selectedDraft?.modelSelection ?? selectedThread?.modelSelection ?? null;
   const runtimeMode = selectedDraft?.runtimeMode ?? selectedThread?.runtimeMode ?? null;
@@ -271,7 +288,7 @@ export function useThreadComposerState() {
   const isCompacting = useMemo(() => {
     const queuedMessage = selectedThreadQueuedMessages.findLast(
       (message) =>
-        message.messageId === dispatchingQueuedMessageId &&
+        threadOutboxStorageIdentity(message) === dispatchingQueuedMessageId &&
         message.text.trim().toLowerCase() === "/compact" &&
         message.attachments.length === 0,
     );
@@ -339,6 +356,28 @@ export function useThreadComposerState() {
     const draft = getComposerDraftSnapshot(threadKey);
     if (appAtomRegistry.get(composerContextImportsAtom)[threadKey]) return null;
     const thread = selectedThreadDetail ?? selectedThreadShell;
+    // A marked draft is an exact recovered intent, never a client command or
+    // an optimistic clear/merge transaction.
+    if (draft.rejectedTurn !== undefined) {
+      if (recovery === undefined) return null;
+      const selection = draft.modelSelection ?? thread.modelSelection;
+      const config = selectedEnvironmentRuntime?.serverConfig;
+      if (isModelSelectionUnavailable(config, selection)) return null;
+      const selectedProvider = config?.providers.find(
+        (entry) => entry.instanceId === selection.instanceId,
+      );
+      return sendRejectedComposer({
+        owner: recovery.capture(),
+        settings: {
+          modelSelection: selection,
+          runtimeMode: draft.runtimeMode ?? thread.runtimeMode,
+          interactionMode: resolveProviderInteractionMode(
+            selectedProvider,
+            draft.interactionMode ?? thread.interactionMode,
+          ),
+        },
+      });
+    }
     const text = draft.text.trim();
     const attachments = draft.attachments;
     if (
@@ -436,7 +475,7 @@ export function useThreadComposerState() {
     // the tap frame instead of after file I/O. If the write fails the message
     // is rolled out of the queue and the content is merged back into the
     // draft, preserving anything typed since.
-    const enqueuePromise = enqueueThreadOutboxMessage({
+    const admission = enqueueThreadOutboxMessage({
       environmentId: selectedThreadShell.environmentId,
       threadId: selectedThreadShell.id,
       messageId,
@@ -453,31 +492,38 @@ export function useThreadComposerState() {
       createdAt: metadata.createdAt,
     });
     clearComposerDraftContent(threadKey, { deferAttachmentCleanup: true });
-    enqueuePromise.then(
-      () => {
-        // The queued message owns the files now; the sweep sees that and
-        // spares them. Deferred to here so a failed write cannot roll the
-        // message out of the queue mid-sweep and lose the bytes.
-        scheduleUnusedComposerAttachmentCleanup(attachments);
-      },
-      (error: unknown) => {
-        // Restore text via merge (idempotent) but attachments via the uncapped
-        // append: the merge path slots existing attachments first and truncates
-        // at the send limit, which would silently drop this message's images if
-        // the user attached new ones while the write was in flight.
-        void mergeComposerDraftContent(threadKey, {
-          text,
-          context: draft.context,
-          attachments: [],
-        });
-        appendComposerDraftAttachments(threadKey, attachments, { allowOverflow: true });
+    void admission.committed
+      .then(
+        () => {
+          // The queued message owns the files now; the sweep sees that and
+          // spares them. Deferred to here so a failed write cannot roll the
+          // message out of the queue mid-sweep and lose the bytes.
+          scheduleUnusedComposerAttachmentCleanup(attachments);
+        },
+        async (error: unknown) => {
+          // Restore text via merge (idempotent) but attachments via the uncapped
+          // append: the merge path slots existing attachments first and truncates
+          // at the send limit, which would silently drop this message's images if
+          // the user attached new ones while the write was in flight.
+          await restoreOutboxAdmission({
+            message: { text, context: draft.context, attachments },
+            draftKey: threadKey,
+            releaseAfterHandback: admission.releaseAfterHandback,
+          });
+          setPendingConnectionError(
+            error instanceof Error ? error.message : "Failed to save the queued message.",
+          );
+        },
+      )
+      .catch((error: unknown) => {
+        // Failed restoration keeps the admission owner, including upload refs.
         setPendingConnectionError(
-          error instanceof Error ? error.message : "Failed to save the queued message.",
+          error instanceof Error ? error.message : "Could not restore the queued draft.",
         );
-      },
-    );
+      });
     return messageId;
   }, [
+    recovery,
     selectedEnvironmentRuntime?.connectionState,
     selectedEnvironmentRuntime?.serverConfig,
     selectedThreadCreation,
@@ -801,7 +847,10 @@ export function useThreadComposerState() {
     selectedThreadFeed,
     selectedThreadQueueCount,
     selectedThreadQueuedMessages,
-    dispatchingQueuedMessageId,
+    dispatchingQueuedMessageId:
+      selectedThreadQueuedMessages.find(
+        (message) => threadOutboxStorageIdentity(message) === dispatchingQueuedMessageId,
+      )?.messageId ?? null,
     activeWorkStartedAt,
     isCompacting,
     draftMessage,

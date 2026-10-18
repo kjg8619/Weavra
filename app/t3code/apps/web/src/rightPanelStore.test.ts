@@ -21,6 +21,19 @@ beforeEach(() => {
 });
 
 describe("rightPanelStore", () => {
+  it("opens project control voluntarily and restores its tab without opening another thread", () => {
+    useRightPanelStore.getState().open(refA, "control");
+    const saved = { byThreadKey: useRightPanelStore.getState().byThreadKey };
+    useRightPanelStore.setState(migratePersistedRightPanelState(saved));
+    expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
+      id: "control",
+      kind: "control",
+    });
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refB).isOpen,
+    ).toBe(false);
+  });
+
   it("gives each host/device its own tab and preserves renamed tabs", () => {
     const store = useRightPanelStore.getState();
     const android = {

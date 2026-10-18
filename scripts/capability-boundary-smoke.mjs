@@ -175,4 +175,8 @@ for (const text of [payloads, await readFile(stderr, "utf8"), JSON.stringify(act
 }
 assert.ok(events.filter((row) => row.type === "request").every((row) => ["control.hello", "control.snapshot", "facts.prepare", "approval.resolve"].includes(row.command)));
 console.log(`ACTUAL PASS N14/N20/N25/N28: ${events.filter((row) => row.type === "window-start").length} snapshot windows plus observation idle intervals; intercepted Node network/child-process/credential-resource API attempts=0; positive controls=5; no paid inference`);
+const runtimePids = [...new Set(events.filter((row) => row.type === "guard-ready").map((row) => row.pid))];
+assert.ok(runtimePids.length > 0);
+for (const pid of runtimePids) assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+console.log(`CAPABILITY CHILD CLEANUP PASS: ${runtimePids.length} owned Runtime processes exited`);
 console.log("CAPABILITY CROSS-BOUNDARY PASS (actual Runtime/App/filesystem; injected adversarial states separately labelled)");

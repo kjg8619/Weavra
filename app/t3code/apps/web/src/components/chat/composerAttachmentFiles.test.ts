@@ -157,12 +157,11 @@ describe("composer attachment files", () => {
         supportsAttachmentUploads: false,
         maxFileAttachmentBytes: null,
       }),
-    ).toBe("Waiting for the server before file attachments can send");
+    ).toBe("파일 첨부를 보내려면 서버를 기다려야 해요");
   });
 
   it("rejects local staging and send when known config has no file support", () => {
-    const unsupportedReason =
-      "This server does not accept file attachments right now. Remove the files to send.";
+    const unsupportedReason = "이 서버는 지금 파일 첨부를 받지 않아요. 보내려면 파일을 빼 주세요.";
     expect(
       fileAttachmentStagingLimit({
         attachmentUploadsCapabilityKnown: true,

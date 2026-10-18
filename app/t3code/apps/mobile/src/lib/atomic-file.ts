@@ -9,11 +9,27 @@ let tempFileSequence = 0;
  * temp file so concurrent writers to the same destination cannot move or
  * clobber each other's staging file mid-flight.
  */
-export async function writeFileAtomically(file: File, contents: string): Promise<void> {
+export async function prepareAtomicFileWriter(
+  file: File,
+): Promise<(contents: string, mayCommit?: () => boolean) => "written" | "cancelled"> {
   const { File: FileConstructor } = await import("expo-file-system");
-  tempFileSequence += 1;
-  const temp = new FileConstructor(file.parentDirectory, `${file.name}.${tempFileSequence}.tmp`);
-  temp.create({ intermediates: true, overwrite: true });
-  temp.write(contents);
-  temp.moveSync(file, { overwrite: true });
+  // After preparation, replacement and the caller's publication can share one
+  // synchronous segment. Check caller state after staging, immediately before rename.
+  return (contents, mayCommit) => {
+    tempFileSequence += 1;
+    const temp = new FileConstructor(file.parentDirectory, `${file.name}.${tempFileSequence}.tmp`);
+    temp.create({ intermediates: true, overwrite: true });
+    temp.write(contents);
+    if (mayCommit && !mayCommit()) {
+      temp.delete();
+      return "cancelled";
+    }
+    temp.moveSync(file, { overwrite: true });
+    return "written";
+  };
+}
+
+export async function writeFileAtomically(file: File, contents: string): Promise<void> {
+  const write = await prepareAtomicFileWriter(file);
+  write(contents);
 }

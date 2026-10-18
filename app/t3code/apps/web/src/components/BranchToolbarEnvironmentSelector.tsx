@@ -42,9 +42,7 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
 
   const environmentItems = useMemo(
     () => [
-      ...(onAutoEnvironment
-        ? [{ value: "auto", label: autoEnvironmentLabel ?? "Auto balance" }]
-        : []),
+      ...(onAutoEnvironment ? [{ value: "auto", label: autoEnvironmentLabel ?? "자동 분배" }] : []),
       ...availableEnvironments.map((env) => ({
         value: env.environmentId,
         label: env.label,
@@ -78,11 +76,11 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
               data-composer-label-motion
               className="block w-full min-w-0 max-w-[240px] truncate transition-opacity duration-180 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[compact]/composer-context:opacity-0 motion-reduce:transition-none"
             >
-              {activeEnvironment?.label ?? "Run on"}
+              {activeEnvironment?.label ?? "실행 위치"}
             </span>
           </span>
         </TooltipTrigger>
-        <TooltipPopup>{activeEnvironment?.label ?? "Run on"}</TooltipPopup>
+        <TooltipPopup>{activeEnvironment?.label ?? "실행 위치"}</TooltipPopup>
       </Tooltip>
     );
   }
@@ -103,7 +101,7 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
               variant="ghost"
               size="xs"
               className="min-w-0 max-w-full font-normal text-xs!"
-              aria-label="Run on"
+              aria-label="실행 위치"
               data-composer-shortcut="composer.host"
               data-composer-context-control
             />
@@ -129,11 +127,13 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
             </span>
           </span>
         </TooltipTrigger>
-        <TooltipPopup>{autoEnvironmentLabel ?? activeEnvironment?.label ?? "Run on"}</TooltipPopup>
+        <TooltipPopup>
+          {autoEnvironmentLabel ?? activeEnvironment?.label ?? "실행 위치"}
+        </TooltipPopup>
       </Tooltip>
       <SelectPopup alignItemWithTrigger={false} {...composerFloatingLayerProps}>
         <SelectGroup>
-          <SelectGroupLabel>Run on</SelectGroupLabel>
+          <SelectGroupLabel>실행 위치</SelectGroupLabel>
           {onAutoEnvironment && (
             <SelectItem
               value="auto"
@@ -143,7 +143,7 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
             >
               <span className="inline-flex items-center gap-1.5">
                 <ScaleIcon className="size-3" aria-hidden="true" />
-                {autoEnvironmentLabel ?? "Auto balance"}
+                {autoEnvironmentLabel ?? "자동 분배"}
               </span>
             </SelectItem>
           )}

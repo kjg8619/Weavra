@@ -75,6 +75,7 @@ export interface DiffEvidence extends NonNullable<Run["workspace"]> {
 	diff: string;
 }
 const owned = new Set([".ai/state.json", ".ai/tasks.json", ".ai/writer.lock", ".ai/writer.lock.recovery"]);
+const isProjectMetadataPath = (path: string): boolean => path === ".ai" || path.startsWith(".ai/");
 /** Runtime-owned: canonical state, projection, lock/recovery guard and immutable terminal-run archives. */
 export const isRuntimeOwnedPath = (path: string): boolean =>
 	owned.has(path) || /^\.ai\/runs\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.json$/.test(path);
@@ -85,7 +86,7 @@ const CLEAN_START_STATUS = ["status", "--porcelain=v1", "-z", "--untracked-files
 /**
  * The paths of `git status --porcelain=v1 -z` output that fail the clean-start check, sorted and unique: every
  * entry's path, and the original path of a rename or copy (the next field, without a status prefix), except
- * Runtime-owned and generated observation paths.
+ * Project metadata and generated observation paths. Both sides of a rename are checked.
  */
 export function cleanStartBlockers(status: string, generated: ReadonlySet<string>): string[] {
 	const fields = status.split("\0");
@@ -96,7 +97,7 @@ export function cleanStartBlockers(status: string, generated: ReadonlySet<string
 		paths.add(entry.slice(3));
 		if (/[RC]/.test(entry.slice(0, 2)) && fields[index + 1]) paths.add(fields[++index]);
 	}
-	return [...paths].filter((path) => !isRuntimeOwnedPath(path) && !generated.has(path)).sort();
+	return [...paths].filter((path) => !isProjectMetadataPath(path) && !generated.has(path)).sort();
 }
 
 /** Git under the fixed Runtime flags: no optional locks, fsmonitor or hooks, the verification environment. */
@@ -227,6 +228,13 @@ class WorkspaceEvidenceCollector {
 	private editable(path: string): boolean {
 		return this.options.allowedPaths.some((root) => path === root || path.startsWith(`${root}/`));
 	}
+	/** Whether a capture keeps this path's text, exactly as `images` decides. */
+	retainsText(path: string): boolean {
+		return !this.options.evidenceMode || this.editable(path);
+	}
+	blob(object: string, signal: AbortSignal): Promise<string> {
+		return this.command(["cat-file", "blob", object], signal);
+	}
 	/** Validate ancestors before touching the leaf, including when the leaf is missing or is an admitted link. */
 	private async ancestors(path: string): Promise<Array<{ path: string; stat: BigIntStats }> | undefined> {
 		const ancestors: Array<{ path: string; stat: BigIntStats }> = [];
@@ -257,8 +265,10 @@ class WorkspaceEvidenceCollector {
 		const names = new Set(
 			(await this.command(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], signal))
 				.split("\0")
-				.filter((path) => path && !isRuntimeOwnedPath(path)),
+				.filter((path) => path && !isProjectMetadataPath(path)),
 		);
+		// Config stays content-bound as protected evidence; other metadata must not make Runtime's own
+		// state writes appear in a worker diff. The independent configDigest remains authoritative.
 		names.add(".ai/config.yaml");
 		for (const path of OBSERVATION_FILES) names.add(path);
 		// Include ignored files in explicitly allowed roots so worker writes cannot disappear from evidence.
@@ -284,7 +294,7 @@ class WorkspaceEvidenceCollector {
 				const current = await lstat(join(this.cwd, path));
 				if (!current.isDirectory() || current.dev !== stat.dev || current.ino !== stat.ino)
 					throw new WorkspaceEvidenceError("unavailable", "Workspace directory changed during capture");
-			} else if (!isRuntimeOwnedPath(path)) names.add(path);
+			} else if (!isProjectMetadataPath(path)) names.add(path);
 			await this.assertAncestors(ancestors);
 		}
 		for (const path of await ownedObservationPaths(this.cwd)) names.delete(path);
@@ -427,6 +437,64 @@ export async function probeWorkspaceEvidence(
 	}
 }
 
+/** One side of a recorded Run change: Git file mode and text, or null text when the content is not text. */
+export interface RunResultImage {
+	mode: string;
+	text: string | null;
+}
+const gitMode = (image: FileImage): string =>
+	image.kind === "symlink" ? "120000" : image.mode & 0o111 ? "100755" : "100644";
+
+/**
+ * Read-only base..result images of a recorded Run, for display only. The result is the current capture and is used
+ * only when its digest equals the recorded `diffDigest`; otherwise null (the workspace is no longer that result). The
+ * base is the staged Git blob, whose object id is re-derived from the bytes read. No writer, check, model or Git write.
+ */
+export async function readRunResultImages(
+	cwd: string,
+	options: WorkspaceEvidenceOptions,
+	diffDigest: string,
+	paths: readonly string[],
+	signal?: AbortSignal,
+): Promise<Map<string, { before: RunResultImage | null; after: RunResultImage | null }> | null> {
+	try {
+		return await boundedCapture(signal, async (signal) => {
+			const collector = await WorkspaceEvidenceCollector.create(cwd, options);
+			const index = await collector.initialize(signal);
+			const capture = await collector.capture(signal);
+			if (capture.index !== index || captureDigest(capture, options.evidenceMode) !== diffDigest) return null;
+			const staged = new Map<string, { mode: string; object: string }>();
+			for (const entry of index.split("\0")) {
+				const match = /^(\d{6}) ([a-f0-9]+) 0\t(.+)$/.exec(entry);
+				if (match) staged.set(match[3], { mode: match[1], object: match[2] });
+			}
+			const result = new Map<string, { before: RunResultImage | null; after: RunResultImage | null }>();
+			for (const path of paths) {
+				const entry = staged.get(path);
+				let before: RunResultImage | null = null;
+				if (entry) {
+					let text: string | null = null;
+					if (entry.mode !== "120000" && collector.retainsText(path)) {
+						const raw = await collector.blob(entry.object, signal);
+						const object = createHash(entry.object.length === 64 ? "sha256" : "sha1")
+							.update(`blob ${Buffer.byteLength(raw)}\0`)
+							.update(raw)
+							.digest("hex");
+						if (object === entry.object && !raw.includes("\0")) text = raw;
+					}
+					before = { mode: entry.mode, text };
+				}
+				const image = capture.images.get(path);
+				result.set(path, { before, after: image ? { mode: gitMode(image), text: textOf(image) ?? null } : null });
+			}
+			return result;
+		});
+	} catch (error) {
+		if (error instanceof WorkspaceEvidenceError) throw error;
+		throw new WorkspaceEvidenceError("unavailable", "Workspace evidence unavailable", error);
+	}
+}
+
 /** Exact clean checkout identity using the execution collector; no writer, baseline or check execution. */
 export async function readCheckoutIdentity(
 	cwd: string,
@@ -552,7 +620,7 @@ export class GitWorkspace {
 		const images: Record<string, WorkspaceFileImage | null> = {};
 		for (const path of paths) {
 			signal?.throwIfAborted();
-			if (!isPolicyPath(path) || isRuntimeOwnedPath(path)) throw new Error("Unsupported claimed path");
+			if (!isPolicyPath(path) || isProjectMetadataPath(path)) throw new Error("Unsupported claimed path");
 			let stat: Stats;
 			try {
 				stat = await lstat(join(this.cwd, path));

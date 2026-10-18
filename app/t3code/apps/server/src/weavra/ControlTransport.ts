@@ -116,7 +116,13 @@ export const openControlTransport = Effect.fn("weavra.openControlTransport")(fun
     }),
     Effect.forkScoped,
   );
-  const exchange = Effect.fn("weavra.controlExchange")(function* (request: WeavraControlRequest) {
+  const exchange = Effect.fn("weavra.controlExchange")(function* (input: WeavraControlRequest) {
+    // The App binds `facts.candidates` to the observed owner and revision; the Runtime accepts
+    // only its read-only envelope.
+    const request: WeavraControlRequest =
+      input.type === "facts.candidates"
+        ? { protocolVersion: input.protocolVersion, id: input.id, type: input.type }
+        : input;
     if (Buffer.byteLength(`${encodeJson(request)}\n`) > WEAVRA_CONTROL_MAX_REQUEST_BYTES)
       return yield* new WeavraControlTransportError({ code: "OVERSIZED_PAYLOAD" });
     const encoded = yield* encodeRequest(request).pipe(

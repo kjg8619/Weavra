@@ -42,7 +42,7 @@ describe("buildThreadActionMenuItems", () => {
     const copyIndex = items.findIndex((item) => item.id === "copy");
     expect(items[copyIndex + 1]).toMatchObject({
       id: "project-settings",
-      label: "Project settings",
+      label: "프로젝트 설정",
       icon: "settings",
     });
     expect(items[copyIndex + 2]?.id).toBe("archive");
@@ -55,7 +55,7 @@ describe("buildThreadActionMenuItems", () => {
         ...baseState,
         projectFilter: { label: "Beta Project", isActive: false },
       }).find((item) => item.id === "filter-by-project"),
-    ).toMatchObject({ label: "Filter by Beta Project", icon: "folder-tree" });
+    ).toMatchObject({ label: "Beta Project만 보기", icon: "folder-tree" });
   });
 
   it("offers the way back to all projects once the list is scoped", () => {
@@ -64,7 +64,7 @@ describe("buildThreadActionMenuItems", () => {
       projectFilter: { label: "Beta Project", isActive: true },
     });
     const filterIndex = items.findIndex((candidate) => candidate.id === "filter-by-project");
-    expect(items[filterIndex]).toMatchObject({ label: "Show all projects", icon: "folder-tree" });
+    expect(items[filterIndex]).toMatchObject({ label: "모든 프로젝트 보기", icon: "folder-tree" });
     expect(items[filterIndex - 1]?.id).toBe("mark-unread");
     expect(items[filterIndex + 1]?.id).toBe("copy");
   });
@@ -96,7 +96,7 @@ describe("buildThreadActionMenuItems", () => {
     const item = buildThreadActionMenuItems({ ...baseState, isRegeneratingTitle: true }).find(
       (candidate) => candidate.id === "regenerate-title",
     );
-    expect(item).toMatchObject({ label: "Regenerating…", disabled: true });
+    expect(item).toMatchObject({ label: "제목 다시 만드는 중…", disabled: true });
   });
 
   it("marks delete as destructive and keeps it last", () => {

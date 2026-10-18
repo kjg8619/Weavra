@@ -31,8 +31,8 @@ export function buildLinkedThreadActionItems(
   return input.threads.map((thread) => ({
     kind: "action",
     value: `thread:${input.environmentId}:${thread.id}`,
-    title: thread.title || "Untitled thread",
-    description: thread.archivedAt === null ? "Linked thread" : "Archived thread",
+    title: thread.title || "제목 없는 스레드",
+    description: thread.archivedAt === null ? "연결된 스레드" : "보관된 스레드",
     searchTerms: [input.query, thread.title],
     icon: input.icon,
     run: () => input.runThread({ environmentId: input.environmentId, id: thread.id }),
@@ -493,7 +493,7 @@ export function buildBrowseGroups(input: {
     });
   }
 
-  return [{ value: "directories", label: "Directories", items }];
+  return [{ value: "directories", label: "폴더", items }];
 }
 
 export function filterPinnedBrowseEntries(input: {
@@ -531,12 +531,12 @@ export function buildRootGroups(input: {
 }): CommandPaletteGroup[] {
   const groups: CommandPaletteGroup[] = [];
   if (input.actionItems.length > 0) {
-    groups.push({ value: "actions", label: "Actions", items: input.actionItems });
+    groups.push({ value: "actions", label: "작업", items: input.actionItems });
   }
   if (input.recentThreadItems.length > 0) {
     groups.push({
       value: "recent-threads",
-      label: "Recent Threads",
+      label: "최근 스레드",
       items: input.recentThreadItems,
     });
   }
@@ -546,12 +546,12 @@ export function buildRootGroups(input: {
 export function getCommandPaletteInputPlaceholder(mode: CommandPaletteMode): string {
   switch (mode) {
     case "root":
-      return "Search commands, projects, and threads...";
+      return "명령, 프로젝트, 스레드 검색...";
     case "root-browse":
-      return "Enter project path (e.g. ~/projects/my-app)";
+      return "프로젝트 경로 입력 (예: ~/projects/my-app)";
     case "submenu":
-      return "Search...";
+      return "검색...";
     case "submenu-browse":
-      return "Enter path (e.g. ~/projects/my-app)";
+      return "경로 입력 (예: ~/projects/my-app)";
   }
 }

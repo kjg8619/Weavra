@@ -57,6 +57,30 @@ it("returns the execution collector identity over stdio and uses it for task pre
 	expect(client.notices.some((notice) => notice.kind === "model-initializing")).toBe(false);
 });
 
+it.each([
+	["missing", "PROJECT_NOT_CONFIGURED"],
+	["invalid", "CONTROL_UNAVAILABLE"],
+] as const)("refuses checkout with %s configuration before any admission", async (configuration, code) => {
+	if (configuration === "missing") await rm(join(project.cwd, ".ai"), { recursive: true });
+	else await writeFile(join(project.cwd, ".ai/config.yaml"), "invalid: [");
+	const client = startTaskControl(project.cwd, project.home);
+	try {
+		await client.hello();
+		expect(await client.request({ type: "workflow.checkout" })).toMatchObject({
+			success: false,
+			error: { code },
+		});
+		const state = await FileStateStore.readSnapshot(project.cwd);
+		expect(state.state).toBeUndefined();
+		expect(state.writerPresent).toBe(false);
+		expect(client.notices.some((notice) => notice.kind === "model-initializing")).toBe(false);
+		if (configuration === "missing")
+			await expect(readdir(join(project.cwd, ".ai"))).rejects.toMatchObject({ code: "ENOENT" });
+	} finally {
+		await client.stop();
+	}
+});
+
 it("previews explicit STANDARD and QUICK routes from normalized config without invoking models", async () => {
 	await writeFile(
 		join(project.cwd, ".ai/config.yaml"),
@@ -353,6 +377,63 @@ it("reads every canonical evidence category without mutation and rejects stale o
 	).toMatchObject({ success: false, error: { code: "RUN_NOT_FOUND" } });
 	expect(await readFile(join(project.cwd, ".ai/state.json"), "utf8")).toBe(before);
 	expect(client.notices.filter((notice) => notice.kind === "provider-use")).toHaveLength(providerUses);
+});
+
+it("pages the bound Run's own base..result diff read-only and refuses it once the workspace moved on", async () => {
+	const client = await project.start();
+	const preview = await prepareTask(client, project.prepareFields);
+	const binding = preview.taskBinding;
+	if (!binding) throw new Error("Missing binding");
+	await confirmTask(client, preview);
+	await client.waitNotice((notice) => notice.kind === "writer-closed");
+	const run = (await FileStateStore.readSnapshot(project.cwd)).state?.runs[0];
+	if (!run?.workspace) throw new Error("Missing fixture Run");
+	const before = await readFile(join(project.cwd, ".ai/state.json"), "utf8");
+	const request = () =>
+		client.request({
+			type: "workflow.evidence",
+			binding: {
+				taskId: binding.taskId,
+				environmentId: binding.environmentId,
+				projectId: binding.projectId,
+				threadId: binding.threadId,
+				executionId: binding.executionId,
+				runId: run.runId,
+				revision: run.revision,
+				diffDigest: run.workspace?.diffDigest ?? null,
+			},
+			cursor: { category: "run-diff", index: 0 },
+		});
+	const page = await request();
+	expect(Buffer.byteLength(JSON.stringify(page)) + 1).toBeLessThanOrEqual(65_536);
+	expect(page).toMatchObject({
+		success: true,
+		data: {
+			kind: "evidence-details",
+			snapshot: { diffDigest: run.workspace.diffDigest },
+			nextCursor: null,
+			records: [
+				{
+					category: "run-diff",
+					index: 0,
+					path: "src/value.ts",
+					change: "modified",
+					patch: "diff --git a/src/value.ts b/src/value.ts\n--- a/src/value.ts\n+++ b/src/value.ts\n@@ -1,1 +1,1 @@\n-export const value = 0;\n+export const value = 1;\n",
+					omitted: null,
+				},
+			],
+		},
+	});
+	await writeFile(join(project.cwd, "src/unrelated.ts"), "export const other = 2;\n");
+	expect(await request()).toMatchObject({
+		success: true,
+		data: { kind: "evidence-detail-unavailable", reason: "DIFF_STALE", recordIndex: 0 },
+	});
+	await rm(join(project.cwd, "src/unrelated.ts"));
+	const again = await request();
+	expect(again.success && again.data).toEqual(page.success && page.data);
+	expect(await readFile(join(project.cwd, ".ai/state.json"), "utf8")).toBe(before);
+	expect((await FileStateStore.readSnapshot(project.cwd)).writerPresent).toBe(false);
 });
 
 it("budgets large multibyte pages against the actual stdio response envelope", async () => {

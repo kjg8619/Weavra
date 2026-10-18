@@ -25,6 +25,7 @@ import {
   useSavedRemoteConnection,
 } from "./use-remote-environment-registry";
 import { useThreadOutboxMessages } from "./use-thread-outbox";
+import { currentThreadOutboxPresentation } from "./thread-outbox-presentation";
 type ThreadSelectionRouteParams = {
   readonly environmentId?: string | string[];
   readonly threadId?: string | string[];
@@ -149,12 +150,18 @@ function useResolvedThreadSelection(params: ThreadSelectionRouteParams | undefin
     [pendingCreation, selectedThreadDetail, selectedThreadRef, selectedThreadShell],
   );
   const [previousCreation, setPreviousCreation] = useState<PendingThreadCreation | null>(null);
-  const selectedThreadCreation = resolvePendingThreadCreation({
-    threadKey: selectedThreadKey,
-    pending: pendingCreation,
-    previous: previousCreation,
-    detail: selectedThreadDetail,
-  });
+  const retainedCreationInServerThread =
+    selectedThreadShell !== null &&
+    pendingCreation !== null &&
+    currentThreadOutboxPresentation(pendingCreation.message).kind === "retained";
+  const selectedThreadCreation = retainedCreationInServerThread
+    ? null
+    : resolvePendingThreadCreation({
+        threadKey: selectedThreadKey,
+        pending: pendingCreation,
+        previous: previousCreation,
+        detail: selectedThreadDetail,
+      });
   if (previousCreation !== selectedThreadCreation) {
     setPreviousCreation(selectedThreadCreation);
   }

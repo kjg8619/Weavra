@@ -29,7 +29,7 @@ import type { WeavraTaskViewState } from "./weavraTask.ts";
 export const environmentId = EnvironmentId.make("task-environment");
 export const projectId = ProjectId.make("task-project");
 export const threadId = ThreadId.make("task-thread");
-export const taskId = WeavraTaskId.make("11111111-1111-4111-8111-111111111111");
+const taskId = WeavraTaskId.make("11111111-1111-4111-8111-111111111111");
 const executionId = "22222222-2222-4222-8222-222222222222";
 const digest = `sha256:${"a".repeat(64)}`;
 export const input: WeavraTaskObserveInput = { environmentId, projectId, threadId, taskId };

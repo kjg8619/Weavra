@@ -32,6 +32,17 @@ function prepareError(input: Parameters<typeof prepareHostWorkflowDraft>[0]): Ho
 	throw new Error("prepare unexpectedly succeeded");
 }
 
+describe("Host workflow preparation for imperative repair", () => {
+	it.each(["Fix stale configuration display", "Fix the parser timeout", "Please fix the missing avatar"])(
+		"prepares %s without an intent override",
+		(goal) => {
+			const draft = prepareHostWorkflowDraft({ goal, config });
+			expect(draft).toMatchObject({ risk: "R1", workflow: "STANDARD", executionMode: "EDIT" });
+			expect(draft.riskOverride).toBeUndefined();
+		},
+	);
+});
+
 describe("Host workflow preparation for R3 goals", () => {
 	it.each([
 		"Fix production build warning in src/a.ts",

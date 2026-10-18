@@ -1,5 +1,6 @@
 import { validBrowserCheckEvidence } from "./browser-evidence.ts";
-import { complexRunError } from "./complex-state.ts";
+import { complexRunError, complexWaves } from "./complex-state.ts";
+import type { CheckGate, ComplexTaskStatus, ReviewGate } from "./complex-types.ts";
 import {
 	type CheckResult,
 	QUICK_STEP_IDS,
@@ -27,7 +28,7 @@ export type GraphNodeStatus =
 	| "unknown";
 export interface GraphNode {
 	id: string;
-	kind: "preflight" | "agent" | "verification" | "review" | "completion" | "approval" | "mutation";
+	kind: "preflight" | "agent" | "verification" | "review" | "completion" | "approval" | "mutation" | "task";
 	label: string;
 	status: GraphNodeStatus;
 	/** For approval/mutation this is the owning Kernel step, not a new step. */
@@ -35,6 +36,8 @@ export interface GraphNode {
 	attempt?: number;
 	role?: Role;
 	parentId?: string;
+	/** COMPLEX only: 1-based implementation wave from the frozen plan's dependency schedule. */
+	wave?: number;
 	verdict?: Review["result"];
 	approvalStatus?: NonNullable<Run["approvals"]>[number]["status"];
 	checks?: Array<Pick<CheckResult, "id" | "kind" | "status" | "required" | "exitCode">>;
@@ -105,20 +108,26 @@ export function projectRunGraph(value: unknown): GraphProjection {
 		diagnostics: [],
 	};
 	// COMPLEX steps carry task attempts (and V0.8A waves), not STANDARD revision attempts: never unroll them as one
-	// single-task chain. One run node keeps the stored outcome; task/integration detail is shown as unavailable.
+	// single-task chain. Plan tasks, their waves and the stored integration gates are drawn by projectComplexGraph.
 	if (run.workflow === "COMPLEX") {
 		requireGraph(complexRunError(run) === undefined, "inconsistent COMPLEX state");
-		graph.nodes.push({
-			id: "preflight",
-			kind: "preflight",
-			label: run.complex ? "COMPLEX run (task graph unavailable)" : "Unsupported COMPLEX",
-			status: terminal ? stopped : "unknown",
-			...(terminal && run.lastError ? { detail: run.lastError } : {}),
-		});
-		graph.diagnostics.push(
-			run.complex
-				? "COMPLEX task, wave and integration detail is not drawn as a graph; /workflow status and /state show the ordered task rows, waves and integration gates. No transition is inferred, and a task COMPLETED is not Run completion."
-				: "COMPLEX has no supported execution graph; no Planner/Lead/scheduler is inferred.",
+		if (!run.complex) {
+			graph.nodes.push({
+				id: "preflight",
+				kind: "preflight",
+				label: "Unsupported COMPLEX",
+				status: terminal ? stopped : "unknown",
+				...(terminal && run.lastError ? { detail: run.lastError } : {}),
+			});
+			graph.diagnostics.push("COMPLEX has no supported execution graph; no Planner/Lead/scheduler is inferred.");
+			return graph;
+		}
+		projectComplexGraph(
+			graph,
+			run.complex,
+			run.status,
+			terminal ? stopped : undefined,
+			terminal ? (run.lastError ?? undefined) : undefined,
 		);
 		return graph;
 	}
@@ -498,7 +507,7 @@ export function renderGraphText(graph: GraphProjection): string {
 	];
 	for (const node of graph.nodes) {
 		lines.push(
-			`[${text(node.label)}] ${labels[node.status]}${node.verdict ? ` (review ${node.verdict})` : ""}${node.approvalStatus ? ` (${node.approvalStatus})` : ""}${node.parentId ? ` [inside ${text(node.parentId)}]` : ""}`,
+			`[${text(node.label)}] ${labels[node.status]}${node.verdict ? ` (review ${node.verdict})` : ""}${node.approvalStatus ? ` (${node.approvalStatus})` : ""}${node.parentId ? ` [inside ${text(node.parentId)}]` : ""}${node.wave ? ` (wave ${node.wave})` : ""}`,
 		);
 		if (node.detail) lines.push(`  ${text(node.detail)}`);
 		for (const check of node.checks ?? [])
@@ -513,4 +522,84 @@ export function renderGraphText(graph: GraphProjection): string {
 	lines.push(...graph.diagnostics.map((message) => `Warning: ${text(message)}`));
 	const output = lines.join("\n");
 	return output.length > 32000 ? `${output.slice(0, 32000)}\n[truncated; inspect narrower /state views]` : output;
+}
+
+const TASK_STATUS: Record<ComplexTaskStatus, GraphNodeStatus> = {
+	PENDING: "pending",
+	ELIGIBLE: "pending",
+	IMPLEMENTING: "running",
+	WAITING_APPROVAL: "waiting_approval",
+	HANDED_OFF: "running",
+	SELF_CHECK: "running",
+	REVIEW: "running",
+	TEST: "running",
+	STOPPING: "running",
+	COMPLETED: "passed",
+	BLOCKED: "blocked",
+	FAILED: "failed",
+	CANCELLED: "cancelled",
+	INTERRUPTED: "unknown",
+};
+const GATE_STATUS: Record<CheckGate | ReviewGate, GraphNodeStatus> = {
+	NOT_RUN: "pending",
+	RUNNING: "running",
+	PASS: "passed",
+	FAIL: "failed",
+	REVISE: "revised",
+	BLOCK: "blocked",
+	UNAVAILABLE: "unknown",
+	STALE: "unknown",
+};
+
+/**
+ * COMPLEX view of the stored Kernel state only: one node per plan task with its stored status, declared
+ * dependency edges, the wave the frozen plan schedules it in, then the stored integration gates. A task COMPLETED
+ * is not Run completion; the completion node follows the outer Run status.
+ */
+function projectComplexGraph(
+	graph: GraphProjection,
+	state: NonNullable<Run["complex"]>,
+	runStatus: Run["status"],
+	stopped: GraphNodeStatus | undefined,
+	lastError: string | undefined,
+): void {
+	const waveOf = new Map<string, number>();
+	complexWaves(state.plan).forEach((ids, index) => {
+		for (const id of ids) waveOf.set(id, index + 1);
+	});
+	const dependents = new Set(state.plan.tasks.flatMap((task) => task.dependsOn));
+	for (const task of state.plan.tasks) {
+		const row = state.tasks.find((candidate) => candidate.id === task.id);
+		if (!row) throw new GraphProjectionError("Graph unavailable: COMPLEX task row missing");
+		const wave = waveOf.get(task.id);
+		graph.nodes.push({
+			id: `task:${task.id}`,
+			kind: "task",
+			label: task.title,
+			status: TASK_STATUS[row.status],
+			...(row.attempt > 0 ? { attempt: row.attempt } : {}),
+			...(wave !== undefined ? { wave } : {}),
+		});
+		for (const dependency of task.dependsOn)
+			graph.edges.push({ from: `task:${dependency}`, to: `task:${task.id}`, kind: "sequence" });
+	}
+	const gates = [
+		{ id: "integration:check", kind: "verification", label: "Integration check", gate: state.integration.check },
+		{ id: "integration:review", kind: "review", label: "Integration review", gate: state.integration.review },
+		{ id: "integration:test", kind: "verification", label: "Integration test", gate: state.integration.test },
+	] as const;
+	for (const task of state.plan.tasks)
+		if (!dependents.has(task.id)) graph.edges.push({ from: `task:${task.id}`, to: gates[0].id, kind: "sequence" });
+	gates.forEach(({ gate, ...node }, index) => {
+		graph.nodes.push({ ...node, status: GATE_STATUS[gate] });
+		if (index > 0) graph.edges.push({ from: gates[index - 1].id, to: node.id, kind: "pass" });
+	});
+	graph.nodes.push({
+		id: "complete",
+		kind: "completion",
+		label: "Run completion",
+		status: runStatus === "COMPLETED" ? "passed" : (stopped ?? "pending"),
+		...(lastError ? { detail: lastError } : {}),
+	});
+	graph.edges.push({ from: gates[2].id, to: "complete", kind: "pass" });
 }

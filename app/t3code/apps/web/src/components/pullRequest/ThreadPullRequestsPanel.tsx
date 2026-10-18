@@ -31,10 +31,10 @@ import {
 import { PullRequestGlyph } from "./pullRequestIcons";
 
 const SOURCE_LABELS: Record<ThreadPullRequestLink["source"], string> = {
-  manual: "Linked by you",
-  created: "Created from this thread",
-  agent: "Linked by the agent",
-  stack: "Found in the stack",
+  manual: "직접 연결함",
+  created: "이 대화에서 만듦",
+  agent: "에이전트가 연결함",
+  stack: "스택에서 찾음",
   "stack-dismissed": "Dismissed",
 };
 
@@ -81,7 +81,7 @@ function LinkRow({
       {depth > 0 ? <span aria-hidden className="-ml-2 h-6 w-px shrink-0 bg-border/70" /> : null}
       {snapshot === null ? (
         <PullRequestGlyph.pullRequest
-          aria-label="Waiting for host state"
+          aria-label="host 상태를 기다리는 중"
           className="size-4 shrink-0 text-muted-foreground"
         />
       ) : (
@@ -126,7 +126,7 @@ function LinkRow({
               snapshot.reviewDecision === "approved" ? (
                 <PullRequestApprovalGlyph />
               ) : (
-                <span className="text-amber-600/90 dark:text-amber-400/80">Changes requested</span>
+                <span className="text-amber-600/90 dark:text-amber-400/80">변경 요청됨</span>
               )
             ) : null}
             {snapshot?.checksState ? <ChecksGlyph state={snapshot.checksState} /> : null}
@@ -177,7 +177,7 @@ function LinkRow({
             <Button
               variant="ghost"
               size="icon-xs"
-              aria-label={`Actions for #${link.number}`}
+              aria-label={`#${link.number} 작업`}
               className={cn(
                 "opacity-0 group-hover/pr-row:opacity-100 data-[popup-open]:opacity-100",
               )}
@@ -189,15 +189,15 @@ function LinkRow({
         <MenuPopup align="end" side="bottom">
           <MenuItem onClick={() => void writeTextToClipboard(link.url, "link")}>
             <LinkIcon className="size-3.5" />
-            Copy link
+            링크 복사
           </MenuItem>
           <MenuItem onClick={(event) => openPrLink(event, link.url, threadRef)}>
             <ArrowUpRightIcon className="size-3.5" />
-            Open
+            열기
           </MenuItem>
           <MenuItem onClick={() => onUnlink(link)}>
             <PullRequestGlyph.unlink className="size-3.5" />
-            {link.source === "stack" ? "Dismiss from thread" : "Unlink from thread"}
+            {link.source === "stack" ? "대화에서 빼기" : "대화 연결 해제"}
           </MenuItem>
         </MenuPopup>
       </Menu>
@@ -210,8 +210,8 @@ export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
   if (configs.get(threadRef.environmentId)?.environment.capabilities.threadPullRequests !== true) {
     return (
       <PullRequestsUnavailableState
-        title="Linked pull requests unavailable"
-        error="This environment does not support multiple linked pull requests."
+        title="연결된 PR을 쓸 수 없어요"
+        error="이 환경은 여러 PR 연결을 지원하지 않아요."
       />
     );
   }
@@ -255,14 +255,13 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <PullRequestGlyph.link aria-hidden className="size-6 text-muted-foreground/60" />
-        <p className="text-sm font-medium">No linked pull requests</p>
+        <p className="text-sm font-medium">연결된 PR이 없어요</p>
         <p className="max-w-60 text-xs text-muted-foreground">
-          Pull requests the agent opens from this thread land here. Link one yourself from a URL or
-          a number.
+          에이전트가 이 대화에서 연 PR이 여기에 모여요. URL이나 번호로 직접 연결할 수도 있어요.
         </p>
         <Button size="sm" variant="outline" onClick={openLinkDialog}>
           <PlusIcon className="size-3.5" />
-          Link pull request
+          PR 연결
         </Button>
       </div>
     );
@@ -289,7 +288,7 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
         </span>
         <Button size="xs" variant="ghost" onClick={openLinkDialog}>
           <PlusIcon className="size-3.5" />
-          Link
+          연결
         </Button>
       </footer>
     </div>

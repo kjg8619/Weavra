@@ -14,6 +14,9 @@ describe("host-independent classification", () => {
 		["Design the system architecture", "architecture", "COMPLEX", "R0"],
 		["Brainstorm feature ideas", "creative", "STANDARD", "R1"],
 		["Fix a typo", "maintenance", "QUICK", "R1"],
+		["Fix stale configuration display", "bugfix", "STANDARD", "R1"],
+		["Fix the parser timeout", "bugfix", "STANDARD", "R1"],
+		["Please fix the missing avatar", "bugfix", "STANDARD", "R1"],
 		["Upgrade dependencies", "maintenance", "STANDARD", "R2"],
 		["배포하고 production 데이터를 삭제", "analysis", "STANDARD", "R3"],
 	])("classifies %s with traceable, non-probabilistic rules", (goal, intent, complexity, risk) => {
@@ -40,6 +43,23 @@ describe("host-independent classification", () => {
 		expect(classifyRequest("Fix a typo", { risk: "R2" }).classification.risk).toBe("R2");
 	});
 
+	it.each([
+		'"Fix stale configuration display"',
+		"Don't fix stale configuration display",
+		"Fix",
+		"Fix it.",
+		"Please fix something",
+	])("keeps ambiguous or non-imperative repair requests unconfirmed: %s", (goal) => {
+		expect(classifyRequest(goal).requiresConfirmation).toBe(true);
+	});
+
+	it("keeps a question about a repair read-only", () => {
+		expect(classifyRequest("Should we fix stale configuration display?")).toMatchObject({
+			classification: { intent: "question", risk: "R0" },
+			requiresConfirmation: false,
+		});
+	});
+
 	it.each(["R2", "R3"] as const)("forces Reviewer for %s even when QUICK is requested", (risk) => {
 		const classification = classifyRequest("Fix a typo", { risk }).classification;
 		expect(classification.complexity).toBe("QUICK");
@@ -54,6 +74,16 @@ describe("host-independent classification", () => {
 		expect(selectWorkflow(classification)).toEqual({ workflow: "QUICK", roles: ["Executor"] });
 		expect(selectWorkflow(classification, "STANDARD").roles).toEqual(["Developer", "Reviewer"]);
 		expect(selectWorkflow(classification, "COMPLEX").roles).toEqual(["Lead", "Developer", "Reviewer"]);
+	});
+});
+
+describe("noun-form and tagged routing", () => {
+	it("strips a leading execution tag before routing", () => {
+		expect(classifyRequest("[읽기 전용] 게임 개발")).toMatchObject({
+			requiresConfirmation: false,
+			classification: { intent: "implementation" },
+		});
+		expect(classifyRequest("결제 흐름 조사").classification).toMatchObject({ intent: "research", risk: "R0" });
 	});
 });
 

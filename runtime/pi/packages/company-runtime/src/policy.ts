@@ -66,6 +66,21 @@ export interface RegisteredCheck {
 	env: Readonly<Record<string, string>>;
 }
 
+export function registeredCheckCommandBlocker(
+	executable: string,
+	argv: readonly string[],
+): "SHELL_COMMAND" | "INLINE_COMMAND" | null {
+	if (
+		/(?:^|\/)(?:bash|sh|zsh|dash|ksh|fish|csh|cmd(?:\.exe)?|powershell(?:\.exe)?|pwsh|env|xargs|sudo|su|nohup|setsid|eval)$/i.test(
+			executable,
+		)
+	)
+		return "SHELL_COMMAND";
+	if (argv.some((arg) => /^(?:-[cep].*|--(?:eval|print|command)(?:=.*)?|\/c.*|-command)$/i.test(arg)))
+		return "INLINE_COMMAND";
+	return null;
+}
+
 export function evaluateRegisteredCheck(
 	identity: { runId: string; actionId: string; actionDigest: string },
 	request: RegisteredCheck,
@@ -73,21 +88,14 @@ export function evaluateRegisteredCheck(
 	context: PolicyContext,
 	cwdSafe: boolean,
 ): PolicyDecision {
-	const shell =
-		/(?:^|\/)(?:bash|sh|zsh|dash|ksh|fish|csh|cmd(?:\.exe)?|powershell(?:\.exe)?|pwsh|env|xargs|sudo|su|nohup|setsid|eval)$/i.test(
-			request.executable,
-		);
-	const inline = request.argv.some((arg) =>
-		/^(?:-[cep].*|--(?:eval|print|command)(?:=.*)?|\/c.*|-command)$/i.test(arg),
-	);
+	const commandBlocker = registeredCheckCommandBlocker(request.executable, request.argv);
 	const allow =
 		cwdSafe &&
 		isExecutionMode(context.executionMode) &&
 		context.executionRunId === identity.runId &&
 		(!context.r2RunId || context.r2RunId === identity.runId) &&
 		request.executable.startsWith("/") &&
-		!shell &&
-		!inline &&
+		commandBlocker === null &&
 		(request.cwd === "." ||
 			(isPolicyPath(request.cwd) && !isProtectedPath(request.cwd, context.protectedPaths ?? []))) &&
 		JSON.stringify(request) === JSON.stringify(registered);

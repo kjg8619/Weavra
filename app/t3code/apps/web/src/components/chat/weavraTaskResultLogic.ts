@@ -5,6 +5,41 @@ import type {
   WeavraTaskEvidenceResult,
 } from "@t3tools/contracts";
 
+export type TaskResultNextAction =
+  | "synchronize"
+  | "reconcile"
+  | "inspect-approval"
+  | "recover-interruption"
+  | "inspect-cleanup"
+  | "none";
+
+/** Presentation only; the existing controller and Runtime still authorize every action. */
+export function taskResultNextAction(input: {
+  readonly task: WeavraTask;
+  readonly fresh: boolean;
+  readonly connected: boolean;
+  readonly recoverySupported: boolean;
+}): TaskResultNextAction {
+  if (!input.fresh || !input.connected) return "synchronize";
+  const { task } = input;
+  const execution = task.execution;
+  const receipt = execution?.receipt;
+  if (receipt?.status === "UNKNOWN") return "reconcile";
+  if (receipt?.status !== "FOUND") return "none";
+  if (receipt.run?.status === "WAITING_APPROVAL") return "inspect-approval";
+  if (
+    input.recoverySupported &&
+    execution?.confirmCommandId != null &&
+    task.phase === "attention-required" &&
+    task.ownership.state !== "released" &&
+    (receipt.run?.status === "INTERRUPTED" ||
+      receipt.admission.outcome.status === "INTERRUPTED_BEFORE_START")
+  )
+    return "recover-interruption";
+  if (receipt.admission.cleanup === "UNCONFIRMED") return "inspect-cleanup";
+  return "none";
+}
+
 export type EvidenceCategory = WeavraEvidenceCursor["category"];
 export interface TaskEvidenceState {
   readonly latest: WeavraTaskEvidenceResult;

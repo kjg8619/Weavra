@@ -66,6 +66,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 
 import {
   COMPOSER_DRAFT_STORAGE_KEY,
+  commitRejectedTurnDraft,
+  rejectedTurnRecoveryKey,
+  type RejectedTurnDraft,
   beginBackgroundDraftSubmissionByRef,
   clearComposerDraftsEnvironment,
   composerDraftHasUserContent,
@@ -159,6 +162,81 @@ function resetComposerDraftStore() {
   });
 }
 
+describe("composerDraftStore rejected turn recovery", () => {
+  const scope = scopeThreadRef(TEST_ENVIRONMENT_ID, ThreadId.make("rejected-draft"));
+  const messageId = MessageId.make("rejected-message");
+  const source = (): RejectedTurnDraft => ({
+    key: rejectedTurnRecoveryKey(scope, messageId),
+    ...scope,
+    messageId,
+    text: "  Exact source text\n",
+    attachments: [
+      {
+        type: "file",
+        id: "rejected-draft-00000000-0000-4000-8000-000000000001-pdf",
+        name: "report.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 6,
+        source: { _tag: "pasted-text" },
+      },
+    ],
+  });
+  beforeEach(async () => {
+    await useComposerDraftStore.persist.clearStorage();
+    resetComposerDraftStore();
+    await useComposerDraftStore.persist.rehydrate();
+  });
+  afterEach(async () => {
+    await useComposerDraftStore.persist.clearStorage();
+    resetComposerDraftStore();
+    await useComposerDraftStore.persist.clearStorage();
+  });
+
+  it("atomically persists source and marker and hydrates without File handles", async () => {
+    const recovered = source();
+    expect(await commitRejectedTurnDraft(scope, null, recovered)).toBe("recovered");
+    const storage = useComposerDraftStore.persist.getOptions().storage!;
+    const stored = await storage.getItem(COMPOSER_DRAFT_STORAGE_KEY);
+    expect(JSON.stringify(stored)).not.toContain('"file":');
+    const before = useComposerDraftStore.getState().getComposerDraft(scope)!;
+    expect(before.prompt).toBe(recovered.text);
+    expect(before.rejectedTurn).toEqual(recovered);
+    await useComposerDraftStore.persist.rehydrate();
+    const hydrated = useComposerDraftStore.getState().getComposerDraft(scope)!;
+    expect(hydrated.prompt).toBe(recovered.text);
+    expect(hydrated.rejectedTurn).toEqual(recovered);
+    expect(hydrated.images).toEqual([]);
+    expect(hydrated.files).toEqual([]);
+    expect(await commitRejectedTurnDraft(scope, null, recovered)).toBe("existing");
+    expect(useComposerDraftStore.getState().getComposerDraft(scope)).toBe(hydrated);
+  });
+
+  it("does not publish content or marker when storage rejects the atomic write", async () => {
+    const storage = useComposerDraftStore.persist.getOptions().storage!;
+    const before = await storage.getItem(COMPOSER_DRAFT_STORAGE_KEY);
+    const write = vi.spyOn(storage, "setItem").mockImplementationOnce(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    await expect(commitRejectedTurnDraft(scope, null, source())).rejects.toThrow();
+    expect(useComposerDraftStore.getState().getComposerDraft(scope)).toBeNull();
+    expect(await storage.getItem(COMPOSER_DRAFT_STORAGE_KEY)).toEqual(before);
+    write.mockRestore();
+    await useComposerDraftStore.persist.rehydrate();
+    expect(useComposerDraftStore.getState().getComposerDraft(scope)?.rejectedTurn).toBeUndefined();
+  });
+
+  it("requires an exact empty draft and isolates the environment", async () => {
+    const store = useComposerDraftStore.getState();
+    store.setPrompt(scope, " ");
+    const occupied = store.getComposerDraft(scope);
+    expect(await commitRejectedTurnDraft(scope, occupied, source())).toBe("changed");
+    expect(store.getComposerDraft(scope)).toBe(occupied);
+    const foreign = { ...scope, environmentId: OTHER_TEST_ENVIRONMENT_ID };
+    expect(await commitRejectedTurnDraft(foreign, null, source())).toBe("changed");
+    expect(store.getComposerDraft(foreign)).toBeNull();
+  });
+});
+
 function modelSelection(
   provider: ProviderDriverKind,
   model: string,
@@ -221,7 +299,6 @@ describe("composerDraftStore assistant citations", () => {
       const prompt = `Explain ${serializeAssistantCitation(citation)} further.`;
       useComposerDraftStore.getState().setPrompt(threadRef, prompt);
       await vi.advanceTimersByTimeAsync(300);
-      resetComposerDraftStore();
       await useComposerDraftStore.persist.rehydrate();
       const restored = draftFor(threadId, TEST_ENVIRONMENT_ID)?.prompt ?? "";
       expect(restored).toBe(prompt);
@@ -797,7 +874,7 @@ describe("composerDraftStore syncPersistedAttachments", () => {
     removeLocalStorageItem(COMPOSER_DRAFT_STORAGE_KEY);
   });
 
-  it("treats malformed persisted draft storage as empty", async () => {
+  it("does not let malformed legacy storage replace committed attachments", async () => {
     const image = makeImage({
       id: "img-persisted",
       previewUrl: "blob:persisted",
@@ -818,7 +895,7 @@ describe("composerDraftStore syncPersistedAttachments", () => {
       Schema.Unknown,
     );
 
-    useComposerDraftStore.getState().syncPersistedAttachments(threadRef, [
+    const attachments = [
       {
         id: image.id,
         name: image.name,
@@ -826,11 +903,11 @@ describe("composerDraftStore syncPersistedAttachments", () => {
         sizeBytes: image.sizeBytes,
         dataUrl: image.previewUrl,
       },
-    ]);
-    await Promise.resolve();
+    ];
+    await useComposerDraftStore.getState().syncPersistedAttachments(threadRef, attachments);
 
-    expect(draftFor(threadId, TEST_ENVIRONMENT_ID)?.persistedAttachments).toEqual([]);
-    expect(draftFor(threadId, TEST_ENVIRONMENT_ID)?.nonPersistedImageIds).toEqual([image.id]);
+    expect(draftFor(threadId, TEST_ENVIRONMENT_ID)?.persistedAttachments).toEqual(attachments);
+    expect(draftFor(threadId, TEST_ENVIRONMENT_ID)?.nonPersistedImageIds).toEqual([]);
   });
 });
 
@@ -1211,7 +1288,7 @@ describe("composerDraftStore project draft thread mapping", () => {
     resetComposerDraftStore();
   });
 
-  it("clears composer data for one environment without touching another", () => {
+  it("clears composer data for one environment without touching another", async () => {
     const store = useComposerDraftStore.getState();
     const localThreadRef = scopeThreadRef(TEST_ENVIRONMENT_ID, threadId);
     const remoteThreadRef = scopeThreadRef(OTHER_TEST_ENVIRONMENT_ID, otherThreadId);
@@ -1236,7 +1313,7 @@ describe("composerDraftStore project draft thread mapping", () => {
         ]),
       });
 
-      clearComposerDraftsEnvironment(TEST_ENVIRONMENT_ID);
+      await clearComposerDraftsEnvironment(TEST_ENVIRONMENT_ID);
 
       const next = useComposerDraftStore.getState();
       expect([...next.rewindingThreadKeys]).toEqual([
@@ -1952,7 +2029,6 @@ describe("composerDraftStore modelSelection", () => {
 
       // Hydrate from the same storage the store persists into and verify the
       // marker survives the partialize → decode → merge path.
-      resetComposerDraftStore();
       await useComposerDraftStore.persist.rehydrate();
       expect(draftFor(threadId, TEST_ENVIRONMENT_ID)?.modelSelectionExplicit).toBe(true);
       expect(
@@ -2810,7 +2886,6 @@ describe("composer draft persistence", () => {
       expect(attachmentReads).toBe(1);
       expect(stringify).toHaveBeenCalledTimes(1);
 
-      resetComposerDraftStore();
       await useComposerDraftStore.persist.rehydrate();
       expect(draftFor(typingThreadId, TEST_ENVIRONMENT_ID)?.prompt).toBe("Draft 20");
       expect(draftFor(heavyThreadId, TEST_ENVIRONMENT_ID)?.persistedAttachments).toEqual(

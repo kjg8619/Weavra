@@ -1,4 +1,11 @@
-import { CommandId, ThreadId, WeavraTaskId, type WeavraTask } from "@t3tools/contracts";
+import {
+  CommandId,
+  ThreadId,
+  WeavraTaskId,
+  WeavraTaskRpcError,
+  type WeavraTask,
+} from "@t3tools/contracts";
+import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { act, useLayoutEffect } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
@@ -28,7 +35,8 @@ vi.mock("../../state/use-atom-command", () => ({
 }));
 vi.mock("@t3tools/client-runtime/state/runtime", () => ({
   createEnvironmentCommand: (_runtime: unknown, options: unknown) => options,
-  squashAtomCommandFailure: (failure: unknown) => failure,
+  squashAtomCommandFailure: (failure: { readonly cause?: Cause.Cause<unknown> }) =>
+    failure.cause === undefined ? failure : Cause.squash(failure.cause),
 }));
 vi.mock("@t3tools/client-runtime/state/weavraTask", () => ({
   createEnvironmentWeavraTaskStateAtoms: () => ({ stateAtom: () => ({}) }),
@@ -208,6 +216,30 @@ describe("task-scoped client composition", () => {
     expect(mocks.list).toHaveBeenCalledTimes(3);
     expect(mocks.execute).toHaveBeenCalledOnce();
   });
+  it("reports missing project configuration on create without retrying or associating a task", async () => {
+    mocks.list.mockResolvedValue({ _tag: "Success", value: [] });
+    await act(() => controller.refresh());
+    mocks.execute.mockResolvedValue({
+      _tag: "Failure",
+      cause: Cause.fail(new WeavraTaskRpcError({ code: "PROJECT_NOT_CONFIGURED" })),
+    });
+    await act(async () => {
+      expect(
+        await controller.act({
+          type: "create",
+          input: { ...taskScope(), commandId: CommandId.make("create-unconfigured") },
+        }),
+      ).toBeNull();
+    });
+    expect(controller.error).toMatch(/^PROJECT_NOT_CONFIGURED:/);
+    expect(controller.error).toContain(".ai/config.yaml");
+    expect(controller.error).toContain("weavra project init --config");
+    expect(controller.task).toBeNull();
+    expect(controller.tasks).toEqual([]);
+    expect(controller.route).toBe("free");
+    expect(mocks.execute).toHaveBeenCalledOnce();
+    expect(mocks.execute.mock.calls[0]?.[0].input.type).toBe("create");
+  });
   it("keeps repreparation blocked while the old task is released", async () => {
     const original = preparedTask();
     const released: WeavraTask = {
@@ -328,6 +360,62 @@ describe("task-scoped client composition", () => {
     expect(controller.error).toContain("PREPARE_REJECTED");
     expect(mocks.execute).toHaveBeenCalledOnce();
   });
+  it.each([
+    { kind: "preview", code: "INVALID_PREVIEW" },
+    { kind: "preview", code: "STANDARD_REQUIRED" },
+    { kind: "preview", code: "BINDING_MISMATCH" },
+    { kind: "runtime", code: "INVALID_CRITERIA" },
+    { kind: "runtime", code: "CONFIG_CHANGED" },
+  ] as const)(
+    "surfaces bounded preparation reason $code without retrying",
+    async (prepareReason) => {
+      const task = preparedTask();
+      mocks.execute.mockResolvedValue({
+        _tag: "Failure",
+        cause: Cause.fail(new WeavraTaskRpcError({ code: "PREPARE_REJECTED", prepareReason })),
+      });
+      await act(async () => {
+        expect(
+          await controller.act({
+            type: "prepare",
+            input: {
+              task: { ...taskScope(task), taskId: task.id },
+              expectedRevision: task.revision,
+              draft: buildTaskDraft(taskDraftFields(task), 2, 123),
+            },
+          }),
+        ).toBeNull();
+      });
+      expect(controller.error).toContain(prepareReason.code);
+      expect(mocks.execute).toHaveBeenCalledOnce();
+      expect(mocks.execute.mock.calls[0]?.[0].input.type).toBe("prepare");
+    },
+  );
+
+  it.each(["PREPARE_REJECTED", "RUNTIME_UNAVAILABLE"] as const)(
+    "preserves %s without inventing a preparation reason or retrying",
+    async (code) => {
+      const task = preparedTask();
+      mocks.execute.mockResolvedValue({
+        _tag: "Failure",
+        cause: Cause.fail(new WeavraTaskRpcError({ code })),
+      });
+      await act(async () => {
+        await controller.act({
+          type: "prepare",
+          input: {
+            task: { ...taskScope(task), taskId: task.id },
+            expectedRevision: task.revision,
+            draft: buildTaskDraft(taskDraftFields(task), 2, 123),
+          },
+        });
+      });
+      expect(controller.error).toContain(code);
+      expect(controller.error).not.toContain("INVALID_PREVIEW");
+      expect(mocks.execute).toHaveBeenCalledOnce();
+    },
+  );
+
   it("preserves local draft free sends and queues without task discovery", async () => {
     const calls = mocks.list.mock.calls.length;
     props = { ...props, scope: null };

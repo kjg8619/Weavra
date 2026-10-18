@@ -71,7 +71,7 @@ export function PullRequestLabelPicker({
           : `Could not put ${candidate.name} on`,
         description: readableFailure(
           squashAtomCommandFailure(result),
-          "The host refused it. Check that you have triage access on this repository.",
+          "host가 거절했어요. 이 저장소에 triage 권한이 있는지 확인해 주세요.",
         ),
       });
       return;
@@ -81,22 +81,22 @@ export function PullRequestLabelPicker({
   return (
     <PullRequestCandidatePicker
       icon={<TagIcon className="size-3.5" />}
-      label="Change labels"
+      label="라벨 바꾸기"
       allowed={allowed}
-      disabledReason="Changing labels needs triage access on this repository"
+      disabledReason="라벨을 바꾸려면 이 저장소의 triage 권한이 필요해요"
       open={open}
       onOpenChange={setOpen}
       query={query}
       onQueryChange={setQuery}
-      searchLabel="Search labels"
+      searchLabel="라벨 검색"
       isPending={candidatesQuery.isPending && candidatesQuery.data === null}
       error={candidatesQuery.data === null ? candidatesQuery.error : null}
       candidates={candidates}
-      emptyLabel="This repository has no labels."
-      noMatchLabel="No label matches that."
-      errorLabel="The labels could not be read."
+      emptyLabel="이 저장소에는 라벨이 없어요."
+      noMatchLabel="일치하는 라벨이 없어요."
+      errorLabel="라벨을 읽지 못했어요."
       truncated={candidatesQuery.data?.truncated === true}
-      truncatedLabel="This repository has more labels than are listed here. Apply the rest on the host."
+      truncatedLabel="이 저장소에는 여기 나온 것보다 라벨이 더 많아요. 나머지는 host에서 적용해 주세요."
       candidateKey={(candidate) => candidate.name}
       disabled={pending !== null}
       onSelect={(candidate) => void toggle(candidate)}
@@ -117,7 +117,7 @@ export function PullRequestLabelPicker({
               ) : null}
             </span>
             {candidate.isApplied ? (
-              <CheckIcon aria-label="Applied" className="size-3.5 shrink-0" />
+              <CheckIcon aria-label="적용됨" className="size-3.5 shrink-0" />
             ) : null}
           </>
         );

@@ -45,6 +45,7 @@ import {
   preflightWindowsDesktopBuild,
   renderMacPasskeyEntitlements,
   resolveClerkPasskeyNativeArtifacts,
+  stageClerkPasskeyNativeBinaries,
   resolveMacPasskeySigningConfiguration,
   resolveDesktopRuntimeDependencies,
   resolveMergedStageDependencies,
@@ -246,6 +247,25 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
 });
 
 it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+  for (const declared of [false, true]) {
+    it.effect(`requires Clerk native files only when dependency selected (${declared})`, () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const stage = yield* fs.makeTempDirectoryScoped({ prefix: "weavra-optional-native-" });
+          const result = yield* stageClerkPasskeyNativeBinaries(
+            stage,
+            "mac",
+            "arm64",
+            declared ? { "@clerk/electron-passkeys": "0.0.3" } : {},
+          ).pipe(Effect.result);
+          assert.equal(result._tag, declared ? "Failure" : "Success");
+          assert.deepStrictEqual(yield* fs.readDirectory(stage), []);
+        }),
+      ),
+    );
+  }
+
   it("resolves the dedicated nightly updater channel from nightly versions", () => {
     assert.equal(resolveDesktopUpdateChannel("0.0.17-nightly.20260413.42"), "nightly");
     assert.equal(resolveDesktopUpdateChannel("0.0.17"), "latest");

@@ -19,7 +19,7 @@ function SidebarUpdateArchitectureWarningContent() {
   return (
     <Alert variant="warning" className="rounded-2xl border-warning/40 bg-warning/8 text-xs">
       <TriangleAlertIcon />
-      <AlertTitle>Intel build on Apple Silicon</AlertTitle>
+      <AlertTitle>Apple Silicon에서 Intel 빌드 실행 중</AlertTitle>
       <AlertDescription>{getArm64IntelBuildWarningDescription(state)}</AlertDescription>
     </Alert>
   );
@@ -32,9 +32,9 @@ export function SidebarUpdatePill() {
         <TooltipTrigger
           render={<span tabIndex={0} className="px-2 text-xs text-muted-foreground" />}
         >
-          Updates unavailable
+          업데이트를 사용할 수 없음
         </TooltipTrigger>
-        <TooltipPopup side="top">No Weavra update service is configured.</TooltipPopup>
+        <TooltipPopup side="top">Weavra 업데이트 서비스가 설정되지 않았어요.</TooltipPopup>
       </Tooltip>
     </SidebarMenuItem>
   ) : null;

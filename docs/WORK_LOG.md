@@ -2,6 +2,14 @@
 
 ## 현재 진행 요약
 
+- 2026-10-16 KST 새 후속: 소유자의 실제 `INTERNAL_ERROR`와 자동 설정 요청에 따라 비 Git 최초 조회를 수정하고, 밸런스 기본의 속도/밸런스/품질 프리셋과 명시적 준비를 연결했다. 현재 실제 App 전체 통합 17 groups/32 attempts/32 cleanup 및 전체 게임 복사본 준비가 통과했다. 독립 검토와 설치형 사용자 화면 확인은 아직 진행 중이다. 기존 첫 사용 8개 완료 이력과 이번 후속을 구분한다.
+
+- 2026-10-16 KST 후속: 첫 사용 8개 개선은 구현·독립 승인 후 `~/Applications/Weavra.app`에 설치했다. 실제 Runtime 공개 dist도 오프라인 재빌드 후 검증했다. 소유자 잠금 해제 확인 후 기존 대화와 한국어 설정 폼을 실제 설치 앱에서 읽기 전용으로 확인하고 닫았다. 설치/백업 해시와 원본 게임 clean 상태를 재확인했으며 제품 commit/stage/push/merge는 없다.
+
+- 2026-10-15 19:08 KST: 첫 사용 8개 개선은 진행 중이다. 현재 계정·설정 focused 검증과 실제 브라우저 첫 설정/초기화/재편집은 통과했고, 결과 자동 갱신·입력창 배치·일반 한국어화·단순화는 별도 quick DAG로 구현 중이다. 제품 전체 완료·패키지·설치 수락은 아직 아니다.
+
+- 2026-10-15 추가: 소유자 승인에 따라 루트 `.ai/` 전체를 기존 clean 검사에서 제외하고, controlled-task 카드에 규칙 기반 YAML 초안·명시적 검토 저장·doctor 결과를 연결했다. 현재 Runtime 집중 214개/App 집중 180개, 실제 설정 UI와 dirty-state 통합 검증 결과 및 설치형 미검증 범위는 아래 최신 기록을 따른다.
+- 2026-10-15 추가: `.ai/config.yaml` 없는 프로젝트의 통제 작업 생성 거부를 `PROJECT_NOT_CONFIGURED`로 구분했다. 설정 경로·기존 초기화 문서·Project Settings 안내를 표시하며, 아래 현재 집중 검사 결과와 설치형 앱 미검증 한계를 따른다.
 - 2026-09-27 추가: 실제 업무 설정 중 확인된 대형 저장소 증거 수집 한도를 명시적 `bounded-monorepo` 프로필과 동일 수집기를 사용하는 doctor로 보완했다. strict 편집 모드의 실제 codex-lb 작업은 검사·독립 리뷰를 거쳐 COMPLETED였으며 아래 현재 검증 기록을 따른다.
 - 갱신: 2026-09-26, Asia/Seoul (UTC+09:00). 저장소 통합 baseline과 Product Independence Phase 1은 완료된 역사적 결과로 보존한다.
 - 로컬 팀 파일럿 기반을 `feat/company-pilot`에서 구현했다: 프로젝트 초기화·읽기 전용 진단, 시작 실패 안내, 기존 증거 영역으로의 이동, 팀 운영 안내. 현재 검증과 회사 환경의 미검증 조건은 아래 2026-09-26 기록을 따른다.
@@ -1380,3 +1388,272 @@
 - 발행 전 기존 검증 해시와 원본 보존 검사를 다시 확인했다. 새 모델 호출이나 테스트 결과를 만들지 않았으며 위 10월 2일의 실제 UI 수용·최종 검사 결과를 근거로 사용한다. 문서의 현재 상태 설명은 실제 UI 확인 검증 완료에 맞게 정정했다.
 - `.pi-subagents/`의 로컬 작업 자료, 외부 증거·스크린샷·개인 실행 홈, 별도 모델 결과 checkout은 제외한다. 훅을 우회하지 않으며 원격은 `origin`의 새 기능 브랜치만 대상으로 한다. main/devlop 갱신, PR, merge, deploy는 범위 밖이다.
 - 커밋 hash와 푸시 종료·원격 SHA 일치는 외부 `publication-result.json`에 기록한다. 이 항목 자체는 아직 원격 CI 성공을 주장하지 않는다.
+
+## 2026-10-15 KST — 미설정 프로젝트의 통제 작업 오류 수정 완료
+
+- 목적/상태: 설치형 0.0.42에서 설정 없는 Git 프로젝트의 `Start controlled task`가 실행 승인 불확실성을 잘못 안내한 원인을 소스에서 수정하고 집중 검증했다. 설치 패키지 배포 완료를 뜻하지 않는다.
+- 원인: `HostControlBridge.configuration()`이 `loadRuntimeConfig`의 `missing`을 다른 읽기/파싱 실패와 함께 `CONTROL_UNAVAILABLE`로 바꾸고, `TaskCoordinator.checkout()`이 모든 거부를 `TARGET_CHANGED`로 바꿨다. 웹의 일반 오류 안내는 이미 실행이 승인됐을 가능성을 표시했다. 실제 stdio RED에서 기대 `PROJECT_NOT_CONFIGURED`, 실제 `CONTROL_UNAVAILABLE`을 확인했다.
+- 변경 파일:
+  - `runtime/pi/packages/company-runtime/src/{host-control.ts,host-control-protocol.ts}`: missing만 새 오류로 구분한다. 잘못된 설정/읽기 실패의 기존 거부와 capture 중 설정 변경의 `CONFIG_CHANGED` 검사는 유지한다.
+  - `app/t3code/packages/contracts/src/{weavraControl.ts,weavraTaskRpc.ts}`: 독립 wire 정의와 task RPC 오류 목록에 같은 코드를 추가한다. 중복 프로토콜을 병합하지 않는다.
+  - `app/t3code/apps/server/src/weavra/TaskCoordinator.ts`: 새 코드를 생성 전에 전달한다. 실제 checkout/config 변경의 `TARGET_CHANGED`는 유지한다.
+  - `app/t3code/apps/web/src/components/chat/useWeavraTask.ts`: 설정 미완료, 필요한 `.ai/config.yaml`, `docs/operations/LOCAL_TEAM_PILOT.md`, `weavra project init --config <reviewed-config.yaml>`, 기존 Project Settings의 Workflow control 위치를 안내한다. 설정 UI가 자동 초기화를 제공한다고 주장하지 않는다.
+  - `runtime/pi/packages/company-runtime/test/{host-task-binding.test.ts,host-rerun.test.ts}`, `app/t3code/apps/server/src/weavra/TaskCoordinator.test.ts`, `app/t3code/apps/web/src/components/chat/useWeavraTask.test.tsx`: 설정 부재/잘못된 설정 구분, 상태·writer·admission 미생성, 서버 task/ownership 미저장·prepare/confirm 미전송, 변경 오류 유지, 웹 표시·재전송 없음 회귀를 추가했다. 공유 로더를 사용하는 기존 rerun 거부 assertion은 더 구체적인 새 코드로 갱신했다. 테스트를 삭제하거나 약화하지 않았다.
+- 현재 명령 환경: 모두 지정 worktree에서 `PATH=/Users/kangjingoo/.omo/evidence/weavra-resume-20261015/tools:/Users/kangjingoo/.nvm/versions/node/v24.19.0/bin:/opt/homebrew/bin:/usr/bin:/bin`을 사용했다.
+- 현재 검증과 실제 결과:
+  - `runtime/pi/packages/company-runtime`: `node ../../node_modules/vitest/dist/cli.js --run test/host-task-binding.test.ts -t 'refuses checkout with'` — 수정 전 RED, exit 1(미설정 1 FAIL, 잘못된 설정 1 PASS, 필터 밖 34 skipped). 같은 파일 전체 `node ../../node_modules/vitest/dist/cli.js --run test/host-task-binding.test.ts` — 수정 후 36 PASS, exit 0.
+  - `runtime/pi`: `./node_modules/.bin/biome check --error-on-warnings .` — exit 0, 1,544 files, 수정 없음. 다른 미커밋 파일을 포맷하지 않음을 먼저 확인한 뒤 `npm run check` — exit 0, Biome 수정 없음, dependency/import/entry graph/shrinkwrap/install-lock/type/browser smoke 모두 통과.
+  - `runtime/pi/packages/company-runtime`: `node ../../node_modules/vitest/dist/cli.js --run test/host-rerun.test.ts` — 20 PASS, exit 0.
+  - `app/t3code`: `pnpm --filter t3 test src/weavra/TaskCoordinator.test.ts` — 84 PASS; `pnpm --filter @t3tools/web test src/components/chat/useWeavraTask.test.tsx` — 30 PASS; `pnpm --filter @t3tools/contracts test src/weavraTask.test.ts` — 20 PASS. 모두 exit 0이며 기존 계약 테스트가 새 Runtime/task 오류의 encode/decode도 검증한다.
+  - `app/t3code`: `pnpm --filter @t3tools/contracts typecheck`, `pnpm --filter t3 typecheck`, `pnpm --filter @t3tools/web typecheck` — 모두 exit 0. 기존 Effect suggestion은 보존했고 오류로 숨기지 않았다.
+  - `app/t3code`: `pnpm exec vp lint packages/contracts/src/weavraControl.ts packages/contracts/src/weavraTaskRpc.ts apps/server/src/weavra/TaskCoordinator.ts apps/server/src/weavra/TaskCoordinator.test.ts apps/web/src/components/chat/useWeavraTask.ts apps/web/src/components/chat/useWeavraTask.test.tsx` — exit 0, 경고/오류 없음. 같은 경로의 `pnpm exec vp fmt --check ...`는 새 테스트의 긴 줄 때문에 처음 두 번 exit 1이었으며 해당 줄만 apply_patch로 나눠 최종 exit 0을 확인했다. 포맷터 stdin 비교 중 잘린 읽기 입력으로 발생한 파싱 실패는 전체 파일을 나눠 읽어 해결했다.
+  - 변경 TypeScript 10개 파일의 LSP error 진단 없음. `git diff --check` exit 0. 이번 집중 테스트 최종 합계는 5 files/190 PASS이며 역사적 기록과 합산하지 않는다.
+- 한계/다음 단계: 실제 설치형 Electron 화면·패키지 빌드·설치와 전체 저장소 CI는 실행하지 않았다. 배포 시 함께 변경된 Runtime/App을 반영해야 한다. 실제 모델·인증·유료 추론은 호출하지 않았으며 `~/Applications`, 실제 `~/.weavra`는 건드리지 않았다.
+- 보존/커밋 상태: 기존 dirty detached worktree의 변경을 그대로 두고 위 파일과 이 기록만 수정했다. 의존성 추가, reset/checkout/stash/clean/add/commit, 설치·배포 없음.
+
+## 2026-10-15 13:34 KST — 앱 내 프로젝트 설정 및 .ai clean 예외 구현 완료
+
+- 목적/상태: `PROJECT_NOT_CONFIGURED` 이후 사용자가 커밋 없이 앱에서 검토된 프로젝트 설정을 저장하고 통제 작업을 시작하도록 구현했다. 지정된 `omo-user-flow-20261003` dirty detached worktree에서만 제품 코드를 수정했고 직전 오류 구분 수정과 다른 기존 변경을 보존했다. 설치·배포 완료 선언이 아니다.
+- 소유자 범위 변경 반영: 초기의 `.ai/config.yaml` 한 파일 예외 대신 **루트 `.ai/` 전체**를 clean 검사에서 제외한다. 별도 우회 검사를 만들지 않고 기존 `cleanStartBlockers`/공유 collector를 수정했으므로 checkout identity, prepare/confirm/admission의 workspace open, doctor와 rerun leftovers가 같은 규칙을 사용한다. `.ai-other/`, 중첩 `nested/.ai/`, 다른 수정·미추적 파일 및 `.ai/`로 이동한 파일의 원래 경로는 여전히 거부한다.
+- 증거 설계 결정: 기존 내용 기반 `.ai/config.yaml` 수집을 유지했다. 다른 `.ai/` 내용은 worker diff에서 제외해 Runtime 자신의 state/cache 기록이 실행 증거를 무효화하지 않도록 했다. 설정 원문은 workspace digest와 보호 파일 diff에 남으므로 실행 중 바뀌면 안전한 worker 변경으로 인정되지 않는다. 독립된 정규화 configDigest와 `assertCurrent` 재읽기는 그대로이며 의미가 달라진 설정의 preview 이후 확인은 `CONFIG_CHANGED`다. confirm 이후 model 초기화 장벽에서 설정을 바꾼 경우에도 provider 사용/Run 생성 전에 실패한다. 이 시점의 기존 admission 공개 결과는 `START_FAILED / STALE_PREPARATION`이며 내부 `CONFIG_CHANGED`를 새 receipt 코드로 바꾸지 않았다. Git HEAD/index/config identity 결합과 canonical Runtime 상태의 Git 추적 금지는 유지한다. 따라서 `.ai/`의 staged index 변경도 이미 동결된 Git identity를 우회하지 못한다.
+- 쓰기 경계: clean 예외는 권한 부여가 아니다. 기존 Policy는 `allowed_paths`에 `.ai`가 들어가도 `.ai/config.yaml`, state 및 임의 하위 경로의 worker write/edit를 DENY한다. 병렬 claim 이미지 수집에서도 `.ai/` 전체를 거부한다. 설정 초기화 및 Runtime 소유 state writer 외의 worker 권한을 추가하지 않았다.
+- 앱/Runtime 경계: `orchestration:operate`가 필요한 `weavra.projectSetup` RPC는 scope selector와 검토한 YAML만 받는다. 서버가 기존 ownership 서비스로 실제 checkout을 해석하고 targetDigest를 draft/save에 결합하며, `withFreshOperation`으로 충돌하는 쓰기를 거부한다. `T3_WEAVRA_CONTROL=1` 및 서버 설정의 절대 `T3_WEAVRA_EXECUTABLE`만 사용해 고정 `project draft --json` 또는 `project init --stdin --json`을 실행한다. RPC의 launcher executable/cwd/argv/env 주입은 거부한다. YAML은 stdin, 응답은 제한된 JSON이며 stdout 크기·시간·UTF-8·스키마와 반환 종류를 검사한다. App에서 Runtime 소스를 import하지 않았고 doctor/설정 JSON 정의는 의도적으로 별도 복사했다.
+- 초기화/초안: 파일을 받던 `initProject`와 앱 stdin 입력이 같은 `initProjectYaml`의 검증·exclusive temporary inode·atomic no-replace hardlink 경로를 사용한다. 기존 파일·symlink·writer lock 거부를 보존했고 기존 config를 덮어쓰지 않는다. 모델 호출 없이 Node package scripts test/lint와 lockfile package manager, Python pyproject/pytest, Go, Rust/Cargo, Godot 및 generic을 감지한다. 허용 경로는 실제 루트 항목 중 보호/숨김/생성/의존성 경로와 링크를 제외한 literal 후보다. Godot/generic 등 안전한 check 근거가 없으면 checks를 비우며 명령을 만들지 않는다. SDK provider/model은 임의 선택하지 않고 빈 값으로 두어 초안 그대로는 parse/save가 실패한다. schema가 checks를 선택적으로 허용하므로 모델만 채우고 checks 없이 저장하면 doctor가 `REQUIRED_CHECK_MISSING`을 반환한다.
+- UI: 기존 카드의 오류 상태에서 `Set up this project`를 열고 편집 가능한 YAML·검토 체크박스·Save/Cancel을 제공한다. 편집하면 검토 동의가 해제되고 자동 저장/자동 task 생성은 없다. 저장 뒤 기존 project doctor의 READY 또는 blockers를 표시하며 사람이 `Start controlled task`를 다시 누른다. 연결/대상 변경 뒤 늦게 도착한 응답은 반영하지 않는다. 모바일 네이티브 코드는 변경하지 않았다.
+- 변경 파일(이번 작업분만; Git diff에는 선행 변경도 포함됨):
+  - Runtime: `runtime/pi/packages/company-runtime/src/{workspace.ts,launcher-project.ts,project-draft.ts}`, `test/{project-setup.test.ts,project-setup-binding.test.ts,host-rerun.test.ts}`.
+  - App contracts/client: `app/t3code/packages/contracts/src/{weavraProjectSetup.ts,index.ts,rpc.ts}`, `packages/client-runtime/src/state/weavraTaskRpc.ts`.
+  - App server: `app/t3code/apps/server/src/weavra/{ProjectSetup.ts,ProjectSetup.test.ts}`, `src/auth/RpcAuthorization.ts`, `src/ws.ts`.
+  - App web: `app/t3code/apps/web/src/components/chat/{WeavraProjectSetup.tsx,WeavraProjectSetup.test.tsx,WeavraTaskCard.tsx,useWeavraTask.ts}`.
+  - 통합/문서: `scripts/run-problem-cycle-integration.mjs`, `docs/architecture/BOUNDARIES.md`, `docs/operations/LOCAL_TEAM_PILOT.md`, 이 기록.
+- 최종 명령 환경: `export PATH=/Users/kangjingoo/.omo/evidence/weavra-resume-20261015/tools:/Users/kangjingoo/.nvm/versions/node/v24.19.0/bin:/opt/homebrew/bin:/usr/bin:/bin` 후 아래 명령을 각 build root에서 실행했다. 설치·의존성 추가·desktop package 빌드는 하지 않았다.
+- 현재 Runtime 검증:
+  - `runtime/pi`: `./node_modules/.bin/biome check --error-on-warnings .`로 다른 dirty 파일에 자동 수정이 없음을 먼저 확인했다. 새 regex의 불필요 escape info 2개는 apply_patch로 수정했다.
+  - `runtime/pi`: `npm run check` — 최종 exit 0, Biome 1,547 files/No fixes applied, dependency/import/entry graph/shrinkwrap/install-lock/type/browser-smoke 통과. 전체 출력으로 확인했다.
+  - `runtime/pi/packages/company-runtime`: `node ../../node_modules/vitest/dist/cli.js --run test/project-setup.test.ts test/project-setup-binding.test.ts test/launcher-project.test.ts test/workspace.test.ts test/host-task-binding.test.ts test/policy.test.ts test/host-rerun.test.ts` — 첫 7 files 실행은 213 PASS/1 FAIL. 실패는 기존 rerun leftovers가 `.ai/notes.md`, `.ai/logs/checks.json`을 dirty로 기대하던, 새 소유자 결정과 달라진 assertion이었다. 테스트를 삭제하지 않고 outside 경로 기대와 `.ai`를 commit하지 않아도 clean인 조건으로 갱신했다.
+  - 이어 `node ../../node_modules/vitest/dist/cli.js --run test/project-setup.test.ts test/host-rerun.test.ts` — 2 files/41 PASS, exit 0. 나머지 5개 파일의 성공과 합친 고유 최종 결과는 **7 files/214 PASS**이며 반복 실행을 합산하지 않는다. untracked/modified config와 다른 `.ai` 내용, outside dirt/rename, config 내용 digest, preview/confirm 뒤 설정 변경, worker write DENY, 프로젝트별 초안, 동시 publish/no-overwrite 및 실제 CLI stdin/doctor를 검증했다. 전체 vitest suite는 실행하지 않았다.
+- 현재 App 검증 (`app/t3code`):
+  - `pnpm --filter t3 test src/weavra/ProjectSetup.test.ts src/auth/RpcAuthorization.test.ts src/weavra/TaskCoordinator.test.ts` — 3 files/99 PASS, exit 0.
+  - `pnpm --filter @t3tools/web test src/components/chat/WeavraProjectSetup.test.tsx src/components/chat/WeavraTaskCard.test.tsx src/components/chat/useWeavraTask.test.tsx` — 3 files/61 PASS, exit 0.
+  - `pnpm --filter @t3tools/contracts test src/weavraTask.test.ts` — 1 file/20 PASS, exit 0. App 고유 최종 합계 **7 files/180 PASS**.
+  - `pnpm --filter @t3tools/contracts typecheck`, `pnpm --filter @t3tools/client-runtime typecheck`, `pnpm --filter t3 typecheck`, `pnpm --filter @t3tools/web typecheck` — 각각 최종 exit 0. 새 Node path import 진단은 Effect Path로, 테스트의 연속 Layer provide 경고는 단일 provide로 고쳤다. 초기 chained 검사 한 번은 PATH를 첫 명령에만 적용하여 monitor deadline에 종료됐고, export PATH로 전 명령을 고정한 최종 검증과 구분한다. 기존 무관한 Effect suggestions는 보존했다.
+  - `pnpm exec vp fmt --check packages/contracts/src/weavraProjectSetup.ts packages/contracts/src/index.ts packages/contracts/src/rpc.ts packages/client-runtime/src/state/weavraTaskRpc.ts apps/server/src/weavra/ProjectSetup.ts apps/server/src/weavra/ProjectSetup.test.ts apps/server/src/auth/RpcAuthorization.ts apps/server/src/ws.ts apps/web/src/components/chat/WeavraProjectSetup.tsx apps/web/src/components/chat/WeavraProjectSetup.test.tsx apps/web/src/components/chat/WeavraTaskCard.tsx apps/web/src/components/chat/useWeavraTask.ts` — 최종 exit 0, 12 files. 같은 12개 경로의 `pnpm exec vp lint` — 최종 exit 0, 경고/오류 없음. 포맷 수정은 stdin 출력 비교 후 apply_patch만 사용했다.
+  - `pnpm --filter @t3tools/web build` — exit 0, 6,097 modules, 18.85초. 기존 chunk-size 경고는 보존했다. 통합 script는 빌드를 하지 않으므로 현재 web bundle을 명시적으로 재빌드했고 Runtime의 기존 SDK build/offline artifact와 소스 launcher를 사용했다. desktop 빌드/설치는 실행하지 않았다.
+- 현재 실제 경계/UI 검증 (저장소 루트, 위 PATH 및 `WEAVRA_CHROMIUM='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'`):
+  - `node scripts/run-problem-cycle-integration.mjs --case=dirty-state --evidence-dir=/Users/kangjingoo/.omo/evidence/weavra-resume-20261015/setup-feature-dirty-state` — exit 0, `FOCUSED_PASS`. 다른 미추적 파일 보존, task/Run/admission/worker 0, 자동 정리 없음, 소유 App/Runtime 종료 및 fixture 삭제를 확인했다.
+  - `node scripts/run-problem-cycle-integration.mjs --case=project-setup --evidence-dir=/Users/kangjingoo/.omo/evidence/weavra-resume-20261015/setup-feature-ui` — exit 0, `FOCUSED_PASS`. 실제 버튼/편집기/검토/Save/doctor/새 task 생성, 읽기 전용 principal의 setup RPC 거부, 기존 config overwrite 거부, 미추적 config와 Git HEAD 불변, 모델 요청 0을 확인했다.
+  - 같은 project-setup case의 `--evidence-dir=/Users/kangjingoo/.omo/evidence/weavra-resume-20261015/setup-feature-ui-actions`는 disabled Save의 `pointer-events:none`을 가림으로 오인한 hit-test 때문에 FAIL했다. 직접 캡처에서 버튼이 가려지지 않음을 확인하고 action row의 hit target을 검사하도록 보정했다. 설정을 아직 저장하지 않은 실패 fixture도 cleanup snapshot이 표현할 수 있도록 config 부재를 해당 case에서만 null로 기록했다. 실패 evidence는 남겼으며 종료된 소유 임시 fixture는 별도로 정리했다.
+  - 최종 `node scripts/run-problem-cycle-integration.mjs --case=project-setup --evidence-dir=/Users/kangjingoo/.omo/evidence/weavra-resume-20261015/setup-feature-ui-final` — exit 0, `FOCUSED_PASS`. 1280/375 px, light/dark의 missing/review/ready와 review 하단 action 캡처 16개, 가로 overflow 0 및 Save/Cancel 접근성을 확인했다. 실제 App→고정 launcher→atomic publish→doctor 결과를 사용했으며 모형 UI가 아니다. 소유 browser는 강제 종료 없이 종료했고 최종 fixture cleanup 실패 0이다. 초기/최종 focused 결과를 full corpus PASS나 모델 품질 검증으로 확대하지 않는다.
+- 추가 검사/한계: `node --check scripts/run-problem-cycle-integration.mjs`, `git diff --check` exit 0. workspace.ts LSP 오류 없음; 다른 변경 파일의 fresh LSP는 일부 3초 timeout이므로 무진단으로 주장하지 않으며 실제 build-root 타입 검사 성공을 근거로 한다. 전체 CI, 설치형 Electron, 모바일 네이티브, 다른 OS, 실제 모델 인증/유료 추론은 검증하지 않았다. 초안 탐지는 루트 manifest 기반이고 프로젝트별 명령·모델·sandbox 선택은 사람의 검토가 필요하다. 기존 config 편집/덮어쓰기는 제공하지 않는다.
+- 보존/커밋/다음 단계: 지정 worktree의 detached HEAD `c9068f96`, staged 파일 0을 확인했다. 기존 변경을 reset/checkout/stash/clean/add/commit하지 않았고 원본 작업 기록·`~/Applications`·실제 `~/.weavra`·사용자 프로젝트를 수정하지 않았다. 다음 배포 시 함께 바뀐 Runtime/App을 반영해야 하며 현재 결과는 소스 구현과 격리 검증 완료다.
+
+## 2026-10-15 14:46 KST — Weavra UI 한국어 전환·로그인 프로바이더 기준 모델 추천 (중단 작업 인계 완료)
+
+- 목적/상태: 이전 작업자가 provider usage limit으로 편집 도중 중단한 작업을 이어받아 완료했다. 소유자가 한국어만 읽으므로 Weavra 전용 UI 문구를 한국어로 바꾸고, 프로젝트 설정 초안의 모델 프로필을 앱에 로그인된 프로바이더 기준으로 미리 채우며, 영어 문구에 의존하던 기계 소비 값(테스트·corpus 셀렉터)을 안정적인 data 속성으로 옮겼다. 지정된 `omo-user-flow-20261003` dirty detached worktree(HEAD `c9068f96`)에서만 수정했고 설치·배포는 하지 않았다.
+- 인계 시 발견한 반쯤 끝난 상태(`docs/WORK_LOG.md` mtime 이후 수정 파일 28개 기준):
+  - Runtime `project-draft.ts`가 프로젝트 종류를 `"노드"`로 바꿨지만 테스트는 `["Node"]`를 기대했다. 고유 명사는 유지하는 규칙으로 `Node`로 되돌리고, 웹 표시에서만 `Generic`을 `일반`으로 라벨링했다.
+  - Runtime `project-models.ts`(신규)가 `ReadOnlyAuthStorage`로 Runtime `auth.json`을 읽어 자격 증명 메타데이터를 draft에 실었고 coding-agent 소스를 상대 경로로 직접 import했다. "자격 증명 파일을 읽지 않는다"는 요구와 충돌해 설계를 바꿨다(아래).
+  - 웹 컴포넌트는 대부분 번역돼 있었으나 `"none"`·`"required"`·`"optional"`·`"unknown"`·`"unavailable"`·`"UNKNOWN"`·`"Stopping"`·`"Read N개"`·`"task"/"tasks"`·`File`·`NOT EXPOSED` 등 조각과 `작업 N title/goal`, `작업 N claim N operation/path` 같은 혼합 aria-label이 남아 있었다. 모두 한국어로 맞췄다.
+  - 웹 테스트 6개 파일(197개 중 106개 실패)과 corpus 스크립트는 아직 영어 문구를 기대하고 있었다.
+- 모델 추천 설계(최종):
+  - Runtime `project draft --json`은 `modelAvailability.providers[]`에 **정적 카탈로그만** 보고한다(`InMemoryCredentialStore`+`InMemoryModelsStore`, `allowModelNetwork: false`, `refreshOnCreate: false`). 자격 증명 파일·네트워크·모델 호출이 없고, 보고 대상은 `openai-codex`뿐이며 `anthropic`은 목록에 넣지 않는다.
+  - 서버 `ProjectModelRecommendation.ts`는 App이 installed·enabled·available·authenticated로 보고한 프로바이더 중 Runtime 대응이 있는 드라이버(현재 `codex → openai-codex`)만 후보로 삼고, 그 프로바이더가 보고한 모델 중 Runtime 카탈로그에 있는 모델만 쓴다. 결정 규칙: 후보는 Runtime 프로바이더 ID → 인스턴스 ID 오름차순이고 첫 번째가 `selected`, 나머지는 `alternatives`; 구현 모델은 App 기본 모델, 없으면 slug 오름차순 첫 번째; 검토 모델은 Runtime이 reasoning으로 표시한 첫 후보, 없으면 구현 모델. 후보가 없으면 YAML을 비워 둔다. `claudeAgent`는 매핑에 없어 App의 Claude 채팅 로그인이 Runtime `anthropic` 프로필로 번역될 수 없고, 감지되면 `anthropicOmitted: true`로만 보고한다.
+  - 웹 `WeavraProjectSetup.tsx`는 "로그인된 프로바이더 기준 추천" 블록(규칙 설명·대안 목록)과 항상 보이는 안내 "Claude 구독 로그인은 Runtime 작업에 자동 추천하지 않아요. Anthropic은 API 키 방식으로만 직접 설정할 수 있어요."를 표시하고, 추천 YAML은 저장 전에 편집할 수 있다.
+  - Anthropic 구독 OAuth 도달 경로: `runtime/pi/packages/ai/src/auth/oauth/anthropic.ts`는 `packages/ai/src/auth/oauth/load.ts:33`(provider id `anthropic`의 지연 import)과 `packages/ai/src/bun-oauth.ts:13`에서만 참조되며, Runtime 설정의 프로필이 `provider: anthropic`이고 Runtime 자체 자격 증명 저장소에 anthropic OAuth 자격 증명이 있을 때만 사용된다. 추천 경로(Runtime 정적 목록·서버 매핑·UI)는 `anthropic`을 생성하지 않으며 `project-models.test.ts`와 `ProjectModelRecommendation.test.ts`가 이를 검증한다.
+- 기계 소비 값: 오류 코드·wire enum·`data-issue-verification`·`data-next-action`·test id는 그대로다. 웹 컴포넌트에 `data-weavra`(controlled-outcome, advisory-context-size, read-selected-message, prepared-snapshot, project-setup-status/-review/-yaml, anthropic-note, model-recommendation)·`data-weavra-action`(start-controlled-task, return-to-free-coding, prepare-handoff, confirm-implementation, prepare-new-snapshot, refresh-task-state, recover-interrupted-task, stop-controlled-task, include-selected-finding, assess-original-issue, load-evidence, reload-evidence-snapshot, set-up-project, save-project-setup, cancel-project-setup, open-controlled-task)·`data-weavra-record`/`data-record-index`·`data-weavra-outcome-freshness`를 추가했고, `scripts/run-problem-cycle-integration.mjs`의 영어 텍스트 셀렉터 전부와 `scripts/problem-cycle-browser.mjs`(`clickAction` 추가)를 이 속성 기준으로 바꿨다. 상태 문구 검사만 한국어 텍스트(`' | 사용자 | '`, `중단을 기록했어요.`, `시작 전 중단`/`소유권 해제됨`, `Run 중단됨`/`정리가 확인되지 않아`)를 쓴다.
+- 변경 파일(이번 인계 작업분; Git diff에는 선행 미커밋 변경도 포함됨):
+  - Runtime: `runtime/pi/packages/company-runtime/src/{project-models.ts,project-draft.ts}`, `test/project-models.test.ts`; `npm run check`의 Biome이 `src/{launcher-project.ts,project-readiness.ts}`, `test/project-setup.test.ts` 포맷만 고쳤다.
+  - App contracts/server: `packages/contracts/src/weavraProjectSetup.ts`(modelAvailability에서 authType/anthropicOmitted 제거, 후보 스키마 공용화), `apps/server/src/weavra/{ProjectModelRecommendation.ts,ProjectModelRecommendation.test.ts}`.
+  - App web: `apps/web/src/components/chat/{WeavraProjectSetup.tsx,WeavraProjectSetup.test.tsx,WeavraTaskCard.tsx,WeavraTaskCard.test.tsx,WeavraTaskResult.tsx,WeavraTaskResult.test.tsx,weavraTaskFocus.test.tsx}`, `ChatView.tsx`, `settings/{CapabilityInventory.tsx,CapabilityInventory.test.tsx,WeavraComplex.tsx,WeavraControls.tsx,WeavraControls.test.tsx,WeavraFitness.tsx,WeavraPreflightFailure.tsx,WeavraSettings.tsx}`, `weavraLabels.ts`; 포맷터가 이전 작업자의 `useWeavraTask.ts`, `weavraTaskLogic.ts`, `ProjectSettingsPanel.tsx`도 포맷만 정리했다.
+  - 통합: `scripts/run-problem-cycle-integration.mjs`, `scripts/problem-cycle-browser.mjs`, 이 기록.
+- 명령 환경: 모든 명령에 `export PATH=/Users/kangjingoo/.omo/evidence/weavra-resume-20261015/tools:/Users/kangjingoo/.nvm/versions/node/v24.19.0/bin:/opt/homebrew/bin:/usr/bin:/bin`을 적용했고 로그는 `/Users/kangjingoo/.omo/evidence/weavra-resume-20261015/korean-ui-logs/`에 남겼다.
+- 현재 Runtime 검증:
+  - `runtime/pi`: `./node_modules/.bin/biome check --error-on-warnings .`(읽기 전용)로 포맷 오류가 이번 작업 파일 3개뿐임을 먼저 확인한 뒤 `npm run check` — exit 0, Checked 1549 files / Fixed 3 files, dependency·import·entry graph·shrinkwrap·install-lock·tsgo·browser-smoke 통과.
+  - `runtime/pi/packages/company-runtime`: `node ../../node_modules/vitest/dist/cli.js --run test/project-models.test.ts test/project-setup.test.ts test/project-setup-binding.test.ts test/launcher-project.test.ts` — 4 files/47 PASS, exit 0(실제 launcher `project draft --json`이 정적 `modelAvailability`를 포함해 `projectTypes: ["Node"]`를 반환함을 포함).
+- 현재 App 검증(`app/t3code`):
+  - `pnpm --filter @t3tools/web test`(useWeavraTask, WeavraProjectSetup, WeavraTaskCard, weavraTaskFocus, weavraTaskLogic, WeavraTaskResult, weavraTaskResultLogic, WeavraControls, CapabilityInventory) — 인계 직후 기준선 6 files 실패/106 tests 실패 → 최종 9 files/198 PASS, exit 0. 테스트를 삭제·skip하지 않았고 동작 assertion은 유지한 채 기대 문구만 컴포넌트의 한국어로 바꿨다. WeavraProjectSetup에는 추천 블록·Claude 안내의 `data-anthropic-omitted` 표시 테스트를 추가했다.
+  - `pnpm --filter t3 test src/weavra/ProjectModelRecommendation.test.ts src/weavra/ProjectSetup.test.ts src/weavra/TaskCoordinator.test.ts` — 3 files/95 PASS; `pnpm --filter @t3tools/contracts test src/weavraTask.test.ts` — 20 PASS.
+  - `pnpm --filter @t3tools/contracts typecheck`, `@t3tools/client-runtime`, `t3`, `@t3tools/web` — 모두 exit 0(web은 마지막 표시 보강 후 다시 exit 0).
+  - 수정 파일 26개에 `pnpm exec vp fmt --check` — 처음 18개 파일 실패 → 해당 18개만 `pnpm exec vp fmt` 적용 후 exit 0; `pnpm exec vp lint` — exit 0(ChatView.tsx의 기존 `react(set-state-in-effect)` 경고 5건은 Weavra와 무관한 선행 상태).
+  - `pnpm --filter @t3tools/web build` — exit 0, 6,098 modules, 16.75초(corpus 실행 전 1회, 설정 대화상자 라벨·정리 상태 라벨 보강 후 2회 재빌드 모두 exit 0).
+- 현재 corpus 집중 사례(저장소 루트, 위 PATH와 `WEAVRA_CHROMIUM='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'`, `node scripts/run-problem-cycle-integration.mjs --case=<case> --evidence-dir=/Users/kangjingoo/.omo/evidence/weavra-resume-20261015/korean-ui-<case>`):
+  - `project-setup` — exit 0, `FOCUSED_PASS`. 한국어 설정 버튼→초안→검토→저장→doctor 흐름을 data 속성 셀렉터로 통과했고 1280/375 px light/dark 캡처 16장(`korean-ui-project-setup/setup-{missing,review,review-actions,ready}-*.png`). 격리 fixture의 `Fixture Codex` 모델은 Runtime 카탈로그와 겹치지 않아 "추천하지 않았어요" 경로가 표시됐다(선택 경로는 단위 테스트가 검증).
+  - `dirty-state` — exit 0, `FOCUSED_PASS`(브라우저 캡처 없음).
+  - `normal-success` — exit 0, `FOCUSED_PASS`, 캡처 24장(`korean-ui-normal-success/normal-success-{context,source,focus,completed,symptom-binding}-*.png`).
+  - `paged-issue-assessment` — exit 0, `FOCUSED_PASS`, 캡처 4장(`korean-ui-paged-issue-assessment/all-page-{assessment,final-record}-{1280,375}.png`).
+  - 네 사례는 설정 대화상자 라벨(승인/파일 지문/문서/대상/검사 조건/설명)과 결과 카드의 정리 상태·검토 결과 라벨 보강 **이전** 번들로 실행했다. 이 변경은 corpus 경로가 검사하지 않는 표시 문구이며 이후 웹 테스트·typecheck·build를 다시 통과시켰다.
+- 남은 영어(의도적): T3 일반 chrome(프로젝트 설정의 이름·아이콘·checkout·삭제 섹션, 작성기 placeholder, Add action/Open/Publish repository, 모델·권한 선택, Update Available 토스트, RejectedTurnNotice·breadcrumb aria-label)과 식별자(Run, Runtime, Host, Kernel, Policy, Planner, STANDARD/COMPLEX/QUICK/R3, 오류 코드, 명령어 `weavra project doctor/init`, `.ai/config.yaml`, 모델·프로바이더·Run·revision·digest ID, `models.intents.plan`, Host Unix ms). doctor 진단 `code`와 Runtime이 보내는 일부 `action`은 Runtime 원문 그대로다.
+- 한계/다음 단계: 설치형 Electron·모바일·전체 CI·실제 모델 인증은 검증하지 않았다. 추천은 App 프로바이더 보고와 Runtime 정적 카탈로그의 교집합일 뿐 Runtime 쪽 로그인/API 키를 보장하지 않으며 UI가 이를 안내한다. 매핑은 현재 `codex`만이며 다른 드라이버(cursor, grok, opencode, antigravity)는 후보에서 제외된다. corpus 실행 중 Runtime 소스를 건드리지 않았고, crash 등 나머지 사례의 한국어 텍스트 검사는 갱신했지만 이번에 실행하지 않았다.
+- 보존/커밋 상태: staged 파일 0, HEAD `c9068f96` 불변, `git diff --check` exit 0. reset/checkout/stash/clean/add/commit, 의존성 추가, `~/Applications`·실제 `~/.weavra`·사용자 프로젝트 수정 없음. 실행 모델: Claude(claude-fable-5-1).
+
+## 2026-10-15 KST — 첫 사용 개선 8개, mass-ulw 구현 진행 중
+
+- 목적/범위: 소유자 Discord1560182932931485737이 승인한 계정 경로·설정 재편집·용량/검사 사전 점검·결과·레이아웃·일반 한국어화·단순화를 작은 quick 단위로 병렬 구현한다. 전면 재작성·모바일·기억 기능·원본 게임 변경·커밋은 범위 밖이다.
+- 보존/실행: `first-use-improvements-1552/baseline.patch`와 `baseline-untracked.tar`를 먼저 보존했고, 기존 dirty source가 조사 단계에서 그대로임을 cmp로 확인했다. source 분기와 공통 파일 의존성을 고정했으며 부모만 전역 기록/설치/실사용 검증을 맡는다.
+- 현재 기초 변경: Runtime의 공통 등록 검사 명령 거부 함수, `models.claude_code.enabled` 기본 false, 인증 메타데이터별 전송 gate, 제한된 설정 읽기/해시와 기존 writer lease를 사용하는 명시적 CAS 갱신, 유한한 workspace profile 제안, 준비 상태의 shell/inline 사전 거부를 구현했다. CLI·App 폼 연결·공식 SDK 인증 경합 보완은 아직 통합 중이다.
+- 부모가 현재 실행한 검증(과거 결과 재사용 아님): company-runtime에서 `node ../../node_modules/vitest/dist/cli.js --run test/policy.test.ts test/config.test.ts test/provider-permission.test.ts`는 3 files/161 PASS, exit0. 사람용 오류 문구 고정 assertion 보정 뒤 provider-permission만 다시 5 PASS, exit0. `--run test/project-config.test.ts test/project-preflight.test.ts test/project-readiness-policy.test.ts`는 3 files/18 PASS, exit0. 반복된 5개를 합산하지 않은 고유 현재 확인은 179개이다. 일부 fresh LSP timeout은 clean으로 주장하지 않는다.
+- 발견/보정: 없는 하위 AGENTS.md를 이유로 구현 없이 완료하거나 upstream을 기다리며 완료한 노드는 수락하지 않고 같은 소유자를 재개했다. Runtime 인증 메타데이터 조회와 실제 auth 선택 사이의 경합은 실제 선택 branch에서 종류 제한을 적용하도록 최소 SDK 범위를 확장했다. 코드 없이 안전한 SDK 연결이라고 주장하지 않는다.
+- 실행 사고: quick 기본 GPT registry만 확인했으나 초기 locale 조사 하나가 Claude Haiku5.5로 실행돼 19시 전 금지 지시를 위반했다. 발견 즉시 해당 DAG 중단·소유자 보고·실패 기록을 보존했다. 이후 소유자1560192944353443862 지시에 따라 임시 모델 고정 helper를 삭제하고 로그인/전역 모델 설정 실험을 중단했으며, 현재 보이는 모델의 원래 quick 경로만 재개했다. 사고를 이후 성공으로 삭제하지 않는다.
+- 남은 검증: 전체 source 통합·부정/회귀 사례·원본과 분리된 실제 게임 복사본 Electron 흐름·현재 화면 독립 검토·Mac 패키지와 설치 확인이 남아 있다. 현재 설치본/제품 전체 수락이나 실제 모델 품질을 증명한 결과가 아니다. staged/commit/push/merge는 하지 않았다.
+- 근거/재개: `~/.omo/evidence/weavra-resume-20261015/first-use-improvements-1552/active-checkpoint.json`, 구현 report·부모 테스트 로그·두 DAG 기록을 따른다. 공유 채널에서 받은 회사 사용자 표시 원칙은 참고만 사용했고 회사 원본 자료는 요청하지 않았다.
+
+## 2026-10-15 19:08 KST — 첫 설정 통합 회귀와 화면 단계 착수
+
+- 부모 통합 보정: 기본 증거 프로필이 재편집 중 조용히 확대되던 문제, 삭제한 process check가 YAML에 남던 문제, 명시적 Claude Code 동의 누락, 기존 설정을 새 초안으로 열던 문제를 고쳤다. 공식 SDK 경로는 opt-in을 요구하며 CLI가 자체 인증을 소유한다. 과거 Runtime OAuth 저장을 필수 조건으로 요구하지 않고 API 키 경로의 실제 선택 종류 제한은 유지한다.
+- 추가 발견/수정: `doctor --app-json`의 ready=false/exit1을 정상 진단으로 처리한다. 첫 `project init --stdin --json` 응답이 App 계약의 yaml/configDigest를 누락하던 결함은 회귀 RED를 확인한 뒤 제한된 config reader 결과를 응답에 포함해 고쳤다. 초기화 완료는 기존 버튼의 존재가 아닌 `data-result-kind="initialized"` 상태로 확인한다.
+- 현재 실제 실행: Runtime `npm run check` exit0(1561 files, fixture 들여쓰기 1개 보정); 계정/프로젝트 focused 9 files/93 PASS, 첫 저장 수정 후 launcher/project-setup 2 files/48 PASS. SDK·planner 관련 별도 부모 확인 5 files/87 PASS; App form/helper/card 3 files/42 PASS 및 web typecheck/build exit0. 중복 테스트 수를 전체 고유 합계로 더하지 않는다.
+- 실제 App source + 격리 Chrome `--case=project-setup` a2는 exit0/FOCUSED_PASS다. 명시적 검토 전 무저장·동의 기본 off·기본 증거 프로필·저장·Runtime 초기화·doctor READY·재편집 read·CAS update·stale 거부·기존 파일 무덮어쓰기와 모델 호출 0을 확인했다. 1280/375 px light/dark 캡처 16장은 evidence의 `setup-browser-a2`에 있다. a1의 잘못된 완료 대기 실패 기록은 보존했다.
+- 결과·화면은 `dag_61000400-1094-4bda-b9cd-375d67de0f8a`: 독립 quick 5개 → 실패 계약을 소비하는 자동 결과/단순화 2개 → 독립 검증 1개다. 부모는 첫 설정/전체 게임 복사본 검증을 병행한다. 설치본·원본 게임·실제 인증·staged/commit 상태는 변경하지 않았다. 전체 corpus, 최종 화면 검수, 패키지·설치는 남았다.
+
+## 2026-10-15 KST — 결과·화면 DAG 주장 검증과 부모 보완
+
+- DAG 8개 완료 통보를 그대로 수락하지 않았다. 자동 결과 노드는 구현 없이 차단을 보고했고, 독립 검증은 같은 누락과 포맷 실패 6개를 FAIL로 기록했다. 부모가 소스와 산출물을 읽고 포맷 6개를 apply_patch로 보정했다.
+- 자동 결과는 새 전송 프로토콜 없이 기존 `RuntimeController.observe`의 canonical 관측을 `ws.ts`의 작업 구독에 연결했다. 기존 2초 스냅샷 수집기를 재사용하며 새 타이머를 추가하지 않았다. 상태 키를 중복 제거하고 기존 task 직렬 reconcile만 호출한다. confirm/cancel/recover 재전송 없이 durable task-set 이벤트로 결과를 전달하고 기존 receipt/cleanup 완료 판정을 유지한다.
+- 정상 통합 사례가 task 이벤트를 먼저 구독하고, 수동 reconcile 없이 released 결과를 기다리도록 보강했다. RED는 정확히 automatic canonical task completion 시간 초과였고, 연결 후 실제 App/Runtime GREEN은 FOCUSED_PASS였다. 최신 UI 정상 경로 `current-normal-a3`도 FOCUSED_PASS이며 부모가 목표·계획·결과 기본 화면과 작은 화면의 docked 입력창을 직접 확인했다.
+- 현재 부모 실행: App 11 files/446 PASS, server/web typecheck와 web build exit0. Runtime `npm run check`는 1562 files/no fixes 및 모든 하위 정적 게이트 exit0, 실패/checkout focused 7 PASS. App 변경 28개 fmt exit0, lint exit0이나 선행 React·unused import 등의 경고는 보존했다. 공통 헤더 문구 보완 뒤 3 files/103 PASS, OpenInPicker 4 PASS였다. 이후 Sidebar 빈 상태 한국어와 마지막 포맷 보정의 검사는 별도 진행 중이다.
+- 결과의 오래된 실패 요약이 재연결·정리·복구의 다음 조치를 덮지 않도록 부모가 우선순위를 고쳤다. 일반 검사 실패를 필수 검사라고 오인하지 않도록 문구도 보정했다. 실제 첫 화면에서 남아 있던 프로젝트 작업 추가·편집기 열기·저장소 게시·맨 아래 이동·빈 프로젝트/대화 문구를 한국어로 보완했다.
+- 전체 corpus a1/a2는 접힌 진단의 task ID를 보이기 전에 읽던 검사 동선을 찾아 보정한 실패 기록이다. a3는 정상·권한·용량 설정·변경 충돌·거짓 성공·필수 검사 실패·응답 유실 등 26개 시도까지 PASS였으나 monitor 실행 기한으로 종료돼 전체 PASS가 아니다. 충분한 명시적 실행 기한의 a4가 진행 중이다.
+- 격리 Mac zip 빌드는 성공했다. `--skip-build` 재포장은 server/client에 이전 웹 산출물이 남을 수 있어 최종 수락으로 쓰지 않고, 마지막 문구를 포함한 전체 패키지 빌드를 다시 시작했다. 원본 앱은 PID22022로 유지하고 별도 홈·프로필의 검증 앱에서 한국어 첫 실행 3단계와 로컬 프로젝트 추가를 직접 조작했다. 전체 게임 초안은 Godot/2142파일/55504965바이트의 bounded 후보와 좁은 수정 경로를 표시했고, 합성 모델 ID의 명시적 검토 저장까지 확인했다. 검증 앱의 실행 기한 종료로 초기화·재편집·최종 패키지 수락은 아직 남아 있다. 실제 인증이나 모델 요청은 하지 않았다.
+- 최종 native QA·독립 gate review·설치·정리는 미완료다. 설치본/원본 게임/git stage·commit·push는 변경하지 않았다. 최신 근거는 `first-use-improvements-1552/parent-phase4-corrections.md`, `current-normal-a3`, `full-corpus-a4`, `native-a2`, `mac-package-final`을 따른다.
+
+## 2026-10-15 KST — 독립 지적 보정·배포 산출물 검증·설치, 마지막 live UI 확인 대기
+
+- 범위: 승인된 8개 첫 사용 개선의 계정/명시적 SDK 경로, 한국어 설정·초기화·재편집, 유한 증거 프로필, Policy 일치 검사, 자동 canonical 결과/원인/다음 행동, docked 입력창, 일반 진입 문구, 목표·계획·결과 기본 화면을 구현했다. 모바일·기억 통합·전면 재작성·실제 모델 품질 평가는 범위 밖이다.
+- 단일 독립 검토는 먼저 REJECT했다. 검사 ID 변경의 신뢰 소스/`repairable_exit_codes` 손실, 생략된 sandbox의 disabled→required 변경, 생략된 required=true의 잘못된 표시를 부모가 실제 함수와 Runtime 스키마로 재현했다. 3개 RED 회귀를 고정한 뒤 현재 YAML 노드의 원래 ID로 병합하고 내부 ID를 제거해 저장하며 Runtime 기본값과 UI를 맞췄다. 편집 가능한 ID는 별도 행 토큰으로 관리해 연속 입력 포커스를 유지한다. 중복 ID는 원문이 유지된 invalid draft로 남긴다.
+- 수정 후 관련 3 files/49 PASS, web typecheck·해당 파일 lint/fmt exit0(새 경고 없음). 같은 검토자가 49개와 실제 Runtime 스키마 재현을 독립 실행해 B1-B3를 닫고 `independent-gate-followup.md`에 APPROVE했다. 원래 REJECT와 실패 기록은 보존했다. 앞선 Runtime 80개 독립 집중 검사와 부모 정적 게이트 결과는 각 로그의 당시 결과이며 고유 합계로 더하지 않는다.
+- 실제 폼 `safe-reedit-browser`와 전체 `full-corpus-reedit-fixed`는 기본값·모델만 수정·연속 ID 입력·신뢰 소스/종료 코드 보존을 실제 CLI 저장 후 Runtime 파서로 확인했다. 전체는 16 groups/30 attempts/30 cleanup PASS다. 별도 설치형 전체 게임 복사본에서도 2,142 files/55,504,965 bytes 후보, 명시적 저장·초기화·doctor·CAS stale 거부·unsafe shell NOT READY·고급 데이터 보존을 확인했다. 합성 STANDARD 확인은 `MODEL_UNAVAILABLE`, Run 0, cleanup CONFIRMED, 소유권 released를 자동 표시했고 게임 성공으로 주장하지 않았다.
+- 배포 직전 실제 package export를 확인하니 Runtime 공개 진입점은 `dist/index.js`인데 이전 산출물이 남아 있었다. 동일한 in-memory 소비자 검사는 빌드 전 `Missing expected rejection`으로 실패했다. `packages/ai build:offline`과 `packages/coding-agent build`(CLI 번들 포함)를 실행한 뒤 빈 환경의 실제 공개 dist 검사에서 OAuth 변경 거부, refresh/derive 0, API 키 경로 보존을 확인했다. 소스·실제 자격 증명·lockfile은 바꾸지 않았다. 이 새 산출물의 `full-corpus-compiled-runtime`도 16/30과 모든 정리 영수증 PASS다.
+- 설치본: `~/Applications/Weavra.app`, asar SHA256 `d25c6503568f1cff47e90e1d25398753f30b508aebb4cb95872e734a54b73d14`. 원본 앱은 정상 종료 후 `~/Applications/Weavra.backup-20261015T121930Z.app`에 보존했고 이전 asar `fb417778e72a1e2efa6306ade8a4efc2b4dbdcb897b5a32057144712f2614275`와 일치한다. 기존 `Weavra 실행.app`은 수정하지 않았고 그 런처로 설치본이 열려 새 한국어 메인창을 캡처했다. 실제 사용자 DB는 기존 `~/.weavra/app/userdata`를 사용하며 테스트 DB로 교체하지 않았다.
+- 정리: 중단됐던 소유 fixture 2개의 canonical 상태를 보존했고, 코드·cwd·포트로 확인한 이전 App 그룹만 종료했다. QA 홈/프로필/클론·중복 앱 복사본·큰 임시 모듈 추적 로그를 제거했다. 현재 정상 사용자 앱과 기존 Dori 수신기는 유지했다. 원본 게임은 clean, HEAD `d56348bdfacfb228410442fc4b51a3f3d9dc2636`였다. 제품 stage/commit/push/merge는 하지 않았다.
+- 미완료: 설치된 실제 사용자 대화에서 설정 버튼으로 진입하는 마지막 클릭이 OS 잠금 화면에 차단됐다. 우회 입력을 하지 않았고 G006의 최종 live UI/보고 수락은 아직 닫지 않는다. 소스/격리 패키지 검증을 이 클릭의 실행 증거로 바꾸어 주장하지 않는다. 실제 provider 로그인·유료 추론·게임플레이·remote CI·native mobile은 검증하지 않았다.
+- 재개 근거: `~/.omo/evidence/weavra-resume-20261015/first-use-improvements-1552/`의 승인 보고서, `compiled-runtime-deployment.md`, 현재 corpus, 설치 스크린샷, `native-canonical-proof.json`과 `retained-fixture-proof.json`을 따른다. 삭제한 QA 홈 대신 보존된 canonical 증거를 사용하고, 화면 잠금 해제 후 현재 창/프로세스를 새로 관찰한다.
+
+## 2026-10-16 KST — 설치 앱의 마지막 읽기 전용 화면 확인
+
+- 소유자 잠금 해제 메시지 `1560435986771738645` 후 현재 capabilities/windows를 새로 확인했다. 설치 앱의 기존 Greeting 대화를 AX로 선택하고 프로젝트 설정을 열었다. 한국어 설명, 2,142 files/55,504,965 bytes의 bounded-monorepo 제안, 명시적 Claude 미허용, 제한 경로, 검사/격리/프로필 및 고급 YAML을 관찰했다.
+- 스크롤 후 검토 동의가 미선택이고 저장이 비활성인 상태, 닫기/시작 버튼과 입력창의 분리를 실제 창에서 확인했다. 폼을 닫기만 했으며 원본 게임의 저장/초기화/실행과 모델 호출은 하지 않았다.
+- `shasum -a 256`으로 설치본/백업의 이전 해시 일치를 재확인했다. 원본 `git status --porcelain=v1`은 빈 출력, HEAD는 `d56348bdfacfb228410442fc4b51a3f3d9dc2636`이다. 영수증은 `installed-live-ui-final.json`, 실제 캡처 frame-15~20은 부모 세션 기록이다.
+- 이번 후속은 UI 관찰과 보존 확인이며 기존 통합/독립 검사를 다시 실행한 것으로 세지 않는다. 실제 로그인/유료 추론/게임플레이/remote CI/native mobile 및 과거 전체 C08 해결은 주장하지 않는다. 제품 commit/stage/push/merge는 없다.
+
+## 2026-10-16 KST — 비 Git 최초 조회와 자동 설정·프리셋 후속 검증
+
+- 새 범위는 소유자 `1560445224281702402`의 실제 화면 오류/자동 설정, `1560445919105781802`의 밸런스 기본/의도적 속도·품질 변경이다. 프롬프트 A/B 평가는 별도 질문으로 답했으며 인용된 실행 명령을 새 작업으로 실행하지 않았다.
+- 실제 Demon은 Git 저장소가 아니었다. 서버 trace5193–5195와 native frame21에서 목록 조회가 실행용 checkout 검증을 호출하고 `WorkspaceOwnershipError`를 `INTERNAL_ERROR`로 포장하는 경로를 확인했다. 목록은 서버 소유 환경/프로젝트/대화 연결만 검증하고 실행의 엄격한 checkout 검증은 유지한다. 회귀 RED 후 Coordinator90 PASS였다.
+- 새 초안은 App의 설치·인증된 Codex 모델과 Runtime 정적 목록의 교집합에서 밸런스를 고른다. 속도/품질 후보가 없으면 비활성으로 남기며, 실제 Runtime 인증이나 모델 성능 측정 결과라고 주장하지 않는다. 기존 YAML/CAS digest와 사용자 모델 의도 지정은 보존한다. 초기 조회/선택은 저장이나 모델 요청이 아니며, 명시적 준비 버튼 뒤 저장·초기화·doctor를 이어간다.
+- 실제 전체 통합 첫 실행은 재편집 입력이 존재하는 즉시 비활성 입력을 조작한 기존 하네스 경계에서 실패했다. 조회+후보 요청 전체에 busy를 유지하고 하네스는 입력 enabled 신호를 구독하도록 보정했다. 기존 기본값/CAS/연속 ID 입력/포커스/고급 검사 메타데이터 주장은 줄이지 않았고, sleep·재시도·skip은 없다. 보정 후 focused 실제 설정 재편집 및 세 프리셋/비 Git 사례가 통과했고, 최종 `full-corpus-a2`는17 groups/32 attempts/32 cleanup PASS다.
+- 최종 집중4 files/60 PASS와 web 타입/lint, server/web 타입, 변경 파일 형식/공백 검사가 통과했다. 중간 검사 집계는 중복되므로 더하지 않는다. 별도 전체 게임 격리 복사본은2,142 files/55,504,965bytes의 bounded-monorepo 후보, 밸런스5.6-sol, 실제 저장·초기화·doctor ready 및 제한 경로를 확인했고 정리했다. 원본 HEAD/status와 복사본 tracked 파일은 변하지 않았으며 모델 호출은0이다.
+- App 필수 전체 게이트는 기존 대기열 버튼의 영문 aria-label 검사1개에서 중단됐다(web402 files/5,498 tests PASS,1 FAIL). 컴포넌트는 이미 한국어 라벨을 렌더링하며 해당 컴포넌트/테스트는 이번에 수정하지 않았다. 단독 실행도6 PASS/1 FAIL였다. 기존 추천 테스트의 누락된 workspaceProfile fixture와 LSP fresh-diagnostics timeout도 숨기지 않는다. 실제 타입 명령은 exit0이며 전체 게이트 통과로 바꾸어 기록하지 않는다.
+- 최종 빌드는 `mac-package-a5` exit0/ZIP integrity PASS, ZIP SHA256 `378884d5821e8b9584b2e0e7cafcd3aeceb4448953d0fe6abb861f38b7c91ba4`, staged asar `9d56d9e190c491443618d288fb8942ad723824f98835cff53c4b22188bab914f`다. 검토/설치 전이며 현재 사용자 앱은 교체하지 않았다.
+- 근거는 `~/.omo/evidence/weavra-auto-setup-20261016/`의 검증 기록, 최종 소스 manifest, 실제 스크린샷13개, focused/full corpus, full-size 영수증이다. 단일 독립 검토 `st_01a1423f`가 진행 중이다. 원본 게임/Demon 소스·실제 자격 증명·전역 라우팅을 바꾸지 않았고 제품 stage/commit/push/merge는 없다.
+
+## 2026-10-16 KST: 이상 상태 계획(weavra-ideal-state-20261016) Runtime·App 구현과 게이트
+
+- 단계/상태: 계획 `.omo/plans/weavra-ideal-state-20261016.md`의 Wave 1~4 구현과 감독자 재검증이 끝났다. 실행 자체는 2026-10-16 계획 수립 뒤 2026-10-17 KST에 이어졌다. todo 22(전체 corpus)와 23(패키지·설치·설치본 QA)은 이 기록을 쓰는 시점에 끝나지 않았다.
+- 목적: 첫 사용자가 목표 입력부터 설정, 실패 이해, 완료 인계, 규칙 학습까지 막히지 않게 한다. 정책·검증·완료 권한은 그대로 Runtime/Kernel에 둔다.
+- Runtime 변경(상세는 `runtime/pi/docs/WORK_LOG.md` LOG-127, LOG-128):
+  - 명사형 목표와 `[읽기 전용]`/`[수정]` 태그 분류(todo 1), doctor/read/draft의 검사별 `checkPolicies`와 수정 제안(todo 2), 실행 가능한 검사 후보 초안과 정책 필터(todo 3), Claude 잠금 회귀 테스트(todo 4).
+  - 프로젝트 안 상대 경로 검사 스크립트 해석(todo 28), 실패 Run의 규칙 후보 `facts.candidates`(todo 14)와 확인 시 실제 사실 저장(todo 31), Developer·Reviewer 자문 규칙 패킷(todo 16), 자문 검사 기본 켜짐 `verification.advisory_checks`(todo 25).
+  - dirty 거부의 파일 목록 `error.details`(todo 26 Runtime), `project trial-check`(todo 27 Runtime), 웨이브 이전 변경으로 깨진 테스트 정리(todo 29), 전체 게이트 녹색화(todo 20).
+- App 변경(`app/t3code`):
+  - 애매한 목표의 읽기 전용/수정 선택(todo 7), 설정 화면 검사별 정책 배지와 "허용 형태로 고치기"(todo 8), 결과 화면의 실패 이유와 다음 행동(todo 9), 용어 통일과 한국어화(todo 10).
+  - 완료 Run의 "변경 보기"와 PR 설명 초안 복사(todo 12), 보고된 토큰 사용량 표시(todo 13), 규칙 후보 확인/무시 화면(todo 15).
+  - dirty 파일 목록과 동의 기반 기준 커밋 RPC `weavra.taskCommitDirtyBaseline`(todo 26 App), 설정 화면 검사 시험 실행(todo 27 App), knip 미사용 export 해소(todo 17), capability harness 한국어 문구 기대 갱신(todo 18), ComposerPrimaryActions 테스트 한국어 라벨 갱신(todo 30).
+  - 통합 하네스 `scripts/run-problem-cycle-integration.mjs`에 실제 화면 사례 7개를 더했다.
+- 변경 파일: 각 노드 보고서(`~/.omo/evidence/weavra-ulw-20261016/waves/g1~g4/todo-*.md`)에 절대 경로로 남겼다. 주요 파일은 Runtime `packages/company-runtime/src/{execution-contract,classification,project-readiness,launcher-project,project-draft,process-runner,verification,analysis-context,memory-candidates,project-facts,state-store,host-control,host-control-protocol,agent-runner,agent-tools,config,sandbox,workflow,graph,fingerprint}.ts`, App `packages/contracts/src/{weavraProjectSetup,weavraControl,weavraTaskRpc,rpc}.ts`, `apps/server/src/weavra/{ProjectSetup,ProjectDirtyBaseline,TaskCoordinator,ControlTransport,RuntimeController}.ts`, `apps/web/src/components/chat/{WeavraTaskCard,WeavraTaskResult,WeavraProjectSetup,WeavraFactCandidates,useWeavraTask}.tsx|ts`, 루트 `scripts/{run-problem-cycle-integration,capability-app-integration}.mjs`와 각 테스트 파일이다.
+- 이번 작업에서 실행한 검증(2026-10-17 KST, 감독자 재실행 포함):
+  - G002 Runtime: `npm run check` exit 0. 같은 재실행의 집중 vitest는 32 files 중 2 files/2 tests 실패였고(complex-rerun clean-start, host-capability CT id), todo 29가 테스트 기대를 의도에 맞게 고친 뒤 3 files/55 PASS다.
+  - G003 App: web chat·settings, contracts weavraProjectSetup, server ProjectSetup 111 files/1548 PASS, server/web typecheck 0, 변경 파일 lint 0(바뀌지 않은 줄의 선행 경고 2건), web build 0. 금지 문구 rg 0건.
+  - G004: Runtime 26 files/652 PASS, `npm run check` exit 0. App은 수정 전 267 files/4054 PASS, 수정 뒤 310 files PASS와 ThreadSettlementReactor 1 file/37 실패였다. todo 32가 이 실패를 macOS `TMPDIR` 심볼릭 링크에 걸리는 기존 realpath 가드 문제로 분류했고 코드는 바꾸지 않았다.
+  - G005: `node scripts/validate.mjs pi`는 `TMPDIR`를 realpath로 지정한 실행에서 ALL GATES PASS(exit 0). 첫 재실행은 1건 실패로 exit 1이었다. `node scripts/validate.mjs t3`는 단독 실행 exit 0이고, 앞선 동시 실행의 유일한 실패였던 ElectronWindow import timeout은 단독 2/2 PASS다. `pnpm run knip:check` exit 0(수정 전 exit 1), `node scripts/run-capability-boundary.mjs` `CAPABILITY CROSS-BOUNDARY PASS`.
+  - 실제 앱(격리 App·Runtime·Chrome, 스크립트 loopback 모델): check-policy-preflight-a1, goal-mode-choice-fix-a1, failed-result-next-action-fix-a2, completed-handoff-fix-a1, fact-candidate-confirm-a3, dirty-baseline-commit-a4, setup-trial-check-a3 모두 exit 0, `FOCUSED_PASS`. 1280 light/dark와 375 캡처는 `~/.omo/evidence/weavra-ulw-20261016/real-surface/`에 있다. 실패한 이전 시도(a1, a2 등)는 덮어쓰지 않았다.
+  - 중간 집계는 서로 겹치므로 합산하지 않는다. 이전 날짜 항목의 결과는 이번에 다시 실행한 것으로 세지 않는다.
+- 문제와 해결:
+  - Runtime이 `control.hello`에 `factCandidates: 1`을 광고했지만 App 계약에 키가 없어 엄격 디코딩이 연결을 거부했다(`RUNTIME_UNAVAILABLE`). 감독자가 contracts에 capability 키를 추가해 풀었다.
+  - 하네스 사례가 카드가 fresh 상태가 되기 전에 눌러 실패했다. 대기 단계만 더했고 assertion은 약화하지 않았다.
+  - 규칙 후보 "확인"이 `FACT_SOURCE_UNAVAILABLE`로 늘 거부됐다. `run:<runId>#<candidateId>` 출처를 Runtime이 다시 유도해 검증하게 고쳤다(todo 31).
+  - `advisory` 키를 `advisory_checks`로 바꾼 뒤 evals fitness-runner가 옛 키를 써서 설정이 거부됐다. source를 고쳤고, StandardWorkflow 시작 전 configDigest 재검사를 더했다(LOG-127).
+- 남은 한계:
+  - 유료 모델 실행은 하지 않았다. 모든 테스트는 faux provider나 loopback 모델을 썼다.
+  - 전체 corpus(todo 22)와 패키지·설치·설치본 QA(todo 23)는 이 기록 시점에 미완료다.
+  - "변경 보기"는 Run 자체의 diff가 아니라 대화(thread) diff 패널을 연다.
+  - 확인된 사실이 프롬프트에 projectFacts와 projectRules로 중복해 들어간다.
+  - Godot 검사와 상대 경로 검사는 검사 cwd 기준으로 해석되므로 cwd를 바꾼 등록은 따로 확인해야 한다.
+  - Claude 비활성 시 한국어 인증 문구가 역할/프로필 이름을 더 이상 밝히지 않는다.
+  - `GitWorkspace.inspect` 이름이 다른 의미의 함수와 겹친다.
+  - ThreadSettlementReactor 테스트는 macOS에서 `TMPDIR` realpath를 줘야 통과한다.
+  - todo 11과 todo 5의 노드 보고서가 없다. todo 11은 감독자가 rg와 테스트로 확인했지만 보고서 자체는 누락으로 남긴다.
+- 다음 단계: 전체 corpus 실행, 패키지 빌드 뒤 백업·설치·설치본 네이티브 QA, 위 한계의 후속 정리.
+- 커밋 상태: 미커밋. stage/commit/push/stash/checkout/reset은 하지 않았고 worktree는 dirty로 남는다. 자격 증명과 대화 로그는 기록하지 않았다.
+
+## 2026-10-17 KST: F2 게이트 리뷰 비차단 수정(trial-check 동의·writer·sandbox)
+
+- 단계/상태: 완료. 근거: `~/.omo/evidence/weavra-ulw-20261016/F2-gate-review.md` NOTE 1, 3, 4, 5. 상세: `~/.omo/evidence/weavra-ulw-20261016/waves/g5/review-fixes.md`.
+- 변경:
+  - Runtime: trialCheck가 실제 Run과 같은 보호 경로를 sandbox에 넘기고, writer.lock이 있으면 `TRIAL_CHECK_WRITER_ACTIVE`, 동의가 없으면 `TRIAL_CHECK_CONSENT_REQUIRED`로 실행 없이 거부한다(runtime/pi WORK_LOG 같은 날짜 항목).
+  - App: `packages/contracts/src/weavraProjectSetup.ts` trial-check 입력에 `consent: Literal(true)` 필수와 새 오류 코드 2개, `apps/server/src/weavra/ProjectSetup.ts`가 Runtime stdin에 consent를 전달, `WeavraProjectSetup.tsx`는 확인 버튼 경로에서만 consent:true를 보낸다. 동의 없는 요청은 서버 디코딩에서 `INVALID_PAYLOAD`로 거부되고 Runtime을 띄우지 않는다.
+- 이번 작업에서 실행한 검증: App vitest 3 files 48 PASS, vp fmt/lint exit 0, server/web typecheck exit 0, web build exit 0, Runtime 2 files 51 PASS, `npm run check` exit 0, 실제 앱 `--case=setup-trial-check` FOCUSED_PASS(`real-surface/setup-trial-check-review-a1`).
+- 남은 한계: 유료 모델 실행 없음. 리뷰 NOTE 2, 6-10은 이번 범위가 아니다.
+- 커밋 상태: 미커밋. stage/commit/push/stash/checkout/reset 없음.
+
+## 2026-10-17 KST: F4 이상 상태 불일치 수정(todo 33-37)과 knip 수정
+
+- 단계/상태: 완료. 근거: `~/.omo/evidence/weavra-ulw-20261016/waves/g5/F4-ideal-state-fidelity.md`의 MISMATCH 행(IS-3, IS-5, IS-6, IS-7, IS-10)과 같은 폴더 `todo-33.md`~`todo-37.md`. IS-12(설치본 QA)는 todo 38 범위라 여기 포함하지 않는다.
+- 변경:
+  - todo 33(IS-3, Runtime): doctor/readiness와 trial-check의 검사 정책 판정에 프로젝트 보호 경로(`resolveProjectProtectedPaths` + 지시 파일 경로)를 넘긴다. 실행 시점과 같은 기준이라 보호 경로 cwd 검사는 doctor에서 이미 `CHECK_POLICY_DENIED:<id>`가 된다(runtime/pi WORK_LOG 같은 날짜 항목).
+  - todo 34(IS-6, App): 사이드바, 대화 머리글, 작성기·접근/모드 메뉴, checkout 칩·branch 툴바, 오른쪽 패널 탭, Diff 패널, Git 작업, 채팅 타임라인, PR 탭의 사용자 표시 영어 문구를 한국어로 바꿨다. 인벤토리 rg 657줄 → 41줄이고, 남은 41줄은 `Promise<...>` 타입 오탐과 제품·공급자 이름 등 허용 목록이다. 공급자 effort 라벨은 표시 시점에만 번역한다(`traitDisplayLabel`). 테스트는 기대 문구만 바꿨고 약화·삭제는 없다.
+  - todo 35(IS-10, App): `WeavraRunGraphPanel.tsx`에서 BLOCKED/FAILED Run의 완료 노드에 실패 요약과 "실패 이유는 결과 화면에서 확인" 버튼을 넣었다. 버튼은 오른쪽 패널을 control 화면으로 연다. 완료 노드가 없으면 그래프 아래에 같은 줄을 한 번 보여 준다. 테스트 `WeavraRunGraphPanel.test.tsx`(신규).
+  - todo 36(IS-5, Runtime+App): FAIL 검사 증거에 비밀값을 가린 출력 끝부분(`stderrTail`/`stdoutTail`, 합계 20줄·2048바이트 이하)과 REVISE 검토의 `reviseSummary`(500자 이하)를 더했다. App 계약 `weavraControl.ts`에 같은 선택 필드를 추가했고, `WeavraTaskResult.tsx` 실패 블록이 이를 보여 준다. 서버 코드는 바꾸지 않았다.
+  - todo 37(IS-7, Runtime+App): "변경 보기"가 대화 Diff 패널 대신 Run 자신의 변경을 보여 준다. Runtime은 기존 `workflow.evidence`에 읽기 전용 `run-diff` 범주를 더했고, 작업 트리가 기록된 `diffDigest`와 다르면 `DIFF_STALE`, 기준을 재현하지 못하면 `DIFF_UNVERIFIED`, 너무 크면 `DIFF_TOO_LARGE`로 거부한다. App은 계약에 범주와 거부 코드를 더하고 `WeavraRunDiff.tsx`(신규)로 기존 diff 렌더러를 재사용한다.
+  - knip: `packages/contracts/src/weavraControl.ts`의 `WEAVRA_RUN_DIFF_FILE_MAX_BYTES`에서 export를 뺐다(파일 안에서만 쓰는 상수).
+  - 통합 하네스 `scripts/run-problem-cycle-integration.mjs`: `failed-result-next-action/failed-check-reason`에 출력 끝부분 단언, `completed-handoff`에 Run diff 단언(다른 대화의 파일이 보이지 않음)을 더했다.
+- 이번 작업에서 실행한 검증(2026-10-17 KST, 각 노드 보고서 기준):
+  - todo 33: Runtime vitest 5 files/82 PASS, biome check exit 0, `npm run check:base` exit 0.
+  - todo 34: web typecheck exit 0, 바꾼 127개 파일 vp fmt/lint exit 0(오류 0, 기존 경고 171), 웹 패키지 설정 vitest 407 files/5558 PASS, web build exit 0, `node scripts/run-capability-boundary.mjs` exit 0. 저장소 루트 설정 실행은 5482 tests 모두 통과했지만 ghostty 테스트 파일 3개가 wasm mock 수집 오류로 exit 1이었다(기존 문제, 수정 안 함).
+  - todo 35: vitest 2 files/8 PASS, vp fmt/lint exit 0, web typecheck exit 0, build exit 0.
+  - todo 36: Runtime company-runtime 전체 104 files/2625 PASS(1 skipped), `npm run check` exit 0, App 5 files/303 PASS, contracts/server/web typecheck exit 0, web build exit 0, 실제 앱 `--case=failed-result-next-action` FOCUSED_PASS(`real-surface/failed-result-tail-a1`).
+  - todo 37: Runtime company-runtime 전체 105 files/2630 PASS(1 skipped), `npm run check` exit 0, contracts 66 PASS, web chat 64 files/1031 PASS, server weavra 12 files/322 PASS, typecheck·build exit 0, 실제 앱 `--case=completed-handoff` FOCUSED_PASS(`real-surface/completed-run-diff-a1`).
+  - 최종 게이트: `node scripts/validate.mjs pi`는 `waves/g5/validate-pi-r6.log`에서 exit 0(ALL GATES PASS). `node scripts/validate.mjs t3`는 r6 실행이 `pnpm knip:check failed: 1` 하나로 실패했고, 위 knip 수정 뒤 `waves/g5/validate-t3-r7.log`에서 exit 0(ALL GATES PASS)이다.
+  - 노드별 집계는 서로 겹치므로 합산하지 않는다. 이전 항목(G002~G005, F2 수정)의 결과는 이번에 다시 실행한 것으로 세지 않는다.
+- 남은 한계:
+  - 유료 모델 실행 없음. 실제 앱 사례는 스크립트 loopback 모델을 썼다.
+  - REVISE 사유는 Runtime·컴포넌트 테스트로만 확인했고 실제 앱 REVISE 사례가 없다. 정책 거부 사유 문구는 아직 증거에 없다.
+  - Run diff는 작업 트리가 Run 결과와 같을 때만 보이고, 파일당 한 hunk라 떨어진 두 수정도 한 블록으로 보인다.
+  - 그래프 링크는 control 화면을 열지만 실패 블록으로 키보드 포커스를 옮기지 않는다.
+  - project draft/read의 검사별 정책 미리보기는 아직 보호 경로 없이 판정한다.
+  - 설정·사용량·기기·미리보기·예전 사이드바 등 todo 34 범위 밖 화면의 영어 문구가 남아 있다. 설치본 화면 확인(IS-12)은 하지 않았다.
+- 다음 단계: `.omo/plans/weavra-followups-20261017.md`의 A(자문 이상 상태 A-2~A-20)와 B(알려진 한계) 표를 따른다.
+- 커밋 상태: 미커밋. stage/commit/push/stash/checkout/reset 없음. worktree는 dirty로 남는다.
+
+## 2026-10-18 KST: GPT 실모델 벤치마크 파일럿(후속 A-11)
+
+- 단계/상태: 파일럿 완료. 소유자 요청(Discord 1561232084956221511) "GPT 모델 붙혀서 실 모델 테스트". 근거: `~/.omo/evidence/weavra-realmodel-20261018/`.
+- 변경:
+  - `runtime/pi/packages/ai/scripts/generate-models.ts`: models.dev 데이터에 `opencode-go`의 Google API 모델(`gemini-4-argon-contributor`)이 새로 들어와 `npm run build`가 `src/providers/opencode-go.ts`에서 TS2322로 실패했다. `opencodeGoProvider()`는 Anthropic·OpenAI API만 등록하므로 생성 단계에서 `opencode-go`의 `@ai-sdk/google` 모델을 건너뛴다. 생성 데이터(`src/providers/data/`)는 git 무시 대상이라 빌드할 때마다 네트워크에서 다시 받는다.
+  - 모델 설정·자격 증명·기본 모델은 바꾸지 않았다.
+- 실행한 검증(2026-10-18 KST):
+  - `cd runtime/pi && npm run build`: 첫 실행 exit 1(위 TS2322), 수정 뒤 exit 0.
+  - `openai-codex/gpt-5.6-sol` 파일럿 10회: 모든 실행이 0.4초 만에 끝났다. pi는 첫 모델 호출에서 ERROR, Weavra는 NOT_STARTED, 토큰 보고 0. 하네스가 원시 오류를 숨겨 원인은 확정하지 못했다. 이 경로의 실행 기록은 `bench/`에 남겼다.
+  - `~/.weavra/agent/models.json`에 이미 있는 로컬 중계 `codex-lb`(127.0.0.1:2455, `/v1/models` HTTP 200)로 바꿨다. B01 확인 2회: pi 12.4초·7,397토큰, Weavra 31.5초·33,290토큰, 둘 다 숨은 검사 통과.
+  - 파일럿 `codex-lb/gpt-5.6-sol`, pi·weavra × B01, B07, B08, B09, B10, repeat 1(`bench2/benchmark-0eab80f2-e6bb-4553-9429-1f0b8cc73613.json`):
+    - pi: 완료 주장 5/5, 숨은 검사 5/5, 거짓 완료 0, 중간 18.0초, 보고 토큰 52,388.
+    - weavra: Kernel COMPLETED 5/5, 숨은 검사 5/5, 거짓 완료 0, 중간 36.9초(25.4~40.6초), 보고 토큰 204,613, REVISE 0, 검증 수리 0, 도구 오류 0.
+  - A-11(QUICK 수정 1~2분): STANDARD 한 번이 25~41초로 목표 안이다(QUICK 경로 자체는 이 벤치마크에 없어서 STANDARD로 상한을 확인했다).
+- 남은 한계:
+  - 표본이 작다(과제 5개 × 1회). B07~B10에서 모델이 한 번도 함정에 걸리지 않아 리뷰어가 막을 일이 없었고, 그래서 Weavra의 이점(거짓 완료 차단)은 이 파일럿에서 드러나지 않았다. 비용은 시간 약 2배, 토큰 약 4배다.
+  - `openai-codex` 직접 경로가 실패한 원인은 조사하지 않았다.
+- 다음 단계: 소유자가 GPT 사용을 넉넉히 허락해(Discord 1561234948650831885) 전체 19과제 × pi·weavra·weavra-advisory 57회와 리뷰어 효과 평가 11건을 같은 `codex-lb/gpt-5.6-sol`로 이어서 실행 중이다(`full/`, `reviewer/`). 끝나면 새 항목으로 기록한다.
+- 커밋 상태: 미커밋. stage/commit/push/stash/checkout/reset 없음.
+
+## 2026-10-18 KST: GPT 실모델 전체 벤치마크와 리뷰어 효과 평가
+
+- 단계/상태: 완료. 앞 항목(파일럿)의 다음 단계. 근거: `~/.omo/evidence/weavra-realmodel-20261018/full/`, `reviewer/`.
+- 변경: 없음(앞 항목의 `generate-models.ts` 수정 그대로).
+- 실행한 검증(2026-10-18 KST, `codex-lb/gpt-5.6-sol`):
+  - `run-benchmark.mjs --arms pi,weavra,weavra-advisory --fixtures all --repeat 1 --confirm-paid`(57회, `benchmark-ff337142-d0cf-457c-8308-4326862e68fa`): 세 방식 모두 완료 19/19, 숨은 검사 19/19, 거짓 완료 0. 중간 시간 pi 10.9초, weavra 26.1초, weavra-advisory 30.3초. 보고 토큰 133,868 / 569,776 / 601,213. 도구 오류 weavra 4(4 회복), advisory 5(4 회복). advisory 검사 17회. REVISE 0, 검증 수리 0.
+  - `run-reviewer-eval.mjs --confirm-paid`(11건, `reviewer-eval-20a64bf1-763b-44fb-8dc3-6877340be323`): 결함 잡기 7/7, 오경보 1/4(B08-correct: 기준 3개 MET, blocker 0, warning 1인데 REVISE), 거짓 완료 0/11, 판정 없음 0, 리뷰어 토큰 178,171, 중간 15.4초.
+- 남은 한계:
+  - 벤치마크에서 모델이 함정에 걸리지 않아 Weavra의 차단 효과는 벤치마크가 아니라 리뷰어 평가(심은 결함)로만 확인됐다.
+  - B08-correct 오경보: 모든 기준 MET·blocker 0에서도 REVISE가 Kernel에 받아들여진다. 판정과 근거가 어긋나는 경우를 막는 규칙이 없다.
+  - 반복 1회라 분산을 모른다.
+- 다음 단계: REVISE 수용 조건(미충족 기준 또는 blocker 이슈 필요)을 Kernel 판정 검증에 추가하는 방안 검토; 비싼 경로의 비용 대비 효과를 보려면 반복 3회 이상.
+- 커밋 상태: 미커밋. stage/commit/push/stash/checkout/reset 없음.

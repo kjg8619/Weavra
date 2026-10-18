@@ -113,6 +113,24 @@ describe("V0.3C proposal is not a permission grant", () => {
 	);
 });
 
+describe("noun-form and tagged execution proposals", () => {
+	it.each([
+		["게임 개발", "EDIT"],
+		["로그인 기능 개발", "EDIT"],
+		["결제 흐름 조사", "READ_ONLY"],
+		["[읽기 전용] 게임 개발", "READ_ONLY"],
+		["수정하지 말고 게임 개발 현황 정리", "READ_ONLY"],
+	])("proposes %s as %s", (goal, mode) => {
+		expect(proposeExecutionMode(goal)).toMatchObject({ mode, requiresConfirmation: false });
+	});
+	it("keeps mixed noun-form and verb-form signals unknown", () => {
+		const proposal = proposeExecutionMode("fix the login and explain why");
+		expect(proposal.requiresConfirmation).toBe(true);
+		expect(proposal.mode).toBeUndefined();
+		expect(proposeExecutionMode("게임 개발 설명하고 고쳐줘")).toMatchObject({ requiresConfirmation: true });
+	});
+});
+
 describe("READ_ONLY Policy double enforcement", () => {
 	it.each(["Developer", "Executor"] as const)(
 		"direct registered write/edit/delete cannot mutate for %s",

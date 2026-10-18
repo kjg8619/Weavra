@@ -74,9 +74,7 @@ export function SidebarThreadHeader({
   // list; pointing aria-activedescendant at a removed option strands the
   // screen reader on nothing.
   const activeResultExists = resultsVisible && activeSearchResultIndex < searchResultCount;
-  const newThreadLabel = newThreadShortcutLabel
-    ? `New thread (${newThreadShortcutLabel})`
-    : "New thread";
+  const newThreadLabel = newThreadShortcutLabel ? `새 대화 (${newThreadShortcutLabel})` : "새 대화";
 
   return (
     <div className="flex items-center gap-1">
@@ -93,8 +91,8 @@ export function SidebarThreadHeader({
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.currentTarget.value)}
           onKeyDown={onSearchKeyDown}
-          placeholder="Search"
-          aria-label="Search threads"
+          placeholder="검색"
+          aria-label="대화 검색"
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={resultsVisible}
@@ -112,7 +110,7 @@ export function SidebarThreadHeader({
             size="icon-micro"
             variant="ghost"
             className="shrink-0 text-sidebar-muted-foreground hover:bg-sidebar-control-surface hover:text-sidebar-foreground"
-            aria-label="Clear thread search"
+            aria-label="대화 검색 지우기"
             onClick={() => {
               onClearSearch();
               searchInputRef.current?.focus();
@@ -129,19 +127,19 @@ export function SidebarThreadHeader({
         {hasProjects ? (
           <>
             {projectScope}
-            <SidebarHeaderIconButton label="New project" onClick={onNewProject}>
+            <SidebarHeaderIconButton label="새 프로젝트" onClick={onNewProject}>
               <FolderPlusIcon />
             </SidebarHeaderIconButton>
           </>
         ) : null}
         <SidebarHeaderIconButton
-          label="New thread"
+          label="새 대화"
           tooltip={
             showNewThreadInProjectHint ? (
               <span className="flex flex-col gap-0.5">
                 <span>{newThreadLabel}</span>
                 <span className="text-muted-foreground">
-                  New thread in current project: Shift+click
+                  현재 프로젝트에서 새 대화: Shift+클릭
                   {newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}
                 </span>
               </span>

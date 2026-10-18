@@ -67,7 +67,7 @@ export function pullRequestStackView(
         : query.error
           ? "Stack data may be stale. We couldn’t refresh it."
           : !query.isSuccess || query.isPending
-            ? "Refreshing stack… Showing saved data."
+            ? "스택을 새로고침하는 중… 저장된 정보를 보여 줘요."
             : null,
   };
 }

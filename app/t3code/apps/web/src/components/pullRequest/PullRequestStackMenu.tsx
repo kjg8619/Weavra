@@ -104,13 +104,13 @@ export function PullRequestStackMenu({
     if (result._tag === "Failure") {
       toastManager.add({
         type: "error",
-        title: "Stack operation did not complete",
+        title: "스택 작업을 마치지 못했어요",
         description: String(squashAtomCommandFailure(result)),
       });
     } else {
       toastManager.add({
         type: "success",
-        title: action === "merge" ? "Stack merge request completed" : "Stack rebased",
+        title: action === "merge" ? "스택 병합 요청을 마쳤어요" : "스택을 rebase했어요",
         description:
           action === "merge"
             ? "GitHub merged the stack or added it to its merge queue."
@@ -130,7 +130,7 @@ export function PullRequestStackMenu({
                   <Button
                     variant="ghost"
                     size="xs"
-                    aria-label={`Stack ${stack.number}, layer ${position} of ${stack.layers.length}`}
+                    aria-label={`스택 ${stack.number}, ${stack.layers.length}개 중 ${position}번째 층`}
                   />
                 }
               >
@@ -148,7 +148,7 @@ export function PullRequestStackMenu({
         <MenuPopup align="start" className="w-96 max-w-[calc(100vw-2rem)]">
           <MenuGroup>
             <PullRequestStackHeader number={stack.number} notice={notice} stale={!!onRetry} />
-            {onRetry ? <MenuItem onClick={onRetry}>Retry stack refresh</MenuItem> : null}
+            {onRetry ? <MenuItem onClick={onRetry}>스택 다시 새로고침</MenuItem> : null}
             <PullRequestStackLayers
               stack={stack}
               reference={reference}
@@ -178,12 +178,12 @@ export function PullRequestStackMenu({
                   onClick={() => setConfirmation("update-branch")}
                 >
                   <RefreshCwIcon aria-hidden />
-                  Rebase stack
+                  스택 rebase
                 </MenuItem>
               ) : null}
               {mergeHasClosed || mergeLayers.some((layer) => layer.isDraft) ? (
                 <p className="px-2 py-1 text-xs text-muted-foreground">
-                  Every layer being merged must be open and ready for review.
+                  병합할 모든 층이 열려 있고 리뷰 준비가 되어 있어야 해요.
                 </p>
               ) : null}
             </>
@@ -202,7 +202,7 @@ export function PullRequestStackMenu({
                   onClick={() => setConfirmation("merge")}
                 >
                   <PullRequestGlyph.merged aria-hidden className="size-3.5" />
-                  Merge stack
+                  스택 병합
                 </Button>
               </span>
             }
@@ -246,10 +246,10 @@ export function PullRequestStackMenu({
           </DialogPanel>
           <DialogFooter>
             <Button variant="outline" disabled={pending} onClick={() => setConfirmation(null)}>
-              Cancel
+              취소
             </Button>
             <Button disabled={pending} onClick={() => void run()}>
-              {pending ? "Working…" : confirmation === "merge" ? "Merge stack" : "Rebase stack"}
+              {pending ? "처리 중…" : confirmation === "merge" ? "스택 병합" : "스택 rebase"}
             </Button>
           </DialogFooter>
         </DialogPopup>

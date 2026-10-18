@@ -49,23 +49,23 @@ import {
   composerDraftsAtom,
   createNewTaskDraft,
   getComposerDraftSnapshot,
-  isComposerDraftEmpty,
   isNewTaskDraftKey,
   removeComposerDraftAttachment,
   replaceComposerDraftAttachments,
   retargetNewTaskDraft,
   scheduleUnusedComposerAttachmentCleanup,
   setComposerDraftText,
-  setComposerDraftContext,
   setStickyComposerModelSelection,
   updateComposerDraftSettings,
   useComposerDraft,
   useStickyComposerModelSelection,
 } from "../../state/use-composer-drafts";
+import { flushPendingTaskEditorWrite } from "../../state/pending-task-editor-writes";
 import {
-  capturePendingTaskEditorWriteBaseline,
-  flushPendingTaskEditorWrite,
-} from "../../state/pending-task-editor-writes";
+  beginPendingTaskEditorSession,
+  initializePendingTaskEditorDraft,
+} from "../../state/pending-task-editor-session";
+import { pendingTaskDraftKey, findQueuedPendingTask } from "../../state/pending-task-identity";
 import { useDebouncedValue, usePaginatedBranches } from "../../state/queries";
 import { vcsEnvironment } from "../../state/vcs";
 import {
@@ -73,11 +73,6 @@ import {
   threadOutboxManager,
   type QueuedThreadMessage,
 } from "../../state/thread-outbox";
-import {
-  holdEditingQueuedMessage,
-  releaseEditingQueuedMessage,
-  useThreadOutboxMessages,
-} from "../../state/use-thread-outbox";
 import {
   setPendingConnectionError,
   useSavedRemoteConnections,
@@ -105,23 +100,6 @@ import { resolveProjectThreadCreationBranch } from "./projectThreadCreationValid
 type WorkspaceMode = "local" | "worktree";
 
 const BRANCH_SEARCH_DEBOUNCE_MS = 150;
-
-function pendingTaskDraftKey(messageId: string): string {
-  return `pending-task:${messageId}`;
-}
-
-// The message id owned by the currently active editing session, tracked
-// across provider instances. An in-flight flush from a dismissed session
-// consults it so it never drops the draft or releases the drain lock out from
-// under a newer session editing the same task.
-let activeEditingMessageId: string | null = null;
-
-function findQueuedPendingTask(messageId: string): QueuedThreadMessage | null {
-  const message = flattenQueuedThreadMessages(
-    appAtomRegistry.get(threadOutboxManager.queuedMessagesByThreadKeyAtom),
-  ).find((candidate) => candidate.messageId === messageId);
-  return message?.creation !== undefined ? message : null;
-}
 
 export function branchBadgeLabel(input: {
   readonly branch: VcsRef;
@@ -191,8 +169,9 @@ type NewTaskFlowContextValue = {
   readonly setWorkspaceMode: (mode: WorkspaceMode) => void;
   readonly selectBranch: (branch: VcsRef) => void;
   readonly setStartFromOrigin: (value: boolean) => void;
-  readonly beginEditingPendingTask: (messageId: string) => boolean;
+  readonly beginEditingPendingTask: (messageId: string) => Promise<boolean>;
   readonly finishEditingPendingTask: () => void;
+  readonly savePendingTask: (message: QueuedThreadMessage) => Promise<boolean>;
   readonly cancelEditingPendingTask: () => void;
   readonly buildPendingTaskMessage: (
     metadata: TurnCommandMetadata,
@@ -268,7 +247,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   const editingPendingTaskRef = useRef<QueuedThreadMessage | null>(null);
   // Outbox revision this editor session may write after its predecessor save.
   // Unrelated accepted writes still beat the dismissed session's CAS.
-  const editingRevisionRef = useRef(Promise.resolve(0));
+  const editingSessionRef = useRef<ReturnType<typeof beginPendingTaskEditorSession>>(null);
 
   const reset = useCallback(() => {
     setSelectedEnvironmentId(null);
@@ -281,12 +260,8 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     const editing = editingPendingTaskRef.current;
     editingPendingTaskRef.current = null;
     setEditingPendingTask(null);
-    if (editing) {
-      if (activeEditingMessageId === editing.messageId) {
-        activeEditingMessageId = null;
-      }
-      releaseEditingQueuedMessage(editing.messageId);
-    }
+    if (editing) editingSessionRef.current?.detach();
+    editingSessionRef.current = null;
   }, []);
 
   const projectsForEnvironment = useMemo(
@@ -396,7 +371,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   // While a queued pending task is being edited its draft lives under a key
   // scoped to the queued message, so new-task drafts stay intact.
   const selectedProjectDraftKey = editingPendingTask
-    ? pendingTaskDraftKey(editingPendingTask.messageId)
+    ? pendingTaskDraftKey(editingPendingTask)
     : selectedProject
       ? activeDraftKey
       : null;
@@ -916,37 +891,39 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     [selectedProjectDraftKey, selectedProviderStatus],
   );
 
-  const beginEditingPendingTask = useCallback((messageId: string): boolean => {
-    const message = findQueuedPendingTask(messageId);
+  const beginEditingPendingTask = useCallback(async (routeIdentity: string): Promise<boolean> => {
+    const message = findQueuedPendingTask(
+      routeIdentity,
+      flattenQueuedThreadMessages(
+        appAtomRegistry.get(threadOutboxManager.queuedMessagesByThreadKeyAtom),
+      ),
+    );
     if (!message?.creation) {
       return false;
     }
-    const draftKey = pendingTaskDraftKey(message.messageId);
-    // Only hydrate a fresh editing draft; reopening mid-edit keeps newer edits.
-    if (isComposerDraftEmpty(getComposerDraftSnapshot(draftKey))) {
-      setComposerDraftText(draftKey, message.text);
-      setComposerDraftContext(draftKey, message.context);
-      replaceComposerDraftAttachments(draftKey, message.attachments);
-      updateComposerDraftSettings(draftKey, {
-        modelSelection: message.modelSelection,
-        runtimeMode: message.runtimeMode,
-        interactionMode: message.interactionMode,
-        workspaceSelection: {
-          mode: message.creation.workspaceMode,
-          branch: message.creation.branch,
-          worktreePath: message.creation.worktreePath,
-          startFromOrigin: message.creation.startFromOrigin ?? false,
-        },
-      });
+    const session = beginPendingTaskEditorSession(message);
+    if (session === null) return false;
+    editingSessionRef.current?.detach();
+    editingSessionRef.current = session;
+    editingPendingTaskRef.current = message;
+    try {
+      await initializePendingTaskEditorDraft(message, () => editingSessionRef.current === session);
+    } catch (error) {
+      session.detach();
+      if (editingSessionRef.current === session) {
+        editingSessionRef.current = null;
+        editingPendingTaskRef.current = null;
+      }
+      throw error;
+    }
+    if (editingSessionRef.current !== session) {
+      session.detach();
+      return false;
     }
     setSelectedEnvironmentId(message.environmentId);
     setSelectedProjectKey(scopedProjectKey(message.environmentId, message.creation.projectId));
-    activeEditingMessageId = message.messageId;
     editingPendingTaskRef.current = message;
-    editingRevisionRef.current = capturePendingTaskEditorWriteBaseline(message.messageId);
     setEditingPendingTask(message);
-    // Hold the outbox drain off this task while it is open in the editor.
-    holdEditingQueuedMessage(message.messageId);
     return true;
   }, []);
 
@@ -990,6 +967,16 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
         threadId: ThreadId.make(metadata.threadId),
         messageId: MessageId.make(metadata.messageId),
         commandId: CommandId.make(metadata.commandId),
+        ...(editingPendingTask
+          ? {
+              storageIdentity: editingPendingTask.storageIdentity ?? {
+                environmentId: editingPendingTask.environmentId,
+                threadId: editingPendingTask.threadId,
+                messageId: editingPendingTask.messageId,
+              },
+              ...(editingPendingTask.delivery ? { delivery: editingPendingTask.delivery } : {}),
+            }
+          : {}),
         text,
         attachments: draft.attachments,
         context: draft.context,
@@ -1044,37 +1031,32 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     ],
   );
 
+  const savePendingTask = useCallback((message: QueuedThreadMessage) => {
+    const session = editingSessionRef.current;
+    return session === null
+      ? Promise.resolve(false)
+      : flushPendingTaskEditorWrite({
+          message,
+          baseline: session.baseline,
+          draftKey: session.key,
+        });
+  }, []);
+
   const finishEditingPendingTask = useCallback(() => {
     const editing = editingPendingTaskRef.current;
     editingPendingTaskRef.current = null;
     if (editing) {
-      if (activeEditingMessageId === editing.messageId) {
-        activeEditingMessageId = null;
-      }
-      clearComposerDraft(pendingTaskDraftKey(editing.messageId));
-      releaseEditingQueuedMessage(editing.messageId);
+      const session = editingSessionRef.current;
+      if (session?.isAlone()) clearComposerDraft(session.key);
+      session?.release();
+      editingSessionRef.current = null;
       scheduleUnusedComposerAttachmentCleanup(editing.attachments);
     }
     setEditingPendingTask(null);
   }, []);
 
-  // If the queued task disappears mid-edit (deleted from the list, or
-  // delivered), end the editing session immediately without saving — a later
-  // flush must not resurrect it, and the composer should fall back to the
-  // regular per-project draft.
-  const queuedMessagesByThreadKey = useThreadOutboxMessages();
-  useEffect(() => {
-    const editing = editingPendingTaskRef.current;
-    if (!editing) {
-      return;
-    }
-    const stillQueued = flattenQueuedThreadMessages(queuedMessagesByThreadKey).some(
-      (candidate) => candidate.messageId === editing.messageId,
-    );
-    if (!stillQueued) {
-      finishEditingPendingTask();
-    }
-  }, [finishEditingPendingTask, queuedMessagesByThreadKey]);
+  // Hidden/parked/retired rows still own drafts. Only an explicit successful
+  // save ends this editor; disappearance is never deletion authority.
 
   // Leaving the flow mid-edit (sheet dismissed or draft screen popped) saves
   // the current edits back into the queued task so nothing typed here is lost.
@@ -1087,9 +1069,13 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       }
       editingPendingTaskRef.current = null;
       setEditingPendingTask(null);
-      if (activeEditingMessageId === editing.messageId) {
-        activeEditingMessageId = null;
-      }
+      const session = editingSessionRef.current;
+      editingSessionRef.current = null;
+      if (session === null) return;
+      session.detach();
+      // Initialization can be dismissed before React binds this row's draft.
+      // Never save an unrelated prior render's composer into the new lineage.
+      if (editing !== editingPendingTask) return;
 
       const message = buildPendingTaskMessage({
         threadId: editing.threadId,
@@ -1111,13 +1097,14 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       // deliveries, so the flush cannot resurrect or overwrite them.
       void flushPendingTaskEditorWrite({
         message,
-        baseline: editingRevisionRef.current,
-        draftKey: pendingTaskDraftKey(editing.messageId),
+        baseline: session.baseline,
+        draftKey: session.key,
       })
         .then((savedDraftStillCurrent) => {
           // If this task was reopened (possibly in a fresh provider) while
           // the save was in flight, that session owns the draft and the lock.
-          if (activeEditingMessageId === editing.messageId) {
+          if (!session.isAlone()) {
+            session.release();
             return;
           }
           if (!savedDraftStillCurrent) {
@@ -1125,8 +1112,8 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
             // draft. Keep the draft and drain lock so reopening can retry it.
             return;
           }
-          clearComposerDraft(pendingTaskDraftKey(editing.messageId));
-          releaseEditingQueuedMessage(editing.messageId);
+          clearComposerDraft(session.key);
+          session.release();
           scheduleUnusedComposerAttachmentCleanup(editing.attachments);
         })
         .catch((error) => {
@@ -1135,7 +1122,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
           console.warn("[new-task] failed to save edited pending task", error);
         });
     };
-  }, [buildPendingTaskMessage]);
+  }, [buildPendingTaskMessage, editingPendingTask]);
   const cancelEditingPendingTask = useCallback(() => {
     editingFlushRef.current?.();
   }, []);
@@ -1190,6 +1177,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       setStartFromOrigin,
       beginEditingPendingTask,
       finishEditingPendingTask,
+      savePendingTask,
       cancelEditingPendingTask,
       buildPendingTaskMessage,
       setPrompt,
@@ -1222,6 +1210,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       expandedProvider,
       filteredBranches,
       finishEditingPendingTask,
+      savePendingTask,
       interactionMode,
       planModeEnabled,
       loadBranches,

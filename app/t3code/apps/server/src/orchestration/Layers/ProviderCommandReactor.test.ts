@@ -10,6 +10,14 @@ import {
   ProviderDriverKind,
   ProviderInstanceId,
   ProviderSetupError,
+  decodeWorkspaceTurnAdmissionClaimPayload,
+  decodeWorkspaceTurnCompactionContinuationPayload,
+  decodeWorkspaceTurnStartRefusalPayload,
+  makeWorkspaceTurnAdmissionClaimIdentity,
+  makeWorkspaceTurnCompactionContinuationIdentity,
+  makeWorkspaceTurnStartRefusalIdentity,
+  type OrchestrationEvent,
+  type OrchestrationThreadActivity,
 } from "@t3tools/contracts";
 import { createModelSelection } from "@t3tools/shared/model";
 import {
@@ -31,7 +39,10 @@ import * as Deferred from "effect/Deferred";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as OwnershipTest from "../../workspace/WorkspaceExecutionOwnershipTest.ts";
-import { WorkspaceExecutionOwnership } from "../../workspace/WorkspaceExecutionOwnership.ts";
+import {
+  WorkspaceExecutionOwnership,
+  WorkspaceOwnershipError,
+} from "../../workspace/WorkspaceExecutionOwnership.ts";
 import * as ProcessRunner from "../../processRunner.ts";
 import * as FileSystem from "effect/FileSystem";
 import * as Schema from "effect/Schema";
@@ -53,7 +64,13 @@ import {
 } from "../../provider/Errors.ts";
 import { OrchestrationEventStoreLive } from "../../persistence/Layers/OrchestrationEventStore.ts";
 import { OrchestrationCommandReceiptRepositoryLive } from "../../persistence/Layers/OrchestrationCommandReceipts.ts";
-import { SqlitePersistenceMemory } from "../../persistence/Layers/Sqlite.ts";
+import {
+  SqlitePersistenceMemory,
+  makeSqlitePersistenceLive,
+} from "../../persistence/Layers/Sqlite.ts";
+import { PersistenceSqlError } from "../../persistence/Errors.ts";
+import { OrchestrationCommandReceiptRepository } from "../../persistence/Services/OrchestrationCommandReceipts.ts";
+import { OrchestrationEventStore } from "../../persistence/Services/OrchestrationEventStore.ts";
 import {
   ProviderService,
   type ProviderServiceShape,
@@ -88,6 +105,16 @@ const asApprovalRequestId = (value: string): ApprovalRequestId => ApprovalReques
 const asMessageId = (value: string): MessageId => MessageId.make(value);
 const asTurnId = (value: string): TurnId => TurnId.make(value);
 const decodeOwnershipTask = Schema.decodeUnknownSync(WeavraTask);
+const encodeActivityJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+const decodeActivityRequest = Schema.decodeUnknownOption(Schema.Struct({ requestId: MessageId }));
+type ActivityCommand = Extract<
+  Parameters<OrchestrationEngineService["Service"]["dispatch"]>[0],
+  { type: "thread.activity.append" }
+>;
+const differentClaimantNonce = (nonce: string) =>
+  nonce === "11111111-1111-4111-8111-111111111111"
+    ? "22222222-2222-4222-8222-222222222222"
+    : "11111111-1111-4111-8111-111111111111";
 
 const assistantQuoteText = "Retain the reconnect backoff.";
 const assistantCitation = {
@@ -130,6 +157,8 @@ describe("ProviderCommandReactor", () => {
     | ProviderCommandReactor
     | ProjectionSnapshotQuery
     | WorkspaceExecutionOwnership
+    | OrchestrationCommandReceiptRepository
+    | OrchestrationEventStore
     | SqlClient.SqlClient,
     unknown
   > | null = null;
@@ -137,7 +166,7 @@ describe("ProviderCommandReactor", () => {
   const createdStateDirs = new Set<string>();
   const createdBaseDirs = new Set<string>();
 
-  afterEach(async () => {
+  async function closeHarness() {
     if (scope) {
       await Effect.runPromise(Scope.close(scope, Exit.void));
     }
@@ -146,6 +175,10 @@ describe("ProviderCommandReactor", () => {
       await runtime.dispose();
     }
     runtime = null;
+  }
+
+  afterEach(async () => {
+    await closeHarness();
     for (const stateDir of createdStateDirs) {
       NodeFS.rmSync(stateDir, { recursive: true, force: true });
     }
@@ -178,9 +211,20 @@ describe("ProviderCommandReactor", () => {
 
   async function createHarness(input?: {
     readonly baseDir?: string;
+    readonly databasePath?: string;
+    readonly decorateReceipts?: (
+      service: OrchestrationCommandReceiptRepository["Service"],
+    ) => OrchestrationCommandReceiptRepository["Service"];
+    readonly decorateEventStore?: (
+      service: OrchestrationEventStore["Service"],
+    ) => OrchestrationEventStore["Service"];
+    readonly beforeActivityDispatch?: (command: ActivityCommand) => Effect.Effect<void>;
+    readonly afterActivityDispatch?: (command: ActivityCommand) => Effect.Effect<void>;
+    readonly afterTurnStartMessageRead?: (messageId: MessageId) => Effect.Effect<void>;
     readonly workspaceRoot?: string;
     readonly initialTitle?: string;
     readonly deferReactorStart?: boolean;
+    readonly replayPersistedEvents?: boolean;
     readonly threadModelSelection?: ModelSelection;
     readonly sessionModelSwitch?: "unsupported" | "in-session";
     readonly requiresNewThreadForModelChange?: boolean;
@@ -207,6 +251,10 @@ describe("ProviderCommandReactor", () => {
     const { stateDir } = deriveServerPathsSync(baseDir, undefined);
     createdStateDirs.add(stateDir);
     const runtimeEventPubSub = Effect.runSync(PubSub.unbounded<ProviderRuntimeEvent>());
+    const replayedEvents = Effect.runSync(PubSub.unbounded<OrchestrationEvent>());
+    const persistenceLayer = input?.databasePath
+      ? makeSqlitePersistenceLive(input.databasePath)
+      : SqlitePersistenceMemory;
     const tryHandlePromptCommand = vi.fn<ProviderAuthService["Service"]["tryHandlePromptCommand"]>(
       input?.tryHandlePromptCommandEffect ?? (() => Effect.succeed(false)),
     );
@@ -421,14 +469,48 @@ describe("ProviderCommandReactor", () => {
       Layer.provide(OrchestrationEventStoreLive),
       Layer.provide(OrchestrationCommandReceiptRepositoryLive),
       Layer.provide(RepositoryIdentityResolver.layer),
-      Layer.provide(SqlitePersistenceMemory),
+      Layer.provide(persistenceLayer),
     );
-    const projectionSnapshotLayer = OrchestrationProjectionSnapshotQueryLive.pipe(
+    const projectionSnapshotLayer = Layer.effect(
+      ProjectionSnapshotQuery,
+      Effect.gen(function* () {
+        const query = yield* ProjectionSnapshotQuery;
+        return {
+          ...query,
+          getTurnStartMessage: (request) =>
+            query
+              .getTurnStartMessage(request)
+              .pipe(
+                Effect.tap(
+                  () => input?.afterTurnStartMessageRead?.(request.messageId) ?? Effect.void,
+                ),
+              ),
+        } satisfies ProjectionSnapshotQuery["Service"];
+      }),
+    ).pipe(
+      Layer.provide(OrchestrationProjectionSnapshotQueryLive),
       Layer.provide(ThreadBackgroundLiveness.layer),
       Layer.provide(ThreadPlanProgress.layer),
       Layer.provide(RepositoryIdentityResolver.layer),
-      Layer.provide(SqlitePersistenceMemory),
+      Layer.provide(persistenceLayer),
     );
+    const receiptLayer = Layer.effect(
+      OrchestrationCommandReceiptRepository,
+      Effect.gen(function* () {
+        const service = yield* OrchestrationCommandReceiptRepository;
+        return input?.decorateReceipts?.(service) ?? service;
+      }),
+    ).pipe(
+      Layer.provide(OrchestrationCommandReceiptRepositoryLive),
+      Layer.provide(persistenceLayer),
+    );
+    const eventStoreLayer = Layer.effect(
+      OrchestrationEventStore,
+      Effect.gen(function* () {
+        const service = yield* OrchestrationEventStore;
+        return input?.decorateEventStore?.(service) ?? service;
+      }),
+    ).pipe(Layer.provide(OrchestrationEventStoreLive), Layer.provide(persistenceLayer));
     let titleRegenerationCompletionDispatchAttempts = 0;
     const reactorOrchestrationLayer = Layer.effect(
       OrchestrationEngineService,
@@ -458,7 +540,17 @@ describe("ProviderCommandReactor", () => {
                   ? input?.beforeTurnStartDispatch
                   : undefined;
             return (before?.() ?? Effect.void).pipe(
+              Effect.andThen(
+                command.type === "thread.activity.append"
+                  ? (input?.beforeActivityDispatch?.(command) ?? Effect.void)
+                  : Effect.void,
+              ),
               Effect.andThen(engine.dispatch(command)),
+              Effect.tap(() =>
+                command.type === "thread.activity.append"
+                  ? (input?.afterActivityDispatch?.(command) ?? Effect.void)
+                  : Effect.void,
+              ),
               Effect.tap(() =>
                 isReplay ? (input?.afterTurnStartDispatch?.() ?? Effect.void) : Effect.void,
               ),
@@ -467,12 +559,20 @@ describe("ProviderCommandReactor", () => {
           get streamDomainEvents() {
             return engine.streamDomainEvents;
           },
-          subscribeDomainEvents: engine.subscribeDomainEvents,
+          subscribeDomainEvents: input?.replayPersistedEvents
+            ? Effect.gen(function* () {
+                const live = yield* engine.subscribeDomainEvents;
+                const replay = yield* PubSub.subscribe(replayedEvents);
+                return Stream.merge(live, Stream.fromSubscription(replay));
+              })
+            : engine.subscribeDomainEvents,
           latestSequence: engine.latestSequence,
         } satisfies OrchestrationEngineService["Service"];
       }),
     ).pipe(Layer.provide(orchestrationLayer));
     const layer = ProviderCommandReactorLive.pipe(
+      Layer.provideMerge(receiptLayer),
+      Layer.provideMerge(eventStoreLayer),
       Layer.provideMerge(OwnershipTest.baseLayer),
       Layer.provideMerge(reactorOrchestrationLayer),
       Layer.provideMerge(projectionSnapshotLayer),
@@ -504,7 +604,7 @@ describe("ProviderCommandReactor", () => {
         }),
       ),
       Layer.provideMerge(ServerSettingsService.layerTest()),
-      Layer.provideMerge(SqlitePersistenceMemory),
+      Layer.provideMerge(persistenceLayer),
       Layer.provideMerge(ServerConfig.layerTest(process.cwd(), baseDir)),
       Layer.provideMerge(NodeServices.layer),
     );
@@ -517,7 +617,12 @@ describe("ProviderCommandReactor", () => {
       effect: Effect.Effect<
         A,
         E,
-        WorkspaceExecutionOwnership | OrchestrationEngineService | ProjectionSnapshotQuery
+        | WorkspaceExecutionOwnership
+        | OrchestrationEngineService
+        | ProjectionSnapshotQuery
+        | OrchestrationCommandReceiptRepository
+        | OrchestrationEventStore
+        | SqlClient.SqlClient
       >,
     ) => runtime!.runPromise(effect);
 
@@ -648,11 +753,1210 @@ describe("ProviderCommandReactor", () => {
       drain,
       startReactor,
       runEffect,
+      replayPersistedEvent: (event: OrchestrationEvent) =>
+        PubSub.publish(replayedEvents, event).pipe(Effect.asVoid),
       get titleRegenerationCompletionDispatchAttempts() {
         return titleRegenerationCompletionDispatchAttempts;
       },
     };
   }
+
+  const watchActivity = Effect.fnUntraced(function* (
+    harness: Awaited<ReturnType<typeof createHarness>>,
+    predicate: (activity: OrchestrationThreadActivity) => boolean,
+  ) {
+    const observed =
+      yield* Deferred.make<Extract<OrchestrationEvent, { type: "thread.activity-appended" }>>();
+    const events = yield* harness.engine.subscribeDomainEvents;
+    yield* Stream.runForEach(events, (event) =>
+      event.type === "thread.activity-appended" && predicate(event.payload.activity)
+        ? Deferred.succeed(observed, event)
+        : Effect.void,
+    ).pipe(Effect.forkScoped({ startImmediately: true }));
+    return Deferred.await(observed).pipe(Effect.timeout("5 seconds"));
+  });
+
+  const failureFor = (requestId: string) => (activity: OrchestrationThreadActivity) =>
+    activity.kind === "provider.turn.start.failed" &&
+    Option.getOrUndefined(decodeActivityRequest(activity.payload))?.requestId === requestId;
+
+  const readActivities = (harness: Awaited<ReturnType<typeof createHarness>>) =>
+    Stream.runCollect(harness.engine.readEvents(0, 200)).pipe(
+      Effect.map((events) =>
+        events.flatMap((event) =>
+          event.type === "thread.activity-appended" ? [event.payload.activity] : [],
+        ),
+      ),
+    );
+
+  const dispatchAdmissionMessage = (
+    harness: Awaited<ReturnType<typeof createHarness>>,
+    commandId: string,
+    messageId = "admission-message",
+    text = "Keep the exact intent",
+  ) =>
+    harness.engine.dispatch({
+      type: "thread.turn.start",
+      commandId: CommandId.make(commandId),
+      threadId: ThreadId.make("thread-1"),
+      message: { messageId: MessageId.make(messageId), role: "user", text, attachments: [] },
+      runtimeMode: "approval-required",
+      interactionMode: "default",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+  const seedAdmissionOwner = Effect.fnUntraced(function* (
+    harness: Awaited<ReturnType<typeof createHarness>>,
+    cwd: string,
+    options?: {
+      readonly id?: string;
+      readonly generation?: number;
+      readonly threadId?: ThreadId;
+      readonly worktreePath?: string;
+    },
+  ) {
+    const ownership = yield* Effect.promise(() =>
+      harness.runEffect(Effect.service(WorkspaceExecutionOwnership)),
+    );
+    const threadId = options?.threadId ?? ThreadId.make("thread-1");
+    const generation = options?.generation ?? 0;
+    if (threadId !== ThreadId.make("thread-1")) {
+      yield* harness.engine.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make(`create-admission-owner:${threadId}`),
+        projectId: asProjectId("project-1"),
+        threadId,
+        title: "Other controlled conversation",
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5-codex" },
+        runtimeMode: "approval-required",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: options?.worktreePath ?? null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+    }
+    const task = decodeOwnershipTask({
+      id: options?.id ?? "77777777-7777-4777-8777-777777777777",
+      environmentId: ownership.environmentId,
+      projectId: asProjectId("project-1"),
+      threadId,
+      target: { workspaceRoot: cwd, worktreePath: options?.worktreePath ?? null },
+      checkout: {
+        canonicalCwd: options?.worktreePath ?? cwd,
+        repositoryRoot: options?.worktreePath ?? cwd,
+        headCommit: "a".repeat(40),
+        workspaceDigest: `sha256:${"a".repeat(64)}`,
+      },
+      phase: "analysis",
+      revision: 1,
+      context: null,
+      execution: null,
+      ownership: { generation: generation + 1, state: "analysis" },
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    yield* harness.engine.dispatch({
+      type: "thread.weavra-task.set",
+      commandId: CommandId.make(`seed-admission-owner:${task.id}`),
+      threadId,
+      expectedRevision: null,
+      expectedOwnershipGeneration: generation,
+      task,
+    });
+    return task;
+  });
+
+  const prepareCompactionConversation = Effect.fnUntraced(function* (
+    harness: Awaited<ReturnType<typeof createHarness>>,
+    cwd: string,
+  ) {
+    const threadId = ThreadId.make("thread-1");
+    const now = "2026-01-01T00:00:00.000Z";
+    // Persist prior conversation before starting the reactor subscription.
+    yield* dispatchAdmissionMessage(
+      harness,
+      "admission-history",
+      "admission-history",
+      "Earlier work",
+    );
+    harness.runtimeSessions.push({
+      provider: ProviderDriverKind.make("codex"),
+      providerInstanceId: ProviderInstanceId.make("codex"),
+      threadId,
+      status: "ready",
+      runtimeMode: "approval-required",
+      cwd,
+      model: "gpt-5-codex",
+      createdAt: now,
+      updatedAt: now,
+    });
+    yield* harness.engine.dispatch({
+      type: "thread.session.set",
+      commandId: CommandId.make("admission-ready-session"),
+      threadId,
+      session: {
+        threadId,
+        status: "ready",
+        providerName: "codex",
+        providerInstanceId: ProviderInstanceId.make("codex"),
+        runtimeMode: "approval-required",
+        activeTurnId: null,
+        lastError: null,
+        updatedAt: now,
+      },
+      createdAt: now,
+    });
+    yield* Effect.promise(() => harness.startReactor());
+  });
+
+  effectIt.effect.each([
+    "missing",
+    "accepted",
+    "competing",
+    "rejected",
+    "lookup-failed",
+    "refusal-lookup-failed",
+    "missing-readback",
+    "missing-event",
+    "failed-readback",
+    "mismatched-readback",
+    "commit-failed",
+    "ack-failed",
+  ] as const)("durable admission handles %s without guessing permission", (scenario) =>
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("thread-1");
+      const messageId = MessageId.make("admission-message");
+      const identity = makeWorkspaceTurnAdmissionClaimIdentity(threadId, messageId, {
+        kind: "initial",
+      });
+      const refusal = makeWorkspaceTurnStartRefusalIdentity(threadId, messageId);
+      const sent = yield* Deferred.make<void>();
+      let lookupCount = 0;
+      let competitorCommitted = false;
+      let submittedNonce: string | undefined;
+      let competitorNonce: string | undefined;
+      let harness: Awaited<ReturnType<typeof createHarness>>;
+      harness = yield* Effect.promise(() =>
+        createHarness({
+          afterSendTurn: () => Deferred.succeed(sent, undefined),
+          decorateReceipts: (service) => ({
+            ...service,
+            getByCommandId: (input) => {
+              if (scenario === "refusal-lookup-failed" && input.commandId === refusal.commandId) {
+                return Effect.fail(
+                  new PersistenceSqlError({
+                    operation: "test.refusal.lookup",
+                    detail: "unavailable",
+                  }),
+                );
+              }
+              if (input.commandId !== identity.commandId) return service.getByCommandId(input);
+              lookupCount++;
+              if (scenario === "lookup-failed") {
+                return Effect.fail(
+                  new PersistenceSqlError({
+                    operation: "test.claim.lookup",
+                    detail: "unavailable",
+                  }),
+                );
+              }
+              if (scenario === "missing-readback" && lookupCount === 2) {
+                return service.getByCommandId(input).pipe(Effect.as(Option.none()));
+              }
+              return service.getByCommandId(input);
+            },
+          }),
+          decorateEventStore: (service) => ({
+            ...service,
+            readAggregateRange: (range) => {
+              if (scenario === "failed-readback") {
+                return Stream.fail(
+                  new PersistenceSqlError({
+                    operation: "test.claim.readback",
+                    detail: "unavailable",
+                  }),
+                );
+              }
+              if (scenario === "missing-event") {
+                return service.readAggregateRange(range).pipe(Stream.filter(() => false));
+              }
+              return service.readAggregateRange(range).pipe(
+                Stream.map((event) =>
+                  scenario === "mismatched-readback" && event.type === "thread.activity-appended"
+                    ? {
+                        ...event,
+                        payload: {
+                          ...event.payload,
+                          activity: { ...event.payload.activity, id: EventId.make("wrong-claim") },
+                        },
+                      }
+                    : event,
+                ),
+              );
+            },
+          }),
+          beforeActivityDispatch: (command) => {
+            if (command.commandId !== identity.commandId) return Effect.void;
+            const payload = Option.getOrThrow(
+              decodeWorkspaceTurnAdmissionClaimPayload(command.activity.payload),
+            );
+            submittedNonce ??= payload.claimantNonce;
+            if (scenario !== "competing" || competitorCommitted) return Effect.void;
+            competitorCommitted = true;
+            competitorNonce = differentClaimantNonce(payload.claimantNonce);
+            // Commit the competing invocation through the real engine before
+            // the first invocation reaches its deduplicated dispatch.
+            return harness.engine
+              .dispatch({
+                ...command,
+                activity: {
+                  ...command.activity,
+                  payload: { ...payload, claimantNonce: competitorNonce },
+                },
+              })
+              .pipe(Effect.orDie, Effect.asVoid);
+          },
+          afterActivityDispatch: (command) =>
+            scenario === "ack-failed" && command.commandId === identity.commandId
+              ? Effect.die(new Error("Injected lost claim acknowledgement"))
+              : Effect.void,
+        }),
+      );
+      if (scenario === "accepted") {
+        yield* harness.engine.dispatch({
+          type: "thread.activity.append",
+          commandId: identity.commandId,
+          threadId,
+          activity: {
+            id: identity.activityId,
+            tone: "info",
+            kind: "provider.turn.admission.claimed",
+            summary: "Prior admission",
+            payload: {
+              version: 1,
+              source: "workspace-admission",
+              requestId: messageId,
+              originCommandId: CommandId.make("prior-origin"),
+              originSequence: 0,
+              attempt: { kind: "initial" },
+              claimantNonce: "11111111-1111-4111-8111-111111111111",
+            },
+            turnId: null,
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+          createdAt: "2026-01-01T00:00:00.000Z",
+        });
+      }
+      if (scenario === "rejected") {
+        yield* Effect.promise(() =>
+          harness.runEffect(
+            Effect.gen(function* () {
+              const receipts = yield* OrchestrationCommandReceiptRepository;
+              yield* receipts.upsert({
+                commandId: identity.commandId,
+                aggregateKind: "thread",
+                aggregateId: threadId,
+                acceptedAt: "2026-01-01T00:00:00.000Z",
+                resultSequence: 0,
+                status: "rejected",
+                error: "Prior rejection",
+              });
+            }),
+          ),
+        );
+      }
+      if (scenario === "commit-failed") {
+        yield* Effect.promise(() =>
+          harness.runEffect(
+            Effect.gen(function* () {
+              const sql = yield* SqlClient.SqlClient;
+              yield* sql`
+                CREATE TRIGGER fail_admission_receipt
+                BEFORE INSERT ON orchestration_command_receipts
+                WHEN NEW.command_id LIKE 'server:["workspace-admission-v1"%'
+                BEGIN SELECT RAISE(ABORT, 'injected claim receipt failure'); END
+              `;
+            }),
+          ),
+        );
+      }
+      const failure = yield* watchActivity(harness, failureFor(messageId));
+      yield* dispatchAdmissionMessage(harness, "fresh-origin");
+      if (scenario === "missing") {
+        yield* Deferred.await(sent).pipe(Effect.timeout("5 seconds"));
+      } else {
+        const activity = (yield* failure).payload.activity;
+        expect(decodeWorkspaceTurnStartRefusalPayload(activity.payload)).toEqual(Option.none());
+      }
+      yield* Effect.promise(() => harness.drain());
+      expect(harness.startSession).toHaveBeenCalledTimes(scenario === "missing" ? 1 : 0);
+      expect(harness.sendTurn).toHaveBeenCalledTimes(scenario === "missing" ? 1 : 0);
+      expect(harness.tryHandlePromptCommand).toHaveBeenCalledTimes(scenario === "missing" ? 1 : 0);
+      expect(harness.compactThread).not.toHaveBeenCalled();
+      const claims = (yield* readActivities(harness)).filter(
+        (activity) => activity.id === identity.activityId,
+      );
+      const projected = (yield* Effect.promise(() => harness.readModel())).threads.find(
+        (thread) => thread.id === threadId,
+      );
+      expect(
+        projected?.activities.some(
+          (activity) => activity.kind === "provider.turn.admission.claimed",
+        ),
+      ).toBe(false);
+      const noClaim = [
+        "rejected",
+        "lookup-failed",
+        "refusal-lookup-failed",
+        "commit-failed",
+      ].includes(scenario);
+      expect(claims).toHaveLength(noClaim ? 0 : 1);
+      if (scenario === "missing" || scenario === "competing") {
+        const claim = claims[0];
+        if (claim === undefined) return yield* Effect.die("Expected persisted admission claim");
+        const payload = Option.getOrThrow(decodeWorkspaceTurnAdmissionClaimPayload(claim.payload));
+        expect(payload.claimantNonce).toBe(
+          scenario === "missing" ? submittedNonce : competitorNonce,
+        );
+        if (scenario === "competing") expect(competitorNonce).not.toBe(submittedNonce);
+        expect(payload.originCommandId).toBe(CommandId.make("fresh-origin"));
+      }
+      if (scenario !== "missing") {
+        expect(yield* Effect.promise(() => harness.readPendingTurnStarts())).toEqual([]);
+      }
+    }),
+  );
+
+  effectIt.effect.each([
+    "claim-commit-before-ack",
+    "refusal-transaction-failure",
+    "interrupted-before-refusal-commit",
+  ] as const)("consumes admission across %s, restart, and ownership release", (scenario) =>
+    Effect.gen(function* () {
+      const baseDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "admission-restart-"));
+      const cwd = NodeFS.realpathSync(baseDir);
+      const databasePath = NodePath.join(baseDir, "admission.sqlite");
+      const interrupted = yield* Deferred.make<void>();
+      const harness = yield* Effect.promise(() =>
+        createHarness({
+          baseDir,
+          databasePath,
+          workspaceRoot: cwd,
+          beforeActivityDispatch: (command) =>
+            scenario === "interrupted-before-refusal-commit" &&
+            command.commandId.startsWith('server:["workspace-refusal-v1"')
+              ? Deferred.succeed(interrupted, undefined).pipe(Effect.andThen(Effect.never))
+              : Effect.void,
+          afterActivityDispatch: (command) =>
+            scenario === "claim-commit-before-ack" &&
+            command.activity.kind === "provider.turn.admission.claimed"
+              ? Deferred.succeed(interrupted, undefined).pipe(Effect.andThen(Effect.never))
+              : Effect.void,
+        }),
+      );
+      const task =
+        scenario === "claim-commit-before-ack"
+          ? undefined
+          : yield* seedAdmissionOwner(harness, cwd);
+      if (scenario === "refusal-transaction-failure") {
+        yield* Effect.promise(() =>
+          harness.runEffect(
+            Effect.gen(function* () {
+              const sql = yield* SqlClient.SqlClient;
+              yield* sql`
+                CREATE TRIGGER fail_refusal_receipt
+                BEFORE INSERT ON orchestration_command_receipts
+                WHEN NEW.command_id LIKE 'server:["workspace-refusal-v1"%'
+                BEGIN SELECT RAISE(ABORT, 'injected refusal receipt failure'); END
+              `;
+            }),
+          ),
+        );
+      }
+      const failure = yield* watchActivity(harness, failureFor("admission-message"));
+      yield* dispatchAdmissionMessage(harness, "before-restart");
+      if (scenario === "refusal-transaction-failure") {
+        expect(
+          decodeWorkspaceTurnStartRefusalPayload((yield* failure).payload.activity.payload),
+        ).toEqual(Option.none());
+      } else {
+        yield* Deferred.await(interrupted).pipe(Effect.timeout("5 seconds"));
+      }
+      const before = yield* readActivities(harness);
+      expect(
+        before.filter((activity) => activity.kind === "provider.turn.admission.claimed"),
+      ).toHaveLength(1);
+      expect(
+        before.filter((activity) =>
+          Option.isSome(decodeWorkspaceTurnStartRefusalPayload(activity.payload)),
+        ),
+      ).toEqual([]);
+      expect(harness.startSession).not.toHaveBeenCalled();
+      expect(harness.sendTurn).not.toHaveBeenCalled();
+      expect(harness.compactThread).not.toHaveBeenCalled();
+      expect(harness.tryHandlePromptCommand).not.toHaveBeenCalled();
+      yield* Effect.promise(closeHarness);
+
+      const restarted = yield* Effect.promise(() =>
+        createHarness({ baseDir, databasePath, workspaceRoot: cwd }),
+      );
+      if (task !== undefined) {
+        const ownership = yield* Effect.promise(() =>
+          restarted.runEffect(Effect.service(WorkspaceExecutionOwnership)),
+        );
+        const released = yield* Effect.promise(() =>
+          restarted.runEffect(ownership.releaseAnalysis(task.id)),
+        );
+        const reacquired = yield* seedAdmissionOwner(restarted, cwd, {
+          id: "88888888-8888-4888-8888-888888888888",
+          generation: released.ownership.generation,
+        });
+        yield* Effect.promise(() => restarted.runEffect(ownership.releaseAnalysis(reacquired.id)));
+      }
+      const replayFailure = yield* watchActivity(restarted, failureFor("admission-message"));
+      yield* dispatchAdmissionMessage(restarted, "new-command-after-restart");
+      const replay = yield* replayFailure;
+      yield* Effect.promise(() => restarted.drain());
+      expect(decodeWorkspaceTurnStartRefusalPayload(replay.payload.activity.payload)).toEqual(
+        Option.none(),
+      );
+      expect(restarted.startSession).not.toHaveBeenCalled();
+      expect(restarted.sendTurn).not.toHaveBeenCalled();
+      expect(restarted.compactThread).not.toHaveBeenCalled();
+      expect(restarted.tryHandlePromptCommand).not.toHaveBeenCalled();
+      expect(yield* Effect.promise(() => restarted.readPendingTurnStarts())).toEqual([]);
+      const after = yield* readActivities(restarted);
+      expect(
+        after.filter((activity) => activity.kind === "provider.turn.admission.claimed"),
+      ).toHaveLength(1);
+      const identity = makeWorkspaceTurnAdmissionClaimIdentity(
+        ThreadId.make("thread-1"),
+        MessageId.make("admission-message"),
+        { kind: "initial" },
+      );
+      const receipt = yield* Effect.promise(() =>
+        restarted.runEffect(
+          Effect.gen(function* () {
+            const receipts = yield* OrchestrationCommandReceiptRepository;
+            return yield* receipts.getByCommandId({ commandId: identity.commandId });
+          }),
+        ),
+      );
+      expect(Option.getOrThrow(receipt).status).toBe("accepted");
+    }),
+  );
+
+  effectIt.effect("preserves a newer pending start and the immutable bounded refusal", () =>
+    Effect.gen(function* () {
+      const cwd = NodeFS.realpathSync(
+        NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "admission-refused-")),
+      );
+      createdBaseDirs.add(cwd);
+      const firstEntered = yield* Deferred.make<void>();
+      const releaseFirst = yield* Deferred.make<void>();
+      const newerEntered = yield* Deferred.make<void>();
+      const releaseNewer = yield* Deferred.make<void>();
+      const harness = yield* Effect.promise(() =>
+        createHarness({
+          workspaceRoot: cwd,
+          beforeActivityDispatch: (command) => {
+            const claim = decodeWorkspaceTurnAdmissionClaimPayload(command.activity.payload);
+            if (Option.isNone(claim)) return Effect.void;
+            if (claim.value.requestId === MessageId.make("admission-message")) {
+              return Deferred.succeed(firstEntered, undefined).pipe(
+                Effect.andThen(Deferred.await(releaseFirst)),
+              );
+            }
+            if (claim.value.requestId === MessageId.make("newer-message")) {
+              return Deferred.succeed(newerEntered, undefined).pipe(
+                Effect.andThen(Deferred.await(releaseNewer)),
+              );
+            }
+            return Effect.void;
+          },
+        }),
+      );
+      const task = yield* seedAdmissionOwner(harness, cwd, {
+        threadId: ThreadId.make("private-owner-thread"),
+      });
+      const threadId = ThreadId.make("thread-1");
+      const activeTurnId = TurnId.make("another-active-turn");
+      yield* harness.engine.dispatch({
+        type: "thread.session.set",
+        commandId: CommandId.make("keep-active-session"),
+        threadId,
+        session: {
+          threadId,
+          status: "running",
+          providerName: "codex",
+          providerInstanceId: ProviderInstanceId.make("codex"),
+          runtimeMode: "approval-required",
+          activeTurnId,
+          lastError: null,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      const refused = yield* watchActivity(harness, failureFor("admission-message"));
+      const newerRefused = yield* watchActivity(harness, failureFor("newer-message"));
+      yield* dispatchAdmissionMessage(harness, "refused-origin");
+      yield* Deferred.await(firstEntered).pipe(Effect.timeout("5 seconds"));
+      yield* dispatchAdmissionMessage(harness, "newer-origin", "newer-message");
+      yield* Deferred.succeed(releaseFirst, undefined);
+      const original = yield* refused;
+      yield* Deferred.await(newerEntered).pipe(Effect.timeout("5 seconds"));
+
+      // The subscriber stays alive. The worker is now parked on the newer
+      // claim, so the older failure must leave that exact pending slot intact.
+      const pending = yield* Effect.promise(() =>
+        harness.runEffect(
+          Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
+            return yield* sql<{ readonly messageId: string }>`
+              SELECT pending_message_id AS "messageId"
+              FROM projection_turns
+              WHERE thread_id = ${threadId} AND turn_id IS NULL AND state = 'pending'
+            `;
+          }),
+        ),
+      );
+      expect(pending).toEqual([{ messageId: "newer-message" }]);
+      const active = (yield* Effect.promise(() => harness.readModel())).threads.find(
+        (thread) => thread.id === threadId,
+      );
+      expect(active?.session?.activeTurnId).toBe(activeTurnId);
+      expect(active?.session?.status).toBe("running");
+      const payload = Option.getOrThrow(
+        decodeWorkspaceTurnStartRefusalPayload(original.payload.activity.payload),
+      );
+      const origin = (yield* Stream.runCollect(harness.engine.readEvents(0, 100))).find(
+        (event) =>
+          event.type === "thread.turn-start-requested" &&
+          event.commandId === CommandId.make("refused-origin"),
+      );
+      expect(payload).toEqual({
+        version: 1,
+        source: "workspace-ownership",
+        requestId: MessageId.make("admission-message"),
+        reason: "owned",
+        originCommandId: CommandId.make("refused-origin"),
+        originSequence: origin?.sequence,
+      });
+      for (const privateValue of [cwd, task.id, task.threadId]) {
+        expect(encodeActivityJson(original.payload.activity)).not.toContain(privateValue);
+      }
+      yield* Deferred.succeed(releaseNewer, undefined);
+      yield* newerRefused;
+      yield* Effect.promise(() => harness.drain());
+
+      const parent = makeWorkspaceTurnAdmissionClaimIdentity(threadId, payload.requestId, {
+        kind: "initial",
+      });
+      const strayCompactionId = EventId.make("stray-compaction");
+      const stray = makeWorkspaceTurnCompactionContinuationIdentity(
+        threadId,
+        payload.requestId,
+        parent.activityId,
+        strayCompactionId,
+      );
+      yield* harness.engine.dispatch({
+        type: "thread.activity.append",
+        commandId: stray.commandId,
+        threadId,
+        activity: {
+          id: stray.activityId,
+          tone: "info",
+          kind: "provider.turn.compaction.continuation",
+          summary: "Stray continuation",
+          payload: {
+            version: 1,
+            source: "workspace-admission",
+            requestId: payload.requestId,
+            originCommandId: payload.originCommandId,
+            originSequence: payload.originSequence,
+            parentClaimId: parent.activityId,
+            compactionRequestId: MessageId.make("stray-compaction-message"),
+            compactionEventId: strayCompactionId,
+            compactionSequence: 0,
+          },
+          turnId: null,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      const repeated = yield* watchActivity(harness, failureFor("admission-message"));
+      yield* dispatchAdmissionMessage(harness, "refused-reissue");
+      expect(
+        decodeWorkspaceTurnStartRefusalPayload((yield* repeated).payload.activity.payload),
+      ).toEqual(Option.none());
+      yield* Effect.promise(() => harness.drain());
+      const events = yield* Stream.runCollect(harness.engine.readEvents(0, 100));
+      expect(
+        events.filter(
+          (event) =>
+            event.type === "thread.activity-appended" &&
+            event.payload.activity.id === original.payload.activity.id,
+        ),
+      ).toEqual([original]);
+      expect(harness.startSession).not.toHaveBeenCalled();
+      expect(harness.sendTurn).not.toHaveBeenCalled();
+      expect(harness.tryHandlePromptCommand).not.toHaveBeenCalled();
+      expect(yield* Effect.promise(() => harness.readPendingTurnStarts())).toEqual([]);
+      expect(
+        (yield* Effect.promise(() => harness.readModel())).threads.find(
+          (thread) => thread.id === threadId,
+        )?.session,
+      ).toMatchObject({ status: "running", activeTurnId });
+    }),
+  );
+
+  effectIt.effect("does not label an ownership error after callback entry as a refusal", () =>
+    Effect.gen(function* () {
+      const sent = yield* Deferred.make<void>();
+      const harness = yield* Effect.promise(() =>
+        createHarness({ afterSendTurn: () => Deferred.succeed(sent, undefined) }),
+      );
+      const ownership = yield* Effect.promise(() =>
+        harness.runEffect(Effect.service(WorkspaceExecutionOwnership)),
+      );
+      const withFreshOperation = ownership.withFreshOperation;
+      const lateFailure: WorkspaceExecutionOwnership["Service"]["withFreshOperation"] = (
+        operation,
+        effect,
+      ) =>
+        withFreshOperation(operation, effect).pipe(
+          Effect.andThen(
+            Effect.fail(
+              new WorkspaceOwnershipError({
+                cwd: "/private/late-provider-cwd",
+                reason: "owned",
+                detail: "Private ownership detail after callback entry",
+              }),
+            ),
+          ),
+        );
+      const spy = vi.spyOn(ownership, "withFreshOperation").mockImplementation(lateFailure);
+      const failed = yield* watchActivity(harness, failureFor("admission-message"));
+      yield* dispatchAdmissionMessage(harness, "late-ownership-failure");
+      const activity = (yield* failed).payload.activity;
+      yield* Deferred.await(sent).pipe(Effect.timeout("5 seconds"));
+      yield* Effect.promise(() => harness.drain());
+      spy.mockRestore();
+      expect(harness.startSession).toHaveBeenCalledTimes(1);
+      expect(harness.sendTurn).toHaveBeenCalledTimes(1);
+      expect(decodeWorkspaceTurnStartRefusalPayload(activity.payload)).toEqual(Option.none());
+      expect(encodeActivityJson(activity)).not.toContain("/private/late-provider-cwd");
+      expect(encodeActivityJson(activity)).not.toContain("Private ownership detail");
+    }),
+  );
+
+  effectIt.effect.each(["fresh-successor", "competing-successor"] as const)(
+    "consumes successful compaction continuation once (%s)",
+    (scenario) =>
+      Effect.gen(function* () {
+        const entered = yield* Deferred.make<void>();
+        const completed = yield* Deferred.make<void>();
+        const sent = yield* Deferred.make<void>();
+        let competitorCommitted = false;
+        let competingNonce: string | undefined;
+        let submittedNonce: string | undefined;
+        let harness: Awaited<ReturnType<typeof createHarness>>;
+        harness = yield* Effect.promise(() =>
+          createHarness({
+            deferReactorStart: true,
+            replayPersistedEvents: true,
+            compactThreadEffect: () =>
+              Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(completed))),
+            afterSendTurn: () => Deferred.succeed(sent, undefined),
+            beforeActivityDispatch: (command) => {
+              const decoded = decodeWorkspaceTurnAdmissionClaimPayload(command.activity.payload);
+              if (
+                scenario !== "competing-successor" ||
+                competitorCommitted ||
+                Option.isNone(decoded) ||
+                decoded.value.attempt.kind !== "compaction"
+              ) {
+                return Effect.void;
+              }
+              competitorCommitted = true;
+              submittedNonce = decoded.value.claimantNonce;
+              competingNonce = differentClaimantNonce(submittedNonce);
+              return harness.engine
+                .dispatch({
+                  ...command,
+                  activity: {
+                    ...command.activity,
+                    payload: { ...decoded.value, claimantNonce: competingNonce },
+                  },
+                })
+                .pipe(Effect.orDie, Effect.asVoid);
+            },
+          }),
+        );
+        yield* prepareCompactionConversation(harness, "/tmp/provider-project");
+        yield* dispatchAdmissionMessage(
+          harness,
+          "successful-compact",
+          "compact-message",
+          "/compact",
+        );
+        yield* Deferred.await(entered).pipe(Effect.timeout("5 seconds"));
+        const claimed = yield* watchActivity(
+          harness,
+          (activity) =>
+            activity.kind === "provider.turn.admission.claimed" &&
+            Option.getOrUndefined(decodeActivityRequest(activity.payload))?.requestId ===
+              MessageId.make("queued-message"),
+        );
+        yield* dispatchAdmissionMessage(
+          harness,
+          "queued-origin",
+          "queued-message",
+          "Queued intent",
+        );
+        yield* claimed;
+        yield* Effect.promise(() => harness.drain());
+        expect(harness.sendTurn).not.toHaveBeenCalled();
+        const failed = yield* watchActivity(harness, failureFor("queued-message"));
+        expect(yield* Deferred.succeed(completed, undefined)).toBe(true);
+        if (scenario === "fresh-successor") {
+          yield* Deferred.await(sent).pipe(Effect.timeout("5 seconds"));
+        } else {
+          expect(
+            decodeWorkspaceTurnStartRefusalPayload((yield* failed).payload.activity.payload),
+          ).toEqual(Option.none());
+          expect(competingNonce).not.toBe(submittedNonce);
+        }
+        yield* Effect.promise(() => harness.drain());
+        // Duplicate completion cannot re-enter the success branch.
+        expect(yield* Deferred.succeed(completed, undefined)).toBe(false);
+        const events = yield* Stream.runCollect(harness.engine.readEvents(0, 100));
+        const origin = events.find(
+          (event) =>
+            event.type === "thread.turn-start-requested" &&
+            event.commandId === CommandId.make("queued-origin"),
+        );
+        const compaction = events.find(
+          (event) =>
+            event.type === "thread.turn-start-requested" &&
+            event.commandId === CommandId.make("successful-compact"),
+        );
+        const replay = events.find(
+          (event) =>
+            event.type === "thread.turn-start-requested" &&
+            event.commandId?.startsWith("server:after-compaction:"),
+        );
+        const restoration = events.find(
+          (event) =>
+            event.type === "thread.session-set" &&
+            event.payload.session.status === "ready" &&
+            event.commandId?.startsWith("server:provider-session-set:"),
+        );
+        if (!origin || !compaction || !replay || !restoration) {
+          return yield* Effect.die("Expected durable compaction and continuation events");
+        }
+        const activities = yield* readActivities(harness);
+        const permits = activities.filter(
+          (activity) => activity.kind === "provider.turn.compaction.continuation",
+        );
+        expect(permits).toHaveLength(1);
+        const permitActivity = permits[0];
+        if (!permitActivity) return yield* Effect.die("Expected one continuation permit");
+        const permit = Option.getOrThrow(
+          decodeWorkspaceTurnCompactionContinuationPayload(permitActivity.payload),
+        );
+        const initial = makeWorkspaceTurnAdmissionClaimIdentity(
+          ThreadId.make("thread-1"),
+          MessageId.make("queued-message"),
+          { kind: "initial" },
+        );
+        expect(permit).toEqual({
+          version: 1,
+          source: "workspace-admission",
+          requestId: MessageId.make("queued-message"),
+          originCommandId: CommandId.make("queued-origin"),
+          originSequence: origin.sequence,
+          parentClaimId: initial.activityId,
+          compactionRequestId: MessageId.make("compact-message"),
+          compactionEventId: compaction.eventId,
+          compactionSequence: compaction.sequence,
+        });
+        const successor = makeWorkspaceTurnAdmissionClaimIdentity(
+          ThreadId.make("thread-1"),
+          MessageId.make("queued-message"),
+          { kind: "compaction", permitId: permitActivity.id },
+        );
+        const successorActivity = activities.find(
+          (activity) => activity.id === successor.activityId,
+        );
+        if (!successorActivity) return yield* Effect.die("Expected consumed successor claim");
+        expect(
+          Option.getOrThrow(decodeWorkspaceTurnAdmissionClaimPayload(successorActivity.payload)),
+        ).toMatchObject({
+          originCommandId: CommandId.make("queued-origin"),
+          originSequence: origin.sequence,
+          attempt: { kind: "compaction", permitId: permitActivity.id },
+          ...(scenario === "competing-successor" ? { claimantNonce: competingNonce } : {}),
+        });
+        yield* harness.replayPersistedEvent(restoration);
+        for (const duplicate of [compaction, origin, replay]) {
+          if (duplicate.type !== "thread.turn-start-requested") {
+            return yield* Effect.die("Expected turn-start event");
+          }
+          const duplicateFailure = yield* watchActivity(
+            harness,
+            failureFor(duplicate.payload.messageId),
+          );
+          yield* harness.replayPersistedEvent(duplicate);
+          expect(
+            decodeWorkspaceTurnStartRefusalPayload(
+              (yield* duplicateFailure).payload.activity.payload,
+            ),
+          ).toEqual(Option.none());
+          yield* Effect.promise(() => harness.drain());
+        }
+        const newCommandFailure = yield* watchActivity(harness, failureFor("queued-message"));
+        yield* dispatchAdmissionMessage(
+          harness,
+          "new-command-is-not-new-permission",
+          "queued-message",
+          "Queued intent",
+        );
+        yield* newCommandFailure;
+        yield* Effect.promise(() => harness.drain());
+        expect(harness.compactThread).toHaveBeenCalledTimes(1);
+        expect(harness.startSession).not.toHaveBeenCalled();
+        expect(harness.sendTurn).toHaveBeenCalledTimes(scenario === "fresh-successor" ? 1 : 0);
+        const finalActivities = yield* readActivities(harness);
+        const projected = (yield* Effect.promise(() => harness.readModel())).threads.find(
+          (thread) => thread.id === ThreadId.make("thread-1"),
+        );
+        expect(
+          projected?.activities.some(
+            (activity) =>
+              activity.kind === "provider.turn.admission.claimed" ||
+              activity.kind === "provider.turn.compaction.continuation",
+          ),
+        ).toBe(false);
+        expect(
+          finalActivities.filter(
+            (activity) => activity.kind === "provider.turn.compaction.continuation",
+          ),
+        ).toEqual(permits);
+        expect(
+          finalActivities.filter(
+            (activity) =>
+              activity.kind === "provider.turn.admission.claimed" &&
+              Option.getOrUndefined(decodeActivityRequest(activity.payload))?.requestId ===
+                MessageId.make("queued-message"),
+          ),
+        ).toHaveLength(2);
+        expect(yield* Effect.promise(() => harness.readPendingTurnStarts())).toEqual([]);
+      }),
+  );
+
+  effectIt.effect.each(["failed", "unrestored"] as const)(
+    "does not mint a continuation after %s compaction",
+    (scenario) =>
+      Effect.gen(function* () {
+        const entered = yield* Deferred.make<void>();
+        const finish = yield* Deferred.make<void>();
+        const harness = yield* Effect.promise(() =>
+          createHarness({
+            deferReactorStart: true,
+            compactThreadEffect: () =>
+              Deferred.succeed(entered, undefined).pipe(
+                Effect.andThen(Deferred.await(finish)),
+                Effect.andThen(
+                  scenario === "failed"
+                    ? Effect.fail(
+                        new ProviderAdapterRequestError({
+                          provider: "codex",
+                          method: "compactThread",
+                          detail: "Injected unsuccessful compaction",
+                        }),
+                      )
+                    : Effect.void,
+                ),
+              ),
+          }),
+        );
+        yield* prepareCompactionConversation(harness, "/tmp/provider-project");
+        yield* dispatchAdmissionMessage(
+          harness,
+          "unsuccessful-compact",
+          "compact-message",
+          "/compact",
+        );
+        yield* Deferred.await(entered).pipe(Effect.timeout("5 seconds"));
+        const claimed = yield* watchActivity(
+          harness,
+          (activity) =>
+            activity.kind === "provider.turn.admission.claimed" &&
+            Option.getOrUndefined(decodeActivityRequest(activity.payload))?.requestId ===
+              MessageId.make("queued-message"),
+        );
+        yield* dispatchAdmissionMessage(harness, "queued-origin", "queued-message");
+        yield* claimed;
+        yield* Effect.promise(() => harness.drain());
+        if (scenario === "unrestored") {
+          yield* harness.engine.dispatch({
+            type: "thread.session.set",
+            commandId: CommandId.make("externally-stopped-session"),
+            threadId: ThreadId.make("thread-1"),
+            session: {
+              threadId: ThreadId.make("thread-1"),
+              status: "stopped",
+              providerName: "codex",
+              providerInstanceId: ProviderInstanceId.make("codex"),
+              runtimeMode: "approval-required",
+              activeTurnId: null,
+              lastError: null,
+              updatedAt: "2026-01-01T00:00:01.000Z",
+            },
+            createdAt: "2026-01-01T00:00:01.000Z",
+          });
+        }
+        const canceled = yield* watchActivity(harness, failureFor("queued-message"));
+        yield* Deferred.succeed(finish, undefined);
+        yield* canceled;
+        yield* Effect.promise(() => harness.drain());
+        const repeated = yield* watchActivity(harness, failureFor("queued-message"));
+        yield* dispatchAdmissionMessage(harness, "after-failed-compaction", "queued-message");
+        yield* repeated;
+        yield* Effect.promise(() => harness.drain());
+        expect(harness.sendTurn).not.toHaveBeenCalled();
+        expect(harness.compactThread).toHaveBeenCalledTimes(1);
+        expect(
+          (yield* readActivities(harness)).filter(
+            (activity) => activity.kind === "provider.turn.compaction.continuation",
+          ),
+        ).toEqual([]);
+        expect(yield* Effect.promise(() => harness.readPendingTurnStarts())).toEqual([]);
+      }),
+  );
+
+  effectIt.effect(
+    "fences a compaction continuation at its original sequence across sibling ownership",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const root = yield* fs.realPath(
+          yield* fs.makeTempDirectoryScoped({ prefix: "admission-sibling-compaction-" }),
+        );
+        const cwd = `${root}/main`;
+        const linked = `${root}/linked`;
+        yield* fs.makeDirectory(cwd);
+        const runner = yield* ProcessRunner.ProcessRunner;
+        for (const args of [
+          ["init", "-q"],
+          [
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@localhost",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            "Fixture",
+          ],
+          ["worktree", "add", "--detach", linked, "HEAD"],
+        ]) {
+          expect((yield* runner.run({ command: "git", args: ["-C", cwd, ...args] })).code).toBe(0);
+        }
+        const entered = yield* Deferred.make<void>();
+        const finish = yield* Deferred.make<void>();
+        const replayReady = yield* Deferred.make<void>();
+        const releaseReplay = yield* Deferred.make<void>();
+        const harness = yield* Effect.promise(() =>
+          createHarness({
+            workspaceRoot: cwd,
+            deferReactorStart: true,
+            compactThreadEffect: () =>
+              Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(finish))),
+            beforeTurnStartDispatch: () =>
+              Deferred.succeed(replayReady, undefined).pipe(
+                Effect.andThen(Deferred.await(releaseReplay)),
+              ),
+          }),
+        );
+        yield* prepareCompactionConversation(harness, cwd);
+        yield* dispatchAdmissionMessage(harness, "sibling-compact", "compact-message", "/compact");
+        yield* Deferred.await(entered).pipe(Effect.timeout("5 seconds"));
+        const claimed = yield* watchActivity(
+          harness,
+          (activity) =>
+            activity.kind === "provider.turn.admission.claimed" &&
+            Option.getOrUndefined(decodeActivityRequest(activity.payload))?.requestId ===
+              MessageId.make("queued-message"),
+        );
+        yield* dispatchAdmissionMessage(harness, "original-before-sibling-owner", "queued-message");
+        yield* claimed;
+        yield* Effect.promise(() => harness.drain());
+        yield* Deferred.succeed(finish, undefined);
+        yield* Deferred.await(replayReady).pipe(Effect.timeout("5 seconds"));
+        const task = yield* seedAdmissionOwner(harness, cwd, {
+          threadId: ThreadId.make("sibling-owner-thread"),
+          worktreePath: linked,
+        });
+        const refused = yield* watchActivity(harness, failureFor("queued-message"));
+        yield* Deferred.succeed(releaseReplay, undefined);
+        const failure = (yield* refused).payload.activity;
+        yield* Effect.promise(() => harness.drain());
+        const payload = Option.getOrThrow(decodeWorkspaceTurnStartRefusalPayload(failure.payload));
+        const events = yield* Stream.runCollect(harness.engine.readEvents(0, 100));
+        const origin = events.find(
+          (event) =>
+            event.type === "thread.turn-start-requested" &&
+            event.commandId === CommandId.make("original-before-sibling-owner"),
+        );
+        const changed = events.find((event) => event.type === "thread.weavra-task-set");
+        const replay = events.find(
+          (event) =>
+            event.type === "thread.turn-start-requested" &&
+            event.commandId?.startsWith("server:after-compaction:"),
+        );
+        if (!origin || !changed || !replay)
+          return yield* Effect.die("Expected ownership fence events");
+        expect(origin.sequence).toBeLessThan(changed.sequence);
+        expect(changed.sequence).toBeLessThan(replay.sequence);
+        // Using the replay sequence would report "owned", not the original
+        // request's intervening-generation refusal.
+        expect(payload.reason).toBe("stale");
+        expect(payload.originSequence).toBe(origin.sequence);
+        expect(payload.originCommandId).toBe(CommandId.make("original-before-sibling-owner"));
+        const activities = yield* readActivities(harness);
+        const permits = activities.filter(
+          (activity) => activity.kind === "provider.turn.compaction.continuation",
+        );
+        expect(permits).toHaveLength(1);
+        const permitActivity = permits[0];
+        if (!permitActivity) return yield* Effect.die("Expected successful compaction permit");
+        expect(
+          Option.getOrThrow(
+            decodeWorkspaceTurnCompactionContinuationPayload(permitActivity.payload),
+          ).originSequence,
+        ).toBe(origin.sequence);
+        for (const privateValue of [cwd, linked, task.id, task.threadId]) {
+          expect(encodeActivityJson(failure)).not.toContain(privateValue);
+        }
+        expect(harness.compactThread).toHaveBeenCalledTimes(1);
+        expect(harness.startSession).not.toHaveBeenCalled();
+        expect(harness.sendTurn).not.toHaveBeenCalled();
+        expect(yield* Effect.promise(() => harness.readPendingTurnStarts())).toEqual([]);
+      }).pipe(Effect.provide(ProcessRunner.layer.pipe(Layer.provideMerge(NodeServices.layer)))),
+  );
+
+  effectIt.effect.each(["current", "stale"] as const)(
+    "keeps queued controlled analysis separate from ordinary permits (%s revision)",
+    (revision) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const cwd = yield* fs.realPath(
+          yield* fs.makeTempDirectoryScoped({ prefix: "controlled-compaction-queue-" }),
+        );
+        const runner = yield* ProcessRunner.ProcessRunner;
+        expect((yield* runner.run({ command: "git", args: ["-C", cwd, "init", "-q"] })).code).toBe(
+          0,
+        );
+        const entered = yield* Deferred.make<void>();
+        const finish = yield* Deferred.make<void>();
+        const analysisRead = yield* Deferred.make<void>();
+        const replayed = yield* Deferred.make<void>();
+        const sent = yield* Deferred.make<void>();
+        const analysisMessageId = MessageId.make("queued-controlled-analysis");
+        const harness = yield* Effect.promise(() =>
+          createHarness({
+            workspaceRoot: cwd,
+            deferReactorStart: true,
+            compactThreadEffect: () =>
+              Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(finish))),
+            afterTurnStartMessageRead: (messageId) =>
+              messageId === analysisMessageId
+                ? Deferred.succeed(analysisRead, undefined)
+                : Effect.void,
+            afterTurnStartDispatch: () => Deferred.succeed(replayed, undefined),
+            afterSendTurn: () => Deferred.succeed(sent, undefined),
+          }),
+        );
+        yield* prepareCompactionConversation(harness, cwd);
+        yield* dispatchAdmissionMessage(
+          harness,
+          "controlled-queue-compact",
+          "compact-message",
+          "/compact",
+        );
+        yield* Deferred.await(entered).pipe(Effect.timeout("5 seconds"));
+        const task = yield* seedAdmissionOwner(harness, cwd);
+        yield* harness.engine.dispatch({
+          type: "thread.turn.start",
+          commandId: CommandId.make("queued-analysis-origin"),
+          threadId: ThreadId.make("thread-1"),
+          message: {
+            messageId: analysisMessageId,
+            role: "user",
+            text: "Analyze without ordinary write authority",
+            attachments: [],
+          },
+          runtimeMode: "approval-required",
+          interactionMode: "plan",
+          controlledAnalysis: { taskId: task.id, expectedRevision: task.revision },
+          createdAt: "2026-01-01T00:00:00.000Z",
+        });
+        yield* Deferred.await(analysisRead).pipe(Effect.timeout("5 seconds"));
+        yield* Effect.promise(() => harness.drain());
+        expect(harness.startSession).not.toHaveBeenCalled();
+        expect(harness.sendTurn).not.toHaveBeenCalled();
+        if (revision === "stale") {
+          yield* harness.engine.dispatch({
+            type: "thread.weavra-task.set",
+            commandId: CommandId.make("analysis-revised-while-queued"),
+            threadId: task.threadId,
+            expectedRevision: task.revision,
+            expectedOwnershipGeneration: task.ownership.generation,
+            task: {
+              ...task,
+              revision: task.revision + 1,
+              ownership: { ...task.ownership, generation: task.ownership.generation + 1 },
+            },
+          });
+        }
+        yield* Deferred.succeed(finish, undefined);
+        yield* Deferred.await(replayed).pipe(Effect.timeout("5 seconds"));
+        if (revision === "current") {
+          yield* Deferred.await(sent).pipe(Effect.timeout("5 seconds"));
+          yield* Effect.promise(() => harness.drain());
+          expect(harness.startSession).toHaveBeenCalledTimes(1);
+          expect(harness.startSession.mock.calls[0]?.[1]).toMatchObject({
+            controlledAnalysis: { taskId: task.id, generation: task.ownership.generation },
+          });
+          expect(harness.startSession.mock.calls[0]?.[1]).not.toHaveProperty("resumeCursor");
+          expect(harness.sendTurn).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({ interactionMode: "plan" }),
+          );
+        } else {
+          // A later ordinary refusal is a worker-order barrier after the stale
+          // controlled replay. It does not substitute for task revision checks.
+          const barrier = yield* watchActivity(harness, failureFor("analysis-barrier"));
+          yield* dispatchAdmissionMessage(harness, "analysis-barrier", "analysis-barrier");
+          yield* barrier;
+          yield* Effect.promise(() => harness.drain());
+          expect(harness.startSession).not.toHaveBeenCalled();
+          expect(harness.sendTurn).not.toHaveBeenCalled();
+        }
+        const activities = yield* readActivities(harness);
+        expect(
+          activities.filter(
+            (activity) =>
+              (activity.kind === "provider.turn.admission.claimed" ||
+                activity.kind === "provider.turn.compaction.continuation") &&
+              Option.getOrUndefined(decodeActivityRequest(activity.payload))?.requestId ===
+                analysisMessageId,
+          ),
+        ).toEqual([]);
+        expect(harness.compactThread).toHaveBeenCalledTimes(1);
+      }).pipe(Effect.provide(ProcessRunner.layer.pipe(Layer.provideMerge(NodeServices.layer)))),
+  );
 
   effectIt.effect(
     "starts a fresh controlled analysis from an existing free Codex conversation",

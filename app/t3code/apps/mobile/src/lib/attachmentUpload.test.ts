@@ -1,6 +1,6 @@
 import { EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 
 const mocks = vi.hoisted(() => ({
   documentUri: "file:///documents",
@@ -59,37 +59,41 @@ vi.mock("./uuid", () => ({
   randomHex: () => "0000",
 }));
 
-vi.mock("expo-file-system", () => ({
-  File: class {
-    readonly uri: string;
-    exists = true;
-    constructor(uri: string, name?: string) {
-      this.uri = name ? `${uri}/${name}` : uri;
-    }
-    create() {}
-    write(bytes: string, options: unknown) {
-      mocks.writeFile(this.uri, bytes, options);
-    }
-    delete() {
-      mocks.deleteFile(this.uri);
-    }
+function nativeFileSystemMock() {
+  return {
+    File: class {
+      readonly uri: string;
+      exists = true;
+      constructor(uri: string, name?: string) {
+        this.uri = name ? `${uri}/${name}` : uri;
+      }
+      create() {}
+      write(bytes: string, options: unknown) {
+        mocks.writeFile(this.uri, bytes, options);
+      }
+      delete() {
+        mocks.deleteFile(this.uri);
+      }
 
-    async base64() {
-      return mocks.readBase64(this.uri);
-    }
+      async base64() {
+        return mocks.readBase64(this.uri);
+      }
 
-    upload(url: string, options: unknown) {
-      return mocks.upload(this.uri, url, options);
-    }
-  },
-  Paths: {
-    cache: "file:///cache",
-    get document() {
-      return { uri: mocks.documentUri };
+      upload(url: string, options: unknown) {
+        return mocks.upload(this.uri, url, options);
+      }
     },
-  },
-  UploadType: { BINARY_CONTENT: 0 },
-}));
+    Paths: {
+      cache: "file:///cache",
+      get document() {
+        return { uri: mocks.documentUri };
+      },
+    },
+    UploadType: { BINARY_CONTENT: 0 },
+  };
+}
+
+vi.mock("expo-file-system", () => nativeFileSystemMock());
 
 import {
   prepareTurnAttachments,
@@ -222,6 +226,42 @@ describe("prepareTurnAttachments", () => {
     mocks.upload.mockResolvedValue({ status: 204, body: "", headers: {} });
   });
 
+  it("does not start native bytes after eligibility changes during module resolution", async () => {
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    let eligible = true;
+    vi.doMock("expo-file-system", async () => {
+      entered.resolve();
+      await release.promise;
+      return nativeFileSystemMock();
+    });
+    onTestFinished(() => {
+      release.resolve();
+      vi.doMock("expo-file-system", () => nativeFileSystemMock());
+      vi.resetModules();
+    });
+    const persist = vi.fn(async () => "persisted" as const);
+    const pending = prepareTurnAttachments({
+      environmentId,
+      attachments: [file],
+      supportsImageUploads: true,
+      canUpload: () => eligible,
+      persistUploadedReferences: persist,
+    });
+    const settled = pending.then(
+      (value) => ({ status: "success" as const, value }),
+      (error: unknown) => ({ status: "failure" as const, error }),
+    );
+    await entered.promise;
+    eligible = false;
+    release.resolve();
+    await settled;
+
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
+    expect(removeCallsFor(MINTED_ID)).toBeGreaterThan(0);
+  });
+
   it("keeps existing image attachments on the legacy wire path", async () => {
     const prepared = await prepareTurnAttachments({ environmentId, attachments: [image] });
 
@@ -239,6 +279,41 @@ describe("prepareTurnAttachments", () => {
     expect(prepared.pendingAttachmentIds).toEqual([]);
     expect(mocks.upload).not.toHaveBeenCalled();
   });
+
+  it.each(["inline", "uploaded", "reused"] as const)(
+    "preserves recovered screenshot provenance on the %s wire path",
+    async (transport) => {
+      const source = {
+        kind: "snap-shot" as const,
+        capturedAt: "2026-10-08T00:00:00.000Z",
+        appName: "Editor",
+        windowTitle: "Recovered screenshot",
+      };
+      const attachment = {
+        ...image,
+        source,
+        ...(transport === "reused"
+          ? { uploadedAttachmentId: "saved-image", uploadEnvironmentId: environmentId }
+          : {}),
+      };
+
+      const prepared = await prepareTurnAttachments({
+        environmentId,
+        attachments: [attachment],
+        supportsImageUploads: transport !== "inline",
+      });
+
+      expect(prepared.status).toBe("ready");
+      if (prepared.status !== "ready") return;
+      expect(prepared.attachments[0]).toMatchObject({
+        type: "image",
+        name: image.name,
+        source,
+      });
+      expect(prepared.draftAttachments[0]?.source).toEqual(source);
+      expect(mocks.upload).toHaveBeenCalledTimes(transport === "uploaded" ? 1 : 0);
+    },
+  );
 
   it("inlines a file-backed image lazily when the server lacks image uploads", async () => {
     const prepared = await prepareTurnAttachments({
@@ -709,18 +784,23 @@ describe("prepareTurnAttachments", () => {
     expect(removeCallsFor(MINTED_ID)).toBe(1);
   });
 
-  it("deletes the minted uploads when persisting the references throws", async () => {
+  it("retains minted uploads when their reference write may have committed", async () => {
+    const persisted = vi.fn();
     await expect(
       prepareTurnAttachments({
         environmentId,
         attachments: [file],
-        persistUploadedReferences: async () => {
+        persistUploadedReferences: async (references) => {
+          persisted(references);
           throw new Error("draft write failed");
         },
       }),
     ).rejects.toThrow("draft write failed");
 
-    expect(removeCallsFor(MINTED_ID)).toBe(1);
+    expect(persisted).toHaveBeenCalledExactlyOnceWith([
+      { ...file, uploadedAttachmentId: MINTED_ID, uploadEnvironmentId: environmentId },
+    ]);
+    expect(removeCallsFor(MINTED_ID)).toBe(0);
   });
 
   it("skips persisting when every reference is already stored", async () => {

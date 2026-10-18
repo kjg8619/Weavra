@@ -2,6 +2,7 @@ import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
 
 import { deriveThreadTitleFromPrompt } from "../lib/projectThreadStartTurn";
 import type { QueuedThreadCreation, QueuedThreadMessage } from "./thread-outbox-model";
+import { pendingTaskDraftKey } from "./pending-task-identity";
 import { isNewTaskDraftKey } from "./new-task-draft-key";
 import type { ComposerDraft } from "./use-composer-drafts";
 
@@ -69,7 +70,7 @@ export function buildPendingNewTasks(input: {
     }
     tasks.push({
       kind: "pending",
-      key: `pending-task:${message.messageId}`,
+      key: pendingTaskDraftKey(message),
       environmentId: message.environmentId,
       projectId: message.creation.projectId,
       projectTitle: message.creation.projectTitle,

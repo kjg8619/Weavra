@@ -61,12 +61,14 @@ export function buildGitActionProgressStages(input: {
   terminology?: ChangeRequestTerminology;
 }): string[] {
   const terminology = input.terminology ?? DEFAULT_CHANGE_REQUEST_TERMINOLOGY;
-  const branchStages = input.featureBranch ? ["Preparing feature ref..."] : [];
-  const pushStage = input.pushTarget ? `Pushing to ${input.pushTarget}...` : "Pushing...";
+  const branchStages = input.featureBranch ? ["feature ref 준비 중..."] : [];
+  const pushStage = input.pushTarget
+    ? `${input.pushTarget}(으)로 push 하는 중...`
+    : "push 하는 중...";
   const prStages = [
-    `Preparing ${terminology.shortLabel}...`,
-    `Generating ${terminology.shortLabel} content...`,
-    `Creating ${terminology.singular}...`,
+    `${terminology.shortLabel} 준비 중...`,
+    `${terminology.shortLabel} 내용 생성 중...`,
+    `${terminology.shortLabel} 만드는 중...`,
   ];
 
   if (input.action === "push") {
@@ -80,8 +82,8 @@ export function buildGitActionProgressStages(input: {
   const commitStages = !shouldIncludeCommitStages
     ? []
     : input.hasCustomCommitMessage
-      ? ["Committing..."]
-      : ["Generating commit message...", "Committing..."];
+      ? ["commit 하는 중..."]
+      : ["commit 메시지 생성 중...", "commit 하는 중..."];
   if (input.action === "commit") {
     return [...branchStages, ...commitStages];
   }
@@ -124,7 +126,7 @@ export function buildMenuItems(
 
   const commitItem: GitActionMenuItem = {
     id: "commit",
-    label: "Commit",
+    label: "commit",
     disabled: !canCommit,
     icon: "commit",
     kind: "open_dialog",
@@ -139,7 +141,7 @@ export function buildMenuItems(
     commitItem,
     {
       id: "push",
-      label: "Push",
+      label: "push",
       disabled: !canPush,
       icon: "push",
       kind: "open_dialog",
@@ -148,14 +150,14 @@ export function buildMenuItems(
     hasOpenPr
       ? {
           id: "pr",
-          label: `View ${terminology.shortLabel}`,
+          label: `${terminology.shortLabel} 보기`,
           disabled: !canOpenPr,
           icon: "pr",
           kind: "open_pr",
         }
       : {
           id: "pr",
-          label: `Create ${terminology.shortLabel}`,
+          label: `${terminology.shortLabel} 만들기`,
           disabled: !canCreatePr,
           icon: "pr",
           kind: "open_dialog",
@@ -171,15 +173,20 @@ export function resolveQuickAction(
   hasPrimaryRemote = true,
 ): GitQuickAction {
   if (isBusy) {
-    return { label: "Commit", disabled: true, kind: "show_hint", hint: "Git action in progress." };
+    return {
+      label: "commit",
+      disabled: true,
+      kind: "show_hint",
+      hint: "Git 작업이 진행 중이에요.",
+    };
   }
 
   if (!gitStatus) {
     return {
-      label: "Commit",
+      label: "commit",
       disabled: true,
       kind: "show_hint",
-      hint: "Git status is unavailable.",
+      hint: "Git 상태를 확인할 수 없어요.",
     };
   }
 
@@ -194,22 +201,27 @@ export function resolveQuickAction(
 
   if (!hasBranch) {
     return {
-      label: "Commit",
+      label: "commit",
       disabled: true,
       kind: "show_hint",
-      hint: `Create and checkout a ref before pushing or opening a ${terminology.singular}.`,
+      hint: `push하거나 ${terminology.shortLabel}을(를) 열기 전에 ref를 만들고 checkout해 주세요.`,
     };
   }
 
   if (hasChanges) {
     if (!gitStatus.hasUpstream && !hasPrimaryRemote) {
-      return { label: "Commit", disabled: false, kind: "run_action", action: "commit" };
+      return { label: "commit", disabled: false, kind: "run_action", action: "commit" };
     }
     if (hasOpenPr || isDefaultRef) {
-      return { label: "Commit & push", disabled: false, kind: "run_action", action: "commit_push" };
+      return {
+        label: "commit 후 push",
+        disabled: false,
+        kind: "run_action",
+        action: "commit_push",
+      };
     }
     return {
-      label: `Commit, push & ${terminology.shortLabel}`,
+      label: `commit, push 후 ${terminology.shortLabel}`,
       disabled: false,
       kind: "run_action",
       action: "commit_push_pr",
@@ -219,35 +231,35 @@ export function resolveQuickAction(
   if (!gitStatus.hasUpstream) {
     if (!hasPrimaryRemote) {
       if (hasOpenPr && !isAhead) {
-        return { label: `View ${terminology.shortLabel}`, disabled: false, kind: "open_pr" };
+        return { label: `${terminology.shortLabel} 보기`, disabled: false, kind: "open_pr" };
       }
       return {
-        label: "Publish repository",
+        label: "저장소 게시",
         disabled: false,
         kind: "open_publish",
       };
     }
     if (!isAhead) {
       if (hasOpenPr) {
-        return { label: `View ${terminology.shortLabel}`, disabled: false, kind: "open_pr" };
+        return { label: `${terminology.shortLabel} 보기`, disabled: false, kind: "open_pr" };
       }
       return {
-        label: "Push",
+        label: "push",
         disabled: true,
         kind: "show_hint",
-        hint: "No local commits to push.",
+        hint: "push할 로컬 commit이 없어요.",
       };
     }
     if (hasOpenPr || isDefaultRef) {
       return {
-        label: "Push",
+        label: "push",
         disabled: false,
         kind: "run_action",
         action: isDefaultRef ? "commit_push" : "push",
       };
     }
     return {
-      label: `Push & create ${terminology.shortLabel}`,
+      label: `push 후 ${terminology.shortLabel} 만들기`,
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -256,16 +268,16 @@ export function resolveQuickAction(
 
   if (isDiverged) {
     return {
-      label: "Sync ref",
+      label: "ref 동기화",
       disabled: true,
       kind: "show_hint",
-      hint: "Branch has diverged from upstream. Rebase/merge first.",
+      hint: "branch가 upstream과 갈라졌어요. 먼저 rebase나 merge를 해 주세요.",
     };
   }
 
   if (isBehind) {
     return {
-      label: "Pull",
+      label: "pull",
       disabled: false,
       kind: "run_pull",
     };
@@ -274,14 +286,14 @@ export function resolveQuickAction(
   if (isAhead) {
     if (hasOpenPr || isDefaultRef) {
       return {
-        label: "Push",
+        label: "push",
         disabled: false,
         kind: "run_action",
         action: isDefaultRef ? "commit_push" : "push",
       };
     }
     return {
-      label: `Push & create ${terminology.shortLabel}`,
+      label: `push 후 ${terminology.shortLabel} 만들기`,
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -289,12 +301,12 @@ export function resolveQuickAction(
   }
 
   if (hasOpenPr && gitStatus.hasUpstream) {
-    return { label: `View ${terminology.shortLabel}`, disabled: false, kind: "open_pr" };
+    return { label: `${terminology.shortLabel} 보기`, disabled: false, kind: "open_pr" };
   }
 
   if (hasDefaultBranchDelta && !isDefaultRef) {
     return {
-      label: `Create ${terminology.shortLabel}`,
+      label: `${terminology.shortLabel} 만들기`,
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -302,10 +314,10 @@ export function resolveQuickAction(
   }
 
   return {
-    label: "Commit",
+    label: "commit",
     disabled: true,
     kind: "show_hint",
-    hint: "Branch is up to date. No action needed.",
+    hint: "branch가 최신이에요. 할 작업이 없어요.",
   };
 }
 
@@ -329,35 +341,35 @@ export function resolveDefaultBranchActionDialogCopy(input: {
   terminology?: ChangeRequestTerminology;
 }): DefaultBranchActionDialogCopy {
   const branchLabel = input.branchName;
-  const suffix = ` on "${branchLabel}". You can continue on this ref or create a feature ref and run the same action there.`;
+  const suffix = ` 대상: "${branchLabel}". 이 ref에서 계속하거나 feature ref를 만들어 같은 작업을 실행할 수 있어요.`;
   const terminology = input.terminology ?? DEFAULT_CHANGE_REQUEST_TERMINOLOGY;
 
   if (input.action === "push" || input.action === "commit_push") {
     if (input.includesCommit) {
       return {
-        title: "Commit & push to default ref?",
-        description: `This action will commit and push changes${suffix}`,
-        continueLabel: `Commit & push to ${branchLabel}`,
+        title: "기본 ref에 commit 후 push할까요?",
+        description: `변경을 commit하고 push해요.${suffix}`,
+        continueLabel: `${branchLabel}에 commit 후 push`,
       };
     }
     return {
-      title: "Push to default ref?",
-      description: `This action will push local commits${suffix}`,
-      continueLabel: `Push to ${branchLabel}`,
+      title: "기본 ref에 push할까요?",
+      description: `로컬 commit을 push해요.${suffix}`,
+      continueLabel: `${branchLabel}에 push`,
     };
   }
 
   if (input.includesCommit) {
     return {
-      title: `Commit, push & create ${terminology.shortLabel} from default ref?`,
-      description: `This action will commit, push, and create a ${terminology.singular}${suffix}`,
-      continueLabel: `Commit, push & create ${terminology.shortLabel}`,
+      title: `기본 ref에서 commit, push 후 ${terminology.shortLabel}을(를) 만들까요?`,
+      description: `commit, push 후 ${terminology.shortLabel}을(를) 만들어요.${suffix}`,
+      continueLabel: `commit, push 후 ${terminology.shortLabel} 만들기`,
     };
   }
   return {
-    title: `Push & create ${terminology.shortLabel} from default ref?`,
-    description: `This action will push local commits and create a ${terminology.singular}${suffix}`,
-    continueLabel: `Push & create ${terminology.shortLabel}`,
+    title: `기본 ref에서 push 후 ${terminology.shortLabel}을(를) 만들까요?`,
+    description: `로컬 commit을 push하고 ${terminology.shortLabel}을(를) 만들어요.${suffix}`,
+    continueLabel: `push 후 ${terminology.shortLabel} 만들기`,
   };
 }
 

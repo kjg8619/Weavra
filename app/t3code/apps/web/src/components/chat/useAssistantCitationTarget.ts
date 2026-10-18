@@ -93,7 +93,7 @@ export function useAssistantCitationTarget({
         const cursor = loadEarlier.cursor ?? entries[0]?.id ?? "first";
         if (navigation.requestedPages.has(cursor) || navigation.requestedPages.size >= 20) {
           fail(
-            "Could not load the cited response",
+            "인용한 응답을 불러오지 못했어요",
             "Load earlier turns, then click the citation to try again. Your saved quote is unchanged.",
           );
           return;
@@ -103,15 +103,15 @@ export function useAssistantCitationTarget({
         return;
       }
       fail(
-        "The cited response is unavailable",
-        "It may have been removed. The selected text is still saved in your citation.",
+        "인용한 응답을 사용할 수 없어요",
+        "삭제되었을 수 있어요. 선택한 텍스트는 인용에 그대로 저장되어 있어요.",
       );
       return;
     }
     if (source.kind !== "message" || source.message.role !== "assistant") {
       fail(
-        "The citation does not refer to an assistant response",
-        "The selected text is still saved in your citation.",
+        "이 인용은 도우미 응답을 가리키지 않아요",
+        "선택한 텍스트는 인용에 그대로 저장되어 있어요.",
       );
       return;
     }

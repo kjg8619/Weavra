@@ -112,26 +112,26 @@ it("toggles checks from their heading and resets sections for another pull reque
   expect(
     renderer.root.findAllByType("span").some((span) => span.children.includes("Unit tests")),
   ).toBe(false);
-  click("Checks");
+  click("검사");
   expect(
     renderer.root.findAllByType("span").some((span) => span.children.includes("Unit tests")),
   ).toBe(true);
-  click("Checks");
-  expect(heading("Checks").props["aria-expanded"]).toBe(false);
-  click("Checks");
-  click("Description");
+  click("검사");
+  expect(heading("검사").props["aria-expanded"]).toBe(false);
+  click("검사");
+  click("설명");
   act(() =>
     renderer.update(render({ ...detail, url: "https://github.com/owner/repo/pull/2", number: 2 })),
   );
-  expect(heading("Checks").props["aria-expanded"]).toBe(false);
-  expect(heading("Description").props["aria-expanded"]).toBe(true);
+  expect(heading("검사").props["aria-expanded"]).toBe(false);
+  expect(heading("설명").props["aria-expanded"]).toBe(true);
 });
 
 it("keeps an unsaved description when collapsed and reopened", () => {
   act(() => {
     renderer = create(render());
   });
-  act(() => renderer.root.findByProps({ "aria-label": "Edit description" }).props.onClick());
+  act(() => renderer.root.findByProps({ "aria-label": "설명 편집" }).props.onClick());
   act(() =>
     renderer.root.findByType("textarea").props.onChange({
       target: { value: "Unsaved description" },
@@ -139,9 +139,9 @@ it("keeps an unsaved description when collapsed and reopened", () => {
       nativeEvent: {},
     }),
   );
-  click("Description");
-  expect(heading("Description").props["aria-expanded"]).toBe(false);
-  click("Description");
+  click("설명");
+  expect(heading("설명").props["aria-expanded"]).toBe(false);
+  click("설명");
   expect(renderer.root.findByType("textarea").props.value).toBe("Unsaved description");
 });
 
@@ -187,7 +187,7 @@ it("opens bot reports in pages without hiding human comments", () => {
   act(() =>
     renderer.root
       .findAllByType("button")
-      .find((button) => button.children.includes(" older bot comment"))!
+      .find((button) => button.children.includes("이전 봇 댓글 "))!
       .props.onClick(),
   );
   expect(

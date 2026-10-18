@@ -124,16 +124,16 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
             <p className="text-secondary-label text-xs">
               {props.isLoading
                 ? props.triggerKind === "skill"
-                  ? "Searching workspace skills..."
+                  ? "작업 공간 스킬을 검색하는 중..."
                   : props.triggerKind === "pull-request"
-                    ? "Finding pull request..."
-                    : "Searching workspace files..."
+                    ? "PR을 찾는 중..."
+                    : "작업 공간 파일을 검색하는 중..."
                 : (props.emptyStateText ??
                   (props.triggerKind === "skill"
                     ? "No skills found. Try / to browse provider commands."
                     : props.triggerKind === "path"
-                      ? "No matching files or folders."
-                      : "No matching command."))}
+                      ? "일치하는 파일이나 폴더가 없어요."
+                      : "일치하는 명령이 없어요."))}
             </p>
           </div>
         )}

@@ -137,7 +137,7 @@ export function SnapShotContentsButton({
   const includesAccessibility = snapShotIncludesAccessibility(source);
   const ContentsIcon = includesAccessibility ? TextIcon : ImageIcon;
   const accessibilityDetails = snapShotAccessibilityDetails(source);
-  const tooltip = includesAccessibility ? "Accessibility data" : "No accessibility data";
+  const tooltip = includesAccessibility ? "접근성 데이터" : "접근성 데이터 없음";
 
   return (
     <Popover>
@@ -147,9 +147,7 @@ export function SnapShotContentsButton({
             <PopoverTrigger
               render={
                 <Button
-                  aria-label={
-                    includesAccessibility ? "View accessibility data" : "No accessibility data"
-                  }
+                  aria-label={includesAccessibility ? "접근성 데이터 보기" : "접근성 데이터 없음"}
                   className={cn("[--control-icon-color:currentColor]", className)}
                   onClick={(event) => event.stopPropagation()}
                   size="icon-micro"
@@ -170,7 +168,7 @@ export function SnapShotContentsButton({
         viewportClassName="max-h-[min(28rem,70vh)]"
       >
         <div className="space-y-2">
-          <PopoverTitle className="text-sm leading-5">Accessibility data</PopoverTitle>
+          <PopoverTitle className="text-sm leading-5">접근성 데이터</PopoverTitle>
           {accessibilityDetails ? (
             <SnapShotAccessibilityData
               details={accessibilityDetails}
@@ -183,7 +181,7 @@ export function SnapShotContentsButton({
             </div>
           ) : (
             <div className="rounded-md border border-border/70 bg-muted/45 p-2.5 text-muted-foreground text-xs leading-4">
-              The app or capture backend did not provide verified accessibility data.
+              앱이나 캡처 백엔드가 검증된 접근성 데이터를 주지 않았어요.
             </div>
           )}
         </div>
@@ -222,7 +220,7 @@ export function SnapShotAttachmentDetails({
           />
         </div>
         <div className="truncate text-[9px] leading-3.5 text-white/70">
-          {source.windowTitle || "Captured window"}
+          {source.windowTitle || "캡처한 창"}
         </div>
       </div>
     </div>

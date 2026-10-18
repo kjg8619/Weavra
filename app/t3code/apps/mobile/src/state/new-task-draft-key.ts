@@ -1,3 +1,5 @@
+import { threadOutboxStorageIdentity, type QueuedThreadMessage } from "./thread-outbox-model";
+
 const NEW_TASK_DRAFT_PREFIX = "new-task:";
 
 /** Every new-task draft key: `new-task:<draftId>`. */
@@ -14,8 +16,8 @@ export function isNewTaskDraftKey(draftKey: string): boolean {
  * drain writes it and the thread screen's "Edit task" action opens it, so both
  * sides derive the key here rather than rebuilding the string.
  */
-export function restoredNewTaskDraftKey(messageId: string): string {
-  return newTaskDraftKey(`restored-${messageId}`);
+export function restoredNewTaskDraftKey(message: QueuedThreadMessage): string {
+  return newTaskDraftKey(`restored-${threadOutboxStorageIdentity(message)}`);
 }
 
 /**

@@ -10,6 +10,10 @@ import {
   type OrchestrationThread,
   type OrchestrationThreadDetailSnapshot,
   type OrchestrationThreadStreamItem,
+  CommandId,
+  MessageId,
+  type OrchestrationThreadActivity,
+  makeWorkspaceTurnStartRefusalIdentity,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
@@ -21,6 +25,7 @@ import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 
 import type { WsRpcProtocolClient } from "../rpc/protocol.ts";
+import { decodeTurnStartRefusal } from "./turnStartRefusal.ts";
 import {
   AVAILABLE_CONNECTION_STATE,
   PrimaryConnectionTarget,
@@ -292,6 +297,276 @@ const revertEvent = (sequence: number): OrchestrationThreadStreamItem => ({
 });
 
 describe("thread pagination state", () => {
+  it.effect("orders a late refusal from an older message page before any live replay", () =>
+    Effect.gen(function* () {
+      const recentMessage: OrchestrationMessage = {
+        ...RECENT_MESSAGE,
+        role: "user",
+        turnId: null,
+        streaming: false,
+      };
+      const oldMessage: OrchestrationMessage = {
+        ...OLDER_MESSAGE,
+        role: "user",
+        turnId: null,
+        streaming: false,
+      };
+      const recentRefusal: OrchestrationThreadActivity = {
+        id: makeWorkspaceTurnStartRefusalIdentity(THREAD_ID, recentMessage.id).activityId,
+        tone: "error",
+        kind: "provider.turn.start.failed",
+        summary: "Not started",
+        payload: {
+          version: 1,
+          source: "workspace-ownership",
+          requestId: recentMessage.id,
+          reason: "owned",
+          originCommandId: CommandId.make("recent-start"),
+          originSequence: 8,
+        },
+        turnId: null,
+        sequence: 9,
+        createdAt: RECENT_MESSAGE.createdAt,
+      };
+      const oldRefusal: OrchestrationThreadActivity = {
+        id: makeWorkspaceTurnStartRefusalIdentity(THREAD_ID, oldMessage.id).activityId,
+        tone: "error",
+        kind: "provider.turn.start.failed",
+        summary: "Not started",
+        payload: {
+          version: 1,
+          source: "workspace-ownership",
+          requestId: oldMessage.id,
+          reason: "owned",
+          originCommandId: CommandId.make("old-start"),
+          originSequence: 1,
+        },
+        turnId: null,
+        sequence: 20,
+        createdAt: oldMessage.createdAt,
+      };
+      const latestTurn: NonNullable<OrchestrationThread["latestTurn"]> = {
+        turnId: TurnId.make("newer-running-turn"),
+        state: "running",
+        requestedAt: RECENT_MESSAGE.createdAt,
+        startedAt: RECENT_MESSAGE.createdAt,
+        completedAt: null,
+        assistantMessageId: null,
+      };
+      // Both snapshots were captured after the late refusal was persisted.
+      // The recent message window excludes the old message and its refusal.
+      const harness = yield* makeHarness({
+        initialResponse: Option.some({
+          snapshotSequence: 30,
+          thread: {
+            ...BASE_THREAD,
+            title: "Current metadata",
+            messages: [recentMessage],
+            activities: [recentRefusal],
+            latestTurn,
+          },
+          page: {
+            beforeCursor: "cursor-1",
+            hasMore: true,
+            snapshotSequence: 30,
+            threadSequence: 30,
+          },
+        }),
+      });
+      yield* harness.awaitState((value) => Option.isSome(value.page));
+      expect(requestOlderThreadTurns(TARGET.environmentId, THREAD_ID)).toBe(true);
+      yield* harness.resolveNextPage(
+        Option.some({
+          snapshotSequence: 30,
+          thread: {
+            ...OLDER_PAGE.thread,
+            title: "Older metadata",
+            messages: [oldMessage, recentMessage],
+            activities: [recentRefusal, oldRefusal],
+            latestTurn: null,
+          },
+          page: {
+            beforeCursor: null,
+            hasMore: false,
+            snapshotSequence: 30,
+            threadSequence: 30,
+          },
+        }),
+      );
+      const mergedState = yield* harness.awaitState((value) =>
+        Option.exists(value.data, (thread) =>
+          thread.messages.some((message) => message.id === oldMessage.id),
+        ),
+      );
+      const merged = Option.getOrThrow(mergedState.data);
+      expect(merged.activities).toEqual([recentRefusal, oldRefusal]);
+      expect(merged.messages).toEqual([oldMessage, recentMessage]);
+      expect(merged.title).toBe("Current metadata");
+      expect(merged.latestTurn).toEqual(latestTurn);
+      expect(Option.getOrThrow(mergedState.page).loadingOlder).toBe(false);
+      const scope = { environmentId: TARGET.environmentId, threadId: THREAD_ID };
+      expect(decodeTurnStartRefusal(scope, scope, merged.activities[0])?.requestId).toBe(
+        recentMessage.id,
+      );
+      expect(decodeTurnStartRefusal(scope, scope, merged.activities[1])?.requestId).toBe(
+        oldMessage.id,
+      );
+
+      yield* Queue.offerAll(harness.inputs, [
+        {
+          kind: "event",
+          event: {
+            eventId: EventId.make("late-refusal-replay"),
+            sequence: 31,
+            occurredAt: oldRefusal.createdAt,
+            aggregateKind: "thread",
+            aggregateId: THREAD_ID,
+            commandId: null,
+            causationEventId: null,
+            correlationId: null,
+            metadata: {},
+            type: "thread.activity-appended",
+            payload: { threadId: THREAD_ID, activity: oldRefusal },
+          },
+        },
+        titleEvent("Late replay applied", 32),
+      ]);
+      const replayedState = yield* harness.awaitState((value) =>
+        Option.exists(value.data, (thread) => thread.title === "Late replay applied"),
+      );
+      const replayed = Option.getOrThrow(replayedState.data);
+      expect(replayed.activities).toEqual([recentRefusal, oldRefusal]);
+      expect(replayed.messages).toEqual([oldMessage, recentMessage]);
+      expect(replayed.latestTurn).toEqual(latestTurn);
+    }).pipe(Effect.timeout("5 seconds")),
+  );
+
+  it.effect(
+    "merges refused-message pages with live replay without losing correlation or newer state",
+    () =>
+      Effect.gen(function* () {
+        const makeRefusal = (
+          requestId: MessageId,
+          sequence: number,
+        ): OrchestrationThreadActivity => ({
+          id: makeWorkspaceTurnStartRefusalIdentity(THREAD_ID, requestId).activityId,
+          tone: "error",
+          kind: "provider.turn.start.failed",
+          summary: "Not started",
+          payload: {
+            version: 1,
+            source: "workspace-ownership",
+            requestId,
+            reason: "owned",
+            originCommandId: CommandId.make(`start-${requestId}`),
+            originSequence: sequence - 1,
+          },
+          turnId: null,
+          sequence,
+          createdAt: BASE_THREAD.createdAt,
+        });
+        const recentMessage: OrchestrationMessage = {
+          ...RECENT_MESSAGE,
+          id: MessageId.make("recent-refused-message"),
+          role: "user",
+          turnId: null,
+          streaming: false,
+        };
+        const oldMessage: OrchestrationMessage = {
+          ...OLDER_MESSAGE,
+          id: MessageId.make("old-refused-message"),
+          role: "user",
+          turnId: null,
+          streaming: false,
+        };
+        const recentRefusal = makeRefusal(recentMessage.id, 9);
+        const oldRefusal = makeRefusal(oldMessage.id, 2);
+        const latestTurn: NonNullable<OrchestrationThread["latestTurn"]> = {
+          turnId: TurnId.make("newer-running-turn"),
+          state: "running",
+          requestedAt: RECENT_MESSAGE.createdAt,
+          startedAt: RECENT_MESSAGE.createdAt,
+          completedAt: null,
+          assistantMessageId: null,
+        };
+        const initial = {
+          ...WINDOWED_SNAPSHOT,
+          thread: {
+            ...BASE_THREAD,
+            messages: [recentMessage],
+            activities: [recentRefusal],
+            latestTurn,
+          },
+        };
+        const harness = yield* makeHarness({ initialResponse: Option.some(initial) });
+        yield* harness.awaitState((value) => Option.isSome(value.page));
+        expect(requestOlderThreadTurns(TARGET.environmentId, THREAD_ID)).toBe(true);
+        yield* harness.resolveNextPage(
+          Option.some({
+            ...OLDER_PAGE,
+            snapshotSequence: 12,
+            thread: {
+              ...OLDER_PAGE.thread,
+              messages: [oldMessage, recentMessage],
+              activities: [oldRefusal, recentRefusal],
+              latestTurn: null,
+            },
+            page: {
+              beforeCursor: null,
+              hasMore: false,
+              snapshotSequence: 12,
+              threadSequence: 12,
+            },
+          }),
+        );
+        const refusalEvent = (sequence: number): OrchestrationThreadStreamItem => ({
+          kind: "event",
+          event: {
+            eventId: EventId.make(`live-refusal-${sequence}`),
+            sequence,
+            occurredAt: BASE_THREAD.createdAt,
+            aggregateKind: "thread",
+            aggregateId: THREAD_ID,
+            commandId: null,
+            causationEventId: null,
+            correlationId: null,
+            metadata: {},
+            type: "thread.activity-appended",
+            payload: { threadId: THREAD_ID, activity: oldRefusal },
+          },
+        });
+        yield* Queue.offerAll(harness.inputs, [refusalEvent(11), titleEvent("Caught up", 12)]);
+        yield* harness.awaitState((value) =>
+          Option.exists(value.data, (thread) =>
+            thread.messages.some((entry) => entry.id === oldMessage.id),
+          ),
+        );
+        yield* Queue.offerAll(harness.inputs, [refusalEvent(13), titleEvent("Replay applied", 14)]);
+        const state = yield* harness.awaitState((value) =>
+          Option.exists(value.data, (thread) => thread.title === "Replay applied"),
+        );
+        const thread = Option.getOrThrow(state.data);
+        expect(thread.messages).toEqual([oldMessage, recentMessage]);
+        expect(thread.activities.filter((entry) => entry.id === oldRefusal.id)).toEqual([
+          oldRefusal,
+        ]);
+        expect(thread.activities.filter((entry) => entry.id === recentRefusal.id)).toEqual([
+          recentRefusal,
+        ]);
+        expect(thread.activities).toHaveLength(2);
+        expect(thread.latestTurn).toEqual(latestTurn);
+        expect(Option.getOrThrow(state.page).loadingOlder).toBe(false);
+        const scope = { environmentId: TARGET.environmentId, threadId: THREAD_ID };
+        for (const message of thread.messages) {
+          const activity = thread.activities.find(
+            (entry) =>
+              entry.id === makeWorkspaceTurnStartRefusalIdentity(THREAD_ID, message.id).activityId,
+          );
+          expect(decodeTurnStartRefusal(scope, scope, activity)?.requestId).toBe(message.id);
+        }
+      }).pipe(Effect.timeout("5 seconds")),
+  );
+
   for (const reasoningCapability of [false, true]) {
     it.effect(
       `negotiates reasoning for initial, older and socket reads: ${reasoningCapability}`,

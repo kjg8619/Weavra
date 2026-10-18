@@ -90,6 +90,7 @@ export const WeavraGraphSummary = Schema.Struct({
         "completion",
         "approval",
         "mutation",
+        "task",
       ]),
       status: Schema.Literals([
         "pending",
@@ -107,6 +108,7 @@ export const WeavraGraphSummary = Schema.Struct({
       attempt: Schema.optionalKey(counter),
       role: Schema.optionalKey(Schema.Literals(["Executor", "Developer", "Reviewer", "Lead"])),
       parentId: Schema.optionalKey(identifier),
+      wave: Schema.optionalKey(counter),
     }),
   ),
   edges: Schema.Array(

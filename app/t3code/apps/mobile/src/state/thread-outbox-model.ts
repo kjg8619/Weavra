@@ -10,11 +10,13 @@ import {
   IsoDateTime,
   MessageId,
   ModelSelection,
+  OrchestrationMessage,
   OrchestrationMessageContext,
   ProjectId,
   ProviderInteractionMode,
   RuntimeMode,
   ThreadId,
+  WorkspaceTurnStartRefusalPayload,
   type ModelSelection as ModelSelectionType,
   type ProjectId as ProjectIdType,
   type ProviderInteractionMode as ProviderInteractionModeType,
@@ -28,8 +30,8 @@ import type { DraftComposerAttachment } from "../lib/composerImages";
 import { scopedThreadKey } from "../lib/scopedEntities";
 import { resolveProviderInteractionMode } from "../features/threads/legacy-plan-mode";
 
-// Keep current writes until a compatible native baseline includes the v4 reader.
-const THREAD_OUTBOX_SCHEMA_VERSION = 3;
+// Older readers must reject, rather than discard, durable delivery fences.
+const THREAD_OUTBOX_SCHEMA_VERSION = 5;
 const THREAD_OUTBOX_MAX_RETRY_DELAY_MS = 16_000;
 
 const QueuedThreadCreationSchema = Schema.Struct({
@@ -44,14 +46,34 @@ const QueuedThreadCreationSchema = Schema.Struct({
   startFromOrigin: Schema.optional(Schema.Boolean),
 });
 
+export const QueuedThreadDeliverySchema = Schema.Union([
+  Schema.Struct({ state: Schema.Literal("ready") }),
+  Schema.Struct({ state: Schema.Literal("attempted") }),
+  Schema.Struct({ state: Schema.Literal("unknown") }),
+  Schema.Struct({
+    state: Schema.Literal("refused"),
+    sourceMessage: OrchestrationMessage,
+    refusal: WorkspaceTurnStartRefusalPayload,
+  }),
+]);
+export type QueuedThreadDelivery = typeof QueuedThreadDeliverySchema.Type;
+
 export const QueuedThreadMessageSchema = Schema.Struct({
-  schemaVersion: Schema.Literals([1, 2, THREAD_OUTBOX_SCHEMA_VERSION, 4]),
+  schemaVersion: Schema.Literals([1, 2, 3, 4, THREAD_OUTBOX_SCHEMA_VERSION]),
   environmentId: EnvironmentId,
   threadId: ThreadId,
   messageId: MessageId,
   commandId: CommandId,
   text: Schema.String,
   context: Schema.optional(OrchestrationMessageContext),
+  delivery: Schema.optionalKey(QueuedThreadDeliverySchema),
+  storageIdentity: Schema.optionalKey(
+    Schema.Struct({
+      environmentId: EnvironmentId,
+      threadId: ThreadId,
+      messageId: MessageId,
+    }),
+  ),
   attachments: Schema.Array(DraftComposerAttachmentSchema),
   modelSelection: Schema.optional(ModelSelection),
   runtimeMode: Schema.optional(RuntimeMode),
@@ -60,7 +82,19 @@ export const QueuedThreadMessageSchema = Schema.Struct({
   // instead of appending a turn to an existing one.
   creation: Schema.optional(QueuedThreadCreationSchema),
   createdAt: IsoDateTime,
-});
+}).check(
+  Schema.makeFilter((message) => {
+    const delivery = message.delivery;
+    return (
+      (message.storageIdentity === undefined ||
+        message.storageIdentity.messageId === message.messageId) &&
+      (delivery?.state !== "refused" ||
+        (delivery.sourceMessage.role === "user" &&
+          delivery.sourceMessage.id === message.messageId &&
+          delivery.refusal.requestId === message.messageId))
+    );
+  }),
+);
 
 const decodeStoredQueuedThreadMessage = Schema.decodeUnknownSync(QueuedThreadMessageSchema);
 const encodeStoredQueuedThreadMessage = Schema.encodeUnknownSync(QueuedThreadMessageSchema);
@@ -82,6 +116,10 @@ export interface QueuedThreadMessage {
   readonly commandId: CommandId;
   readonly text: string;
   readonly context?: OrchestrationMessageContext;
+  /** Missing legacy metadata is unknown, never permission to invoke startTurn. */
+  readonly delivery?: QueuedThreadDelivery;
+  /** A pending task keeps its durable slot when the user retargets its scope. */
+  readonly storageIdentity?: Pick<QueuedThreadMessage, "environmentId" | "threadId" | "messageId">;
   readonly attachments: ReadonlyArray<DraftComposerAttachment>;
   readonly modelSelection?: ModelSelectionType;
   readonly runtimeMode?: RuntimeModeType;
@@ -94,6 +132,16 @@ export interface ThreadSettingsSnapshot {
   readonly modelSelection: ModelSelectionType;
   readonly runtimeMode: RuntimeModeType;
   readonly interactionMode: ProviderInteractionModeType;
+}
+
+export function threadOutboxIdentity(
+  message: Pick<QueuedThreadMessage, "environmentId" | "threadId" | "messageId">,
+): string {
+  return JSON.stringify([message.environmentId, message.threadId, message.messageId]);
+}
+
+export function threadOutboxStorageIdentity(message: QueuedThreadMessage): string {
+  return threadOutboxIdentity(message.storageIdentity ?? message);
 }
 
 export function resolveQueuedThreadSettings(
@@ -131,16 +179,24 @@ export function encodeQueuedThreadMessage(message: QueuedThreadMessage): unknown
 }
 
 export function decodeQueuedThreadMessage(value: unknown): QueuedThreadMessage {
-  const { schemaVersion: _, ...message } = decodeStoredQueuedThreadMessage(value);
+  const { schemaVersion, ...message } = decodeStoredQueuedThreadMessage(value);
+  if (schemaVersion !== THREAD_OUTBOX_SCHEMA_VERSION) {
+    const {
+      delivery: _legacyDelivery,
+      storageIdentity: _legacyStorageIdentity,
+      ...legacyMessage
+    } = message;
+    return legacyMessage;
+  }
   return message;
 }
 
 export function groupQueuedThreadMessages(
   messages: ReadonlyArray<QueuedThreadMessage>,
 ): Record<string, ReadonlyArray<QueuedThreadMessage>> {
-  const deduplicated = new Map<MessageId, QueuedThreadMessage>();
+  const deduplicated = new Map<string, QueuedThreadMessage>();
   for (const message of messages) {
-    deduplicated.set(message.messageId, message);
+    deduplicated.set(threadOutboxStorageIdentity(message), message);
   }
 
   const grouped: Record<string, Array<QueuedThreadMessage>> = {};
@@ -164,7 +220,7 @@ export function threadOutboxRetryDelayMs(attempt: number): number {
   return Math.min(1_000 * 2 ** Math.max(0, attempt - 1), THREAD_OUTBOX_MAX_RETRY_DELAY_MS);
 }
 
-export type ThreadOutboxDeliveryAction = "wait" | "remove" | "send";
+export type ThreadOutboxDeliveryAction = "wait" | "send";
 
 export function resolveThreadOutboxDeliveryAction(input: {
   readonly isCreation: boolean;
@@ -174,10 +230,10 @@ export function resolveThreadOutboxDeliveryAction(input: {
   readonly threadBusy: boolean;
 }): ThreadOutboxDeliveryAction {
   if (input.isCreation) {
-    // A pending task creates its thread on delivery. If the thread already
-    // exists the creation command went through and only cleanup remains.
+    // A shell is not a delivery receipt. Only a consumed claim's ACK or exact
+    // persisted refusal evidence authorizes transport retirement.
     if (input.threadExists) {
-      return "remove";
+      return "wait";
     }
     // Wait for the shell to be live before sending: until the thread list has
     // synchronized, a previously delivered creation whose cleanup failed would
@@ -185,22 +241,20 @@ export function resolveThreadOutboxDeliveryAction(input: {
     return input.environmentConnected && input.shellStatus === "live" ? "send" : "wait";
   }
   if (!input.threadExists) {
-    return input.shellStatus === "live" ? "remove" : "wait";
+    return "wait";
   }
   return input.environmentConnected ? "send" : "wait";
 }
 
 export type ThreadOutboxDispatchStep =
   | { readonly step: "wait" }
-  | { readonly step: "remove" }
   | { readonly step: "retry" }
   | { readonly step: "restore"; readonly reason: string }
   | { readonly step: "send" };
 
 /**
- * Wait for provider and file capabilities before sending. Cleanup does not
- * need config: a creation whose thread exists, or a message whose thread is
- * gone, can still be removed while config loads.
+ * Wait for provider and file capabilities before sending. Shell existence
+ * or absence never grants removal authority.
  */
 export function resolveThreadOutboxDispatchStep(input: {
   readonly deliveryAction: ThreadOutboxDeliveryAction;

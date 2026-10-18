@@ -12,6 +12,8 @@ import {
   ThreadLinkedPullRequest,
   TurnId,
   ProviderInstanceId,
+  makeWorkspaceTurnStartRefusalIdentity,
+  makeWorkspaceTurnAdmissionClaimIdentity,
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -65,6 +67,7 @@ const BaseTestLayer = makeProjectionPipelinePrefixedTestLayer("t3-projection-pip
 const encodeThreadLinkedPullRequest = Schema.encodeSync(
   Schema.fromJsonString(ThreadLinkedPullRequest),
 );
+const decodeActivityPayloadJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
 it.layer(Layer.fresh(makeProjectionPipelinePrefixedTestLayer("t3-projection-cursor-batch-")))(
   "OrchestrationProjectionPipeline cursor batches",
@@ -4092,6 +4095,135 @@ it.layer(BaseTestLayer)("OrchestrationProjectionPipeline", (it) => {
     }),
   );
 });
+
+it.layer(Layer.fresh(makeProjectionPipelinePrefixedTestLayer("t3-refusal-pending-replay-test-")))(
+  "OrchestrationProjectionPipeline refusal replay",
+  (it) => {
+    it.effect(
+      "replays a refusal without clearing a newer pending start or exposing its claim",
+      () =>
+        Effect.gen(function* () {
+          const pipeline = yield* OrchestrationProjectionPipeline;
+          const eventStore = yield* OrchestrationEventStore;
+          const sql = yield* SqlClient.SqlClient;
+          const threadId = ThreadId.make("refusal-pending-thread");
+          const oldMessageId = MessageId.make("refusal-old-message");
+          const newerMessageId = MessageId.make("refusal-new-message");
+          const refusalIdentity = makeWorkspaceTurnStartRefusalIdentity(threadId, oldMessageId);
+          const claimIdentity = makeWorkspaceTurnAdmissionClaimIdentity(threadId, oldMessageId, {
+            kind: "initial",
+          });
+          const createdAt = "2026-02-26T16:00:00.000Z";
+          let originSequence = 0;
+          for (const [index, messageId] of [oldMessageId, newerMessageId].entries()) {
+            const event = yield* eventStore.append({
+              type: "thread.turn-start-requested",
+              eventId: EventId.make(`refusal-pending-${index}`),
+              aggregateKind: "thread",
+              aggregateId: threadId,
+              occurredAt: createdAt,
+              commandId: CommandId.make(`refusal-start-${index}`),
+              causationEventId: null,
+              correlationId: null,
+              metadata: {},
+              payload: { threadId, messageId, runtimeMode: "full-access", createdAt },
+            });
+            if (index === 0) originSequence = event.sequence;
+          }
+          const refusalPayload = {
+            version: 1,
+            source: "workspace-ownership",
+            requestId: oldMessageId,
+            reason: "owned",
+            originCommandId: CommandId.make("refusal-start-0"),
+            originSequence,
+          } as const;
+          yield* eventStore.append({
+            type: "thread.activity-appended",
+            eventId: EventId.make("refusal-claim-event"),
+            aggregateKind: "thread",
+            aggregateId: threadId,
+            occurredAt: createdAt,
+            commandId: claimIdentity.commandId,
+            causationEventId: null,
+            correlationId: null,
+            metadata: {},
+            payload: {
+              threadId,
+              activity: {
+                id: claimIdentity.activityId,
+                tone: "info",
+                kind: "provider.turn.admission.claimed",
+                summary: "Admission claimed",
+                payload: {
+                  version: 1,
+                  source: "workspace-admission",
+                  requestId: oldMessageId,
+                  originCommandId: refusalPayload.originCommandId,
+                  originSequence,
+                  attempt: { kind: "initial" },
+                  claimantNonce: "00000000-0000-4000-8000-000000000001",
+                },
+                turnId: null,
+                createdAt,
+              },
+            },
+          });
+          const refusalEvent = yield* eventStore.append({
+            type: "thread.activity-appended",
+            eventId: EventId.make("refusal-visible-event"),
+            aggregateKind: "thread",
+            aggregateId: threadId,
+            occurredAt: createdAt,
+            commandId: refusalIdentity.commandId,
+            causationEventId: null,
+            correlationId: null,
+            metadata: {},
+            payload: {
+              threadId,
+              activity: {
+                id: refusalIdentity.activityId,
+                tone: "error",
+                kind: "provider.turn.start.failed",
+                summary: "Not started",
+                payload: refusalPayload,
+                turnId: null,
+                createdAt,
+              },
+            },
+          });
+          for (let replay = 0; replay < 2; replay += 1) {
+            if (replay > 0) yield* sql`DELETE FROM projection_state`;
+            yield* pipeline.bootstrap;
+            yield* pipeline.projectEvent(refusalEvent);
+            const pending = yield* sql<{ messageId: string }>`
+            SELECT pending_message_id AS "messageId"
+            FROM projection_turns
+            WHERE thread_id = ${threadId} AND turn_id IS NULL AND state = 'pending'
+          `;
+            assert.deepEqual(pending, [{ messageId: newerMessageId }]);
+            const activities = yield* sql<{ activityId: string; payload: string }>`
+            SELECT activity_id AS "activityId", payload_json AS "payload"
+            FROM projection_thread_activities WHERE thread_id = ${threadId}
+          `;
+            assert.deepEqual(
+              activities.map((row) => ({
+                activityId: row.activityId,
+                payload: decodeActivityPayloadJson(row.payload),
+              })),
+              [{ activityId: refusalIdentity.activityId, payload: refusalPayload }],
+            );
+            const claims = yield* sql<{ count: number }>`
+            SELECT COUNT(*) AS "count" FROM orchestration_events
+            WHERE stream_id = ${threadId}
+              AND json_extract(payload_json, '$.activity.kind') = 'provider.turn.admission.claimed'
+          `;
+            assert.deepEqual(claims, [{ count: 1 }]);
+          }
+        }),
+    );
+  },
+);
 
 it.layer(makeProjectionPipelinePrefixedTestLayer("t3-pending-turn-terminal-test-"))(
   "OrchestrationProjectionPipeline pending turn cleanup",

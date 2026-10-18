@@ -1,10 +1,42 @@
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, realpath } from "node:fs/promises";
-import { delimiter, isAbsolute, join } from "node:path";
+import { access, open, realpath } from "node:fs/promises";
+import { delimiter, isAbsolute, join, sep } from "node:path";
 import { Readable } from "node:stream";
+import { isPolicyPath, isProtectedPath } from "./policy.ts";
 
-export async function resolveExecutable(executable: string, path: string): Promise<string> {
+/**
+ * PATH names and absolute paths resolve as before. A relative path resolves only with a project, from the
+ * check's own cwd like the verifier trust sources: a literal unprotected path whose real target stays inside
+ * the project root and is an executable file with a shebang.
+ */
+export async function resolveExecutable(
+	executable: string,
+	path: string,
+	project?: { readonly root: string; readonly cwd: string },
+): Promise<string> {
+	if (project !== undefined && !isAbsolute(executable) && executable.includes("/")) {
+		const projectPath = project.cwd === "." ? executable : `${project.cwd}/${executable}`;
+		if (isPolicyPath(projectPath) && !isProtectedPath(projectPath))
+			try {
+				const root = await realpath(project.root);
+				const resolved = await realpath(join(root, projectPath));
+				if (resolved.startsWith(`${root}${sep}`)) {
+					await access(resolved, constants.X_OK);
+					const handle = await open(resolved, constants.O_RDONLY | constants.O_NOFOLLOW);
+					try {
+						const { bytesRead, buffer } = await handle.read(Buffer.alloc(2), 0, 2, 0);
+						if ((await handle.stat()).isFile() && bytesRead === 2 && buffer.toString("latin1") === "#!")
+							return resolved;
+					} finally {
+						await handle.close();
+					}
+				}
+			} catch {
+				/* Missing, unreadable or escaping scripts are unavailable. */
+			}
+		throw new Error("Registered executable is unavailable");
+	}
 	const candidates = isAbsolute(executable)
 		? [executable]
 		: executable.includes("/")

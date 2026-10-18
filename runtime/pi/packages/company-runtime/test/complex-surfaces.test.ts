@@ -207,34 +207,93 @@ describe("COMPLEX TUI status, history and footer (#16 stage C)", () => {
 describe("COMPLEX graph (#16 stage C)", () => {
 	it("never unrolls task attempts into one single-task chain or invents a transition", async () => {
 		const { h, run } = await revised();
-		// Before stage C a revised COMPLEX snapshot read as "inconsistent step/phase/attempt"; now every one projects.
+		// Before stage C a revised COMPLEX snapshot read as "inconsistent step/phase/attempt"; now every one projects
+		// as one node per plan task (never one node per attempt), the stored integration gates and the Run outcome.
+		const gatePassed = (gate: string) => gate === "PASS";
 		for (const snapshot of h.saved) {
 			const graph = projectRunGraph(snapshot);
-			expect(graph.nodes).toHaveLength(1);
-			expect(graph.edges).toEqual([]);
-			expect(graph.nodes[0]).toMatchObject({
-				id: "preflight",
-				kind: "preflight",
-				label: "COMPLEX run (task graph unavailable)",
-			});
-			expect(graph.nodes[0].status).not.toBe("passed");
+			const state = snapshot.complex!;
+			expect(graph.nodes.map((node) => [node.id, node.kind, node.wave])).toEqual([
+				["task:CT-001", "task", 1],
+				["task:CT-002", "task", 2],
+				["integration:check", "verification", undefined],
+				["integration:review", "review", undefined],
+				["integration:test", "verification", undefined],
+				["complete", "completion", undefined],
+			]);
+			// Only the declared dependency and the fixed integration order: no transition is inferred.
+			expect(graph.edges).toEqual([
+				{ from: "task:CT-001", to: "task:CT-002", kind: "sequence" },
+				{ from: "task:CT-002", to: "integration:check", kind: "sequence" },
+				{ from: "integration:check", to: "integration:review", kind: "pass" },
+				{ from: "integration:review", to: "integration:test", kind: "pass" },
+				{ from: "integration:test", to: "complete", kind: "pass" },
+			]);
+			const status = (id: string) => graph.nodes.find((node) => node.id === id)?.status;
+			for (const row of state.tasks) expect(status(`task:${row.id}`) === "passed").toBe(row.status === "COMPLETED");
+			expect(status("integration:check") === "passed").toBe(gatePassed(state.integration.check));
+			expect(status("integration:review") === "passed").toBe(gatePassed(state.integration.review));
+			expect(status("integration:test") === "passed").toBe(gatePassed(state.integration.test));
+			// A task COMPLETED is not Run completion.
+			expect(status("complete") === "passed").toBe(snapshot.status === "COMPLETED");
 			expect(graph.status).toBe(snapshot.status);
 			expect(graph.stateRevision).toBe(snapshot.revision);
-			expect(projectHostGraph(snapshot).nodes).toEqual([
-				{ id: "preflight", kind: "preflight", status: graph.nodes[0].status },
-			]);
+			expect(projectHostGraph(snapshot).nodes).toEqual(
+				graph.nodes.map(({ id, kind, status: nodeStatus, attempt, wave }) => ({
+					id,
+					kind,
+					status: nodeStatus,
+					...(attempt !== undefined ? { attempt } : {}),
+					...(wave !== undefined ? { wave } : {}),
+				})),
+			);
 		}
-		const text = renderGraphText(projectRunGraph(run));
+		const graph = projectRunGraph(run);
+		// The revised CT-001 stays one node carrying its latest stored attempt.
+		expect(graph.nodes.filter((node) => node.id.startsWith("task:"))).toMatchObject([
+			{ id: "task:CT-001", status: "passed", attempt: 2, wave: 1 },
+			{ id: "task:CT-002", status: "passed", attempt: 1, wave: 2 },
+		]);
+		expect(graph.nodes.find((node) => node.id === "complete")).toMatchObject({ status: "passed" });
+		expect(graph.nodes.find((node) => node.id === "complete")?.detail).toBeUndefined();
+		const text = renderGraphText(graph);
 		expect(text).toContain("COMPLEX / R1 / COMPLETED");
-		expect(text).toContain("[COMPLEX run (task graph unavailable)] UNKNOWN");
-		expect(text).toContain("/workflow status and /state show the ordered task rows, waves and integration gates");
-		expect(text).not.toMatch(/Complete #|Developer #|PASS required/);
+		expect(text).toContain("(wave 2)");
+		expect(text).not.toContain("task graph unavailable");
+		// Exactly the stored tasks and integration gates; no per-attempt STANDARD chain is unrolled.
+		expect(text.slice(text.indexOf("[Task 1]"))).toBe(
+			[
+				"[Task 1] PASS (wave 1)",
+				"  -- sequence --> [Task 2]",
+				"[Task 2] PASS (wave 2)",
+				"  -- sequence --> [Integration check]",
+				"[Integration check] PASS",
+				"  -- PASS required --> [Integration review]",
+				"[Integration review] PASS",
+				"  -- PASS required --> [Integration test]",
+				"[Integration test] PASS",
+				"  -- PASS required --> [Run completion]",
+				"[Run completion] PASS",
+			].join("\n"),
+		);
+		expect(text).not.toMatch(/Complete #|Developer #/);
 	});
 
 	it("keeps stopped outcomes and refuses an inconsistent COMPLEX snapshot", async () => {
 		const { run } = await integrationBlocked();
 		const graph = projectRunGraph(run);
-		expect(graph.nodes[0]).toMatchObject({ status: "blocked", detail: run.lastError });
+		expect(run.lastError).toBeTypeOf("string");
+		expect(graph.nodes.map((node) => [node.id, node.status])).toEqual([
+			["task:CT-001", "passed"],
+			["task:CT-002", "passed"],
+			["integration:check", "failed"],
+			["integration:review", "pending"],
+			["integration:test", "pending"],
+			["complete", "blocked"],
+		]);
+		// Both tasks COMPLETED, yet the stopped Run outcome and its stored error stay on the completion node only.
+		expect(graph.nodes.find((node) => node.id === "complete")?.detail).toBe(run.lastError);
+		expect(graph.nodes.filter((node) => node.detail !== undefined).map((node) => node.id)).toEqual(["complete"]);
 		const tampered = structuredClone(run);
 		tampered.complex!.tasks[0].status = "PENDING";
 		expect(() => projectRunGraph(tampered)).toThrow(GraphProjectionError);

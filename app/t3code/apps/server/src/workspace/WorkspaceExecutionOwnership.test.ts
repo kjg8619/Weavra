@@ -221,6 +221,54 @@ const repository = Effect.gen(function* () {
   return cwd;
 });
 
+it.effect(
+  "repository preparation rejects overlapping active writes without changing their admission",
+  () =>
+    Effect.gen(function* () {
+      const cwd = yield* repository;
+      const ownership = yield* Ownership.WorkspaceExecutionOwnership;
+      for (const kind of ["write", "terminal", "provider"] as const) {
+        const token = yield* ownership.acquireIndependent({ cwd, kind });
+        const denied = yield* ownership
+          .withFreshOperation({ cwd, kind: "git", exclusive: true }, Effect.void)
+          .pipe(Effect.result);
+        assert.equal(denied._tag, "Failure");
+        assert.equal((yield* ownership.activeOperations).length, 1);
+        yield* ownership.release(token);
+      }
+      assert.equal((yield* ownership.activeOperations).length, 0);
+    }).pipe(Effect.provide(Layer.mergeAll(systemLayer, NodeServices.layer))),
+);
+
+it.effect("holds exclusive repository preparation until its exact completion signal", () =>
+  Effect.gen(function* () {
+    const cwd = yield* repository;
+    const ownership = yield* Ownership.WorkspaceExecutionOwnership;
+    const entered = yield* Deferred.make<void>();
+    const finish = yield* Deferred.make<void>();
+    const preparing = yield* ownership
+      .withFreshOperation(
+        { cwd, kind: "git", exclusive: true },
+        Effect.gen(function* () {
+          yield* Deferred.succeed(entered, undefined);
+          yield* Deferred.await(finish);
+        }),
+      )
+      .pipe(Effect.forkScoped);
+    yield* Deferred.await(entered);
+    for (const kind of ["write", "terminal", "provider", "git"] as const) {
+      const denied = yield* ownership
+        .withFreshOperation({ cwd, kind }, Effect.void)
+        .pipe(Effect.result);
+      assert.equal(denied._tag, "Failure");
+    }
+    yield* Deferred.succeed(finish, undefined);
+    yield* Fiber.join(preparing);
+    yield* ownership.withFreshOperation({ cwd, kind: "write" }, Effect.void);
+    assert.equal((yield* ownership.activeOperations).length, 0);
+  }).pipe(Effect.provide(Layer.mergeAll(systemLayer, NodeServices.layer))),
+);
+
 it.effect("holds file-save admission through refresh and rejects a queued late save", () =>
   Effect.gen(function* () {
     // Given a real filesystem save parked inside its final refresh effect.
@@ -883,6 +931,94 @@ it.effect("rejects an old queued admission even after the controlled owner relea
     assert.equal(yield* fs.readFileString(`${cwd}/new`), "new request");
   }).pipe(Effect.provide(Layer.mergeAll(systemLayer, NodeServices.layer))),
 );
+
+for (const history of ["available", "unavailable"] as const) {
+  it.effect(`fences released sibling ownership using the original sequence (${history})`, () =>
+    Effect.gen(function* () {
+      const cwd = yield* repository;
+      const fs = yield* FileSystem.FileSystem;
+      const runner = yield* ProcessRunner.ProcessRunner;
+      const ownership = yield* Ownership.WorkspaceExecutionOwnership;
+      const engine = yield* OrchestrationEngineService;
+      const outside = yield* fs.realPath(
+        yield* fs.makeTempDirectoryScoped({ prefix: "weavra-released-sibling-" }),
+      );
+      const linked = `${outside}/linked`;
+      for (const args of [
+        [
+          "-c",
+          "user.name=Fixture",
+          "-c",
+          "user.email=fixture@localhost",
+          "commit",
+          "--allow-empty",
+          "-qm",
+          "Fixture",
+        ],
+        ["worktree", "add", "--detach", linked, "HEAD"],
+      ]) {
+        assert.equal((yield* runner.run({ command: "git", args: ["-C", cwd, ...args] })).code, 0);
+      }
+      const originSequence = yield* engine.latestSequence;
+      const task = yield* seedTask(cwd, linked);
+      const released = yield* ownership.releaseAnalysis(task.id);
+      assert.equal(released.ownership.state, "released");
+      if (history === "unavailable") yield* fs.remove(linked, { recursive: true });
+
+      let callbacks = 0;
+      const denied = yield* ownership
+        .withFreshOperation(
+          {
+            cwd,
+            kind: "write",
+            threadId: "ordinary-sibling-thread",
+            sharedGitMetadata: true,
+            eventSequence: originSequence,
+          },
+          Effect.sync(() => {
+            callbacks++;
+          }),
+        )
+        .pipe(Effect.flip);
+      assert.equal(denied.reason, history === "available" ? "stale" : "unavailable");
+      assert.equal(callbacks, 0);
+
+      // Ordinary sibling file writes do not touch shared Git metadata.
+      yield* ownership.withFreshOperation(
+        { cwd, kind: "write", threadId: "ordinary-sibling-thread", eventSequence: originSequence },
+        fs.writeFileString(`${cwd}/ordinary-after-release.txt`, "allowed"),
+      );
+      yield* ownership.withFreshOperation(
+        {
+          cwd,
+          kind: "write",
+          threadId: "ordinary-sibling-thread",
+          sharedGitMetadata: true,
+          eventSequence: yield* engine.latestSequence,
+        },
+        Effect.sync(() => {
+          callbacks++;
+        }),
+      );
+      if (history === "available") {
+        const unrelated = yield* repository;
+        yield* ownership.withFreshOperation(
+          {
+            cwd: unrelated,
+            kind: "write",
+            threadId: "unrelated-thread",
+            sharedGitMetadata: true,
+            eventSequence: originSequence,
+          },
+          Effect.void,
+        );
+      }
+      assert.equal(callbacks, 1);
+      assert.equal(yield* fs.readFileString(`${cwd}/ordinary-after-release.txt`), "allowed");
+      assert.deepStrictEqual(yield* ownership.activeOperations, []);
+    }).pipe(Effect.provide(Layer.mergeAll(systemLayer, NodeServices.layer))),
+  );
+}
 
 for (const operation of ["file-save", "repository-init"] as const) {
   it.effect(`rejects shared metadata ${operation} while a linked checkout is owned`, () =>

@@ -29,9 +29,9 @@ function AccountSummary({ account }: { readonly account: UsageLimitsReport["acco
         <RedactedSensitiveText
           key={label}
           value={label}
-          ariaLabel="Toggle account label visibility"
-          revealTooltip="Click to reveal account"
-          hideTooltip="Click to hide account"
+          ariaLabel="계정 표시 켜기/끄기"
+          revealTooltip="눌러서 계정 보기"
+          hideTooltip="눌러서 계정 숨기기"
           className="max-w-full truncate align-bottom font-sans text-xs leading-normal"
         />
       ) : (
@@ -61,9 +61,9 @@ export function usageLimitsBannerItem(
     variant: "info",
     priority: "notice",
     icon: <GaugeIcon />,
-    title: "Usage limits",
+    title: "사용 한도",
     description: summary,
-    dismissLabel: "Dismiss usage limits",
+    dismissLabel: "사용 한도 닫기",
     onDismiss,
     children: <UsageLimitsBannerBody report={report} environmentId={environmentId} />,
   };

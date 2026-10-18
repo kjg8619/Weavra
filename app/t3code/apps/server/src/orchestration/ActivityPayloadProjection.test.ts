@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { OrchestrationThreadActivity } from "@t3tools/contracts";
-import { projectActivityPayload } from "./ActivityPayloadProjection.ts";
+import {
+  CommandId,
+  EventId,
+  MessageId,
+  ThreadId,
+  decodeWorkspaceTurnStartRefusalPayload,
+  makeWorkspaceTurnStartRefusalIdentity,
+} from "@t3tools/contracts";
+import * as Option from "effect/Option";
+import { projectActivityEvent, projectActivityPayload } from "./ActivityPayloadProjection.ts";
 
 function activity(payload: Record<string, unknown>): OrchestrationThreadActivity {
   return {
@@ -21,6 +30,50 @@ function activity(payload: Record<string, unknown>): OrchestrationThreadActivity
  * assertions are the tripwire.
  */
 describe("projectActivityPayload", () => {
+  it("preserves the closed refusal machine fields in payload and live-event shaping", () => {
+    const threadId = ThreadId.make("refusal-thread");
+    const requestId = MessageId.make("refusal-message");
+    const identity = makeWorkspaceTurnStartRefusalIdentity(threadId, requestId);
+    const payload = {
+      version: 1,
+      source: "workspace-ownership",
+      requestId,
+      reason: "owned",
+      originCommandId: CommandId.make("original-start"),
+      originSequence: 7,
+    } as const;
+    const refusal: OrchestrationThreadActivity = {
+      id: identity.activityId,
+      tone: "error",
+      kind: "provider.turn.start.failed",
+      summary: "Not started",
+      payload,
+      turnId: null,
+      sequence: 8,
+      createdAt: "2026-08-01T10:00:00.000Z",
+    };
+    expect(projectActivityPayload(refusal)).toEqual(refusal);
+    const event = projectActivityEvent({
+      eventId: EventId.make("refusal-event"),
+      sequence: 8,
+      occurredAt: refusal.createdAt,
+      aggregateKind: "thread",
+      aggregateId: threadId,
+      commandId: identity.commandId,
+      causationEventId: null,
+      correlationId: null,
+      metadata: {},
+      type: "thread.activity-appended",
+      payload: { threadId, activity: refusal },
+    });
+    expect(event.type).toBe("thread.activity-appended");
+    if (event.type !== "thread.activity-appended") throw new Error("Unexpected event type");
+    expect(event.payload.activity).toEqual(refusal);
+    expect(
+      Option.getOrThrow(decodeWorkspaceTurnStartRefusalPayload(event.payload.activity.payload)),
+    ).toEqual(payload);
+  });
+
   it("preserves tool attribution (agentId/parentToolUseId) through data slimming", () => {
     const projected = projectActivityPayload(
       activity({
