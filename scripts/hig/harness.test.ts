@@ -73,6 +73,16 @@ describe("state-bound capture evidence", () => {
   test("rejects a non-PNG frame", () => {
     expect(() => pngDimensions(Buffer.alloc(24))).toThrow("PNG signature");
   });
+  test("rejects unpainted code despite visible DOM geometry", () => {
+    expect(() =>
+      validateRecord({ ...record(), stateId: "41", paint: { colors: 1 } }, image()),
+    ).toThrow("Unpainted code fixture");
+  });
+  test("accepts painted code with matching image identity", () => {
+    expect(() =>
+      validateRecord({ ...record(), stateId: "41", paint: { colors: 32 } }, image()),
+    ).not.toThrow();
+  });
   test("rejects duplicate 47 and 48 evidence", () => {
     const rows = ["1280x800", "1920x1080"].flatMap((size) => [
       {

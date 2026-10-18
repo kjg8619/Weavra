@@ -123,6 +123,10 @@ async function ready(page, expected, target = "body") {
     page.evaluate(
       async ({ expected, target }) => {
         await document.fonts.ready;
+        const finiteAnimations = document
+          .getAnimations()
+          .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime));
+        await Promise.allSettled(finiteAnimations.map((animation) => animation.finished));
         await new Promise((resolve, reject) => {
           let prior = null;
           let stable = 0;
@@ -281,6 +285,28 @@ async function runSize(width, height, includeStress = false) {
       const state = [...DESKTOP_STATES, ...STRESS_STATES].find((s) => s.id === id);
       NodeAssert.ok(state);
       const readiness = await ready(page, state.expected, target);
+      let paint = null;
+      if (["36", "41", "42", "43"].includes(id)) {
+        const fixtureCode = page.locator("pre").filter({ hasText: "greeting" });
+        NodeAssert.equal(await fixtureCode.count(), 1, "Ambiguous code fixture");
+        const box = await fixtureCode.boundingBox();
+        NodeAssert.ok(box, "Missing code geometry");
+        const region = {
+          x: Math.max(0, Math.floor(box.x + 8)),
+          y: Math.max(0, Math.floor(box.y + 8)),
+          width: Math.floor(box.width - 16),
+          height: Math.floor(box.height - 16),
+        };
+        paint = await win.evaluate(async (window, region) => {
+          const image = await window.webContents.capturePage(region);
+          const bitmap = image.toBitmap();
+          const colors = new Set();
+          for (let i = 0; i < bitmap.length && colors.size < 64; i += 4)
+            colors.add(bitmap.readUInt32LE(i));
+          return { region, colors: colors.size, pixels: bitmap.length / 4 };
+        }, region);
+        NodeAssert.ok(paint.colors >= 16, `Unpainted code fixture: ${id}, colors=${paint.colors}`);
+      }
       const file = suffix ?? `${stress ? "390x844" : `${width}x${height}`}/${id}_${state.name}.png`;
       await NodeFSP.mkdir(NodePath.dirname(NodePath.join(output, file)), { recursive: true });
       const geometry = await page.evaluate(
@@ -406,13 +432,16 @@ async function runSize(width, height, includeStress = false) {
       const png = await page.screenshot({
         path: NodePath.join(output, file),
         scale: "css",
-        animations: "disabled",
       });
-      const native = await win.evaluate(async (window) =>
-        (await window.webContents.capturePage()).toPNG().toString("base64"),
-      );
-      const electronFile = file.replace(".png", ".electron.png");
-      await NodeFSP.writeFile(NodePath.join(output, electronFile), Buffer.from(native, "base64"));
+      let nativeCapture = {};
+      if (["36", "41", "42", "43"].includes(id)) {
+        const native = await win.evaluate(async (window) =>
+          (await window.webContents.capturePage()).toPNG().toString("base64"),
+        );
+        const electronFile = file.replace(".png", ".electron.png");
+        await NodeFSP.writeFile(NodePath.join(output, electronFile), Buffer.from(native, "base64"));
+        nativeCapture = { electronFile, electronSha256: sha256(Buffer.from(native, "base64")) };
+      }
       const nativeGeometry = await win.evaluate((window) => ({
         minimum: window.getMinimumSize(),
         bounds: window.getBounds(),
@@ -432,9 +461,9 @@ async function runSize(width, height, includeStress = false) {
         stress,
         authority: "SYNTHETIC_PROJECTION_ONLY; REAL PACKAGED RENDERER",
         readiness,
+        paint,
         sha256: sha256(png),
-        electronFile,
-        electronSha256: sha256(Buffer.from(native, "base64")),
+        ...nativeCapture,
         expectedProject: Number(id) >= 7 ? (run.fixture?.projectId ?? "baseline-project") : null,
         expectedThread: /baseline-/.test(geometry.selection.route)
           ? geometry.selection.route

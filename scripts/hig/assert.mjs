@@ -26,6 +26,8 @@ export function validateRecord(record, bytes) {
   );
   if (!record.stress)
     NodeAssert.ok(record.targetVisible, `Target outside scrollport: ${record.file}`);
+  if (["36", "41", "42", "43"].includes(record.stateId))
+    NodeAssert.ok(record.paint?.colors >= 16, `Unpainted code fixture: ${record.file}`);
 }
 export function validateProvenance(provenance, revision) {
   NodeAssert.equal(provenance.revision, revision, "Stale source revision");
