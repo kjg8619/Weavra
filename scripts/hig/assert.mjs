@@ -12,7 +12,7 @@ export const sha256 = (bytes) => NodeCrypto.createHash("sha256").update(bytes).d
 // Runs in the renderer. Text in a mounted but clipped pane is not screenshot evidence.
 export function observeVisibleState({ target, boundary }) {
   const visible = (element, rect) => {
-    if (!element.checkVisibility()) return false;
+    if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
     let clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
     for (let p = element.parentElement; p; p = p.parentElement) {
       const style = getComputedStyle(p);

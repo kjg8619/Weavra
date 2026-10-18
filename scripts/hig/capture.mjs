@@ -170,7 +170,17 @@ async function ready(page, expected, target = "body") {
               content,
             ]);
             const complete =
-              node && rect.width > 0 && rect.height > 0 && content.includes(expected);
+              node &&
+              rect.width > 0 &&
+              rect.height > 0 &&
+              content.includes(expected) &&
+              !document
+                .getAnimations()
+                .some(
+                  (animation) =>
+                    (animation.playState === "running" || animation.pending) &&
+                    Number.isFinite(animation.effect?.getComputedTiming().endTime),
+                );
             stable = complete && current === prior ? stable + 1 : 0;
             prior = current;
             if (stable >= 2) {
