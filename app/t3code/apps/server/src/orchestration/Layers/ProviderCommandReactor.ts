@@ -3,7 +3,12 @@ import { WorkspaceExecutionOwnership } from "../../workspace/WorkspaceExecutionO
 import {
   type ChatAttachment,
   CommandId,
+  decodeWorkspaceTurnAdmissionClaimPayload,
+  decodeWorkspaceTurnCompactionContinuationPayload,
   EventId,
+  makeWorkspaceTurnAdmissionClaimIdentity,
+  makeWorkspaceTurnCompactionContinuationIdentity,
+  makeWorkspaceTurnStartRefusalIdentity,
   type ModelSelection,
   type OrchestrationEvent,
   type ProviderControlledAnalysis,
@@ -14,6 +19,9 @@ import {
   type ProviderSession,
   type RuntimeMode,
   type TurnId,
+  WorkspaceTurnAdmissionClaimPayload,
+  WorkspaceTurnCompactionContinuationPayload,
+  type WorkspaceTurnStartRefusalPayload,
 } from "@t3tools/contracts";
 import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
 import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
@@ -67,6 +75,8 @@ import {
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
 import { GitWorkflowService } from "../../git/GitWorkflowService.ts";
+import { OrchestrationCommandReceiptRepository } from "../../persistence/Services/OrchestrationCommandReceipts.ts";
+import { OrchestrationEventStore } from "../../persistence/Services/OrchestrationEventStore.ts";
 const isProviderAdapterProcessError = Schema.is(ProviderAdapterProcessError);
 const isProviderAdapterRequestError = Schema.is(ProviderAdapterRequestError);
 const isProviderAdapterValidationError = Schema.is(ProviderAdapterValidationError);
@@ -122,6 +132,13 @@ const turnStartKeyForEvent = (event: ProviderIntentEvent): string =>
 const HANDLED_TURN_START_KEY_MAX = 10_000;
 const HANDLED_TURN_START_KEY_TTL = Duration.minutes(30);
 const DEFAULT_RUNTIME_MODE: RuntimeMode = "full-access";
+
+class TurnAdmissionUnconfirmedError extends Schema.TaggedError<TurnAdmissionUnconfirmedError>()(
+  "TurnAdmissionUnconfirmedError",
+  {
+    message: Schema.String,
+  },
+) {}
 
 function providerErrorLabel(value: string | undefined): string {
   const normalized = value?.trim();
@@ -214,6 +231,8 @@ function buildGeneratedWorktreeBranchName(raw: string): string {
 const make = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto;
   const orchestrationEngine = yield* OrchestrationEngineService;
+  const commandReceipts = yield* OrchestrationCommandReceiptRepository;
+  const eventStore = yield* OrchestrationEventStore;
   const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
   const providerAuthService = yield* ProviderAuthService;
   const providerService = yield* ProviderService;
@@ -253,7 +272,19 @@ const make = Effect.gen(function* () {
 
   const threadModelSelections = new Map<string, ModelSelection>();
   const compactingThreadIds = new Set<ThreadId>();
-  type QueuedTurnStart = Extract<ProviderIntentEvent, { type: "thread.turn-start-requested" }>;
+  type TurnStartEvent = Extract<ProviderIntentEvent, { type: "thread.turn-start-requested" }>;
+  type AdmissionClaim = {
+    readonly identity: ReturnType<typeof makeWorkspaceTurnAdmissionClaimIdentity>;
+    readonly payload: WorkspaceTurnAdmissionClaimPayload;
+  };
+  type ContinuationPermit = {
+    readonly identity: ReturnType<typeof makeWorkspaceTurnCompactionContinuationIdentity>;
+    readonly payload: WorkspaceTurnCompactionContinuationPayload;
+  };
+  type QueuedTurnStart = TurnStartEvent & {
+    // Controlled analysis retains its task authority, not ordinary admission authority.
+    readonly admission: AdmissionClaim | undefined;
+  };
   // Turn starts received while a thread compacts, replayed in order once its session is restored.
   const turnsAfterCompaction = new Map<ThreadId, Array<QueuedTurnStart>>();
   // Replay command id → the queued turn start it re-requests. `sent` settles once the replay's
@@ -264,9 +295,289 @@ const make = Effect.gen(function* () {
       readonly event: QueuedTurnStart;
       readonly queued: Array<QueuedTurnStart>;
       readonly sent: Deferred.Deferred<void>;
+      readonly permit: ContinuationPermit | undefined;
     }
   >();
   const stoppingThreadIds = new Set<ThreadId>();
+
+  const admissionUnconfirmed = Effect.fail(
+    new TurnAdmissionUnconfirmedError({
+      message: "Durable turn admission could not be confirmed.",
+    }),
+  );
+  const equivalentClaim = Schema.toEquivalence(WorkspaceTurnAdmissionClaimPayload);
+  const equivalentPermit = Schema.toEquivalence(WorkspaceTurnCompactionContinuationPayload);
+
+  const readWorkspaceActivity = Effect.fnUntraced(function* (
+    threadId: ThreadId,
+    identity: { readonly commandId: CommandId; readonly activityId: EventId },
+    kind: string,
+    expectedSequence?: number,
+  ) {
+    const receipt = yield* commandReceipts.getByCommandId({ commandId: identity.commandId });
+    if (
+      Option.isNone(receipt) ||
+      receipt.value.status !== "accepted" ||
+      receipt.value.commandId !== identity.commandId ||
+      receipt.value.aggregateKind !== "thread" ||
+      receipt.value.aggregateId !== threadId ||
+      receipt.value.resultSequence <= 0 ||
+      (expectedSequence !== undefined && receipt.value.resultSequence !== expectedSequence)
+    ) {
+      return yield* admissionUnconfirmed;
+    }
+    const sequence = receipt.value.resultSequence;
+    const events = yield* Stream.runCollect(
+      eventStore.readAggregateRange({
+        aggregateKind: "thread",
+        aggregateId: threadId,
+        fromSequenceExclusive: sequence - 1,
+        toSequenceInclusive: sequence,
+        limit: 1,
+      }),
+    );
+    const event = events[0];
+    if (
+      events.length !== 1 ||
+      event === undefined ||
+      event.sequence !== sequence ||
+      event.commandId !== identity.commandId ||
+      event.aggregateKind !== "thread" ||
+      event.aggregateId !== threadId ||
+      event.type !== "thread.activity-appended" ||
+      event.payload.threadId !== threadId ||
+      event.payload.activity.id !== identity.activityId ||
+      event.payload.activity.kind !== kind ||
+      event.payload.activity.turnId !== null ||
+      event.payload.activity.tone !== "info"
+    ) {
+      return yield* admissionUnconfirmed;
+    }
+    return event;
+  });
+
+  const verifyParentClaim = Effect.fnUntraced(function* (
+    threadId: ThreadId,
+    claim: AdmissionClaim,
+  ) {
+    const event = yield* readWorkspaceActivity(
+      threadId,
+      claim.identity,
+      "provider.turn.admission.claimed",
+    );
+    const payload = decodeWorkspaceTurnAdmissionClaimPayload(event.payload.activity.payload);
+    if (
+      Option.isNone(payload) ||
+      !equivalentClaim(payload.value, claim.payload) ||
+      makeWorkspaceTurnAdmissionClaimIdentity(
+        threadId,
+        payload.value.requestId,
+        payload.value.attempt,
+      ).activityId !== claim.identity.activityId
+    ) {
+      return yield* admissionUnconfirmed;
+    }
+    return event;
+  });
+
+  const verifyCompactionEvent = Effect.fnUntraced(function* (
+    threadId: ThreadId,
+    permit: WorkspaceTurnCompactionContinuationPayload,
+  ) {
+    if (permit.compactionSequence <= 0) return yield* admissionUnconfirmed;
+    const events = yield* Stream.runCollect(
+      eventStore.readAggregateRange({
+        aggregateKind: "thread",
+        aggregateId: threadId,
+        fromSequenceExclusive: permit.compactionSequence - 1,
+        toSequenceInclusive: permit.compactionSequence,
+        limit: 1,
+      }),
+    );
+    const event = events[0];
+    if (
+      events.length !== 1 ||
+      event === undefined ||
+      event.type !== "thread.turn-start-requested" ||
+      event.commandId === null ||
+      event.aggregateKind !== "thread" ||
+      event.aggregateId !== threadId ||
+      event.payload.threadId !== threadId ||
+      event.sequence !== permit.compactionSequence ||
+      event.eventId !== permit.compactionEventId ||
+      event.payload.messageId !== permit.compactionRequestId ||
+      event.payload.controlledAnalysis !== undefined
+    ) {
+      return yield* admissionUnconfirmed;
+    }
+    return event;
+  });
+
+  // Only the awaited successful compaction branch calls this, after restoration.
+  // Its request event identifies that operation; the event alone is not permission.
+  const issueCompactionPermit = Effect.fnUntraced(function* (
+    queued: QueuedTurnStart,
+    compaction: TurnStartEvent,
+  ) {
+    const claim = queued.admission;
+    if (claim === undefined) return yield* admissionUnconfirmed;
+    const threadId = queued.payload.threadId;
+    const parent = yield* verifyParentClaim(threadId, claim);
+    const payload: WorkspaceTurnCompactionContinuationPayload = {
+      version: 1,
+      source: "workspace-admission",
+      requestId: queued.payload.messageId,
+      originCommandId: claim.payload.originCommandId,
+      originSequence: claim.payload.originSequence,
+      parentClaimId: claim.identity.activityId,
+      compactionRequestId: compaction.payload.messageId,
+      compactionEventId: compaction.eventId,
+      compactionSequence: compaction.sequence,
+    };
+    yield* verifyCompactionEvent(threadId, payload);
+    const identity = makeWorkspaceTurnCompactionContinuationIdentity(
+      threadId,
+      payload.requestId,
+      payload.parentClaimId,
+      payload.compactionEventId,
+    );
+    const createdAt = DateTime.formatIso(yield* DateTime.now);
+    const result = yield* orchestrationEngine.dispatch({
+      type: "thread.activity.append",
+      commandId: identity.commandId,
+      threadId,
+      activity: {
+        id: identity.activityId,
+        tone: "info",
+        kind: "provider.turn.compaction.continuation",
+        summary: "Compaction continuation recorded",
+        payload,
+        turnId: null,
+        createdAt,
+      },
+      createdAt,
+    });
+    const stored = yield* readWorkspaceActivity(
+      threadId,
+      identity,
+      "provider.turn.compaction.continuation",
+      result.sequence,
+    );
+    const decoded = decodeWorkspaceTurnCompactionContinuationPayload(
+      stored.payload.activity.payload,
+    );
+    if (
+      Option.isNone(decoded) ||
+      !equivalentPermit(decoded.value, payload) ||
+      stored.sequence <= parent.sequence ||
+      stored.sequence <= compaction.sequence
+    ) {
+      return yield* admissionUnconfirmed;
+    }
+    return { identity, payload } satisfies ContinuationPermit;
+  });
+
+  const consumeTurnAdmission = Effect.fnUntraced(function* (event: TurnStartEvent) {
+    const threadId = event.payload.threadId;
+    const requestId = event.payload.messageId;
+    const refusal = makeWorkspaceTurnStartRefusalIdentity(threadId, requestId);
+    // A refusal receipt is terminal. Neither a new command nor a stray permit
+    // can replace its history or authorize this message again.
+    if (Option.isSome(yield* commandReceipts.getByCommandId({ commandId: refusal.commandId }))) {
+      return undefined;
+    }
+    if (event.commandId === null || event.sequence <= 0) return yield* admissionUnconfirmed;
+    const resumed = resumedTurnStarts.get(event.commandId);
+    let originCommandId = event.commandId;
+    let originSequence = event.sequence;
+    let attempt: WorkspaceTurnAdmissionClaimPayload["attempt"] = { kind: "initial" };
+    if (resumed !== undefined) {
+      const permit = resumed.permit;
+      const parentClaim = resumed.event.admission;
+      if (permit === undefined || parentClaim === undefined) {
+        return yield* admissionUnconfirmed;
+      }
+      const stored = yield* readWorkspaceActivity(
+        threadId,
+        permit.identity,
+        "provider.turn.compaction.continuation",
+      );
+      const decoded = decodeWorkspaceTurnCompactionContinuationPayload(
+        stored.payload.activity.payload,
+      );
+      const parent = yield* verifyParentClaim(threadId, parentClaim);
+      if (
+        Option.isNone(decoded) ||
+        !equivalentPermit(decoded.value, permit.payload) ||
+        permit.payload.requestId !== requestId ||
+        permit.payload.parentClaimId !== parentClaim.identity.activityId ||
+        permit.payload.originCommandId !== parentClaim.payload.originCommandId ||
+        permit.payload.originSequence !== parentClaim.payload.originSequence ||
+        makeWorkspaceTurnCompactionContinuationIdentity(
+          threadId,
+          requestId,
+          permit.payload.parentClaimId,
+          permit.payload.compactionEventId,
+        ).activityId !== permit.identity.activityId ||
+        stored.sequence <= parent.sequence ||
+        stored.sequence <= permit.payload.compactionSequence ||
+        event.sequence <= stored.sequence
+      ) {
+        return yield* admissionUnconfirmed;
+      }
+      yield* verifyCompactionEvent(threadId, permit.payload);
+      originCommandId = permit.payload.originCommandId;
+      originSequence = permit.payload.originSequence;
+      attempt = { kind: "compaction", permitId: permit.identity.activityId };
+    }
+
+    const identity = makeWorkspaceTurnAdmissionClaimIdentity(threadId, requestId, attempt);
+    if (Option.isSome(yield* commandReceipts.getByCommandId({ commandId: identity.commandId }))) {
+      return undefined;
+    }
+    const payload: WorkspaceTurnAdmissionClaimPayload = {
+      version: 1,
+      source: "workspace-admission",
+      requestId,
+      originCommandId,
+      originSequence,
+      attempt,
+      claimantNonce: yield* crypto.randomUUIDv4,
+    };
+    const createdAt = DateTime.formatIso(yield* DateTime.now);
+    const result = yield* orchestrationEngine.dispatch({
+      type: "thread.activity.append",
+      commandId: identity.commandId,
+      threadId,
+      activity: {
+        id: identity.activityId,
+        tone: "info",
+        kind: "provider.turn.admission.claimed",
+        summary: "Turn admission recorded",
+        payload,
+        turnId: null,
+        createdAt,
+      },
+      createdAt,
+    });
+    const stored = yield* readWorkspaceActivity(
+      threadId,
+      identity,
+      "provider.turn.admission.claimed",
+      result.sequence,
+    );
+    const decoded = decodeWorkspaceTurnAdmissionClaimPayload(stored.payload.activity.payload);
+    if (
+      Option.isNone(decoded) ||
+      !equivalentClaim(decoded.value, payload) ||
+      stored.sequence <= event.sequence
+    ) {
+      return yield* admissionUnconfirmed;
+    }
+    // An accepted deduplicated command is not a fresh grant. Exact nonce
+    // readback selects only the invocation that committed this claim.
+    return { identity, payload } satisfies AdmissionClaim;
+  });
 
   const appendProviderFailureActivity = (input: {
     readonly threadId: ThreadId;
@@ -329,6 +640,7 @@ const make = Effect.gen(function* () {
 
   const resumeTurnsAfterCompaction = Effect.fn("resumeTurnsAfterCompaction")(function* (
     threadId: ThreadId,
+    compaction: TurnStartEvent,
   ) {
     const queued = turnsAfterCompaction.get(threadId) ?? [];
     while (queued.length > 0 && turnsAfterCompaction.get(threadId) === queued) {
@@ -338,6 +650,11 @@ const make = Effect.gen(function* () {
         messageId: event.payload.messageId,
       });
       if (turnsAfterCompaction.get(threadId) !== queued) return;
+      const permit =
+        Option.isSome(turnStart) && event.payload.controlledAnalysis === undefined
+          ? yield* issueCompactionPermit(event, compaction)
+          : undefined;
+      if (turnsAfterCompaction.get(threadId) !== queued) return;
       // In flight from here on: a cancellation reports it when the replay runs, not from the queue.
       queued.shift();
       if (Option.isNone(turnStart)) continue;
@@ -345,7 +662,7 @@ const make = Effect.gen(function* () {
       // pending slot. Reusing the message id preserves a single user bubble.
       const commandId = yield* serverCommandId("after-compaction");
       const sent = yield* Deferred.make<void>();
-      resumedTurnStarts.set(commandId, { event, queued, sent });
+      resumedTurnStarts.set(commandId, { event, queued, sent, permit });
       const { messageId, ...request } = event.payload;
       yield* orchestrationEngine
         .dispatch({
@@ -438,20 +755,20 @@ const make = Effect.gen(function* () {
   const restoreCompaction = Effect.fnUntraced(function* (threadId: ThreadId, fromRunning = false) {
     if (stoppingThreadIds.has(threadId)) {
       compactingThreadIds.delete(threadId);
-      return;
+      return false;
     }
     const thread = yield* resolveThreadShell(threadId);
-    if (!thread?.session) return;
+    if (!thread?.session) return false;
     if (
       thread.session.status !== "starting" &&
       thread.session.status !== "ready" &&
       (!fromRunning || thread.session.status !== "running")
     )
-      return;
+      return false;
     const completedAt = DateTime.formatIso(yield* DateTime.now);
     if (stoppingThreadIds.has(threadId)) {
       compactingThreadIds.delete(threadId);
-      return;
+      return false;
     }
     yield* setThreadSession({
       threadId,
@@ -464,6 +781,7 @@ const make = Effect.gen(function* () {
       },
       createdAt: completedAt,
     });
+    return true;
   });
 
   const resolveProject = Effect.fnUntraced(function* (projectId: ProjectId) {
@@ -1219,12 +1537,16 @@ const make = Effect.gen(function* () {
 
   const processTurnStartRequested = Effect.fn("processTurnStartRequested")(function* (
     receivedEvent: Extract<ProviderIntentEvent, { type: "thread.turn-start-requested" }>,
+    admission?: AdmissionClaim,
   ) {
     const resumed =
       receivedEvent.commandId !== null ? resumedTurnStarts.get(receivedEvent.commandId) : undefined;
     const event = resumed ? { ...receivedEvent, payload: resumed.event.payload } : receivedEvent;
     const key = turnStartKeyForEvent(event);
-    if (yield* hasHandledTurnStartRecently(key)) {
+    if (
+      event.payload.controlledAnalysis !== undefined &&
+      (yield* hasHandledTurnStartRecently(key))
+    ) {
       return;
     }
 
@@ -1494,8 +1816,18 @@ const make = Effect.gen(function* () {
             );
           }).pipe(
             Effect.andThen(restoreCompaction(event.payload.threadId, true)),
-            Effect.andThen(clearCompacting),
-            Effect.andThen(resumeTurnsAfterCompaction(event.payload.threadId)),
+            Effect.flatMap((restored) =>
+              clearCompacting.pipe(
+                Effect.andThen(
+                  restored
+                    ? resumeTurnsAfterCompaction(event.payload.threadId, receivedEvent)
+                    : cancelTurnsAfterCompaction(
+                        event.payload.threadId,
+                        "The provider session was not restored after compaction. Review its status before sending a new message.",
+                      ),
+                ),
+              ),
+            ),
             Effect.catchCause((cause) =>
               recoverCompactionFailure(cause).pipe(
                 Effect.ensuring(clearCompacting),
@@ -1517,8 +1849,11 @@ const make = Effect.gen(function* () {
       (compactingThreadIds.has(event.payload.threadId) ||
         turnsAfterCompaction.has(event.payload.threadId))
     ) {
+      if (controlledAnalysis === undefined && admission === undefined) {
+        return yield* admissionUnconfirmed;
+      }
       const queued = turnsAfterCompaction.get(event.payload.threadId) ?? [];
-      queued.push(event);
+      queued.push({ ...event, admission });
       turnsAfterCompaction.set(event.payload.threadId, queued);
       return;
     }
@@ -1818,6 +2153,7 @@ const make = Effect.gen(function* () {
 
   const processDomainEvent = Effect.fn("processDomainEvent")(function* (
     event: ProviderIntentEvent,
+    admission?: AdmissionClaim,
   ) {
     yield* Effect.annotateCurrentSpan({
       "orchestration.event_type": event.type,
@@ -1864,13 +2200,11 @@ const make = Effect.gen(function* () {
         const cwd = thread.worktreePath ?? project?.workspaceRoot;
         if (cwd && event.payload.controlledAnalysis !== undefined) {
           yield* processTurnStartRequested(event);
-        } else if (cwd)
-          yield* ownership.withFreshOperation(
-            { cwd, kind: "write", threadId: thread.id },
-            thread.worktreePath
-              ? withWorkspaceLease(path.resolve(cwd), processTurnStartRequested(event))
-              : processTurnStartRequested(event),
-          );
+        } else if (cwd) {
+          yield* thread.worktreePath
+            ? withWorkspaceLease(path.resolve(cwd), processTurnStartRequested(event, admission))
+            : processTurnStartRequested(event, admission);
+        }
         return;
       }
       case "thread.turn-interrupt-requested":
@@ -1906,21 +2240,113 @@ const make = Effect.gen(function* () {
     }
   });
 
+  const appendUnconfirmedTurnStart = (event: TurnStartEvent) =>
+    appendProviderFailureActivity({
+      threadId: event.payload.threadId,
+      kind: "provider.turn.start.failed",
+      summary: "Turn start status unconfirmed",
+      detail:
+        "An admission attempt is already recorded or could not be confirmed. This message will not be sent again automatically. Review its existing status before sending a new message.",
+      turnId: null,
+      createdAt: event.occurredAt,
+      requestId: event.payload.messageId,
+    }).pipe(Effect.asVoid);
+
+  const processOrdinaryTurnStart = Effect.fn("processOrdinaryTurnStart")(
+    function* (event: TurnStartEvent) {
+      const admission = yield* consumeTurnAdmission(event);
+      if (admission === undefined) return yield* appendUnconfirmedTurnStart(event);
+      const thread = yield* resolveThreadShell(event.payload.threadId);
+      if (!thread) return yield* appendUnconfirmedTurnStart(event);
+      const project = yield* resolveProject(thread.projectId);
+      const cwd = thread.worktreePath ?? project?.workspaceRoot;
+      if (!cwd) return yield* appendUnconfirmedTurnStart(event);
+      let callbackEntered = false;
+      yield* ownership
+        .withFreshOperation(
+          {
+            cwd,
+            kind: "write",
+            threadId: thread.id,
+            sharedGitMetadata: true,
+            eventSequence: admission.payload.originSequence,
+          },
+          Effect.suspend(() => {
+            callbackEntered = true;
+            return processDomainEvent(event, admission);
+          }),
+        )
+        .pipe(
+          Effect.catchTag("WorkspaceOwnershipError", (error) =>
+            Effect.gen(function* () {
+              if (callbackEntered) return yield* Effect.fail(error);
+              const identity = makeWorkspaceTurnStartRefusalIdentity(
+                thread.id,
+                event.payload.messageId,
+              );
+              const payload: WorkspaceTurnStartRefusalPayload = {
+                version: 1,
+                source: "workspace-ownership",
+                requestId: event.payload.messageId,
+                reason: error.reason,
+                originCommandId: admission.payload.originCommandId,
+                originSequence: admission.payload.originSequence,
+              };
+              return yield* orchestrationEngine
+                .dispatch({
+                  type: "thread.activity.append",
+                  commandId: identity.commandId,
+                  threadId: thread.id,
+                  activity: {
+                    id: identity.activityId,
+                    tone: "error",
+                    kind: "provider.turn.start.failed",
+                    summary: "Workspace ownership refused this turn",
+                    payload,
+                    turnId: null,
+                    createdAt: event.occurredAt,
+                  },
+                  createdAt: event.occurredAt,
+                })
+                .pipe(Effect.asVoid);
+            }),
+          ),
+        );
+    },
+    (effect, event) =>
+      effect.pipe(
+        Effect.catchCause((cause) =>
+          Effect.gen(function* () {
+            if (Cause.hasInterruptsOnly(cause)) return yield* Effect.failCause(cause);
+            yield* Effect.logWarning("provider command reactor failed to process event", {
+              eventType: event.type,
+              threadId: event.payload.threadId,
+              requestId: event.payload.messageId,
+              cause: Cause.pretty(cause),
+            });
+            return yield* appendUnconfirmedTurnStart(event);
+          }),
+        ),
+      ),
+  );
+
   const processDomainEventSafely = (event: ProviderIntentEvent) =>
     Effect.gen(function* () {
-      if (
-        event.type === "thread.turn-start-requested" ||
-        event.type === "thread.runtime-mode-set" ||
-        event.type === "thread.approval-response-requested" ||
-        event.type === "thread.user-input-response-requested"
-      ) {
-        if (event.type === "thread.turn-start-requested" && event.payload.controlledAnalysis) {
+      if (event.type === "thread.turn-start-requested") {
+        if (event.payload.controlledAnalysis !== undefined) {
           return yield* ownership.withTaskAnalysis(
             event.payload.controlledAnalysis.taskId,
             event.payload.controlledAnalysis.expectedRevision,
             processDomainEvent(event),
           );
         }
+        return yield* processOrdinaryTurnStart(event);
+      }
+      if (
+        event.type === "thread.runtime-mode-set" ||
+        event.type === "thread.approval-response-requested" ||
+        event.type === "thread.user-input-response-requested"
+      ) {
         if (
           event.type === "thread.approval-response-requested" ||
           event.type === "thread.user-input-response-requested"

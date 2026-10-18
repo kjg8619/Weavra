@@ -5,10 +5,12 @@ import {
   WeavraTaskCreateInput,
   WeavraTaskDraft,
   WeavraTaskPreview,
+  WeavraTaskPrepareReason,
   WeavraTaskExecution,
   WeavraTaskRunMetadata,
   WeavraAdmissionOutcome,
   WeavraCheckoutIdentity,
+  type WeavraTaskFailureSummary,
   type WeavraTaskScopeInput,
   type WeavraEvidenceCursor,
   type WeavraControlState,
@@ -31,6 +33,7 @@ import { ProjectionSnapshotQuery } from "../orchestration/Services/ProjectionSna
 import { OrchestrationEngineService } from "../orchestration/Services/OrchestrationEngine.ts";
 import { RuntimeController } from "./RuntimeController.ts";
 import { ProviderService } from "../provider/Services/ProviderService.ts";
+import { commitDirtyBaseline } from "./ProjectDirtyBaseline.ts";
 
 const decodeExecution = Schema.decodeUnknownOption(WeavraTaskExecution);
 const sameCheckout = Schema.toEquivalence(WeavraCheckoutIdentity);
@@ -61,9 +64,15 @@ export interface TaskEvidencePage {
 
 export class TaskCoordinatorError extends Schema.TaggedError<TaskCoordinatorError>()(
   "TaskCoordinatorError",
-  {
+  Schema.Struct({
     code: Schema.Literals([
       "TARGET_CHANGED",
+      "PROJECT_NOT_CONFIGURED",
+      "PROJECT_PREPARATION_BUSY",
+      "PROJECT_PREPARATION_FAILED",
+      "WORKSPACE_EVIDENCE_CAPACITY",
+      "WORKSPACE_EVIDENCE_UNSUPPORTED",
+      "WORKSPACE_EVIDENCE_UNAVAILABLE",
       "NOT_PREPARED",
       "RUNTIME_UNAVAILABLE",
       "INVALID_RECEIPT",
@@ -82,11 +91,18 @@ export class TaskCoordinatorError extends Schema.TaggedError<TaskCoordinatorErro
       "RECOVERY_OWNER_UNPROVEN",
       "RECOVERY_STALE",
       "RECOVERY_CONFLICT",
+      "DIRTY_SET_CHANGED",
+      "DIRTY_BASELINE_REFUSED",
 
       "ANALYSIS_UNAVAILABLE",
       "UNSUPPORTED_PROVIDER",
     ]),
-  },
+    prepareReason: Schema.optionalKey(WeavraTaskPrepareReason),
+  }).check(
+    Schema.makeFilter(
+      (error) => error.prepareReason === undefined || error.code === "PREPARE_REJECTED",
+    ),
+  ),
 ) {}
 
 /**
@@ -116,7 +132,15 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
   ) {
     if (input.environmentId !== ownership.environmentId)
       return yield* new TaskCoordinatorError({ code: "TARGET_CHANGED" });
-    const selected = yield* ownership.resolveTarget(input.threadId);
+    const selected = yield* ownership.resolveTarget(input.threadId).pipe(
+      Effect.catchTag("WorkspaceOwnershipError", (error) =>
+        Effect.fail(
+          new TaskCoordinatorError({
+            code: error.reason === "target-changed" ? "TARGET_CHANGED" : "RUNTIME_UNAVAILABLE",
+          }),
+        ),
+      ),
+    );
     if (selected.projectId !== input.projectId)
       return yield* new TaskCoordinatorError({ code: "TARGET_CHANGED" });
     return selected;
@@ -140,7 +164,8 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
   });
   const persist = Effect.fn("weavra.taskCoordinator.persist")(function* (
     task: WeavraTask,
-    change: Pick<WeavraTask, "phase" | "context" | "execution">,
+    change: Pick<WeavraTask, "phase" | "context" | "execution" | "failureSummary"> &
+      Partial<Pick<WeavraTask, "checkout">>,
   ) {
     const next: WeavraTask = {
       ...task,
@@ -180,6 +205,8 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
   });
   const checkout = Effect.fn("weavra.taskCoordinator.checkout")(function* (
     task: WeavraTaskScopeInput,
+    // Prepare only: a dirty checkout becomes a refusal that names its paths.
+    dirtyRefusal = false,
   ) {
     const response = yield* controller.checkout(
       {
@@ -192,13 +219,42 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
       },
       task.threadId,
     );
-    if (!response.success || response.data.kind !== "checkout-identity")
+    if (!response.success) {
+      switch (response.error.code) {
+        case "PROJECT_NOT_CONFIGURED":
+        case "WORKSPACE_EVIDENCE_CAPACITY":
+        case "WORKSPACE_EVIDENCE_UNSUPPORTED":
+        case "WORKSPACE_EVIDENCE_UNAVAILABLE":
+          return yield* new TaskCoordinatorError({ code: response.error.code });
+        default:
+          return yield* new TaskCoordinatorError(
+            dirtyRefusal &&
+              response.error.code === "PROJECT_CHANGED" &&
+              response.error.details !== undefined
+              ? {
+                  code: "PREPARE_REJECTED",
+                  prepareReason: {
+                    kind: "runtime",
+                    code: response.error.code,
+                    details: response.error.details,
+                  },
+                }
+              : { code: "TARGET_CHANGED" },
+          );
+      }
+    }
+    if (response.data.kind !== "checkout-identity")
       return yield* new TaskCoordinatorError({ code: "TARGET_CHANGED" });
     return response.data.checkout;
   });
-  const create = Effect.fn("weavra.taskCoordinator.create")(function* (raw: WeavraTaskCreateInput) {
+  const create = Effect.fn("weavra.taskCoordinator.create")(function* (
+    raw: WeavraTaskCreateInput,
+    expectedCwd?: string,
+  ) {
     const input = yield* decodeCreate(raw);
     const selected = yield* resolve(input);
+    if (expectedCwd !== undefined && selected.canonicalCwd !== expectedCwd)
+      return yield* new TaskCoordinatorError({ code: "TARGET_CHANGED" });
     const snapshot = yield* query.getCommandReadModel();
     const duplicate = snapshot.weavraTasks?.find(
       (task) => task.createCommandId === input.commandId,
@@ -351,6 +407,7 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
     task: WeavraTask,
     receipt: WeavraTaskReceipt,
     protect = false,
+    failureSummary: WeavraTaskFailureSummary | undefined = undefined,
   ) {
     const execution = task.execution;
     if (execution?.confirmCommandId == null)
@@ -380,16 +437,24 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
               receipt.run.status !== previousReceipt.run.status))))
     )
       return yield* new TaskCoordinatorError({ code: "INVALID_RECEIPT" });
-    const decoded = decodeExecution({ ...execution, receipt });
-    if (Option.isNone(decoded)) return yield* new TaskCoordinatorError({ code: "INVALID_RECEIPT" });
     const terminal =
       receipt.status === "FOUND" &&
       (receipt.run !== null
         ? terminalRun(receipt.run.status)
         : ["START_FAILED", "INTERRUPTED_BEFORE_START"].includes(receipt.admission.outcome.status));
+    const settledFailureSummary =
+      terminal &&
+      receipt.status === "FOUND" &&
+      receipt.run !== null &&
+      receipt.admission.cleanup === "CONFIRMED"
+        ? (failureSummary ?? task.failureSummary)
+        : task.failureSummary;
+    const decoded = decodeExecution({ ...execution, receipt });
+    if (Option.isNone(decoded)) return yield* new TaskCoordinatorError({ code: "INVALID_RECEIPT" });
     task = yield* persist(task, {
       context: task.context,
       execution: decoded.value,
+      ...(settledFailureSummary ? { failureSummary: settledFailureSummary } : {}),
       phase:
         protect ||
         (terminal && receipt.status === "FOUND" && receipt.admission.cleanup === "UNCONFIRMED")
@@ -443,7 +508,7 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
     if (!response.success || response.data.kind !== "task-receipt")
       return yield* new TaskCoordinatorError({ code: "RUNTIME_UNAVAILABLE" });
     const receipt: WeavraTaskReceipt = response.data.receipt;
-    return yield* persistReceipt(task, receipt);
+    return yield* persistReceipt(task, receipt, false, response.data.failureSummary);
   });
   const recover = Effect.fn("weavra.taskCoordinator.recover")(function* (
     input: WeavraTaskReadInput,
@@ -556,7 +621,15 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
     if (task.execution !== null) yield* currentPreview(task, state);
     // A new context version is durable before asking Runtime to prepare it.
     task = yield* persist(task, { phase: "preparing", context, execution: null });
-    if (!sameCheckout(yield* checkout(task), task.checkout))
+    const preparing = task;
+    const current = yield* checkout(task, true).pipe(
+      Effect.tapError((error) =>
+        error._tag === "TaskCoordinatorError" && error.code === "PREPARE_REJECTED"
+          ? persist(preparing, { phase: "analysis", context, execution: null })
+          : Effect.void,
+      ),
+    );
+    if (!sameCheckout(current, task.checkout))
       return yield* new TaskCoordinatorError({ code: "TARGET_CHANGED" });
     const response = yield* ownership
       .withTaskControl(
@@ -595,19 +668,41 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
           }),
         ),
       );
+    if (!response.success) {
+      yield* persist(task, { phase: "analysis", context, execution: null });
+      return yield* new TaskCoordinatorError({
+        code: "PREPARE_REJECTED",
+        prepareReason: {
+          kind: "runtime",
+          code: response.error.code,
+          ...(response.error.details === undefined ? {} : { details: response.error.details }),
+        },
+      });
+    }
     if (
-      !response.success ||
       response.data.kind !== "prepared" ||
-      response.data.preview.workflow !== "STANDARD" ||
       response.data.preview.taskBinding === undefined ||
       response.data.preview.configDigest === undefined
     ) {
       yield* persist(task, { phase: "analysis", context, execution: null });
-      return yield* new TaskCoordinatorError({ code: "PREPARE_REJECTED" });
+      return yield* new TaskCoordinatorError({
+        code: "PREPARE_REJECTED",
+        prepareReason: { kind: "preview", code: "INVALID_PREVIEW" },
+      });
+    }
+    if (response.data.preview.workflow !== "STANDARD") {
+      yield* persist(task, { phase: "analysis", context, execution: null });
+      return yield* new TaskCoordinatorError({
+        code: "PREPARE_REJECTED",
+        prepareReason: { kind: "preview", code: "STANDARD_REQUIRED" },
+      });
     }
     const decoded = decodePreview(response.data.preview);
     if (Option.isNone(decoded))
-      return yield* new TaskCoordinatorError({ code: "PREPARE_REJECTED" });
+      return yield* new TaskCoordinatorError({
+        code: "PREPARE_REJECTED",
+        prepareReason: { kind: "preview", code: "INVALID_PREVIEW" },
+      });
     const preview = decoded.value;
     const symptom = preview.taskBinding.symptomVerification;
     if (
@@ -622,7 +717,10 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
             symptom.checkId,
           )
     )
-      return yield* new TaskCoordinatorError({ code: "PREPARE_REJECTED" });
+      return yield* new TaskCoordinatorError({
+        code: "PREPARE_REJECTED",
+        prepareReason: { kind: "preview", code: "BINDING_MISMATCH" },
+      });
     return yield* persist(task, {
       phase: "awaiting-confirmation",
       context,
@@ -741,13 +839,23 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
       ),
     );
   return {
-    create: (input: WeavraTaskCreateInput) => serial(`create:${input.threadId}`, create(input)),
+    create: (input: WeavraTaskCreateInput, expectedCwd?: string) =>
+      serial(`create:${input.threadId}`, create(input, expectedCwd)),
     analyze: (input: WeavraTaskAnalyzeInput) => serial(input.task.taskId, analyze(input)),
     followup: (input: WeavraTaskAnalyzeInput) => serial(input.task.taskId, followup(input)),
     read: (input: WeavraTaskReadInput) => readTask(input).pipe(Effect.provide(dependencies)),
     list: (input: WeavraTaskScopeInput) =>
       Effect.gen(function* () {
-        yield* resolve(input);
+        // Discovery reads associations, not checkout admission. A new folder may
+        // not have Git yet; create/prepare/confirm still require resolveTarget.
+        if (input.environmentId !== ownership.environmentId)
+          return yield* new TaskCoordinatorError({ code: "TARGET_CHANGED" });
+        const thread = yield* query.getThreadShellById(input.threadId);
+        if (Option.isNone(thread) || thread.value.projectId !== input.projectId)
+          return yield* new TaskCoordinatorError({ code: "TARGET_CHANGED" });
+        const project = yield* query.getProjectShellById(input.projectId);
+        if (Option.isNone(project))
+          return yield* new TaskCoordinatorError({ code: "TARGET_CHANGED" });
         return (
           (yield* query.getCommandReadModel()).weavraTasks?.filter(
             (task) =>
@@ -810,7 +918,7 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
           task = yield* ownership.markRuntime(task.id);
           const execution = task.execution;
           if (execution === null) return yield* new TaskCoordinatorError({ code: "NOT_PREPARED" });
-          yield* ownership.withTaskControl(
+          const response = yield* ownership.withTaskControl(
             task.id,
             controller.command(
               {
@@ -828,7 +936,18 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
               task.threadId,
             ),
           );
-          return yield* reconcile(input);
+          const reconciled = yield* reconcile(input);
+          // The receipt stays canonical; a dirty refusal additionally names the paths to review.
+          if (!response.success && response.error.details !== undefined)
+            return yield* new TaskCoordinatorError({
+              code: "PREPARE_REJECTED",
+              prepareReason: {
+                kind: "runtime",
+                code: response.error.code,
+                details: response.error.details,
+              },
+            });
+          return reconciled;
         }),
       ),
     recover: (input: WeavraTaskReadInput, expectedRevision: number) =>
@@ -862,6 +981,74 @@ export const make = Effect.fn("weavra.taskCoordinator.make")(function* () {
             next.id,
             prepare({ ...input, taskId: next.id }, parsed, next.revision),
           );
+        }),
+      ),
+    // Explicit consent only: commit the reviewed dirty paths in this task's own checkout and
+    // rebind the task to the new HEAD. Never prepares; the user prepares again.
+    commitDirtyBaseline: (
+      input: WeavraTaskReadInput,
+      expectedRevision: number,
+      files: readonly string[],
+      consent: boolean,
+      protectedRoots: readonly string[],
+    ) =>
+      serial(
+        input.taskId,
+        Effect.gen(function* () {
+          if (consent !== true)
+            return yield* new TaskCoordinatorError({ code: "DIRTY_BASELINE_REFUSED" });
+          const task = yield* readTask(input);
+          if (task.revision !== expectedRevision)
+            return yield* new TaskCoordinatorError({ code: "STALE_REVISION" });
+          if (
+            task.ownership.state !== "analysis" ||
+            task.phase !== "analysis" ||
+            task.execution !== null
+          )
+            return yield* new TaskCoordinatorError({ code: "NOT_PREPARED" });
+          const state = yield* observe(task);
+          if (
+            state.busy ||
+            state.cancelling ||
+            state.snapshot.status.writerPresent !== false ||
+            (yield* fs.exists(`${task.checkout.canonicalCwd}/.ai/writer.lock`))
+          )
+            return yield* new TaskCoordinatorError({ code: "DIRTY_BASELINE_REFUSED" });
+          // A dirty checkout has no Runtime identity to compare; the bound cwd (readTask) and
+          // HEAD (checked by commitDirtyBaseline) still bind the commit to this task.
+          yield* commitDirtyBaseline({
+            cwd: task.checkout.canonicalCwd,
+            files,
+            consent,
+            expectedHead: task.checkout.headCommit,
+            protectedRoots,
+          }).pipe(
+            Effect.mapError(
+              (error) =>
+                new TaskCoordinatorError({
+                  code:
+                    error.code === "DIRTY_SET_CHANGED"
+                      ? "DIRTY_SET_CHANGED"
+                      : error.code === "HEAD_CHANGED"
+                        ? "TARGET_CHANGED"
+                        : error.code === "UNAVAILABLE"
+                          ? "PROJECT_PREPARATION_FAILED"
+                          : "DIRTY_BASELINE_REFUSED",
+                }),
+            ),
+          );
+          const identity = yield* checkout(task);
+          if (
+            identity.canonicalCwd !== task.checkout.canonicalCwd ||
+            identity.repositoryRoot !== task.checkout.repositoryRoot
+          )
+            return yield* new TaskCoordinatorError({ code: "TARGET_CHANGED" });
+          return yield* persist(task, {
+            phase: task.phase,
+            context: task.context,
+            execution: null,
+            checkout: identity,
+          });
         }),
       ),
     cancel: (input: WeavraTaskReadInput, selection: TaskRunSelection) =>

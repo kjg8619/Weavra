@@ -1,3 +1,4 @@
+import { weavraLabel } from "../weavraLabels";
 import { useAtomValue } from "@effect/atom-react";
 import {
   createEnvironmentWeavraControlCommand,
@@ -62,7 +63,7 @@ type CommandState = {
 };
 const idle: CommandState = {
   status: "idle",
-  message: "Commands request Runtime actions. Only canonical snapshots establish outcomes.",
+  message: "명령은 Runtime에 작업을 요청해요. 결과는 Runtime의 공식 스냅샷으로만 확인해요.",
 };
 /** Editable only before confirmation; Runtime compiles it and assigns every ID. */
 type ComplexDraftRow = {
@@ -87,19 +88,17 @@ const toggled = (values: ReadonlyArray<number>, value: number) =>
     : [...values, value].sort((left, right) => left - right);
 /** Local reference checks only; Runtime validates the rest and nothing is repaired here. */
 function complexDraftProblem(rows: ReadonlyArray<ComplexDraftRow>, criteria: number) {
-  if (rows.length < 2 || rows.length > 8) return "A COMPLEX task plan needs 2–8 tasks.";
-  if (criteria < 1 || criteria > 16)
-    return "Enter 1–16 parent acceptance criteria for the task plan, one per line.";
+  if (rows.length < 2 || rows.length > 8) return "COMPLEX 계획에는 작업 2~8개가 필요해요.";
+  if (criteria < 1 || criteria > 16) return "상위 수용 기준을 한 줄에 하나씩 1~16개 입력해 주세요.";
   for (const [index, row] of rows.entries()) {
-    if (row.criterionIndexes.length === 0)
-      return `Task ${index + 1} does not map any acceptance criterion.`;
+    if (row.criterionIndexes.length === 0) return `작업 ${index + 1}에 연결된 수용 기준이 없어요.`;
     const missing = row.criterionIndexes.find((criterion) => criterion > criteria);
     if (missing !== undefined)
-      return `Task ${index + 1} maps acceptance criterion ${missing}, but only ${criteria} are entered.`;
+      return `작업 ${index + 1}의 수용 기준 연결 ${missing}이 입력된 기준 ${criteria}개 범위를 벗어나요.`;
   }
   for (let criterion = 1; criterion <= criteria; criterion++) {
     if (!rows.some((row) => row.criterionIndexes.includes(criterion)))
-      return `Acceptance criterion ${criterion} is not mapped to any task.`;
+      return `수용 기준 ${criterion}에 연결된 작업이 없어요.`;
   }
   return null;
 }
@@ -131,33 +130,32 @@ const lines = (text: string) =>
 /** Fixed explanations of the closed Planner failure codes (PLANNER_DRAFT.md §5.5). */
 const plannerFailureText: Record<WeavraPlannerFailureCode, string> = {
   MODEL_UNAVAILABLE:
-    "No usable planning model, profile or credential is configured. There is no fallback model.",
-  CONTEXT_TOO_LARGE: "The planning context would exceed 196,608 bytes. No model was called.",
-  TIMEOUT: "Planning did not finish within the worker timeout.",
-  PROVIDER_ERROR: "The model provider failed or its response ended abnormally.",
-  BUDGET_EXHAUSTED:
-    "The planning budget of 3 model calls or its token cap ran out before a valid draft.",
+    "사용할 수 있는 계획 모델·프로필·인증이 설정되지 않았어요. 다른 모델로 자동 전환하지 않아요.",
+  CONTEXT_TOO_LARGE: "계획 참고 자료가 196,608바이트를 초과해요. 모델을 호출하지 않았어요.",
+  TIMEOUT: "작업 제한 시간 안에 계획을 끝내지 못했어요.",
+  PROVIDER_ERROR: "모델 프로바이더에 오류가 발생했거나 응답이 비정상적으로 끝났어요.",
+  BUDGET_EXHAUSTED: "유효한 초안을 만들기 전에 모델 호출 3회 또는 토큰 한도에 도달했어요.",
   BUDGET_UNKNOWN:
-    "The provider reported no usage, so the token cap stopped further planning calls.",
-  NO_DRAFT: "The model answered without submitting a draft, even after one reminder.",
-  DRAFT_INVALID: "The corrected draft still failed the plan checks.",
-  STALE: "The project or its configuration changed while planning, so the draft was discarded.",
+    "프로바이더가 사용량을 보고하지 않아 토큰 한도 정책에 따라 추가 계획 호출을 멈췄어요.",
+  NO_DRAFT: "한 번 다시 요청했지만 모델이 초안을 제출하지 않고 답변만 보냈어요.",
+  DRAFT_INVALID: "수정한 초안도 계획 검사를 통과하지 못했어요.",
+  STALE: "계획 중 프로젝트나 설정이 바뀌어 초안을 폐기했어요.",
 };
 const plannerRoute = (route: WeavraPlannerStatus["route"]) =>
   route === null
-    ? "route not reported"
-    : `${route.alias === "plan" ? "models.intents.plan" : "role default"} → ${route.profile} → ${route.provider}/${route.model}`;
+    ? "모델 경로 미보고"
+    : `${route.alias === "plan" ? "models.intents.plan" : "역할 기본값"} → ${route.profile} → ${route.provider}/${route.model}`;
 const plannerUsage = ({ invocations, reportedTokens }: WeavraPlannerStatus["usage"]) =>
-  `${invocations} of 3 model calls · ${reportedTokens ?? "unknown"} reported tokens`;
+  `${invocations} / 3회 모델 호출 · 보고된 토큰 ${reportedTokens ?? "확인 안 됨"}`;
 const plannerSeconds = (elapsedMs: number | null) =>
-  elapsedMs === null ? "unknown" : `${Math.floor(elapsedMs / 1000)} s`;
+  elapsedMs === null ? "확인 안 됨" : `${Math.floor(elapsedMs / 1000)} s`;
 /** The COMPLEX_RERUN.md §7 banner, shown while the editor holds the derived draft unchanged. */
 const derivedBanner = ({ runId, sourceStatus, completedTasks }: DerivedLoadedDraft) =>
-  `Derived from Run ${runId} (${sourceStatus}): ${
+  `초안의 원본 Run: ${runId} (${sourceStatus}): ${
     completedTasks === 1
-      ? "1 completed task becomes a read-only verification task that is"
-      : `${completedTasks} completed tasks become read-only verification tasks that are`
-  } checked again; unfinished tasks keep their claims (create → modify where the file now exists). Review before Prepare.`;
+      ? "완료한 작업 하나를 읽기 전용 검증 작업으로 바꿔"
+      : `${completedTasks}개 완료 작업을 읽기 전용 검증 작업으로 바꿔`
+  } 다시 검사해요. 미완료 작업은 담당 범위를 유지하며 파일이 이미 있으면 생성 대신 수정으로 바꿔요. 준비 전에 검토해 주세요.`;
 /** Fixed guidance after a Runtime refusal; the refusal code itself is always shown. */
 function rejectionHint(
   request: WeavraControlMutation,
@@ -167,41 +165,41 @@ function rejectionHint(
   switch (request.type) {
     case "workflow.prepare":
       return code === "STALE_PROJECT"
-        ? " The project changed before a plan was prepared, for example because a stopped owner's Run was just marked INTERRUPTED. Nothing was prepared or retried; prepare again once the refreshed state appears."
+        ? " 계획 준비 전에 프로젝트 상태가 바뀌었어요. 종료된 소유자의 Run이 INTERRUPTED로 기록된 경우도 해당해요. 준비나 재시도는 하지 않았으니 새 상태를 확인한 뒤 다시 준비해 주세요."
         : request.complexDraft
           ? code === "INVALID_REQUEST"
-            ? " A task plan is accepted only when Runtime classifies the goal as COMPLEX; discard it for QUICK or STANDARD goals."
+            ? " 작업 계획은 Runtime이 목표를 COMPLEX로 분류한 경우에만 받아들여요. QUICK이나 STANDARD 목표라면 작업 계획을 비워 주세요."
             : code === "INVALID_CRITERIA"
-              ? " Runtime rejected the task plan's dependencies, criteria coverage, file claims or checks."
+              ? " Runtime이 작업 계획의 의존성·기준 범위·파일 담당 범위·검사 중 하나를 거부했어요."
               : ""
           : code === "UNSUPPORTED_WORKFLOW" && complexSupported
-            ? " If Runtime classified this goal as COMPLEX, add a structured task plan of 2–8 tasks and prepare again."
+            ? " 목표가 COMPLEX로 분류됐다면 작업 2~8개의 구조화된 계획을 추가하고 다시 준비해 주세요."
             : "";
     case "workflow.confirm":
       return code === "PLANNER_BUSY"
-        ? " Planning is still running on this Runtime. Cancel planning first; nothing was started."
+        ? " Runtime이 아직 계획을 만들고 있어요. 먼저 계획을 취소해 주세요. 새 작업은 시작하지 않았어요."
         : "";
     case "planner.start":
       return code === "UNSUPPORTED_WORKFLOW"
-        ? " The Planner drafts only goals that Runtime classifies as COMPLEX, never R3."
+        ? " Planner는 Runtime이 COMPLEX로 분류한 목표만 초안으로 만들며 R3는 처리하지 않아요."
         : code === "PLANNER_BUSY"
-          ? " Planning or a Run is already in progress on this Runtime."
+          ? " Runtime에서 계획 또는 Run이 이미 진행 중이에요."
           : "";
     case "planner.cancel":
-      return code === "PLANNER_NOT_FOUND" ? " That planning request is no longer running." : "";
+      return code === "PLANNER_NOT_FOUND" ? " 해당 계획 요청은 더 이상 실행 중이 아니에요." : "";
     case "planner.read":
       return code === "PLANNER_NOT_FOUND" || code === "PLANNER_NOT_READY"
-        ? " That proposal is no longer available; nothing was loaded."
+        ? " 해당 제안을 더 이상 사용할 수 없어 불러오지 않았어요."
         : "";
     case "workflow.derive":
       return code === "RERUN_NOT_APPLICABLE"
-        ? " Only the latest COMPLEX Run that ended BLOCKED, CANCELLED, FAILED or INTERRUPTED with unfinished tasks, and is not R3, can be re-planned. Nothing was derived."
+        ? " 미완료 작업이 남고 BLOCKED·CANCELLED·FAILED·INTERRUPTED로 끝난 최신 COMPLEX Run만 다시 계획할 수 있어요. R3는 제외해요. 초안을 만들지 않았어요."
         : code === "RUN_NOT_FOUND"
-          ? " That Run is no longer the latest Run. Nothing was derived."
+          ? " 해당 Run이 더 이상 최신 Run이 아니어서 초안을 만들지 않았어요."
           : code === "ACTIVE_RUN"
-            ? " A Run is active on this project or this Runtime. Nothing was derived."
+            ? " 프로젝트나 Runtime에 활성 Run이 있어 초안을 만들지 않았어요."
             : code === "STALE_PROJECT"
-              ? " The project changed before the draft was derived. Nothing was derived; derive again once the refreshed state appears."
+              ? " 초안을 만들기 전에 프로젝트가 바뀌었어요. 초안을 만들지 않았으니 새 상태가 표시되면 다시 요청해 주세요."
               : "";
     default:
       return "";
@@ -456,8 +454,8 @@ export function WeavraControls({
     setCommandState({
       status: "submitting",
       message: confirmation
-        ? "Waiting for explicit confirmation."
-        : "Submitting command to Runtime.",
+        ? "명시적인 확인을 기다리고 있어요."
+        : "Runtime에 명령을 보내고 있어요.",
     });
     try {
       if (confirmation && !(await requestConfirmDialog(confirmation))) {
@@ -490,7 +488,7 @@ export function WeavraControls({
       ) {
         setCommandState({
           status: "rejected",
-          message: "The Runtime view changed. Review fresh state before submitting again.",
+          message: "Runtime 상태가 바뀌었어요. 새 상태를 검토한 뒤 다시 요청해 주세요.",
         });
         return;
       }
@@ -500,7 +498,7 @@ export function WeavraControls({
         setCommandState({
           status: "transport-error",
           message:
-            "Transport error: command outcome is unknown. Wait for fresh Runtime state. No automatic retry was sent.",
+            "통신 오류로 명령 결과를 확인할 수 없어요. 새로운 Runtime 상태를 기다려 주세요. 자동 재시도는 보내지 않았어요.",
         });
         return;
       }
@@ -509,7 +507,7 @@ export function WeavraControls({
         const code = response.error.code;
         setCommandState({
           status: "rejected",
-          message: `Runtime rejected the command: ${code}.${rejectionHint(request, code, complexSupported)} Review fresh state before trying again.`,
+          message: `Runtime이 명령을 거부했어요: ${code}.${rejectionHint(request, code, complexSupported)} 새 상태를 검토한 뒤 다시 시도해 주세요.`,
         });
         return;
       }
@@ -520,21 +518,21 @@ export function WeavraControls({
         if (!loaded) {
           setCommandState({
             status: "rejected",
-            message: "Runtime returned a draft of another planning request. Nothing was loaded.",
+            message: "Runtime이 다른 계획 요청의 초안을 반환해 불러오지 않았어요.",
           });
           return;
         }
         const rows = latest.current.complexRows;
         if (rows.length > 0 && !plannerDraftUnchanged(loaded, toComplexDraft(rows))) {
-          setCommandState({ status: "submitting", message: "Waiting for explicit confirmation." });
+          setCommandState({ status: "submitting", message: "명시적인 확인을 기다리고 있어요." });
           const replace = await requestConfirmDialog(
-            `Replace the ${rows.length} task rows in the editor with the Planner proposal of ${loaded.draft.tasks.length} tasks?\nThe current rows are not kept. The proposal is unreviewed: review every task, claim and check before Prepare.`,
+            `편집기의 ${rows.length}개 작업을 Planner가 제안한 ${loaded.draft.tasks.length}개 작업으로 바꿀까요?\n현재 목록은 보존하지 않아요. 아직 검토하지 않은 제안이니 각 작업·담당 범위·검사를 확인한 뒤 준비해 주세요.`,
           );
           if (!mounted.current) return;
           if (!replace) {
             setCommandState({
               status: "idle",
-              message: "Kept the editor's task rows. Nothing was loaded.",
+              message: "편집기의 작업 목록을 유지했어요. 새 내용을 불러오지 않았어요.",
             });
             return;
           }
@@ -545,7 +543,7 @@ export function WeavraControls({
         setCommandState({
           status: "accepted",
           message:
-            "Planner proposal loaded into the editor. Review every task, claim and check, then Prepare. Nothing was prepared or started.",
+            "Planner 제안을 편집기로 불러왔어요. 각 작업·파일 담당 범위·검사를 검토한 뒤 준비해 주세요. 아직 준비하거나 실행하지 않았어요.",
         });
       } else if (response.data.kind === "derived-draft") {
         // Candidate data for the editor only: nothing is prepared, confirmed, stored or run.
@@ -557,8 +555,7 @@ export function WeavraControls({
         if (!derived) {
           setCommandState({
             status: "rejected",
-            message:
-              "Runtime returned a draft that does not match the requested Run. Nothing was loaded.",
+            message: "Runtime이 요청한 Run과 다른 초안을 반환해 불러오지 않았어요.",
           });
           return;
         }
@@ -566,7 +563,7 @@ export function WeavraControls({
           setCommandState({
             status: "rejected",
             message:
-              "The derived goal or acceptance criteria cannot be edited one criterion per line without changing them. Nothing was loaded; write the task plan by hand.",
+              "생성된 목표나 수용 기준을 한 줄에 하나씩 편집하면 원문이 달라져요. 불러오지 않았으니 작업 계획을 직접 작성해 주세요.",
           });
           return;
         }
@@ -580,15 +577,16 @@ export function WeavraControls({
           editor.acceptanceStatements.length === 0 &&
           current.complexRows.length === 0;
         if (!empty && !derivedDraftUnchanged(derived, editor)) {
-          setCommandState({ status: "submitting", message: "Waiting for explicit confirmation." });
+          setCommandState({ status: "submitting", message: "명시적인 확인을 기다리고 있어요." });
           const replace = await requestConfirmDialog(
-            `Replace the editor's goal, acceptance criteria and task rows with the draft derived from Run ${derived.runId} (${derived.sourceStatus})?\nThe current editor content is not kept. Review every task, claim and check before Prepare.`,
+            `편집기의 목표·수용 기준·작업을 다음 Run에서 만든 초안으로 바꿀까요? Run ${derived.runId} (${derived.sourceStatus})\n현재 편집 내용은 보존하지 않아요. 각 작업·담당 범위·검사를 확인한 뒤 준비해 주세요.`,
           );
           if (!mounted.current) return;
           if (!replace) {
             setCommandState({
               status: "idle",
-              message: "Kept the editor's goal, criteria and task rows. Nothing was loaded.",
+              message:
+                "편집기의 목표·수용 기준·작업 목록을 유지했어요. 새 내용을 불러오지 않았어요.",
             });
             return;
           }
@@ -601,7 +599,7 @@ export function WeavraControls({
         setLoadedDraft(null);
         setCommandState({
           status: "accepted",
-          message: `Draft derived from Run ${derived.runId} loaded into the editor. Resolve leftover changes and review every task, claim and check, then Prepare. Nothing was prepared or started.`,
+          message: `다음 Run의 초안을 편집기로 불러왔어요: ${derived.runId}. 남은 변경을 정리하고 각 작업·담당 범위·검사를 검토한 뒤 준비해 주세요. 아직 준비하거나 실행하지 않았어요.`,
         });
       } else if (response.data.kind === "prepared") {
         setFactPreview(null);
@@ -618,7 +616,7 @@ export function WeavraControls({
         setCommandState({
           status: "accepted",
           message:
-            "Plan prepared by Runtime. No workflow has started; review and explicitly confirm this preview.",
+            "Runtime이 계획을 준비했어요. 워크플로는 시작하지 않았으니 미리보기를 검토하고 직접 확인해 주세요.",
         });
       } else if (response.data.kind === "browser-state") {
         setBrowserInspection({
@@ -633,7 +631,7 @@ export function WeavraControls({
         setCommandState({
           status: "accepted",
           message:
-            "Recorded browser candidates and evidence loaded from Runtime. Historical captures are not a live page check.",
+            "Runtime에서 브라우저 관찰 후보와 증거를 불러왔어요. 과거 캡처는 현재 페이지의 검사 결과가 아니에요.",
         });
       } else if (response.data.kind === "browser-prepared") {
         setFactPreview(null);
@@ -645,7 +643,7 @@ export function WeavraControls({
         setCommandState({
           status: "accepted",
           message:
-            "Browser registration preview prepared by Runtime. Review the expectation and explicitly confirm; nothing is registered yet.",
+            "Runtime이 브라우저 검사 등록 미리보기를 준비했어요. 예상 결과를 검토하고 직접 확인해 주세요. 아직 등록하지 않았어요.",
         });
       } else if (response.data.kind === "browser-registered") {
         setBrowserPreview(null);
@@ -654,7 +652,7 @@ export function WeavraControls({
         setCommandState({
           status: "accepted",
           message:
-            "Runtime acknowledged registration. Refresh browser evidence to read the registry. Registration is not PASS or COMPLETE; each verification requires a new isolated capture.",
+            "Runtime이 등록 요청을 확인했어요. 브라우저 증거를 새로고침해 등록 내용을 확인해 주세요. 등록은 PASS나 COMPLETE가 아니며 검증마다 새 격리 캡처가 필요해요.",
         });
       } else if (response.data.kind === "fact-prepared") {
         setFactPreview(response.data.preview);
@@ -666,7 +664,7 @@ export function WeavraControls({
         setCommandState({
           status: "accepted",
           message:
-            "Fact candidate prepared by Runtime. Review source and statement; nothing is durable until you confirm.",
+            "Runtime이 사실 후보를 준비했어요. 출처와 내용을 검토해 주세요. 확인 전에는 저장하지 않아요.",
         });
       } else if (response.data.kind === "fact-confirmed") {
         setFactPreview(null);
@@ -674,21 +672,21 @@ export function WeavraControls({
         setCommandState({
           status: "accepted",
           message:
-            "Review recorded. Waiting for canonical fact state; this acknowledgement is not VALID, PASS or COMPLETE.",
+            "검토를 기록했어요. Runtime의 공식 사실 상태를 기다리고 있으며 이 응답은 VALID·PASS·COMPLETE 판정이 아니에요.",
         });
       } else {
         setCommandState({
           status: "accepted",
           message:
             request.type === "workflow.cancel"
-              ? "Cancellation accepted. Wait for canonical terminal state and writer release. Partial changes remain."
+              ? "취소 요청을 받았어요. 공식 종료 상태와 쓰기 잠금 해제를 기다려 주세요. 일부 변경은 남아 있어요."
               : request.type === "approval.resolve"
-                ? "Decision accepted for the pending request. Runtime still owns approval validation, consumption and completion."
+                ? "대기 중인 요청에 대한 결정을 받았어요. 승인 검증·사용·완료 판단은 계속 Runtime이 담당해요."
                 : request.type === "planner.start"
-                  ? "Planning started. Runtime drafts a candidate task plan in the background; nothing runs, and nothing enters the editor until you load it."
+                  ? "계획 생성을 시작했어요. Runtime이 백그라운드에서 후보를 만들며 작업을 실행하지 않아요. 직접 불러오기 전에는 편집기에 반영하지 않아요."
                   : request.type === "planner.cancel"
-                    ? "Planning cancellation accepted. Wait for Runtime to report CANCELLED."
-                    : "Start accepted. Waiting for canonical Run state; this acknowledgement does not establish success.",
+                    ? "계획 취소 요청을 받았어요. Runtime의 CANCELLED 보고를 기다려 주세요."
+                    : "시작 요청을 받았어요. 공식 Run 상태를 기다리고 있으며 이 응답만으로 성공을 판단하지 않아요.",
         });
       }
     } catch {
@@ -696,7 +694,7 @@ export function WeavraControls({
         setCommandState({
           status: "transport-error",
           message:
-            "Transport error: command outcome is unknown. Observe fresh Runtime state; do not assume the action failed.",
+            "통신 오류로 명령 결과를 확인할 수 없어요. 새로운 Runtime 상태를 확인해 주세요. 작업이 실패했다고 단정하지 마세요.",
         });
     } finally {
       pending.current = false;
@@ -716,9 +714,9 @@ export function WeavraControls({
     const problem = !complex
       ? null
       : !complexSupported
-        ? "This Runtime does not advertise COMPLEX task plans (NOT EXPOSED). Discard the task plan to prepare a QUICK or STANDARD workflow."
+        ? "이 Runtime은 COMPLEX 작업 계획을 제공하지 않아요(NOT EXPOSED). QUICK 또는 STANDARD를 준비하려면 작업 계획을 비워 주세요."
         : recipeId
-          ? "Reviewed recipes are STANDARD-only and are never sent with a COMPLEX task plan. Clear the recipe or discard the task plan."
+          ? "검토한 실행 절차는 STANDARD 전용이며 COMPLEX 계획과 함께 보낼 수 없어요. 실행 절차나 작업 계획 중 하나를 비워 주세요."
           : complexDraftProblem(complexRows, complexStatements.length);
     if (problem) {
       setCommandState({ status: "rejected", message: problem });
@@ -744,8 +742,8 @@ export function WeavraControls({
       setCommandState({
         status: "rejected",
         message: complex
-          ? "Invalid task plan. Each task needs a nonblank title (up to 80 characters) and goal (up to 300), 1–16 unique check IDs (letters, digits, '.', '_', ':' or '-') and at most 16 exact project-relative file claims without globs, '.', '..', backslashes or a leading or trailing '/'. The whole plan must stay within 12,288 bytes."
-          : "Invalid goal, recipe JSON or acceptance criteria. Use at most 16 nonempty criteria of 500 characters each.",
+          ? "작업 계획을 확인해 주세요. 작업마다 제목(최대 80자)·목표(최대 300자)·중복 없는 검사 ID 1~16개가 필요해요. 검사 ID에는 영문자·숫자·점·밑줄·콜론·하이픈만 쓸 수 있어요. 파일 담당 범위는 정확한 프로젝트 상대 경로 최대 16개이며 glob·점 경로·역슬래시·앞뒤 슬래시는 허용하지 않아요. 전체 계획은 12,288바이트 이내여야 해요."
+          : "목표·실행 절차 JSON·수용 기준을 확인해 주세요. 비어 있지 않은 기준을 각 500자 이내로 최대 16개 입력할 수 있어요.",
       });
     }
   };
@@ -768,15 +766,15 @@ export function WeavraControls({
         previewId: preview.previewId,
         previewDigest: preview.previewDigest,
       },
-      `Start this exact ${preview.workflow} / ${preview.risk} / ${preview.executionMode} plan for ${workspaceRoot}?\nGoal: ${preview.goal}${
+      `이 ${preview.workflow} / ${preview.risk} / ${preview.executionMode} 계획을 다음 checkout에서 시작할까요: ${workspaceRoot}?\n목표: ${preview.goal}${
         plan
           ? `\n${
               plan.schemaVersion === 2 && plan.limits.maxParallel > 1
-                ? `Tasks under one Run, in plan order; up to ${plan.limits.maxParallel} whose dependencies are complete are implemented at once, then checked and reviewed one at a time`
-                : "Tasks, in this order under one Run"
-            }: ${plan.tasks.map((task) => `${task.id} ${task.title}`).join("; ")}\nPlan digest: ${plan.complexPlanDigest}\nThe plan cannot be edited after confirmation. Completing every task does not complete the Run.`
+                ? `하나의 Run에서 계획 순서대로 작업해요. 선행 작업이 끝난 작업을 최대 ${plan.limits.maxParallel}개까지 동시에 구현한 뒤 하나씩 검사하고 검토해요`
+                : "하나의 Run에서 이 순서로 진행할 작업"
+            }: ${plan.tasks.map((task) => `${task.id} ${task.title}`).join("; ")}\n계획 digest: ${plan.complexPlanDigest}\n확인 후에는 계획을 편집할 수 없어요. 모든 개별 작업이 끝나도 Run 완료 판정은 별도예요.`
           : ""
-      }\nPlan confirmation is not R3 approval. No automatic commit, rollback or cleanup.`,
+      }\n계획 확인은 R3 승인이 아니에요. 자동 커밋·되돌리기·정리는 없어요.`,
     );
   };
   const cancel = () => {
@@ -789,7 +787,7 @@ export function WeavraControls({
         runId: run.runId,
         expectedStateRevision: state.stateRevision,
       },
-      `Cancel Run ${run.runId}?\nRuntime must stop active workers and checks before releasing its writer. Partial workspace changes remain. No automatic rollback or cleanup.`,
+      `다음 Run을 취소할까요: ${run.runId}?\nRuntime이 활성 worker와 검사를 멈춘 뒤 쓰기 잠금을 해제해요. 일부 변경은 남으며 자동 되돌리기·정리는 없어요.`,
     );
   };
   const resolveApproval = (decision: "approve" | "reject") => {
@@ -805,7 +803,7 @@ export function WeavraControls({
         decision,
       },
       decision === "approve"
-        ? `Approve ONE deletion of ${approval.path}?\nRun: ${approval.runId}\nApproval: ${approval.approvalId}\nFingerprint: ${approval.preconditionDigest}\nNo automatic rollback. This does not approve any other action or establish completion.`
+        ? `이 파일의 이번 삭제만 승인할까요: ${approval.path}?\nRun: ${approval.runId}\n승인: ${approval.approvalId}\n파일 지문: ${approval.preconditionDigest}\n자동 되돌리기는 없어요. 다른 동작을 승인하거나 완료로 판정하지 않아요.`
         : undefined,
     );
   };
@@ -818,7 +816,7 @@ export function WeavraControls({
       setCommandState({
         status: "rejected",
         message:
-          "Invalid goal or acceptance criteria for the Planner. Use a goal of up to 2,048 characters and 1–16 criteria of up to 500 characters each.",
+          "Planner에 보낼 목표나 수용 기준을 확인해 주세요. 목표는 최대 2,048자, 기준은 각 500자 이내로 1~16개예요.",
       });
     }
   };
@@ -867,7 +865,7 @@ export function WeavraControls({
       setCommandState({
         status: "rejected",
         message:
-          "Use a check name of 1–64 letters, digits, dots, hyphens or underscores, starting with a letter or digit, and a bounded supported expectation.",
+          "검사 이름은 영문자나 숫자로 시작하는 1~64자로 입력해 주세요. 영문자·숫자·점·하이픈·밑줄만 사용할 수 있고, 지원하는 범위의 예상 결과가 필요해요.",
       });
     }
   };
@@ -881,7 +879,7 @@ export function WeavraControls({
         previewId: browserPreview.previewId,
         previewDigest: browserPreview.previewDigest,
       },
-      `Register this exact browser check for ${workspaceRoot}?\nCheck: ${browserPreview.check.checkId}\nDocument: ${browserPreview.check.documentIdentity}\nTarget: ${browserPreview.check.target.selector}\nAssertion: ${JSON.stringify(browserPreview.check.assertion)}\nRegistration digest: ${browserPreview.check.registrationDigest}\nThis records an expectation, not PASS. Runtime must capture a new isolated browser document for every SELF_CHECK and TEST. Browser failures never trigger automatic repair.`,
+      `다음 대상에 이 브라우저 검사를 등록할까요: ${workspaceRoot}?\n검사: ${browserPreview.check.checkId}\n문서: ${browserPreview.check.documentIdentity}\n대상: ${browserPreview.check.target.selector}\n검사 조건: ${JSON.stringify(browserPreview.check.assertion)}\n등록 digest: ${browserPreview.check.registrationDigest}\n예상 결과를 등록할 뿐 PASS 판정이 아니에요. Runtime은 SELF_CHECK와 TEST마다 새 격리 브라우저 캡처를 만들어야 해요. 브라우저 검사 실패 시 자동 수정하지 않아요.`,
     );
   };
   const prepareFact = () => {
@@ -899,8 +897,7 @@ export function WeavraControls({
     } catch {
       setCommandState({
         status: "rejected",
-        message:
-          "Use a project-relative source (up to 256 characters) and a short statement (up to 500 characters).",
+        message: "프로젝트 상대 출처 경로(최대 256자)와 짧은 설명(최대 500자)을 입력해 주세요.",
       });
     }
   };
@@ -914,27 +911,28 @@ export function WeavraControls({
         previewId: factPreview.previewId,
         previewDigest: factPreview.previewDigest,
       },
-      `Record this reviewed advisory fact for ${workspaceRoot}?\nSource: ${factPreview.sourceRef}\nDigest: ${factPreview.sourceDigest}\nStatement: ${factPreview.statement}\nConfirm that this statement is supported by the source and contains no secrets, raw reasoning, transcript or tool output. This is not Policy, Approval, verification or completion.`,
+      `다음 대상에 검토한 참고용 사실을 기록할까요: ${workspaceRoot}?\n출처: ${factPreview.sourceRef}\ndigest: ${factPreview.sourceDigest}\n설명: ${factPreview.statement}\n설명이 출처로 뒷받침되며 비밀값·추론 원문·대화 기록·도구 출력을 포함하지 않는지 확인해 주세요. Policy·승인·검증·완료 판정이 아니에요.`,
     );
   };
   return (
-    <SettingsSection id="weavra-controls" title="Weavra · Workflow control">
+    <SettingsSection id="weavra-controls" title="Weavra · 워크플로 제어">
       <SettingsGroup divided={false} className="space-y-5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-medium">Runtime-owned actions</h3>
+          <h3 className="text-sm font-medium">Runtime 실행 제어</h3>
           <Badge variant={fresh ? "info" : "outline"}>
-            {fresh ? "CONTROL CONNECTED" : "CONTROL UNAVAILABLE"}
+            {fresh ? "제어 연결됨" : "제어할 수 없음"}
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground">
           {view?.support === "unsupported"
-            ? "This environment does not advertise workflow control. Enable T3_WEAVRA_CONTROL=1 on the trusted server to opt in. Read-only observation remains available."
-            : "Control requires orchestration:operate access and a fresh canonical snapshot. Risk, scope, checks, Task Contract, Policy, approval consumption and completion remain Runtime/Kernel-owned."}
+            ? "이 환경은 워크플로 제어를 제공하지 않아요. 신뢰하는 서버에서 T3_WEAVRA_CONTROL=1을 설정해야 사용할 수 있어요. 읽기 전용 관찰은 계속 사용할 수 있어요."
+            : "제어하려면 orchestration:operate 권한과 최신 공식 스냅샷이 필요해요. 위험·범위·검사·작업 계약·Policy·승인 사용·완료 판정은 Runtime/Kernel이 담당해요."}
         </p>
         {!fresh && (
           <p className="text-xs text-muted-foreground">
-            Controls are disabled while disconnected, unsupported or stale. No action is queued for
-            reconnect.{observation?.errorCode ? ` Connection error: ${observation.errorCode}.` : ""}
+            연결이 끊겼거나 지원하지 않거나 정보가 오래되면 제어를 비활성화해요. 재연결 후 실행할
+            작업을 대기열에 넣지 않아요.
+            {observation?.errorCode ? ` 연결 오류: ${observation.errorCode}.` : ""}
           </p>
         )}
         <CapabilityInventory
@@ -960,32 +958,28 @@ export function WeavraControls({
         {run && (
           <div className="space-y-2 rounded-md border border-border p-3 text-xs">
             <p>
-              Canonical Run: <code className="break-all">{run.runId}</code>
+              공식 Run: <code className="break-all">{run.runId}</code>
             </p>
             <p>
-              Durable status: <strong>{run.status}</strong> · Run revision:{" "}
-              {state?.stateRevision ?? "UNKNOWN"} · Project revision:{" "}
+              저장된 상태: <strong>{weavraLabel(run.status)}</strong> · Run revision:{" "}
+              {state?.stateRevision ?? "UNKNOWN"} · 프로젝트 revision:{" "}
               {state?.projectRevision ?? "UNKNOWN"}
             </p>
             <p>
-              Owner operation:{" "}
-              {state?.busy
-                ? state.cancelling
-                  ? "cancellation requested; cleanup pending"
-                  : "active"
-                : "idle"}{" "}
-              · Writer present: {String(state?.snapshot.status.writerPresent ?? "UNKNOWN")}
+              소유 프로세스 작업:{" "}
+              {state?.busy ? (state.cancelling ? "취소 요청됨; 정리 대기" : "active") : "idle"} ·
+              쓰기 잠금 존재: {String(state?.snapshot.status.writerPresent ?? "UNKNOWN")}
             </p>
-            <p>Partial workspace changes are never rolled back automatically.</p>
+            <p>작업 공간의 일부 변경을 자동으로 되돌리지 않아요.</p>
             <a
               href="#weavra-evidence"
               className="inline-flex rounded-sm underline underline-offset-4 hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
             >
-              Review acceptance and verification evidence
+              수용 기준과 검증 증거 확인
             </a>
             {canCancel && (
               <Button size="sm" variant="outline" onClick={cancel}>
-                Cancel workflow
+                워크플로 취소
               </Button>
             )}
           </div>
@@ -1003,50 +997,45 @@ export function WeavraControls({
         ) : (
           run?.workflow === "COMPLEX" && (
             <p className="text-xs text-muted-foreground">
-              COMPLEX task detail is not exposed by this Runtime. The canonical Run status above
-              remains the only outcome.
+              이 Runtime은 COMPLEX 작업 상세를 제공하지 않아요. 위의 공식 Run 상태만 실행 결과로
+              판단해요.
             </p>
           )
         )}
         {rerunOffered && run && state?.complexExecution && (
           <section
-            aria-label="Unfinished COMPLEX work"
+            aria-label="미완료 COMPLEX 작업"
             className="space-y-2 rounded-md border border-border p-3 text-xs"
           >
             <p>
-              Run {run.runId} ended {run.status} with{" "}
-              {state.complexExecution.tasks.filter((task) => task.status !== "COMPLETED").length} of{" "}
-              {state.complexExecution.tasks.length} tasks unfinished. Re-planning asks the Runtime
-              for a candidate draft of a new Run: completed tasks become read-only verification
-              tasks that are checked again, and unfinished tasks keep their claims. Nothing resumes,
-              no evidence is reused, and nothing is prepared or started until you do it.
+              Run {run.runId} 종료 상태: {weavraLabel(run.status)} 미완료:{" "}
+              {state.complexExecution.tasks.filter((task) => task.status !== "COMPLETED").length} /{" "}
+              {state.complexExecution.tasks.length} 개 작업이 미완료 상태예요. 다시 계획하면
+              Runtime이 새 Run의 초안을 만들어요. 완료한 작업은 읽기 전용으로 다시 검증하고 미완료
+              작업은 담당 범위를 유지해요. 이전 작업·증거를 재사용하지 않으며 직접 준비·확인하기
+              전에는 시작하지 않아요.
             </p>
             <Button size="sm" variant="outline" disabled={!canDerive} onClick={derive}>
-              Re-plan unfinished work
+              미완료 작업 다시 계획
             </Button>
           </section>
         )}
         {foreignActiveRun && (
           <p
-            aria-label="Another owner holds this project"
+            aria-label="다른 소유자가 사용 중인 프로젝트"
             className="text-xs text-muted-foreground"
           >
-            Another Runtime owner holds this project's active Run. If that owner has stopped,
-            preparing a workflow marks its Run INTERRUPTED; nothing resumes and partial workspace
-            changes remain. If the owner is still running or cannot be proven stopped, the Runtime
-            refuses.
+            다른 Runtime 소유자가 이 프로젝트의 활성 Run을 관리하고 있어요. 소유 프로세스가
+            종료됐다면 워크플로 준비 시 해당 Run을 INTERRUPTED로 기록해요. 작업은 재개하지 않고 일부
+            변경을 보존해요. 소유자가 실행 중이거나 종료를 확인할 수 없으면 요청을 거부해요.
           </p>
         )}
         {staleWriter && (
-          <p
-            aria-label="Writer lock after the latest Run"
-            className="text-xs text-muted-foreground"
-          >
-            A writer lock is still present although the latest Run ended {run?.status}. If its owner
-            has stopped, preparing a workflow lets the Runtime release the lock; when that changes
-            the project, prepare returns STALE_PROJECT, so prepare again once the refreshed state
-            appears. If the owner is still running or cannot be proven stopped, the Runtime refuses
-            with WRITER_PRESENT. Nothing resumes, and partial workspace changes remain.
+          <p aria-label="최근 Run 종료 후 남은 쓰기 잠금" className="text-xs text-muted-foreground">
+            최근 Run이 종료됐지만 쓰기 잠금이 남아 있어요: {weavraLabel(run?.status)}. 소유
+            프로세스가 종료됐다면 워크플로 준비 시 Runtime이 잠금을 해제해요. 프로젝트 상태가 바뀌어
+            STALE_PROJECT가 반환되면 새 상태를 확인한 뒤 다시 준비해 주세요. 실행 중이거나 종료를
+            확인할 수 없으면 WRITER_PRESENT로 거부해요. 작업을 재개하지 않으며 일부 변경은 보존해요.
           </p>
         )}
         <form
@@ -1057,9 +1046,9 @@ export function WeavraControls({
           }}
         >
           <label className="block space-y-1 text-sm">
-            <span>Workflow goal</span>
+            <span>워크플로 목표</span>
             <Textarea
-              aria-label="Workflow goal"
+              aria-label="워크플로 목표"
               maxLength={2048}
               value={goal}
               onChange={(event) => {
@@ -1067,13 +1056,13 @@ export function WeavraControls({
                 setGoal(event.target.value);
               }}
               disabled={submitting || !fresh || !!state?.busy}
-              placeholder="Describe a supported task for this checkout"
+              placeholder="이 checkout에서 수행할 작업을 입력해 주세요"
             />
           </label>
           <label className="block space-y-1 text-sm">
-            <span>Reviewed recipe (optional)</span>
+            <span>검토한 실행 절차(선택 사항)</span>
             <select
-              aria-label="Reviewed recipe"
+              aria-label="검토한 실행 절차"
               value={recipeId}
               disabled={submitting || !fresh || !!state?.busy}
               className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -1087,7 +1076,7 @@ export function WeavraControls({
                 );
               }}
             >
-              <option value="">No recipe</option>
+              <option value="">실행 절차 없음</option>
               {observation?.capabilities?.recipes.map((recipe) => (
                 <option key={recipe.id} value={recipe.id}>
                   {recipe.title} · v{recipe.version}
@@ -1097,9 +1086,9 @@ export function WeavraControls({
           </label>
           {recipeId && (
             <label className="block space-y-1 text-sm">
-              <span>Recipe inputs (JSON data only)</span>
+              <span>실행 절차 입력값(JSON 데이터만)</span>
               <Textarea
-                aria-label="Recipe inputs"
+                aria-label="실행 절차 입력값"
                 value={recipeInputs}
                 maxLength={16384}
                 onChange={(event) => {
@@ -1113,28 +1102,28 @@ export function WeavraControls({
           )}
           {(complexSupported || complexRows.length > 0) && (
             <section
-              aria-label="COMPLEX task plan"
+              aria-label="COMPLEX 작업 계획"
               className="space-y-3 rounded-md border border-border p-4"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-sm font-medium">Structured task plan · COMPLEX (optional)</h4>
+                <h4 className="text-sm font-medium">구조화된 작업 계획 · COMPLEX(선택 사항)</h4>
                 <Badge variant={complexSupported ? "outline" : "warning"}>
-                  {complexSupported ? `RUNTIME CONTRACT v${complexVersion}` : "NOT EXPOSED"}
+                  {complexSupported ? `Runtime 계약 v${complexVersion}` : "제공되지 않음"}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Only for goals Runtime classifies as COMPLEX.{" "}
+                Runtime이 COMPLEX로 분류한 목표에만 적용해요.{" "}
                 {complexVersion === 2
-                  ? "Tasks whose dependencies are complete may be implemented at the same time, up to the Runtime's configured limit; checks and reviews still run one task at a time in plan order. Add a dependency to force an order."
-                  : "Tasks run one at a time, in order, under one Runtime-owned Run."}{" "}
-                Runtime assigns task IDs and validates dependencies, criteria coverage, exact file
-                claims and registered checks. The plan cannot be edited after confirmation.
+                  ? "선행 작업이 끝난 작업은 Runtime에 설정된 한도까지 동시에 구현할 수 있어요. 검사와 검토는 계획 순서대로 하나씩 진행해요. 순서를 정하려면 의존성을 추가해 주세요."
+                  : "하나의 Runtime 소유 Run에서 순서대로 하나씩 진행해요."}{" "}
+                Runtime이 작업 ID를 부여하고 의존성·수용 기준 범위·정확한 파일 담당 범위·등록 검사를
+                검증해요. 확인 후에는 계획을 편집할 수 없어요.
               </p>
               {(complexRows.length > 0 || plannerExposed) && (
                 <label className="block space-y-1 text-sm">
-                  <span>Parent acceptance criteria · one per line (1–16)</span>
+                  <span>상위 수용 기준 · 한 줄에 하나씩(1~16개)</span>
                   <Textarea
-                    aria-label="COMPLEX acceptance criteria"
+                    aria-label="COMPLEX 수용 기준"
                     value={complexCriteria}
                     maxLength={16384}
                     disabled={!canEditDraft || !complexSupported}
@@ -1148,47 +1137,48 @@ export function WeavraControls({
               {loadedDraft && loadedUnchanged && (
                 <div
                   role="note"
-                  aria-label="Loaded Planner proposal"
+                  aria-label="불러온 Planner 제안"
                   className="space-y-1 rounded-md border border-warning/50 p-3 text-xs"
                 >
-                  <p className="font-medium">Review every task, claim and check before Prepare.</p>
+                  <p className="font-medium">
+                    준비하기 전에 각 작업·파일 담당 범위·검사를 검토해 주세요.
+                  </p>
                   <p className="text-muted-foreground">
-                    These rows are the unedited Planner proposal. Prepare re-validates them, and
-                    nothing runs until you confirm the Runtime preview.
+                    아직 편집하지 않은 Planner 제안이에요. 준비 시 다시 검증하며 Runtime 미리보기를
+                    확인하기 전에는 실행하지 않아요.
                   </p>
                   {loadedCurrent === false && (
-                    <p>Not current: the project or its configuration changed after planning.</p>
+                    <p>계획 생성 후 프로젝트나 설정이 바뀌어 현재 상태와 다를 수 있어요.</p>
                   )}
                   {editorDigest !== loadedDraft.requestDigest && (
-                    <p>Planned for a different goal or criteria than the editor now holds.</p>
+                    <p>편집기의 현재 목표·수용 기준과 다른 내용으로 만든 계획이에요.</p>
                   )}
                 </div>
               )}
               {derivedShown && derivedDraft && (
                 <section
-                  aria-label="Derived re-run draft"
+                  aria-label="다시 실행할 작업 초안"
                   className="space-y-2 rounded-md border border-warning/50 p-3 text-xs"
                 >
                   {derivedUnchanged ? (
                     <p className="font-medium">{derivedBanner(derivedDraft)}</p>
                   ) : (
                     <p>
-                      The editor no longer holds the derived draft unchanged. The prepare check and
-                      notes below describe the draft as derived; Prepare checks the editor again.
+                      편집기의 내용이 생성된 초안에서 바뀌었어요. 아래 준비 검사와 메모는 최초
+                      초안에 관한 것이며, 준비 시 편집기 내용을 다시 검사해요.
                     </p>
                   )}
                   <p className="text-muted-foreground">
-                    Claims follow the files at derive time. After you commit or discard leftover
-                    changes in your own tools, derive again so that create and modify match the
-                    checkout. This is an ordinary new Run: nothing resumes and no earlier evidence
-                    is reused.
+                    파일 담당 범위는 초안 생성 시점의 파일을 기준으로 해요. 남은 변경을 직접
+                    커밋하거나 정리한 뒤 초안을 다시 만들어 생성·수정 구분을 checkout과 맞춰 주세요.
+                    일반적인 새 Run이며 이전 작업이나 증거를 재사용하지 않아요.
                   </p>
-                  <div aria-label="Leftover changes" className="space-y-1">
+                  <div aria-label="남은 변경사항" className="space-y-1">
                     {derivedDraft.leftovers.clean === false ? (
                       <>
                         <p>
-                          These changes block a new Run until you commit or discard them. The
-                          Runtime never does either.
+                          이 변경을 직접 커밋하거나 정리하기 전에는 새 Run을 시작할 수 없어요.
+                          Runtime은 둘 다 자동으로 하지 않아요.
                         </p>
                         <ul className="space-y-0.5 font-mono">
                           {derivedDraft.leftovers.paths.map((path) => (
@@ -1199,27 +1189,27 @@ export function WeavraControls({
                         </ul>
                         {derivedDraft.leftovers.truncated && (
                           <p>
-                            More changes exist than are listed; the list stops at 200 names or
-                            16,384 bytes.
+                            표시하지 못한 변경이 더 있어요. 목록은 경로 200개 또는 16,384바이트까지
+                            표시해요.
                           </p>
                         )}
                       </>
                     ) : derivedDraft.leftovers.clean === null ? (
                       <p>
-                        Workspace state unknown: Git could not report leftover changes at derive
-                        time, so changes that block a new Run may remain.
+                        작업 공간 상태를 확인할 수 없어요. 초안 생성 시 Git 변경 조회가 실패해 새
+                        Run을 막는 변경이 남아 있을 수 있어요.
                       </p>
                     ) : (
-                      <p>No leftover changes at derive time.</p>
+                      <p>초안 생성 시 남은 변경사항이 없었어요.</p>
                     )}
                   </div>
-                  <p aria-label="Prepare check">
+                  <p aria-label="준비 검사">
                     {derivedDraft.prepareCheck.ok
-                      ? "Prepare dry-run at derive time: passed. This is not a preview; Prepare checks the editor again."
-                      : `Prepare dry-run at derive time: refused with ${derivedDraft.prepareCheck.code}. Edit the task plan before Prepare; the notes may say why.`}
+                      ? "초안 생성 시 준비 검사를 통과했어요. 미리보기가 아니며 준비 시 편집기 내용을 다시 검사해요."
+                      : `초안 생성 시 준비 검사에서 거부됨: ${derivedDraft.prepareCheck.code}. 메모에서 사유를 확인하고 작업 계획을 수정한 뒤 준비해 주세요.`}
                   </p>
                   {derivedDraft.notes.length > 0 && (
-                    <ul aria-label="Derivation notes" className="space-y-0.5">
+                    <ul aria-label="초안 생성 메모" className="space-y-0.5">
                       {derivedDraft.notes.map((note, position) => (
                         // Fixed-template notes may repeat; their position is their identity.
                         // oxlint-disable-next-line react/no-array-index-key
@@ -1230,7 +1220,7 @@ export function WeavraControls({
                     </ul>
                   )}
                   <Button size="sm" variant="outline" disabled={!canDerive} onClick={derive}>
-                    Derive again
+                    초안 다시 만들기
                   </Button>
                 </section>
               )}
@@ -1240,16 +1230,16 @@ export function WeavraControls({
                 return (
                   <fieldset
                     key={task}
-                    aria-label={`Task ${task}`}
+                    aria-label={`작업 ${task}`}
                     className="space-y-2 rounded-md border border-border p-3 text-sm"
                   >
-                    <legend className="px-1 text-xs font-medium">Task {task}</legend>
+                    <legend className="px-1 text-xs font-medium">작업 {task}</legend>
                     <input
-                      aria-label={`Task ${task} title`}
+                      aria-label={`작업 ${task} 제목`}
                       value={row.title}
                       maxLength={80}
                       disabled={!editable}
-                      placeholder="Short title"
+                      placeholder="짧은 제목"
                       className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                       onChange={(event) => {
                         const title = event.target.value;
@@ -1257,11 +1247,11 @@ export function WeavraControls({
                       }}
                     />
                     <Textarea
-                      aria-label={`Task ${task} goal`}
+                      aria-label={`작업 ${task} 목표`}
                       value={row.goal}
                       maxLength={300}
                       disabled={!editable}
-                      placeholder="Bounded contribution to the parent goal"
+                      placeholder="상위 목표에서 이 작업이 맡을 범위"
                       onChange={(event) => {
                         const taskGoal = event.target.value;
                         editComplexRow(index, (current) => ({ ...current, goal: taskGoal }));
@@ -1269,13 +1259,13 @@ export function WeavraControls({
                     />
                     {index > 0 && (
                       <div className="flex flex-wrap gap-3 text-xs">
-                        <span className="text-muted-foreground">Depends on</span>
+                        <span className="text-muted-foreground">선행 작업</span>
                         {Array.from({ length: index }, (_, earlier) => earlier + 1).map(
                           (dependency) => (
                             <label key={dependency} className="flex items-center gap-1">
                               <input
                                 type="checkbox"
-                                aria-label={`Task ${task} depends on task ${dependency}`}
+                                aria-label={`작업 ${task}의 선행 작업 ${dependency}`}
                                 checked={row.dependsOnIndexes.includes(dependency)}
                                 disabled={!editable}
                                 onChange={() =>
@@ -1285,23 +1275,21 @@ export function WeavraControls({
                                   }))
                                 }
                               />
-                              Task {dependency}
+                              작업 {dependency}
                             </label>
                           ),
                         )}
                       </div>
                     )}
                     <div className="space-y-1 text-xs">
-                      <span className="text-muted-foreground">
-                        Acceptance criteria it contributes to
-                      </span>
+                      <span className="text-muted-foreground">이 작업이 충족할 수용 기준</span>
                       {lines(complexCriteria).map((statement, position) => (
                         // A criterion's number is its position; the draft sends 1-based indexes.
                         // oxlint-disable-next-line react/no-array-index-key
                         <label key={position} className="flex items-start gap-1 break-words">
                           <input
                             type="checkbox"
-                            aria-label={`Task ${task} maps criterion ${position + 1}`}
+                            aria-label={`작업 ${task}의 수용 기준 연결 ${position + 1}`}
                             checked={row.criterionIndexes.includes(position + 1)}
                             disabled={!editable}
                             onChange={() =>
@@ -1317,14 +1305,14 @@ export function WeavraControls({
                     </div>
                     <div className="space-y-1 text-xs">
                       <span className="text-muted-foreground">
-                        Exact file claims · responsibility, not permission
+                        정확한 파일 담당 범위 · 권한 부여가 아니에요
                       </span>
                       {row.ownership.map((claim, position) => (
                         // Claims are positional rows of controlled inputs and are never reordered.
                         // oxlint-disable-next-line react/no-array-index-key
                         <div key={position} className="flex flex-wrap items-center gap-2">
                           <select
-                            aria-label={`Task ${task} claim ${position + 1} operation`}
+                            aria-label={`작업 ${task} 담당 범위 ${position + 1} 종류`}
                             value={claim.operation}
                             disabled={!editable}
                             className="h-8 rounded-md border border-input bg-background px-2 text-xs"
@@ -1348,7 +1336,7 @@ export function WeavraControls({
                             <option value="delete">delete</option>
                           </select>
                           <input
-                            aria-label={`Task ${task} claim ${position + 1} path`}
+                            aria-label={`작업 ${task} 담당 범위 ${position + 1} 경로`}
                             value={claim.path}
                             maxLength={256}
                             disabled={!editable}
@@ -1367,7 +1355,7 @@ export function WeavraControls({
                           <Button
                             size="sm"
                             variant="outline"
-                            aria-label={`Remove task ${task} claim ${position + 1}`}
+                            aria-label={`작업 ${task} 담당 범위 ${position + 1} 제거`}
                             disabled={!editable}
                             onClick={() =>
                               editComplexRow(index, (current) => ({
@@ -1376,14 +1364,14 @@ export function WeavraControls({
                               }))
                             }
                           >
-                            Remove
+                            제거
                           </Button>
                         </div>
                       ))}
                       <Button
                         size="sm"
                         variant="outline"
-                        aria-label={`Add task ${task} file claim`}
+                        aria-label={`작업 ${task}에 파일 담당 범위 추가`}
                         disabled={!editable || row.ownership.length >= 16}
                         onClick={() =>
                           editComplexRow(index, (current) => ({
@@ -1392,15 +1380,15 @@ export function WeavraControls({
                           }))
                         }
                       >
-                        Add file claim
+                        파일 담당 범위 추가
                       </Button>
                     </div>
                     <input
-                      aria-label={`Task ${task} check IDs`}
+                      aria-label={`작업 ${task}의 검사 ID`}
                       value={row.checkIds}
                       maxLength={2200}
                       disabled={!editable}
-                      placeholder="Registered check IDs, separated by spaces"
+                      placeholder="등록 검사 ID를 공백으로 구분해 주세요"
                       className="h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-xs"
                       onChange={(event) => {
                         const checkIds = event.target.value;
@@ -1417,7 +1405,7 @@ export function WeavraControls({
                   disabled={!canEditDraft || !complexSupported || complexRows.length >= 8}
                   onClick={() => editComplexRows((rows) => [...rows, emptyComplexRow])}
                 >
-                  Add task
+                  작업 추가
                 </Button>
                 {complexRows.length > 0 && (
                   <>
@@ -1427,7 +1415,7 @@ export function WeavraControls({
                       disabled={!canEditDraft || !complexSupported}
                       onClick={() => editComplexRows((rows) => rows.slice(0, -1))}
                     >
-                      Remove last task
+                      마지막 작업 제거
                     </Button>
                     <Button
                       size="sm"
@@ -1439,7 +1427,7 @@ export function WeavraControls({
                         setDerivedDraft(null);
                       }}
                     >
-                      Discard task plan
+                      작업 계획 비우기
                     </Button>
                   </>
                 )}
@@ -1447,14 +1435,13 @@ export function WeavraControls({
               {plannerExposed && (
                 <section aria-label="Planner" className="space-y-3 border-t border-border pt-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h5 className="text-sm font-medium">Planner · proposed task rows</h5>
-                    <Badge variant="outline">CANDIDATE ONLY</Badge>
+                    <h5 className="text-sm font-medium">Planner · 작업 목록 제안</h5>
+                    <Badge variant="outline">검토 전 후보</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Runtime asks the configured planning model, with at most 3 calls, to propose
-                    task rows for this goal and these criteria from a bounded context of file names,
-                    project instructions and reviewed facts. A proposal is never loaded, prepared or
-                    started automatically.
+                    Runtime이 설정된 계획 모델을 최대 3회 호출해 목표와 수용 기준에 맞는 작업 목록을
+                    제안받아요. 파일명·프로젝트 지침·검토한 사실만 제한된 범위로 전달해요. 제안을
+                    자동으로 불러오거나 준비·실행하지 않아요.
                   </p>
                   <Button
                     size="sm"
@@ -1462,15 +1449,15 @@ export function WeavraControls({
                     disabled={!canStartPlanner}
                     onClick={startPlanner}
                   >
-                    Draft with Planner
+                    Planner로 초안 만들기
                   </Button>
                   {planner?.status === "RUNNING" && (
                     <div
-                      aria-label="Planner running"
+                      aria-label="Planner 실행 중"
                       className="space-y-2 rounded-md border border-border p-3 text-xs"
                     >
                       <p>
-                        Planning · elapsed{" "}
+                        계획 생성 중 · 경과{" "}
                         {plannerSeconds(plannerElapsedMs(planner, observation?.observedAt ?? null))}{" "}
                         · {plannerRoute(planner.route)} · {plannerUsage(planner.usage)}
                       </p>
@@ -1480,93 +1467,93 @@ export function WeavraControls({
                         disabled={!canCancelPlanner}
                         onClick={cancelPlanner}
                       >
-                        Cancel planning
+                        계획 생성 취소
                       </Button>
                     </div>
                   )}
                   {plannerProposal && (
                     <section
-                      aria-label="Planner proposal"
+                      aria-label="Planner 제안"
                       className="space-y-2 rounded-md border border-warning/50 p-3 text-xs"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h5 className="text-sm font-medium">Planner proposal — unreviewed</h5>
+                        <h5 className="text-sm font-medium">Planner 제안 — 검토 전</h5>
                         <div className="flex flex-wrap gap-2">
-                          {!plannerProposal.current && <Badge variant="warning">NOT CURRENT</Badge>}
+                          {!plannerProposal.current && (
+                            <Badge variant="warning">현재 정보 아님</Badge>
+                          )}
                           {editorDigest !== plannerProposal.requestDigest && (
-                            <Badge variant="warning">OTHER GOAL OR CRITERIA</Badge>
+                            <Badge variant="warning">다른 목표 또는 기준</Badge>
                           )}
                         </div>
                       </div>
                       <p>
-                        {plannerProposal.taskCount} tasks · {plannerRoute(plannerProposal.route)} ·{" "}
-                        {plannerUsage(plannerProposal.usage)}
+                        {plannerProposal.taskCount} 개 작업 · {plannerRoute(plannerProposal.route)}{" "}
+                        · {plannerUsage(plannerProposal.usage)}
                       </p>
                       {!plannerProposal.current && (
                         <p>
-                          The project or its configuration changed after planning. Use it only as a
-                          starting point; Prepare re-validates everything.
+                          계획 생성 후 프로젝트나 설정이 바뀌었어요. 초안으로만 참고해 주세요. 준비
+                          시 전체를 다시 검증해요.
                         </p>
                       )}
                       {editorDigest !== plannerProposal.requestDigest && (
-                        <p>
-                          This proposal is for a different goal or criteria than the editor holds.
-                        </p>
+                        <p>이 제안은 편집기의 목표나 수용 기준과 다른 내용으로 만들었어요.</p>
                       )}
                       <p className="text-muted-foreground">
-                        Loading replaces only the editor's task rows. Nothing is prepared, confirmed
-                        or run until you do it yourself. Drafting again replaces this proposal.
+                        불러오면 편집기의 작업 목록만 바뀌어요. 직접 준비·확인하기 전에는 실행하지
+                        않아요. 초안을 다시 만들면 이 제안이 교체돼요.
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <Button size="sm" disabled={!canLoadPlanner} onClick={loadPlannerProposal}>
-                          Load into editor
+                          편집기로 불러오기
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => setDismissedPlanId(plannerProposal.planId)}
                         >
-                          Discard
+                          버리기
                         </Button>
                       </div>
                     </section>
                   )}
                   {planner?.status === "READY" && planner.planId === dismissedPlanId && (
                     <p className="text-xs text-muted-foreground">
-                      Proposal discarded in this App; Runtime keeps it until planning starts again
-                      or a Run is confirmed.{" "}
+                      앱에서 제안을 버렸어요. Runtime은 계획을 다시 만들거나 Run을 확인할 때까지
+                      보관해요.{" "}
                       <Button size="sm" variant="outline" onClick={() => setDismissedPlanId(null)}>
-                        Show proposal
+                        제안 보기
                       </Button>
                     </p>
                   )}
                   {planner?.status === "FAILED" && planner.failureCode && (
-                    <p aria-label="Planner failed" className="text-xs">
-                      Planner failed: <strong>{planner.failureCode}</strong> —{" "}
-                      {plannerFailureText[planner.failureCode]} Nothing was drafted; draft again
-                      when ready.
+                    <p aria-label="Planner 실패" className="text-xs">
+                      Planner 실패: <strong>{planner.failureCode}</strong> —{" "}
+                      {plannerFailureText[planner.failureCode]} 초안을 만들지 못했어요. 준비되면
+                      다시 요청해 주세요.
                     </p>
                   )}
                   {planner?.status === "CANCELLED" && (
-                    <p className="text-xs">Planning cancelled. Nothing was drafted.</p>
+                    <p className="text-xs">계획 생성을 취소했어요. 만든 초안은 없어요.</p>
                   )}
                 </section>
               )}
             </section>
           )}
           <Button size="sm" type="submit" disabled={!canPrepareWorkflow || !goal.trim()}>
-            {preview ? "Refresh Plan Preview" : "Prepare workflow"}
+            {preview ? "계획 미리보기 새로고침" : "워크플로 준비"}
           </Button>
         </form>
         {preview && (
           <section
-            aria-label="Runtime Plan Preview"
+            aria-label="Runtime 계획 미리보기"
             className="space-y-4 rounded-md border border-border p-4"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="text-sm font-medium">Runtime Plan Preview</h4>
+              <h4 className="text-sm font-medium">Runtime 계획 미리보기</h4>
               <Badge variant={previewCurrent ? "info" : "warning"}>
-                {previewCurrent ? "CURRENT PREVIEW" : "REVIEW / REFRESH REQUIRED"}
+                {previewCurrent ? "현재 미리보기" : "검토·새로고침 필요"}
               </Badge>
             </div>
             <p className="text-sm">{preview.goal}</p>
@@ -1574,20 +1561,20 @@ export function WeavraControls({
               {[
                 ["Workflow", preview.workflow],
                 ["Risk", preview.risk],
-                ["Execution mode", preview.executionMode],
-                ["Allowed scope", preview.allowedPaths.join(", ") || "None"],
+                ["실행 방식", preview.executionMode],
+                ["허용 범위", preview.allowedPaths.join(", ") || "없음"],
                 [
                   "Recipe",
-                  preview.recipe ? `${preview.recipe.id}@${preview.recipe.version}` : "None",
+                  preview.recipe ? `${preview.recipe.id}@${preview.recipe.version}` : "없음",
                 ],
-                ["Expires", new Date(preview.expiresAt).toLocaleString()],
+                ["만료", new Date(preview.expiresAt).toLocaleString()],
                 [
                   "Configuration",
                   Object.entries(preview.configuration)
                     .map(([key, value]) => `${key}: ${String(value)}`)
                     .join(" · "),
                 ],
-                ["Task Contract digest", preview.taskContractDigest],
+                ["작업 계약 digest", preview.taskContractDigest],
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt className="text-muted-foreground">{label}</dt>
@@ -1596,25 +1583,26 @@ export function WeavraControls({
               ))}
             </dl>
             <div className="text-xs">
-              <h5 className="font-medium">Runtime-registered checks</h5>
+              <h5 className="font-medium">Runtime에 등록된 검사</h5>
               <ul className="mt-1 space-y-1">
                 {preview.checks.map((check) => (
                   <li key={check.id}>
-                    {check.id} · {check.kind} · {check.required ? "required" : "optional"}
+                    {check.id} · {weavraLabel(check.kind)} ·{" "}
+                    {check.required ? "required" : "optional"}
                   </li>
                 ))}
               </ul>
             </div>
             {preview.complexPlan ? (
               <p className="text-xs text-muted-foreground">
-                Parent acceptance criteria come from the task plan. Edit the task plan and prepare
-                again to change them.
+                상위 수용 기준은 작업 계획에서 가져와요. 바꾸려면 작업 계획을 편집하고 다시 준비해
+                주세요.
               </p>
             ) : (
               <label className="block space-y-1 text-sm">
-                <span>Acceptance criteria · one line per criterion</span>
+                <span>수용 기준 · 한 줄에 하나씩</span>
                 <Textarea
-                  aria-label="Acceptance criteria"
+                  aria-label="수용 기준"
                   value={criteria}
                   maxLength={16384}
                   disabled={!fresh || submitting || !!state?.busy}
@@ -1626,9 +1614,9 @@ export function WeavraControls({
               {preview.acceptanceCriteria.map((criterion) => (
                 <li key={criterion.id} className="break-words">
                   {criterion.id}
-                  {preview.complexPlan ? ` · ${criterion.statement}` : ""} · checks:{" "}
-                  {criterion.checkIds.join(", ") || "none"} · independent review:{" "}
-                  {criterion.reviewRequired ? "required" : "not required"}
+                  {preview.complexPlan ? ` · ${criterion.statement}` : ""} · 검사:{" "}
+                  {criterion.checkIds.join(", ") || "없음"} · 독립 검토:{" "}
+                  {criterion.reviewRequired ? "필수" : "필수 아님"}
                 </li>
               ))}
             </ul>
@@ -1636,31 +1624,30 @@ export function WeavraControls({
               <ComplexPlanView plan={preview.complexPlan} criteria={preview.acceptanceCriteria} />
             )}
             <p className="text-xs text-muted-foreground">
-              Editing criteria requires a fresh Runtime preview. T3 never assigns criterion IDs,
-              verification mappings or the frozen contract. Confirmation is not an approval token.
+              기준을 편집하면 새 Runtime 미리보기가 필요해요. 앱은 기준 ID·검증 연결·확정 계약을
+              부여하지 않아요. 확인은 승인 토큰이 아니에요.
             </p>
             <Button
               size="sm"
               disabled={!previewCurrent || submitting || !!state?.busy}
               onClick={confirm}
             >
-              Confirm and start
+              확인 후 시작
             </Button>
           </section>
         )}
         <section
-          aria-label="Reviewed Project Facts"
+          aria-label="검토한 프로젝트 사실"
           className="space-y-4 border-t border-border pt-5"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-medium">Reviewed Project Facts</h3>
-            <Badge variant="outline">ADVISORY ONLY</Badge>
+            <h3 className="text-sm font-medium">검토한 프로젝트 사실</h3>
+            <Badge variant="outline">참고 자료 전용</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            Review a short statement against one allowed local source. No automatic extraction or
-            provider calls. Never include secrets, raw reasoning, transcripts or tool output. Facts
-            cannot grant permissions, replace checks or review, or complete a Run. Kernel remains
-            the completion authority.
+            허용된 로컬 소스 하나와 짧은 설명을 대조해 검토해 주세요. 자동 추출이나 프로바이더
+            호출은 없어요. 비밀값·추론 원문·대화 기록·도구 출력은 넣지 마세요. 사실 정보는 권한을
+            부여하거나 검사·검토를 대신하거나 Run을 완료할 수 없어요. 완료 판정은 Kernel이 담당해요.
           </p>
           <form
             className="space-y-3"
@@ -1670,9 +1657,9 @@ export function WeavraControls({
             }}
           >
             <label className="block space-y-1 text-sm">
-              <span>Fact source · project-relative file</span>
+              <span>사실 출처 · 프로젝트 상대 파일 경로</span>
               <Textarea
-                aria-label="Fact source"
+                aria-label="사실 출처"
                 rows={1}
                 maxLength={256}
                 value={factSource}
@@ -1686,9 +1673,9 @@ export function WeavraControls({
               />
             </label>
             <label className="block space-y-1 text-sm">
-              <span>Fact statement</span>
+              <span>사실 설명</span>
               <Textarea
-                aria-label="Fact statement"
+                aria-label="사실 설명"
                 maxLength={500}
                 value={factStatement}
                 disabled={!canPrepare}
@@ -1697,7 +1684,7 @@ export function WeavraControls({
                   setFactPreview(null);
                   setPreparedFactDraft(null);
                 }}
-                placeholder="One concise, source-supported statement"
+                placeholder="출처로 확인할 수 있는 짧은 설명 하나"
               />
             </label>
             <Button
@@ -1705,39 +1692,36 @@ export function WeavraControls({
               type="submit"
               disabled={!canPrepare || !factSource.trim() || !factStatement.trim()}
             >
-              Prepare fact
+              사실 검토 준비
             </Button>
           </form>
           {factPreview && (
             <section
-              aria-label="Runtime Fact Preview"
+              aria-label="Runtime 사실 미리보기"
               className="space-y-3 rounded-md border border-border p-3"
             >
               <Badge variant={factPreviewCurrent ? "info" : "warning"}>
-                {factPreviewCurrent
-                  ? "REVIEW REQUIRED · NOT SAVED"
-                  : "PREVIEW CHANGED · PREPARE AGAIN"}
+                {factPreviewCurrent ? "검토 필요 · 저장 전" : "미리보기 변경됨 · 다시 준비"}
               </Badge>
               <p className="text-sm">{factPreview.statement}</p>
-              <p className="break-all text-xs">Source: {factPreview.sourceRef}</p>
-              <p className="break-all font-mono text-xs">Digest: {factPreview.sourceDigest}</p>
+              <p className="break-all text-xs">출처: {factPreview.sourceRef}</p>
+              <p className="break-all font-mono text-xs">digest: {factPreview.sourceDigest}</p>
               <Button size="sm" disabled={!canPrepare || !factPreviewCurrent} onClick={confirmFact}>
-                Confirm reviewed fact
+                검토한 사실 확인
               </Button>
             </section>
           )}
-          <div aria-label="Canonical Project Facts" className="space-y-3">
+          <div aria-label="Runtime의 공식 프로젝트 사실" className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Runtime checks source identity and digest at each observation and worker use.
-              Re-reviewing the same source replaces its review, preserving the fact ID. Up to 16
-              sources.
+              Runtime은 관찰하거나 worker에 전달할 때마다 출처 식별 정보와 digest를 확인해요. 같은
+              출처를 다시 검토하면 사실 ID는 유지하고 검토 내용을 바꿔요. 출처는 최대 16개예요.
             </p>
             {!fresh || state?.projectFacts.status !== "available" ? (
               <p className="text-xs text-muted-foreground">
-                Facts unavailable or observation stale. No current VALID fact is established.
+                사실 정보를 불러올 수 없거나 관찰이 오래됐어요. 현재 유효한 사실로 판단하지 않아요.
               </p>
             ) : state.projectFacts.entries.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No reviewed facts for this checkout.</p>
+              <p className="text-xs text-muted-foreground">이 checkout에는 검토한 사실이 없어요.</p>
             ) : (
               state.projectFacts.entries.map((fact) => (
                 <article
@@ -1747,34 +1731,34 @@ export function WeavraControls({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <code className="break-all text-xs">{fact.sourceRef}</code>
                     <Badge variant={fact.status === "VALID" ? "info" : "warning"}>
-                      {fact.status}
+                      {weavraLabel(fact.status)}
                     </Badge>
                   </div>
                   <p className="text-sm">
                     {fact.status === "VALID"
                       ? fact.statement
-                      : "Source changed or cannot be verified. Statement withheld; not injected as current context. Review again explicitly."}
+                      : "출처가 바뀌었거나 검증할 수 없어요. 설명을 표시하거나 현재 참고 자료로 전달하지 않아요. 직접 다시 검토해 주세요."}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Reviewed: {new Date(fact.reviewedAt).toLocaleString()} · Status at last Runtime
-                    observation
+                    검토 시각: {new Date(fact.reviewedAt).toLocaleString()} · 마지막 Runtime 관찰
+                    시점의 상태
                   </p>
                   <p className="break-all font-mono text-xs">ID: {fact.id}</p>
-                  <p className="break-all font-mono text-xs">Digest: {fact.sourceDigest}</p>
+                  <p className="break-all font-mono text-xs">digest: {fact.sourceDigest}</p>
                 </article>
               ))
             )}
           </div>
         </section>
         <section
-          aria-label="Browser evidence and registration"
+          aria-label="브라우저 증거와 검사 등록"
           className="space-y-4 border-t border-border pt-5"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-medium">Browser checks</h3>
+              <h3 className="text-sm font-medium">브라우저 검사</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Observe → review expectation → register → independently verify
+                관찰 → 예상 결과 검토 → 등록 → 독립 검증
               </p>
             </div>
             <Button
@@ -1783,26 +1767,24 @@ export function WeavraControls({
               disabled={!fresh || submitting}
               onClick={inspectBrowser}
             >
-              Refresh browser evidence
+              브라우저 증거 새로고침
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Local static documents only. Candidates are recorded observations, not checks or proof
-            of current page state. Runtime owns registration, fresh private HOME/profile/CDP-pipe
-            captures and Kernel completion. Browser isolation is not an OS sandbox. No personal
-            browser session, scripts or interactive actions are accepted.
+            로컬 정적 문서만 지원해요. 후보는 기록된 관찰일 뿐 검사나 현재 페이지 상태의 증거가
+            아니에요. Runtime이 등록과 새 격리 HOME·프로필·CDP-pipe 캡처를 수행하고 Kernel이 완료를
+            판정해요. 브라우저 격리는 OS sandbox가 아니에요. 개인 브라우저 세션·스크립트·상호작용은
+            허용하지 않아요.
           </p>
           {browserInspection && (
             <>
               <Badge variant={browserInspectionCurrent ? "outline" : "warning"}>
-                {browserInspectionCurrent
-                  ? "RECORDED RUNTIME INSPECTION"
-                  : "STALE INSPECTION · REFRESH REQUIRED"}
+                {browserInspectionCurrent ? "기록된 Runtime 관찰" : "오래된 관찰 · 새로고침 필요"}
               </Badge>
               {browserInspection.data.candidates.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  No saved target candidates. Use the Runtime browser observation command with
-                  explicit candidate saving.
+                  저장된 대상 후보가 없어요. Runtime 브라우저 관찰 명령에서 후보 저장을 명시해
+                  주세요.
                 </p>
               )}
               <div className="space-y-3">
@@ -1818,23 +1800,23 @@ export function WeavraControls({
                           ? ` · ${item.observation.target.attribute}`
                           : ""}
                       </code>
-                      <Badge variant="warning">CANDIDATE_ONLY</Badge>
+                      <Badge variant="warning">후보 전용(CANDIDATE_ONLY)</Badge>
                     </div>
                     <dl className="grid gap-2 text-xs sm:grid-cols-2">
                       {[
                         ["Origin", item.origin],
-                        ["Document", item.documentIdentity],
-                        ["Captured", new Date(item.capturedAt).toLocaleString()],
+                        ["문서", item.documentIdentity],
+                        ["캡처 시각", new Date(item.capturedAt).toLocaleString()],
                         [
-                          "Observed value",
+                          "관찰한 값",
                           item.observation.exists
-                            ? (item.observation.value ?? "(attribute absent)")
-                            : "(element absent)",
+                            ? (item.observation.value ?? "(속성 없음)")
+                            : "(요소 없음)",
                         ],
                         ["Candidate", item.candidateId],
-                        ["Candidate digest", item.candidateDigest],
-                        ["Document revision", item.pageRevision],
-                        ["Reader revision", item.source.readerRevision],
+                        ["후보 digest", item.candidateDigest],
+                        ["문서 revision", item.pageRevision],
+                        ["관찰기 revision", item.source.readerRevision],
                       ].map(([label, value]) => (
                         <div key={label}>
                           <dt className="text-muted-foreground">{label}</dt>
@@ -1856,22 +1838,19 @@ export function WeavraControls({
                         setPreparedBrowserDraft(null);
                       }}
                     >
-                      {candidateId === item.candidateId
-                        ? "Selected for review"
-                        : "Review this candidate"}
+                      {candidateId === item.candidateId ? "검토 대상으로 선택됨" : "이 후보 검토"}
                     </Button>
                   </article>
                 ))}
               </div>
               {browserInspection.data.omittedCandidates > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  {browserInspection.data.omittedCandidates} additional candidates omitted from this
-                  bounded view.
+                  {browserInspection.data.omittedCandidates} 개 후보를 표시 한도 때문에 생략했어요.
                 </p>
               )}
               {candidate && (
                 <form
-                  aria-label="Browser expectation editor"
+                  aria-label="브라우저 예상 결과 편집기"
                   className="space-y-3 rounded-md border border-border p-4"
                   onSubmit={(event) => {
                     event.preventDefault();
@@ -1879,13 +1858,13 @@ export function WeavraControls({
                   }}
                 >
                   <p className="text-xs text-muted-foreground">
-                    The observed value is only a starting point. Review and edit the expected
-                    behavior before requesting a Runtime preview.
+                    관찰한 값은 초안일 뿐이에요. Runtime 미리보기를 요청하기 전에 예상 동작을
+                    검토하고 편집해 주세요.
                   </p>
                   <label className="block space-y-1 text-sm">
-                    <span>Browser check name</span>
+                    <span>브라우저 검사 이름</span>
                     <input
-                      aria-label="Browser check name"
+                      aria-label="브라우저 검사 이름"
                       value={browserCheckId}
                       maxLength={64}
                       className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -1895,9 +1874,9 @@ export function WeavraControls({
                     />
                   </label>
                   <label className="block space-y-1 text-sm">
-                    <span>Browser assertion</span>
+                    <span>브라우저 검사 조건</span>
                     <select
-                      aria-label="Browser assertion"
+                      aria-label="브라우저 검사 조건"
                       value={assertionType}
                       className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                       disabled={!canPrepare || !browserInspectionCurrent}
@@ -1925,9 +1904,9 @@ export function WeavraControls({
                   </label>
                   {assertionType !== "element_exists" && assertionType !== "element_not_exists" && (
                     <label className="block space-y-1 text-sm">
-                      <span>Expected value · review and edit</span>
+                      <span>예상 값 · 검토하고 편집해 주세요</span>
                       <Textarea
-                        aria-label="Browser expected value"
+                        aria-label="브라우저 예상 값"
                         value={expectedValue}
                         maxLength={1024}
                         disabled={!canPrepare || !browserInspectionCurrent}
@@ -1936,8 +1915,8 @@ export function WeavraControls({
                     </label>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Fixed target: {candidate.observation.target.selector} · fresh capture every
-                    verification · maximum evidence age 15 seconds.
+                    고정된 대상: {candidate.observation.target.selector} · 검증마다 새 캡처 · 증거
+                    유효 시간 최대 15초
                   </p>
                   <Button
                     type="submit"
@@ -1949,32 +1928,30 @@ export function WeavraControls({
                       (assertionType === "text_contains" && !expectedValue)
                     }
                   >
-                    Prepare browser registration
+                    브라우저 검사 등록 준비
                   </Button>
                 </form>
               )}
               {browserPreview && (
                 <section
-                  aria-label="Runtime browser registration preview"
+                  aria-label="Runtime 브라우저 등록 미리보기"
                   className="space-y-3 rounded-md border border-border p-4"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-sm font-medium">Runtime browser registration preview</h4>
+                    <h4 className="text-sm font-medium">Runtime 브라우저 등록 미리보기</h4>
                     <Badge variant={browserPreviewCurrent ? "info" : "warning"}>
-                      {browserPreviewCurrent
-                        ? "REVIEW BEFORE REGISTERING"
-                        : "REFRESH PREVIEW REQUIRED"}
+                      {browserPreviewCurrent ? "등록 전에 검토해 주세요" : "미리보기 새로고침 필요"}
                     </Badge>
                   </div>
                   <dl className="grid gap-2 text-xs sm:grid-cols-2">
                     {[
                       ["Check", browserPreview.check.checkId],
-                      ["Document", browserPreview.check.documentIdentity],
-                      ["Target", JSON.stringify(browserPreview.check.target)],
+                      ["문서", browserPreview.check.documentIdentity],
+                      ["대상", JSON.stringify(browserPreview.check.target)],
                       ["Expectation", JSON.stringify(browserPreview.check.assertion)],
-                      ["Registration digest", browserPreview.check.registrationDigest],
-                      ["Preview digest", browserPreview.previewDigest],
-                      ["Expires", new Date(browserPreview.expiresAt).toLocaleString()],
+                      ["등록 digest", browserPreview.check.registrationDigest],
+                      ["미리보기 digest", browserPreview.previewDigest],
+                      ["만료", new Date(browserPreview.expiresAt).toLocaleString()],
                     ].map(([label, value]) => (
                       <div key={label}>
                         <dt className="text-muted-foreground">{label}</dt>
@@ -1983,24 +1960,22 @@ export function WeavraControls({
                     ))}
                   </dl>
                   <p className="text-xs text-muted-foreground">
-                    Confirming registers only this expectation. It does not capture the page,
-                    produce PASS, start a workflow or authorize automatic repair.
+                    확인하면 이 예상 결과만 등록해요. 페이지 캡처·PASS 판정·워크플로 시작·자동 수정
+                    허용은 하지 않아요.
                   </p>
                   <Button
                     size="sm"
                     disabled={!canPrepare || !browserPreviewCurrent}
                     onClick={confirmBrowser}
                   >
-                    Confirm browser registration
+                    브라우저 검사 등록 확인
                   </Button>
                 </section>
               )}
               <div className="space-y-2 text-xs">
-                <h4 className="font-medium">Runtime registry · recorded view</h4>
+                <h4 className="font-medium">Runtime 등록 목록 · 기록된 상태</h4>
                 {browserInspection.data.checks.length === 0 && (
-                  <p className="text-muted-foreground">
-                    No registered browser checks in this view.
-                  </p>
+                  <p className="text-muted-foreground">표시할 등록된 브라우저 검사가 없어요.</p>
                 )}
                 {browserInspection.data.checks.map(({ check, required }) => (
                   <div
@@ -2009,7 +1984,7 @@ export function WeavraControls({
                   >
                     <p>
                       {check.checkId} · {required ? "required" : "optional"} ·{" "}
-                      <strong>REGISTERED, NOT VERIFIED</strong>
+                      <strong>등록됨, 아직 미검증</strong>
                     </p>
                     <p className="break-all">
                       {check.documentIdentity} · {check.target.selector}
@@ -2022,21 +1997,18 @@ export function WeavraControls({
                 ))}
                 {browserInspection.data.omittedChecks > 0 && (
                   <p className="text-muted-foreground">
-                    {browserInspection.data.omittedChecks} additional checks omitted.
+                    {browserInspection.data.omittedChecks} 개 검사를 생략했어요.
                   </p>
                 )}
               </div>
               <div className="space-y-2 text-xs">
-                <h4 className="font-medium">Latest durable Run · recorded browser evidence</h4>
+                <h4 className="font-medium">최근 저장된 Run · 기록된 브라우저 증거</h4>
                 <p className="text-muted-foreground">
-                  A recorded PASS applies only to its capture, Run, step and revision. It is not a
-                  live page status. Missing or unavailable evidence never falls back to an older
-                  passing Run.
+                  기록된 PASS는 해당 캡처·Run·단계·revision에만 적용돼요. 현재 페이지 상태가
+                  아니에요. 증거가 없거나 불러올 수 없을 때 과거에 통과한 Run으로 대체하지 않아요.
                 </p>
                 {browserInspection.data.evidence.length === 0 && (
-                  <p className="text-muted-foreground">
-                    No browser verification evidence in the latest Run.
-                  </p>
+                  <p className="text-muted-foreground">최근 Run에 브라우저 검증 증거가 없어요.</p>
                 )}
                 {browserInspection.data.evidence.map((entry) => (
                   <div
@@ -2044,8 +2016,8 @@ export function WeavraControls({
                     className="space-y-1 rounded-md border border-border p-3"
                   >
                     <p>
-                      {entry.checkId} · {entry.step?.stepId ?? "unknown step"} ·{" "}
-                      <strong>{entry.status}</strong>
+                      {entry.checkId} · {entry.step?.stepId ?? "단계 미확인"} ·{" "}
+                      <strong>{weavraLabel(entry.status)}</strong>
                     </p>
                     <p className="break-all">
                       Run {entry.runId} · revision {entry.revision}
@@ -2053,27 +2025,27 @@ export function WeavraControls({
                     {entry.browser ? (
                       <>
                         <p>
-                          Captured {new Date(entry.browser.capturedAt).toLocaleString()} · cleanup{" "}
-                          {entry.browser.cleanup}
+                          캡처 시각 {new Date(entry.browser.capturedAt).toLocaleString()} · 정리
+                          상태 {entry.browser.cleanup}
                         </p>
                         <p className="break-all">{entry.browser.documentIdentity}</p>
                         <p className="break-all text-muted-foreground">
-                          Registration {entry.browser.registrationDigest}
+                          등록 정보 {entry.browser.registrationDigest}
                         </p>
                         <p className="break-all text-muted-foreground">
-                          Document {entry.browser.documentDigest}
+                          문서 {entry.browser.documentDigest}
                         </p>
                       </>
                     ) : (
                       <p className="text-muted-foreground">
-                        No accepted browser capture metadata for this result.
+                        이 결과에 사용할 수 있는 브라우저 캡처 정보가 없어요.
                       </p>
                     )}
                   </div>
                 ))}
                 {browserInspection.data.omittedEvidence > 0 && (
                   <p className="text-muted-foreground">
-                    {browserInspection.data.omittedEvidence} additional browser results omitted.
+                    {browserInspection.data.omittedEvidence} 개 브라우저 결과를 생략했어요.
                   </p>
                 )}
               </div>
@@ -2082,25 +2054,25 @@ export function WeavraControls({
         </section>
         {approval && (
           <section
-            aria-label="Pending R3 approval"
+            aria-label="대기 중인 R3 승인"
             className="space-y-3 rounded-md border border-warning/50 p-4 text-sm"
           >
-            <h4 className="font-medium">Pending R3 approval · one file deletion</h4>
+            <h4 className="font-medium">대기 중인 R3 승인 · 파일 하나 삭제</h4>
             <p>{approval.explanation}</p>
             <dl className="grid gap-2 text-xs sm:grid-cols-2">
               {[
-                ["Target", approval.path],
+                ["대상", approval.path],
                 ["Run", approval.runId],
-                ["Approval", approval.approvalId],
-                ["Operation / role", `${approval.operation} / ${approval.role}`],
-                ["Step", `${approval.step.stepId}@${approval.step.attempt}`],
+                ["승인", approval.approvalId],
+                ["작업 / 역할", `${approval.operation} / ${approval.role}`],
+                ["단계", `${approval.step.stepId}@${approval.step.attempt}`],
                 [
-                  "Run / project revision",
+                  "Run / 프로젝트 revision",
                   `${approval.stateRevision} / ${approval.projectRevision}`,
                 ],
-                ["Bytes", String(approval.bytes)],
-                ["Fingerprint", approval.preconditionDigest],
-                ["Expires", new Date(approval.expiresAt).toLocaleString()],
+                ["바이트", String(approval.bytes)],
+                ["파일 지문", approval.preconditionDigest],
+                ["만료", new Date(approval.expiresAt).toLocaleString()],
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt className="text-muted-foreground">{label}</dt>
@@ -2109,8 +2081,8 @@ export function WeavraControls({
               ))}
             </dl>
             <p className="text-xs text-muted-foreground">
-              Deny is the default. No session-wide grant, scope expansion or automatic rollback.
-              Approval alone never means PASS or COMPLETE.
+              기본 선택은 거부예요. 세션 전체 권한·범위 확대·자동 되돌리기는 없어요. 승인만으로
+              PASS나 COMPLETE가 되지는 않아요.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -2119,14 +2091,14 @@ export function WeavraControls({
                 disabled={submitting || approval.expiresAt <= observedAt}
                 onClick={() => resolveApproval("reject")}
               >
-                Reject
+                거부
               </Button>
               <Button
                 size="sm"
                 disabled={submitting || approval.expiresAt <= observedAt}
                 onClick={() => resolveApproval("approve")}
               >
-                Approve once
+                이번만 승인
               </Button>
             </div>
           </section>

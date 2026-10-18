@@ -88,6 +88,8 @@ function checkpoint(paths: string[]) {
 	);
 }
 function create(goal = "Fix bug in src/app.ts", executionMode: ExecutionMode = "EDIT") {
+	// Tests adjust config in memory; the run's frozen config must match .ai/config.yaml (start recheck).
+	writeFileSync(join(cwd, ".ai/config.yaml"), JSON.stringify(config));
 	return new StandardWorkflow({
 		cwd,
 		goal,

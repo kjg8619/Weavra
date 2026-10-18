@@ -195,7 +195,7 @@ export function SidebarProviderUpdatePill() {
               <Button
                 size="icon-micro"
                 variant="ghost"
-                aria-label="Dismiss provider update notice"
+                aria-label="제공자 업데이트 알림 닫기"
                 className="relative z-[1] mr-1 [--control-icon-color:currentColor] rounded-md text-inherit opacity-70 hover:bg-transparent hover:opacity-100"
                 onClick={() => startExit(displayedView.key, null, displayedView.key)}
               >
@@ -203,7 +203,7 @@ export function SidebarProviderUpdatePill() {
               </Button>
             }
           />
-          <TooltipPopup side="top">Dismiss until provider status changes</TooltipPopup>
+          <TooltipPopup side="top">제공자 상태가 변경될 때까지 닫기</TooltipPopup>
         </Tooltip>
       )}
     </div>

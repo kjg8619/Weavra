@@ -6,6 +6,7 @@ import type {
 	ApiKeyCredential,
 	AuthContext,
 	AuthResult,
+	AuthType,
 	Credential,
 	CredentialStore,
 	OAuthAuth,
@@ -18,6 +19,8 @@ export type ModelsErrorCode = "model_source" | "model_validation" | "provider" |
 export interface AuthResolutionOverrides {
 	apiKey?: string;
 	env?: ProviderEnv;
+	/** Restrict the actual selection, before credential refresh or request-auth derivation. */
+	requiredAuthType?: AuthType;
 	/** Require this much remaining OAuth-token validity; defaults to five minutes. */
 	minOAuthValidityMs?: number;
 	signal?: AbortSignal;
@@ -71,6 +74,8 @@ async function resolveProviderAuthWithSignal(
 	const requestAuthContext = overrides?.env ? overlayEnvAuthContext(authContext, overrides.env) : authContext;
 
 	if (overrides?.apiKey !== undefined && provider.auth.apiKey) {
+		if (overrides.requiredAuthType === "oauth")
+			throw new ModelsError("auth", `Credential type changed for ${provider.id}`);
 		return resolveApiKey(
 			requestAuthContext,
 			provider.auth.apiKey,
@@ -85,6 +90,8 @@ async function resolveProviderAuthWithSignal(
 	}
 
 	const stored = await readCredential(credentials, provider.id, signal);
+	if (overrides?.requiredAuthType && (stored?.type ?? "api_key") !== overrides.requiredAuthType)
+		throw new ModelsError("auth", `Credential type changed for ${provider.id}`);
 	if (stored) {
 		if (stored.type === "oauth" && provider.auth.oauth) {
 			return resolveStoredOAuth(

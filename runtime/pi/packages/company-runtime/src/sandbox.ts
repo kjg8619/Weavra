@@ -4,8 +4,10 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { RuntimeConfig } from "./config.ts";
 import type { ProcessResult } from "./process-runner.ts";
 import { runProcess } from "./process-runner.ts";
+import { resolveVerifierTrustSources } from "./verifier-trust.ts";
 
 /**
  * Verifier Sandbox (V0.4C): an OS-level boundary for registered verification check processes only.
@@ -417,4 +419,45 @@ export async function runSandboxedCheck(input: {
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
+}
+
+/**
+ * Host-owned sandbox for registered process checks, probed before any check runs. Undefined when the sandbox is
+ * disabled or only browser checks exist; required mode never falls back unsandboxed.
+ */
+export async function verifierSandbox(
+	config: RuntimeConfig,
+	cwd: string,
+	protectedPaths: readonly string[],
+): Promise<SandboxPolicySnapshot | undefined> {
+	if (
+		(config.verification.sandbox?.mode ?? "disabled") !== "required" ||
+		!config.verification.checks.some((check) => check.kind !== "browser")
+	)
+		return undefined;
+	const trustedSources = [
+		...new Set(config.verification.checks.flatMap((check) => resolveVerifierTrustSources(cwd, check))),
+	];
+	const canonicalTrust = trustedSources.map((path) => canonicalHostPath(join(cwd, path)));
+	const protectedCandidates = [...new Set([...protectedPaths, ".git", ".ai", ".env"])].map((path) =>
+		canonicalHostPath(join(cwd, path)),
+	);
+	// Worker protection is not the sandbox read boundary, but a trusted source nested inside a
+	// protected read region (or equal to it) would stop the verifier from reading its own oracle.
+	for (const source of canonicalTrust) {
+		for (const protectedPath of protectedCandidates) {
+			// Exact equality is a Worker-protection entry, not a read-boundary conflict.
+			if (source.startsWith(`${protectedPath}${sep}`))
+				throw new SandboxUnavailableError("trusted verifier source conflicts with sandbox protected read boundary");
+		}
+	}
+	const sandbox = buildSandboxPolicy({
+		workspace: canonicalHostPath(cwd),
+		trustedSources,
+		// Trusted sources stay write-denied through trustedSources; they are not read-denied here.
+		protectedPaths: protectedCandidates.filter((path) => !canonicalTrust.includes(path)),
+	});
+	const probe = await probeSandboxBackend(sandbox);
+	if (!probe.ok) throw new SandboxUnavailableError(probe.reason ?? "OS sandbox backend preflight failed");
+	return sandbox;
 }

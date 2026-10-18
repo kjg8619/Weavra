@@ -42,6 +42,8 @@ beforeEach(async () => {
 	await chmod(launcher, 0o755);
 	await cp(join(packageRoot, "src"), dirname(extension), { recursive: true });
 	await symlink(join(repository, "node_modules"), join(checkout, "node_modules"));
+	// Like a real checkout: npm nests some company-runtime dependencies (e.g. the Claude Agent SDK) here.
+	await symlink(join(packageRoot, "node_modules"), join(checkout, "packages/company-runtime/node_modules"));
 	await symlink(process.execPath, join(bin, "node"));
 	await mkdir(join(root, ".weavra"), { mode: 0o700 });
 	await mkdir(join(root, ".weavra/agent"), { mode: 0o700 });

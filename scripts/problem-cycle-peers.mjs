@@ -140,9 +140,12 @@ if (process.env.WEAVRA_TASK8_HOOK) {
     process.stdin.destroy();
   }));
   for (const signal of ["SIGTERM", "SIGINT"]) process.on(signal, () => child.kill(signal));
-} else if (process.argv[2] === "--codex") {
+} else if (process.argv[2] === "--codex" || process.argv[2] === "--codex-qa") {
   const config = await json(process.argv[3]);
   const args = process.argv.slice(4);
+  const ordinaryQa = process.argv[2] === "--codex-qa";
+  const qaEndpoint = args.find(arg => arg.startsWith("mcp_servers.t3-code.url="))
+    ?.slice("mcp_servers.t3-code.url=".length);
   if (args.includes("--version")) {
     console.log("codex-cli 1.0.0");
   } else if (args.includes("exec")) {
@@ -152,7 +155,7 @@ if (process.env.WEAVRA_TASK8_HOOK) {
     await fs.writeFile(output, JSON.stringify({ title: "Greeting investigation" }));
   } else {
     let sequence = 0;
-    const threadId = `analysis-${process.pid}`;
+    const threadId = `${ordinaryQa ? "qa" : "analysis"}-${process.pid}`;
     const send = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
     const toolProbes = new Map();
     for await (const line of createInterface({ input: process.stdin })) {
@@ -171,7 +174,7 @@ if (process.env.WEAVRA_TASK8_HOOK) {
       }
       const p = request.params ?? {};
       // Whitelist observations; never log raw prompts, requests, or credentials.
-      await post(config, { kind: "analysis-request", method: request.method,
+      await post(config, { kind: ordinaryQa ? "qa-request" : "analysis-request", method: request.method,
         ...(request.method === "thread/start" || request.method === "thread/resume"
           ? { sandbox: p.sandbox, approvalPolicy: p.approvalPolicy } : {}),
         ...(request.method === "turn/start" ? { sandboxPolicy: p.sandboxPolicy } : {}) });
@@ -182,14 +185,23 @@ if (process.env.WEAVRA_TASK8_HOOK) {
         case "config/read": result = { config: {
           features: Object.fromEntries(["apps", "plugins", "hooks", "codex_hooks", "plugin_hooks",
             "skill_mcp_dependency_install"].map((f) => [f, !args.some((a, i) => a === "--disable" && args[i + 1] === f)])),
-          mcp_servers: {},
+          mcp_servers: ordinaryQa && qaEndpoint ? { "t3-code": {
+            url: qaEndpoint, bearer_token_env_var: "T3_MCP_BEARER_TOKEN", enabled: true,
+          } } : {},
         }, origins: {}, layers: [] }; break;
         case "account/read": result = { account: { type: "apiKey" }, requiresOpenaiAuth: false }; break;
         case "account/rateLimits/read": result = { rateLimits: null, rateLimitsByLimitId: null }; break;
+        case "config/mcpServer/reload":
+          assert.equal(ordinaryQa, true, "Controlled analysis must not reload an MCP catalog");
+          assert.ok(qaEndpoint && process.env.T3_MCP_BEARER_TOKEN);
+          result = {};
+          break;
         case "skills/list": result = { data: [] }; break;
-        case "model/list": result = { data: [{ defaultReasoningEffort: "medium", description: "fixture",
-          displayName: "Fixture Codex", hidden: false, id: "gpt-5.3-codex", isDefault: true,
-          model: "gpt-5.3-codex", supportedReasoningEfforts: [{ description: "fixture", reasoningEffort: "medium" }] }],
+        case "model/list": result = { data: (config.presetModels
+          ? ["gpt-5.3-codex-spark", "gpt-5.6-sol", "gpt-6-astra"]
+          : ["gpt-5.3-codex"]).map(model => ({ defaultReasoningEffort: "medium", description: "fixture",
+          displayName: model, hidden: false, id: model, isDefault: true,
+          model, supportedReasoningEfforts: [{ description: "fixture", reasoningEffort: "medium" }] })),
           nextCursor: null }; break;
         case "thread/start": case "thread/resume": result = {
           approvalPolicy: p.approvalPolicy, approvalsReviewer: p.approvalsReviewer,
@@ -201,6 +213,29 @@ if (process.env.WEAVRA_TASK8_HOOK) {
           },
         }; break;
         case "turn/start": {
+          if (ordinaryQa) {
+            assert.ok(qaEndpoint, "Ordinary QA requires a normally issued MCP endpoint");
+            assert.ok(process.env.T3_MCP_BEARER_TOKEN, "Ordinary QA requires a normally issued credential");
+            const turnId = `${threadId}-turn-${++sequence}`;
+            send({ id: request.id, result: { turn: { id: turnId, items: [], status: "inProgress" } } });
+            send({ method: "turn/started", params: { threadId, turn: { id: turnId, items: [], status: "inProgress" } } });
+            // This credential goes only to the private fixture broker, never stdout or a report.
+            await post(config, { kind: "qa-credential", endpoint: qaEndpoint,
+              authorizationHeader: `Bearer ${process.env.T3_MCP_BEARER_TOKEN}` });
+            const text = config.qaControlDraft
+              ? "```weavra-control\n" + JSON.stringify({
+                  version: 1, goal: "Fix the greeting implementation",
+                  symptom: "The greeting omits a letter",
+                  criteria: ["The greeting includes Hello", "The registered greeting test passes"],
+                  constraints: ["Preserve the registered test"],
+                }) + "\n```"
+              : "Owned QA tool session ready.";
+            const item = { id: `${turnId}-message`, type: "agentMessage", text };
+            send({ method: "item/completed", params: { completedAtMs: 1, item, threadId, turnId } });
+            send({ method: "turn/completed", params: { threadId,
+              turn: { completedAt: 1, id: turnId, items: [item], status: "completed" } } });
+            continue;
+          }
           assert.deepEqual(p.sandboxPolicy, { type: "readOnly", networkAccess: false });
           const turnId = `${threadId}-turn-${++sequence}`;
           const text = sequence === 1
@@ -217,11 +252,13 @@ if (process.env.WEAVRA_TASK8_HOOK) {
           continue;
         }
         case "turn/interrupt": result = {}; break;
-        default: throw new Error(`Unsupported scripted analysis method: ${request.method}`);
+        default:
+          if (ordinaryQa) await post(config, { kind: "qa-unsupported", method: request.method });
+          throw new Error(`Unsupported scripted ${ordinaryQa ? "QA" : "analysis"} method: ${request.method}`);
       }
       send({ id: request.id, result });
     }
   }
 } else {
-  throw new Error("Task8 peer requires --relay/--codex, or the isolated Runtime hook environment");
+  throw new Error("Task8 peer requires --relay/--codex/--codex-qa, or the isolated Runtime hook environment");
 }

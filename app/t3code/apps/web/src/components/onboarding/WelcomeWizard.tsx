@@ -90,8 +90,9 @@ type WizardStep = "connection" | "agents" | "import";
 const NO_ENVIRONMENTS: readonly EnvironmentId[] = [];
 
 const AGENT_ONBOARDING_THREAD_ID = ThreadId.make("onboarding-agent-setup");
-const ONBOARDING_STAGES = ["Connect", "Agents", "Projects"] as const;
-const SCAN_LIMIT_MESSAGE = "Scan limit reached. Some projects or conversations may be missing.";
+const ONBOARDING_STAGES = ["연결", "에이전트", "프로젝트"] as const;
+const SCAN_LIMIT_MESSAGE =
+  "검색 한도에 도달했어요. 일부 프로젝트나 대화가 표시되지 않을 수 있어요.";
 
 export function WelcomeWizard({
   localAvailable,
@@ -160,8 +161,8 @@ export function WelcomeWizard({
         .catch(() => {
           const errorToast = {
             type: "error",
-            title: "Could not finish setup",
-            description: "Your settings could not be saved. Try again.",
+            title: "설정을 완료하지 못했어요",
+            description: "설정을 저장하지 못했어요. 다시 시도해 주세요.",
           } as const;
           if (completionErrorToastIdRef.current === null) {
             completionErrorToastIdRef.current = toastManager.add(errorToast);
@@ -189,7 +190,7 @@ export function WelcomeWizard({
         initialFocus={() => document.getElementById("onboarding-pairing-url") ?? true}
       >
         <WizardHeader
-          title="Set up Weavra"
+          title="Weavra 설정하기"
           identity={
             <div className="flex items-baseline gap-1.5" role="img" aria-label="Weavra">
               <T3Wordmark className="h-4 w-auto shrink-0" aria-hidden />
@@ -298,15 +299,13 @@ function ConnectionStep({
   }, [ready]);
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-        Connect your computers
-      </h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground">컴퓨터 연결하기</h1>
       <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
-        Choose one or more computers. We’ll set up agents and projects on each.
+        컴퓨터를 하나 이상 선택해 주세요. 각 컴퓨터에 에이전트와 프로젝트를 설정해요.
       </p>
       {directEnvironments.length > 0 ? (
         <fieldset className="mt-5 space-y-2">
-          <legend className="sr-only">Computers to set up</legend>
+          <legend className="sr-only">설정할 컴퓨터</legend>
           {directEnvironments.map((environment) => (
             <label
               key={environment.environmentId}
@@ -328,7 +327,7 @@ function ConnectionStep({
                     {environment.label}
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {environment.connection.phase === "connected" ? "Connected" : "Connecting…"}
+                    {environment.connection.phase === "connected" ? "연결됨" : "연결 중…"}
                   </span>
                 </span>
                 {environment.displayUrl ? (
@@ -365,7 +364,7 @@ function ConnectionStep({
             }
           >
             <LinkIcon className="size-4 text-muted-foreground" />
-            <span className="flex-1">Add a computer</span>
+            <span className="flex-1">컴퓨터 추가하기</span>
             <ChevronRightIcon
               className={cn("size-4 text-muted-foreground", pairingOpen && "rotate-90")}
             />
@@ -392,7 +391,7 @@ function ConnectionStep({
           disabled={!ready || isPairing}
           onClick={onContinue}
         >
-          Continue
+          계속하기
           <ArrowRightIcon className="size-3.5" />
         </Button>
       </div>
@@ -444,11 +443,11 @@ function ConnectAccountOption({
         <span className="flex-1">T3 Connect</span>
         <span className="text-xs text-muted-foreground">
           {!isLoaded
-            ? "Loading sign-in…"
+            ? "로그인 정보를 불러오는 중…"
             : !isSignedIn
-              ? "Sign in"
+              ? "로그인"
               : !discoveryReady
-                ? "Loading computers…"
+                ? "컴퓨터를 불러오는 중…"
                 : null}
         </span>
         <ChevronRightIcon
@@ -467,13 +466,13 @@ function ConnectAccountOption({
                 selection={{ selectedIds, onChange: onToggleEnvironment, autoSelectedComputers }}
                 refreshWhileEmpty
                 empty={
-                  <p className="py-3 text-sm text-muted-foreground">No computers linked yet.</p>
+                  <p className="py-3 text-sm text-muted-foreground">연결된 컴퓨터가 없어요.</p>
                 }
               />
             ) : null}
           </div>
           <p className="text-sm text-muted-foreground">
-            Hosted account connections are unavailable. Use a direct pairing link instead.
+            호스팅 계정 연결을 사용할 수 없어요. 직접 페어링 링크를 사용해 주세요.
           </p>
         </div>
       </CollapsiblePanel>
@@ -520,7 +519,7 @@ function PairingForm({
     }
     if (isAtomCommandInterrupted(result)) return;
     const cause = squashAtomCommandFailure(result);
-    setErrorMessage(cause instanceof Error ? cause.message : "Pairing failed.");
+    setErrorMessage(cause instanceof Error ? cause.message : "페어링에 실패했어요.");
   };
 
   return (
@@ -534,7 +533,7 @@ function PairingForm({
       >
         <div>
           <label className="block text-sm text-muted-foreground" htmlFor="onboarding-pairing-url">
-            Pairing link
+            페어링 링크
           </label>
           <Input
             id="onboarding-pairing-url"
@@ -578,20 +577,19 @@ function PairingForm({
               className="group flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               <ChevronRightIcon className="size-3.5 group-data-panel-open:rotate-90" />
-              Need a pairing link?
+              페어링 링크가 필요하신가요?
             </CollapsibleTrigger>
             <Button type="submit" disabled={isPairing || pairingUrl.trim().length === 0}>
-              {isPairing ? "Pairing..." : "Pair"}
+              {isPairing ? "페어링 중..." : "페어링"}
             </Button>
           </div>
           <CollapsiblePanel className="pt-3">
-            <p className="text-sm text-muted-foreground">
-              Run this on the computer with your code.
-            </p>
+            <p className="text-sm text-muted-foreground">코드가 있는 컴퓨터에서 실행해 주세요.</p>
             <CommandBlock command="weavra-server pair" className="mt-2" />
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Start Weavra first, or run <code className="font-mono">weavra-server serve</code>. Add{" "}
-              <code className="font-mono">--tailscale</code> to use your tailnet.
+              먼저 Weavra를 시작하거나 <code className="font-mono">weavra-server serve</code>를
+              실행해 주세요. tailnet을 사용하려면 <code className="font-mono">--tailscale</code>을
+              추가해 주세요.
             </p>
           </CollapsiblePanel>
         </Collapsible>
@@ -631,7 +629,7 @@ function AgentsStep({
 }) {
   const { environments } = useEnvironments();
   return (
-    <StepShell title="Your agents" description="Agents available on your selected computers.">
+    <StepShell title="에이전트" description="선택한 컴퓨터에서 사용할 수 있는 에이전트예요.">
       <ScrollArea
         scrollFade
         className="mt-5 h-auto max-h-96 [&_[data-slot=scroll-area-scrollbar]]:opacity-100"
@@ -643,7 +641,7 @@ function AgentsStep({
               environmentId={environmentId}
               machineLabel={
                 environments.find((environment) => environment.environmentId === environmentId)
-                  ?.label ?? "Computer"
+                  ?.label ?? "컴퓨터"
               }
             />
           ))}
@@ -651,7 +649,7 @@ function AgentsStep({
       </ScrollArea>
       <div className="mt-6 flex justify-end">
         <Button autoFocus onClick={onContinue}>
-          Continue
+          계속하기
           <ArrowRightIcon className="size-3.5" />
         </Button>
       </div>
@@ -768,12 +766,12 @@ function AgentCard({
         {providerState === "ready" ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
             <CheckIcon className="size-3.5" />
-            Ready
+            준비됨
           </span>
         ) : providerState === "checking" ? (
-          <span className="text-xs text-muted-foreground">Checking...</span>
+          <span className="text-xs text-muted-foreground">확인 중...</span>
         ) : providerState === "disabled" ? (
-          <span className="text-xs text-muted-foreground">Disabled</span>
+          <span className="text-xs text-muted-foreground">사용 안 함</span>
         ) : providerState === "attention" ? (
           <span className="text-xs text-muted-foreground">{summary.headline}</span>
         ) : (
@@ -784,7 +782,7 @@ function AgentCard({
             disabled={terminalOpen || !terminalAvailable}
           >
             <TerminalIcon className="size-3.5" />
-            {providerState === "signIn" ? "Sign in" : "Install"}
+            {providerState === "signIn" ? "로그인" : "설치"}
           </Button>
         )}
       </div>
@@ -897,25 +895,25 @@ function AgentInstallTerminal({
         <span className="text-[11px] font-medium text-muted-foreground">
           {setupState === "writeFailed" ? (
             <>
-              Run <code className="rounded bg-muted px-1 font-mono">{command}</code> in this
-              terminal.
+              이 터미널에서 <code className="rounded bg-muted px-1 font-mono">{command}</code>을
+              실행해 주세요.
             </>
           ) : setupState === "ready" ? (
-            "Review the command, then press Enter to run it."
+            "명령을 확인한 다음 Enter를 눌러 실행해 주세요."
           ) : setupState === "openFailed" ? (
-            "Could not open the setup terminal."
+            "설정 터미널을 열지 못했어요."
           ) : (
-            "Preparing command..."
+            "명령을 준비하고 있어요..."
           )}
         </span>
         <div className="flex items-center gap-1">
           {setupState === "openFailed" ? (
             <Button size="xs" variant="ghost" onClick={() => setSetupAttempt((value) => value + 1)}>
-              Retry
+              다시 시도
             </Button>
           ) : null}
           <Button size="xs" variant="ghost-muted" onClick={onClose}>
-            Close
+            닫기
           </Button>
         </div>
       </div>
@@ -925,7 +923,7 @@ function AgentInstallTerminal({
             threadRef={threadRef}
             threadId={AGENT_ONBOARDING_THREAD_ID}
             terminalId={terminalId}
-            terminalLabel={`Install ${driver}`}
+            terminalLabel={`${driver === "claudeAgent" ? "Claude Code" : "Codex"} 설치`}
             cwd={cwd}
             providerInstanceId={providerInstanceId}
             advancedTypography={advancedTypography}
@@ -1135,18 +1133,16 @@ function ImportStep({
     if (importedProjectsCount < selection.length) {
       if (importedThreadCount > 0 && skippedThreadCount > 0) {
         setImportError(
-          `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "thread" : "threads"}. ${skippedThreadCount} ${skippedThreadCount === 1 ? "thread" : "threads"} could not be imported.`,
+          `대화 ${importedThreadCount}개를 가져왔어요. 대화 ${skippedThreadCount}개는 가져오지 못했어요.`,
         );
       } else if (skippedThreadCount > 0) {
-        setImportError(
-          `${skippedThreadCount} ${skippedThreadCount === 1 ? "thread could" : "threads could"} not be imported.`,
-        );
+        setImportError(`대화 ${skippedThreadCount}개를 가져오지 못했어요.`);
       } else if (importedThreadCount > 0) {
         setImportError(
-          `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "thread" : "threads"}. Some thread history could not be imported.`,
+          `대화 ${importedThreadCount}개를 가져왔어요. 일부 대화 기록은 가져오지 못했어요.`,
         );
       } else {
-        setImportError("Could not import thread history.");
+        setImportError("대화 기록을 가져오지 못했어요.");
       }
       return;
     }
@@ -1156,16 +1152,16 @@ function ImportStep({
   if (scans.every((scan) => scan.data === null) && scans.some((scan) => scan.isPending)) {
     return (
       <div className="flex h-full min-h-40 flex-col">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Your projects</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">프로젝트</h1>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6">
           <Spinner className="size-5 text-muted-foreground" />
           <p className="text-center text-sm text-muted-foreground">
-            Looking for projects from Claude Code and Codex…
+            Claude Code와 Codex 프로젝트를 찾고 있어요…
           </p>
         </div>
         <div className="flex justify-end">
           <Button variant="ghost-muted" onClick={() => void onDone()}>
-            Do not import projects
+            프로젝트 가져오지 않기
           </Button>
         </div>
       </div>
@@ -1174,13 +1170,13 @@ function ImportStep({
 
   return (
     <StepShell
-      title="Choose your projects"
-      description="Import projects and conversations from your selected computers."
+      title="프로젝트 선택하기"
+      description="선택한 컴퓨터에서 프로젝트와 대화를 가져와요."
     >
       {candidates.length > 0 ? (
         <div className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
           <span role="status">
-            {selected.length} of {candidates.length} selected
+            총 {candidates.length}개 중 {selected.length}개 선택됨
           </span>
           <div className="flex items-center gap-1">
             <Button
@@ -1189,7 +1185,7 @@ function ImportStep({
               disabled={isImporting || selected.length === candidates.length}
               onClick={() => setSelectedPaths(new Set(candidates.map((item) => item.key)))}
             >
-              Select all
+              모두 선택
             </Button>
             <Button
               variant="ghost"
@@ -1197,7 +1193,7 @@ function ImportStep({
               disabled={isImporting || selected.length === 0}
               onClick={() => setSelectedPaths(new Set())}
             >
-              Select none
+              선택 해제
             </Button>
           </div>
         </div>
@@ -1213,7 +1209,7 @@ function ImportStep({
             );
             const label =
               environments.find((environment) => environment.environmentId === scan.environmentId)
-                ?.label ?? "Computer";
+                ?.label ?? "컴퓨터";
             return (
               <fieldset
                 key={scan.environmentId}
@@ -1226,21 +1222,21 @@ function ImportStep({
                 {scan.isPending && scan.data === null ? (
                   <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
                     <Spinner className="size-4" />
-                    Looking for projects…
+                    프로젝트를 찾고 있어요…
                   </div>
                 ) : scan.error !== null ? (
                   <div
                     role="alert"
                     className="flex items-center justify-between gap-3 text-sm text-muted-foreground"
                   >
-                    <span>Could not check projects. {scan.error}</span>
+                    <span>프로젝트를 확인하지 못했어요. {scan.error}</span>
                     <Button variant="ghost" size="sm" onClick={scan.refresh}>
-                      Retry
+                      다시 시도
                     </Button>
                   </div>
                 ) : scanCandidates.length === 0 ? (
                   <p className="py-2 text-sm text-muted-foreground">
-                    No existing Claude Code or Codex projects found.
+                    기존 Claude Code 또는 Codex 프로젝트를 찾지 못했어요.
                   </p>
                 ) : null}
                 {scan.data?.truncated ? (
@@ -1265,16 +1261,14 @@ function ImportStep({
           disabled={isImporting}
           onClick={importError ? finishAfterImport : () => void onDone()}
         >
-          {importError ? "Continue without the rest" : "Do not import projects"}
+          {importError ? "나머지는 건너뛰기" : "프로젝트 가져오지 않기"}
         </Button>
         <Button
           autoFocus
           disabled={isImporting || selected.length === 0}
           onClick={() => void runImport(selected)}
         >
-          {isImporting
-            ? "Importing…"
-            : `Import ${selected.length} ${selected.length === 1 ? "project" : "projects"}`}
+          {isImporting ? "가져오는 중…" : `프로젝트 ${selected.length}개 가져오기`}
         </Button>
       </div>
     </StepShell>
@@ -1337,9 +1331,9 @@ function ImportCandidateList({
             />
             <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-left">
               <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
-              <span className="truncate text-sm text-muted-foreground">Other folders</span>
+              <span className="truncate text-sm text-muted-foreground">기타 폴더</span>
               <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
-                {other.length} {other.length === 1 ? "folder" : "folders"}
+                폴더 {other.length}개
               </span>
             </CollapsibleTrigger>
           </div>
@@ -1482,7 +1476,7 @@ function ImportRowMeta({
 }) {
   const relative = lastActiveAt === null ? null : formatRelativeTime(lastActiveAt);
   // "just now" does not fit the fixed column, so collapse it.
-  const age = relative === null ? "" : relative.suffix === null ? "now" : relative.value;
+  const age = relative === null ? "" : relative.suffix === null ? "지금" : relative.value;
   return (
     <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
       <span className="flex size-4 items-center justify-center">
@@ -1549,7 +1543,7 @@ function CommandBlock({
       <Button
         size="icon-xs"
         variant="ghost"
-        aria-label="Copy command"
+        aria-label="명령 복사"
         onClick={() => copyToClipboard(command, undefined)}
       >
         {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}

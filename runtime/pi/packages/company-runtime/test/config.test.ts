@@ -36,7 +36,7 @@ describe("runtime config", () => {
 	});
 	it("uses conservative defaults without hardcoded provider models", () => {
 		const config = parseRuntimeConfig(JSON.stringify(minimal));
-		expect(config.models).toEqual(minimal.models);
+		expect(config.models).toEqual({ ...minimal.models, claude_code: { enabled: false } });
 		expect(config.runtime.workflow).toBe("adaptive");
 		expect(config.agents).toEqual({
 			max_parallel: 1,
@@ -50,6 +50,23 @@ describe("runtime config", () => {
 		expect(config.verification.checks).toEqual([]);
 		expect(Object.hasOwn(config, "workspace")).toBe(false);
 	});
+
+	it.each([true, false])("preserves explicit Claude Code opt-in %s", (enabled) => {
+		const config = parseRuntimeConfig(
+			JSON.stringify({ ...minimal, models: { ...minimal.models, claude_code: { enabled } } }),
+		);
+		expect(config.models.claude_code).toEqual({ enabled });
+		expect(config.models.profiles).toEqual(minimal.models.profiles);
+	});
+
+	it.each([null, {}, { enabled: "true" }, { enabled: 0 }, { enabled: null }, { enabled: true, consent: true }])(
+		"rejects invalid Claude Code opt-in settings: %j",
+		(claude_code) => {
+			expect(() =>
+				parseRuntimeConfig(JSON.stringify({ ...minimal, models: { ...minimal.models, claude_code } })),
+			).toThrow("Invalid runtime config");
+		},
+	);
 
 	it("preserves the explicit bounded-monorepo evidence profile without numeric overrides", () => {
 		const workspace = { evidence: { mode: "bounded-monorepo" } };

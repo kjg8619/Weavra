@@ -9,22 +9,22 @@ export type PullRequestLinkContextMenuAction = "copy-link" | "open-external";
 
 /** Named for the host rather than "externally": the point is where you will land. */
 const OPEN_ON_HOST_LABELS: Partial<Record<string, string>> = {
-  github: "Open on GitHub",
-  gitlab: "Open on GitLab",
-  forgejo: "Open on Forgejo",
-  bitbucket: "Open on Bitbucket",
-  "azure-devops": "Open on Azure DevOps",
+  github: "GitHub에서 열기",
+  gitlab: "GitLab에서 열기",
+  forgejo: "Forgejo에서 열기",
+  bitbucket: "Bitbucket에서 열기",
+  "azure-devops": "Azure DevOps에서 열기",
 };
 
 export const openOnHostLabel = (provider: string): string =>
-  OPEN_ON_HOST_LABELS[provider] ?? "Open on host";
+  OPEN_ON_HOST_LABELS[provider] ?? "host에서 열기";
 
 /** Copy first: it is the reason to right-click a number rather than click it. */
 function pullRequestLinkContextMenuItems(
   openLabel: string,
 ): readonly ContextMenuItem<PullRequestLinkContextMenuAction>[] {
   return [
-    { id: "copy-link", label: "Copy link", icon: "copy" },
+    { id: "copy-link", label: "링크 복사", icon: "copy" },
     { id: "open-external", label: openLabel },
   ];
 }
@@ -63,7 +63,7 @@ export async function showPullRequestLinkContextMenu({
   } catch {
     toastManager.add({
       type: "error",
-      title: action === "copy-link" ? "Could not copy the link" : "Could not open the link",
+      title: action === "copy-link" ? "링크를 복사하지 못했어요" : "링크를 열지 못했어요",
     });
   }
 }

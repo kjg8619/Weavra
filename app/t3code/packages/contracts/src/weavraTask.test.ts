@@ -1,15 +1,22 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 import { ClientOrchestrationCommand, ThreadTurnStartCommand } from "./orchestration.ts";
+import { WeavraControlErrorCode } from "./weavraControl.ts";
 import {
   WeavraAnalysisContext,
   WeavraTask,
   WeavraTaskId,
   WeavraTaskReceipt,
+  WeavraTaskFailureSummary,
   WeavraTaskCreateInput,
   WeavraTaskDraft,
 } from "./weavraTask.ts";
-import { WeavraTaskAnalyzeInput, WeavraTaskRecoverInput } from "./weavraTaskRpc.ts";
+import {
+  WeavraTaskAnalyzeInput,
+  WeavraTaskCommitDirtyBaselineInput,
+  WeavraTaskRecoverInput,
+  WeavraTaskRpcError,
+} from "./weavraTaskRpc.ts";
 
 const digest = `sha256:${"a".repeat(64)}`;
 const taskId = "11111111-1111-4111-8111-111111111111";
@@ -56,6 +63,7 @@ const task = {
 const decodePacket = Schema.decodeUnknownSync(WeavraAnalysisContext);
 const decodeTask = Schema.decodeUnknownSync(WeavraTask);
 const decodeReceipt = Schema.decodeUnknownSync(WeavraTaskReceipt);
+const decodeFailureSummary = Schema.decodeUnknownSync(WeavraTaskFailureSummary);
 const decodeTaskId = Schema.decodeUnknownSync(WeavraTaskId);
 const decodeThreadTurnStartCommand = Schema.decodeUnknownSync(ThreadTurnStartCommand);
 const decodeClientOrchestrationCommand = Schema.decodeUnknownSync(ClientOrchestrationCommand);
@@ -110,6 +118,105 @@ const preview = {
   },
 };
 
+describe("controlled task preparation errors", () => {
+  const decode = Schema.decodeUnknownSync(WeavraTaskRpcError);
+  const encode = Schema.encodeSync(WeavraTaskRpcError);
+  const encodeJson = Schema.encodeSync(Schema.fromJsonString(WeavraTaskRpcError));
+  const decodeJson = Schema.decodeSync(Schema.fromJsonString(WeavraTaskRpcError));
+  const legacy = { _tag: "WeavraTaskRpcError", code: "PREPARE_REJECTED" };
+
+  it("round-trips legacy rejection without inventing a preparation reason", () => {
+    const error = decodeJson(encodeJson(decode(legacy)));
+    expect(error).toBeInstanceOf(WeavraTaskRpcError);
+    expect(encode(error)).toEqual(legacy);
+    expect(error).not.toHaveProperty("prepareReason");
+  });
+
+  it("round-trips every existing Runtime code and each bounded preview reason", () => {
+    const reasons = [
+      ...WeavraControlErrorCode.literals.map((code) => ({ kind: "runtime", code })),
+      ...["INVALID_PREVIEW", "STANDARD_REQUIRED", "BINDING_MISMATCH"].map((code) => ({
+        kind: "preview",
+        code,
+      })),
+    ];
+    for (const prepareReason of reasons) {
+      const value = { ...legacy, prepareReason };
+      expect(encode(decodeJson(encodeJson(decode(value))))).toEqual(value);
+    }
+  });
+
+  it("rejects malformed, open-ended, and cross-kind preparation reasons", () => {
+    for (const prepareReason of [
+      null,
+      "INVALID_GOAL",
+      {},
+      { kind: "runtime" },
+      { code: "INVALID_GOAL" },
+      { kind: "other", code: "INVALID_GOAL" },
+      { kind: "runtime", code: "UNREGISTERED_CODE" },
+      { kind: "runtime", code: "INVALID_PREVIEW" },
+      { kind: "preview", code: "INVALID_GOAL" },
+      { kind: "preview", code: "UNREGISTERED_CODE" },
+      { kind: "runtime", code: "INVALID_GOAL", message: "private Runtime text" },
+      { kind: "runtime", code: "INVALID_GOAL", details: { path: "/private" } },
+      { kind: "preview", code: "INVALID_PREVIEW", payload: {} },
+    ]) {
+      expect(() => decode({ ...legacy, prepareReason })).toThrow();
+    }
+  });
+
+  it("carries dirty workspace paths only on a runtime PROJECT_CHANGED reason", () => {
+    const details = { reason: "DIRTY_WORKSPACE", files: ["a.txt", "b.txt"], truncated: false };
+    const value = {
+      ...legacy,
+      prepareReason: { kind: "runtime", code: "PROJECT_CHANGED", details },
+    };
+    expect(encode(decodeJson(encodeJson(decode(value))))).toEqual(value);
+    for (const prepareReason of [
+      { kind: "runtime", code: "BUSY", details },
+      { kind: "preview", code: "INVALID_PREVIEW", details },
+      { kind: "runtime", code: "PROJECT_CHANGED", details: { ...details, files: [""] } },
+    ]) {
+      expect(() => decode({ ...legacy, prepareReason })).toThrow();
+    }
+  });
+
+  it("requires explicit consent and a bounded reviewed list to commit a dirty baseline", () => {
+    const decodeInput = Schema.decodeUnknownSync(WeavraTaskCommitDirtyBaselineInput);
+    const input = {
+      task: {
+        environmentId: "environment",
+        projectId: "project",
+        threadId: "thread",
+        taskId,
+      },
+      expectedRevision: 2,
+      files: ["a.txt"],
+      consent: true,
+    };
+    expect(decodeInput(input)).toEqual(input);
+    for (const invalid of [
+      { ...input, consent: false },
+      { ...input, files: [] },
+      { ...input, files: Array.from({ length: 51 }, (_, i) => `f${i}`) },
+    ]) {
+      expect(() => decodeInput(invalid)).toThrow();
+    }
+  });
+
+  it("allows reasons only on PREPARE_REJECTED and preserves all legacy error codes", () => {
+    const prepareReason = { kind: "runtime", code: "BUSY" } as const;
+    for (const code of WeavraTaskRpcError.fields.code.literals) {
+      const value = { _tag: "WeavraTaskRpcError", code };
+      expect(encode(decode(value))).toEqual(value);
+      if (code === "PREPARE_REJECTED") continue;
+      expect(() => decode({ ...value, prepareReason })).toThrow();
+      expect(() => new WeavraTaskRpcError({ code, prepareReason })).toThrow();
+    }
+  });
+});
+
 describe("controlled task contracts", () => {
   it("requires canonical UUID task identities", () => {
     expect(decodeTaskId(taskId)).toBe(taskId);
@@ -159,6 +266,67 @@ describe("controlled task contracts", () => {
     const current = { ...legacy, createCommandId: "create", execution: { ...execution, preview } };
     const serialized = encodeTaskJson(decodeTask(current));
     expect(decodeTaskJson(serialized)).toEqual(current);
+  });
+
+  it("accepts only bounded failure codes and next actions", () => {
+    expect(
+      decodeFailureSummary({ code: "CHECK_FAILED", nextAction: "REVIEW_CHECK_FAILURE" }),
+    ).toEqual({ code: "CHECK_FAILED", nextAction: "REVIEW_CHECK_FAILURE" });
+    expect(() =>
+      decodeFailureSummary({
+        code: "CHECK_FAILED",
+        nextAction: "REVIEW_RUN_FAILURE",
+      }),
+    ).toThrow();
+    expect(() =>
+      decodeFailureSummary({
+        code: "RUN_FAILED",
+        nextAction: "REVIEW_RUN_FAILURE",
+        reason: "raw stack or argv",
+      }),
+    ).toThrow();
+  });
+
+  it("stores failure summaries only after canonical terminal cleanup", () => {
+    const receipt = {
+      status: "FOUND",
+      executionId,
+      admission: {
+        metadata: {
+          binding,
+          previewDigest: digest,
+          configDigest: digest,
+          confirmedProjectRevision: 0,
+          admittedProjectRevision: 1,
+        },
+        outcome: { status: "STARTED", runId: "run" },
+        acceptedAt: 1,
+        updatedAt: 2,
+        cleanup: "CONFIRMED",
+      },
+      run: { runId: "run", status: "FAILED", revision: 1 },
+    };
+    const summary = { code: "RUN_FAILED", nextAction: "REVIEW_RUN_FAILURE" };
+    const settled = {
+      ...task,
+      phase: "finished",
+      ownership: { generation: 1, state: "released" },
+      execution: { ...execution, confirmCommandId: "confirm", receipt },
+      failureSummary: summary,
+    };
+    expect(decodeTask(settled).failureSummary).toEqual(summary);
+    expect(() =>
+      decodeTask({
+        ...settled,
+        execution: {
+          ...settled.execution,
+          receipt: {
+            ...receipt,
+            admission: { ...receipt.admission, cleanup: "UNCONFIRMED" },
+          },
+        },
+      }),
+    ).toThrow();
   });
 
   it("rejects preview presentations detached from the execution binding", () => {

@@ -24,9 +24,9 @@ const FAILURE_OPERATION_BY_ACTION = {
 } as const satisfies Record<ExternalLinkContextMenuAction, ExternalLinkContextMenuFailureOperation>;
 
 const EXTERNAL_LINK_CONTEXT_MENU_ITEMS = [
-  { id: "open-in-preview", label: "Open in integrated browser" },
-  { id: "open-external", label: "Open in system browser" },
-  { id: "copy-link", label: "Copy Link" },
+  { id: "open-in-preview", label: "내장 브라우저에서 열기" },
+  { id: "open-external", label: "시스템 브라우저에서 열기" },
+  { id: "copy-link", label: "링크 복사" },
 ] as const satisfies readonly ContextMenuItem<ExternalLinkContextMenuAction>[];
 
 /**
@@ -46,8 +46,7 @@ function externalLinkContextMenuItems(options: {
   return [
     {
       id: options.threadLinkAction,
-      label:
-        options.threadLinkAction === "link-to-thread" ? "Link to thread" : "Unlink from thread",
+      label: options.threadLinkAction === "link-to-thread" ? "대화에 연결" : "대화 연결 해제",
     },
     ...items,
   ];

@@ -36,7 +36,7 @@ describe("ComposerPendingApprovalPanel", () => {
       />,
     );
 
-    expect(markup).toContain("File read approval");
+    expect(markup).toContain("파일 읽기 승인");
   });
 
   it("shows the app name and message for an MCP access request", () => {

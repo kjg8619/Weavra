@@ -102,10 +102,10 @@ describe("resolvePreviousWorktreeSeed", () => {
 describe("resolvePreviousWorktreeLabel", () => {
   it("includes the branch when known", () => {
     expect(resolvePreviousWorktreeLabel({ branch: "t3/fix-thing", worktreePath: "/wt" })).toBe(
-      "Previous worktree (t3/fix-thing)",
+      "이전 worktree (t3/fix-thing)",
     );
     expect(resolvePreviousWorktreeLabel({ branch: null, worktreePath: "/wt" })).toBe(
-      "Previous worktree",
+      "이전 worktree",
     );
   });
 });
@@ -256,7 +256,7 @@ describe("resolveBranchTriggerLabel", () => {
         resolvedActiveBranchIsRemote: null,
         startFromOrigin: true,
       }),
-    ).toBe("Select ref");
+    ).toBe("ref 선택");
   });
 
   it("does not fabricate an origin ref while branch metadata is loading", () => {
@@ -370,7 +370,7 @@ describe("resolveEnvironmentOptionLabel", () => {
         runtimeLabel: "Local environment",
         savedLabel: "Local",
       }),
-    ).toBe("This device");
+    ).toBe("이 기기");
   });
 
   it("keeps configured labels for non-primary environments", () => {
@@ -493,28 +493,28 @@ describe("resolveEffectiveEnvMode", () => {
 
 describe("resolveEnvModeLabel", () => {
   it("uses explicit workspace labels", () => {
-    expect(resolveEnvModeLabel("local")).toBe("Current checkout");
-    expect(resolveEnvModeLabel("worktree")).toBe("New worktree");
+    expect(resolveEnvModeLabel("local")).toBe("현재 checkout");
+    expect(resolveEnvModeLabel("worktree")).toBe("새 worktree");
   });
 });
 
 describe("resolveCurrentWorkspaceLabel", () => {
   it("describes the main repo checkout when no worktree path is active", () => {
-    expect(resolveCurrentWorkspaceLabel(null)).toBe("Current checkout");
+    expect(resolveCurrentWorkspaceLabel(null)).toBe("현재 checkout");
   });
 
   it("describes the active checkout as a worktree when one is attached", () => {
-    expect(resolveCurrentWorkspaceLabel("/repo/.t3/worktrees/feature-a")).toBe("Current worktree");
+    expect(resolveCurrentWorkspaceLabel("/repo/.t3/worktrees/feature-a")).toBe("현재 worktree");
   });
 });
 
 describe("resolveLockedWorkspaceLabel", () => {
   it("uses a shorter label for the main repo checkout", () => {
-    expect(resolveLockedWorkspaceLabel(null)).toBe("Local checkout");
+    expect(resolveLockedWorkspaceLabel(null)).toBe("로컬 checkout");
   });
 
   it("uses a shorter label for an attached worktree", () => {
-    expect(resolveLockedWorkspaceLabel("/repo/.t3/worktrees/feature-a")).toBe("Worktree");
+    expect(resolveLockedWorkspaceLabel("/repo/.t3/worktrees/feature-a")).toBe("worktree");
   });
 });
 

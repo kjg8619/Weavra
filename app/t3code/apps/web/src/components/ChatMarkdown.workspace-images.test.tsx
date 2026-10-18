@@ -13,7 +13,7 @@ vi.mock("../assets/assetUrls", () => ({
   useAssetUrlRefresh: () => vi.fn(),
   useAssetUrlState: (_environmentId: unknown, resource: unknown) => {
     testState.resources.push(resource);
-    if (testState.assetState === "loading") return { _tag: "Loading" };
+    if (testState.assetState === "loading") return { _tag: "불러오는 중" };
     if (testState.assetState === "failure") return { _tag: "Failure" };
     return {
       _tag: "Success",
@@ -27,7 +27,7 @@ vi.mock("../state/use-atom-query-runner", () => ({ useAtomQueryRunner: () => vi.
 vi.mock("../state/use-atom-command", () => ({ useAtomCommand: () => vi.fn() }));
 vi.mock("../state/session", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../state/session")>()),
-  usePreparedConnection: () => ({ _tag: "Loading" }),
+  usePreparedConnection: () => ({ _tag: "불러오는 중" }),
 }));
 vi.mock("../state/entities", () => ({
   readThreadShell: () => null,
@@ -149,7 +149,7 @@ describe("ChatMarkdown workspace images", () => {
       4,
     );
     expect(html.match(/max-w-\[min\(100%,30rem\)\]/g)).toHaveLength(4);
-    expect(html).not.toContain("Image unavailable");
+    expect(html).not.toContain("이미지를 사용할 수 없어요");
   });
 
   it("loads a POSIX absolute path and file URI through a signed asset URL", () => {
@@ -168,7 +168,7 @@ describe("ChatMarkdown workspace images", () => {
       { _tag: "media-file", threadId: threadRef.threadId, path: "/tmp/embed-test/2.png" },
       { _tag: "media-file", threadId: threadRef.threadId, path: "/tmp/embed-test/5.png" },
     ]);
-    expect(html).not.toContain("Image unavailable");
+    expect(html).not.toContain("이미지를 사용할 수 없어요");
   });
 
   it("normalizes a drive-absolute src in raw image HTML", () => {
@@ -365,7 +365,7 @@ describe("ChatMarkdown workspace images", () => {
     expect(loadingUrl).not.toContain("animate-pulse");
     expect(frameClassName(loadingBytes)).toEqual(loadingUrl);
     expect(frameClassName(failure)).toEqual(loadingUrl);
-    expect(failure).toContain("Image unavailable");
+    expect(failure).toContain("이미지를 사용할 수 없어요");
     // The bytes are requested inside the frame but never paint at an unknown size.
     expect(loadingBytes).toMatch(/<img[^>]*src="https:\/\/signed[^>]*class="invisible/);
     expect(loadingBytes).not.toContain('loading="lazy"');
@@ -374,7 +374,7 @@ describe("ChatMarkdown workspace images", () => {
   it("gives a standalone remote image the same frame instead of a bare tag", () => {
     const html = render("![remote](https://example.com/shot.png)");
 
-    expect(html).toContain('aria-label="Loading image"');
+    expect(html).toContain('aria-label="이미지를 불러오는 중"');
     expect(html).toContain("aspect-video");
   });
 
@@ -384,7 +384,7 @@ describe("ChatMarkdown workspace images", () => {
     );
 
     expect(testState.resources).toEqual([]);
-    expect(html).toContain("Image unavailable");
+    expect(html).toContain("이미지를 사용할 수 없어요");
     expect(html).not.toContain("file://");
   });
 
@@ -392,7 +392,7 @@ describe("ChatMarkdown workspace images", () => {
     const html = render("![unsupported](content://media/image/1)");
 
     expect(testState.resources).toEqual([]);
-    expect(html).toContain("Image unavailable");
+    expect(html).toContain("이미지를 사용할 수 없어요");
     expect(html).not.toContain("content://");
   });
 
@@ -402,6 +402,6 @@ describe("ChatMarkdown workspace images", () => {
     expect(testState.resources).toEqual([]);
     expect(html).toContain('src="https://example.com/image.png"');
     expect(html).toContain("max-w-[min(100%,30rem)]");
-    expect(html).not.toContain("Image unavailable");
+    expect(html).not.toContain("이미지를 사용할 수 없어요");
   });
 });

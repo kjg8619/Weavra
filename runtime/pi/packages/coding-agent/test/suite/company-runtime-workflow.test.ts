@@ -152,6 +152,10 @@ function checkpoint() {
 		"Fixture baseline",
 	);
 }
+// A run's frozen config must match .ai/config.yaml (the start recheck); config need not be committed.
+function saveConfig() {
+	writeFileSync(join(cwd, ".ai/config.yaml"), JSON.stringify(config));
+}
 function checkScript(source: string) {
 	writeFileSync(join(cwd, "scripts/check.mjs"), source);
 	checkpoint();
@@ -390,6 +394,7 @@ describe("S4 STANDARD vertical slice: real Git/checks and independent faux SDK s
 				config.verification.checks[0].args = ["scripts/check.mjs"];
 			}
 			if (mode === "eval") config.verification.checks[0].args = ["--eval", "process.exit(0)"];
+			saveConfig();
 			harness.setResponses([edit(), handoff]);
 			const result = await create().execute();
 			expect(result.run?.status).toBe("BLOCKED");
@@ -568,6 +573,7 @@ describe("S4 STANDARD vertical slice: real Git/checks and independent faux SDK s
 	});
 	it("rejects a symlinked registered cwd before spawning a check", async () => {
 		config.verification.checks[0].cwd = "src/check-dir";
+		saveConfig();
 		onEvent = (event) => {
 			if (event.type === "StepStarted" && event.step?.stepId === "self-check")
 				symlinkSync(agentDir, join(cwd, "src/check-dir"));
@@ -685,7 +691,7 @@ describe("S4 STANDARD vertical slice: real Git/checks and independent faux SDK s
 	});
 });
 
-describe("opt-in Developer advisory checks: real verifier process, no evidence", () => {
+describe("default-on Developer advisory checks: real verifier process, no evidence", () => {
 	const requestCheck = () =>
 		fauxAssistantMessage(fauxToolCall("runtime_request_check", { id: "regression" }), { stopReason: "toolUse" });
 	const advisoryOutput = (context: Context) => {
@@ -702,7 +708,7 @@ describe("opt-in Developer advisory checks: real verifier process, no evidence",
 				...config,
 				verification: {
 					...config.verification,
-					advisory: { mode: "developer", ...(maxRuns ? { max_runs: maxRuns } : {}) },
+					advisory_checks: { enabled: true, ...(maxRuns ? { max_runs_per_attempt: maxRuns } : {}) },
 				},
 			}),
 		);
@@ -741,12 +747,12 @@ describe("opt-in Developer advisory checks: real verifier process, no evidence",
 		const result = await create().execute();
 		expect(result.error).toBeUndefined();
 		expect(result.run?.status).toBe("COMPLETED");
-		expect(systemPrompt).toContain("returns ADVISORY output only (at most 5 runs)");
+		expect(systemPrompt).toContain("returns ADVISORY output only (at most 3 runs)");
 		expect(outputs[0]).toContain("ADVISORY ONLY: regression FAILED (exit 1)");
 		expect(outputs[0]).toContain("not verification evidence");
 		expect(outputs[1]).toContain("ADVISORY ONLY: regression PASSED (exit 0)");
 		expect(outputs[1]).toContain("CHECK_PASSED");
-		expect(outputs[1]).toContain("Advisory runs left in this attempt: 3");
+		expect(outputs[1]).toContain("Advisory runs left in this attempt: 1");
 		// Two audited advisory processes, then the Kernel's own fresh SELF_CHECK and TEST.
 		expect(verifierActions()).toEqual(["FAILED", "SUCCEEDED", "SUCCEEDED", "SUCCEEDED"]);
 		expect(result.run?.verification.map((check) => check.status)).toEqual(["PASS", "PASS"]);
@@ -772,7 +778,7 @@ describe("opt-in Developer advisory checks: real verifier process, no evidence",
 		const result = await create().execute();
 		expect(result.run?.status).toBe("COMPLETED");
 		expect(outputs[0]).toContain("PASSED");
-		expect(outputs[1]).toContain("advisory run limit (1) for this attempt is reached");
+		expect(outputs[1]).toContain("advisory run budget exhausted (1 runs in this attempt)");
 		expect(verifierActions()).toEqual(["SUCCEEDED", "SUCCEEDED", "SUCCEEDED"]);
 	});
 });

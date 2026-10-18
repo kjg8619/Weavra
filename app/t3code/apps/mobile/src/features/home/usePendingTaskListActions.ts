@@ -1,27 +1,39 @@
 import { useNavigation } from "@react-navigation/native";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Alert } from "react-native";
 
 import { removeThreadOutboxMessage } from "../../state/thread-outbox-removal";
 import { clearComposerDraftContent } from "../../state/use-composer-drafts";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
-import { releaseEditingQueuedMessage } from "../../state/use-thread-outbox";
+import { pendingTaskDraftKey } from "../../state/pending-task-identity";
+import type { QueuedThreadMessage } from "../../state/thread-outbox-model";
+import { currentThreadOutboxPresentation } from "../../state/thread-outbox-presentation";
 
 export function usePendingTaskListActions(): {
   readonly openPendingTask: (pendingTask: PendingNewTask) => void;
   readonly confirmDeletePendingTask: (pendingTask: PendingNewTask) => void;
+  readonly retainedMessage: QueuedThreadMessage | null;
+  readonly closeRetainedWork: () => void;
 } {
   const navigation = useNavigation();
+  const [retainedMessage, setRetainedMessage] = useState<QueuedThreadMessage | null>(null);
 
   const openPendingTask = useCallback(
     (pendingTask: PendingNewTask) => {
+      if (
+        pendingTask.kind === "pending" &&
+        currentThreadOutboxPresentation(pendingTask.message).kind !== "ready"
+      ) {
+        setRetainedMessage(pendingTask.message);
+        return;
+      }
       navigation.navigate("NewTaskSheet", {
         screen: "NewTaskDraft",
         params: {
           environmentId: String(pendingTask.environmentId),
           projectId: String(pendingTask.projectId),
           ...(pendingTask.kind === "pending"
-            ? { pendingTaskId: String(pendingTask.message.messageId) }
+            ? { pendingTaskId: pendingTaskDraftKey(pendingTask.message) }
             : { draftId: pendingTask.draftKey }),
         },
       });
@@ -50,18 +62,21 @@ export function usePendingTaskListActions(): {
     }
     Alert.alert(
       "Delete pending task?",
-      `“${pendingTask.title}” has not been sent yet and will be removed from the outbox.`,
+      `“${pendingTask.title}” will be discarded locally. This does not undo any recorded attempt or acknowledged transport.`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
           style: "destructive",
           onPress: () => {
-            // Release the edit lock only after removal succeeds, and only if
-            // it is held for THIS task — clearing it up front (or for another
-            // task) would let the drain deliver a mid-edit payload.
             void removeThreadOutboxMessage(pendingTask.message)
-              .then(() => releaseEditingQueuedMessage(pendingTask.message.messageId))
+              .then((released) => {
+                if (!released)
+                  Alert.alert(
+                    "Edited content retained",
+                    "This task has newer work or an open editor. Its retained content was not deleted.",
+                  );
+              })
               .catch((error) => {
                 Alert.alert(
                   "Could not delete pending task",
@@ -74,5 +89,10 @@ export function usePendingTaskListActions(): {
     );
   }, []);
 
-  return { openPendingTask, confirmDeletePendingTask };
+  return {
+    openPendingTask,
+    confirmDeletePendingTask,
+    retainedMessage,
+    closeRetainedWork: () => setRetainedMessage(null),
+  };
 }

@@ -7,12 +7,13 @@ import {
   flushComposerDrafts,
   getComposerDraftSnapshot,
   mergeComposerDraftContent,
+  sameComposerDraftState,
 } from "./use-composer-drafts";
 
 /** Move unsent setup edits into the restored task before reopening its editor. */
 export async function recoverFailedThreadDraft(message: QueuedThreadMessage): Promise<void> {
   const sourceKey = scopedThreadKey(message.environmentId, message.threadId);
-  const targetKey = restoredNewTaskDraftKey(message.messageId);
+  const targetKey = restoredNewTaskDraftKey(message);
   const source = getComposerDraftSnapshot(sourceKey);
   if (source.text.length === 0 && source.attachments.length === 0) return;
 
@@ -32,5 +33,7 @@ export async function recoverFailedThreadDraft(message: QueuedThreadMessage): Pr
   // Recovery may exceed the send cap. Preserve every file and let the editor
   // ask the user to remove extras; never discard them during a failed send.
   await flushComposerDrafts();
-  clearComposerDraftContent(sourceKey);
+  if (sameComposerDraftState(source, getComposerDraftSnapshot(sourceKey))) {
+    clearComposerDraftContent(sourceKey);
+  }
 }

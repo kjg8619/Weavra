@@ -32,14 +32,31 @@ export function composerDraftEnvironmentId(
   queuedMessages: ReadonlyArray<{
     readonly messageId: string;
     readonly environmentId: EnvironmentId;
+    readonly threadId?: string;
+    readonly storageIdentity?: {
+      readonly environmentId: EnvironmentId;
+      readonly threadId: string;
+      readonly messageId: string;
+    };
   }>,
-  draft?: { readonly project?: { readonly environmentId: EnvironmentId } },
+  draft?: {
+    readonly project?: { readonly environmentId: EnvironmentId };
+    readonly rejectedTurn?: { readonly version: 1 };
+  },
 ): EnvironmentId | null {
   if (draftKey.startsWith("pending-task:")) {
-    return (
-      queuedMessages.find((message) => `pending-task:${message.messageId}` === draftKey)
-        ?.environmentId ?? null
-    );
+    let environmentId: EnvironmentId | null = null;
+    for (const message of queuedMessages) {
+      const identity = message.storageIdentity ?? message;
+      const scopedKey =
+        identity.threadId === undefined
+          ? null
+          : `pending-task:${JSON.stringify([identity.environmentId, identity.threadId, identity.messageId])}`;
+      if (`pending-task:${message.messageId}` !== draftKey && scopedKey !== draftKey) continue;
+      if (environmentId !== null && environmentId !== message.environmentId) return null;
+      environmentId = message.environmentId;
+    }
+    return environmentId;
   }
   if (draftKey.startsWith("new-task:")) {
     if (draft?.project) {
@@ -60,6 +77,14 @@ type UploadServerConfig = {
     >;
   };
 };
+
+/** Pending editors and recovered drafts require explicit delivery before uploading. */
+export function composerBackgroundUploadEnvironmentId(
+  ...input: Parameters<typeof composerDraftEnvironmentId>
+): EnvironmentId | null {
+  if (input[0].startsWith("pending-task:") || input[2]?.rejectedTurn !== undefined) return null;
+  return composerDraftEnvironmentId(...input);
+}
 
 export function canUploadComposerAttachment(
   attachment: DraftComposerAttachment,

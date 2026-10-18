@@ -1,3 +1,4 @@
+import { weavraLabel } from "../weavraLabels";
 import type { WeavraControlViewState } from "@t3tools/client-runtime/state/weavraControl";
 import { Badge } from "../ui/badge";
 
@@ -16,33 +17,33 @@ export function CapabilityInventory({
   const historical = inventory?.status === "CURRENT" && !current;
   return (
     <section
-      aria-label="Runtime capability inventory"
+      aria-label="Runtime 기능 목록"
       className="space-y-3 rounded-md border border-border p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">Runtime capability inventory</h3>
-        <Badge variant={current ? "outline" : "warning"}>{status}</Badge>
+        <h3 className="text-sm font-medium">Runtime 기능 목록</h3>
+        <Badge variant={current ? "outline" : "warning"}>{weavraLabel(status)}</Badge>
       </div>
       <p className="text-xs text-muted-foreground">
-        Inspection only. Runtime checks permission per action. This catalog does not grant tool
-        access, Policy eligibility, approval or verification evidence.
+        조회 전용이에요. Runtime이 각 동작의 권한을 확인하며, 이 목록은 도구 접근·Policy
+        허용·승인·검증 증거를 부여하지 않아요.
       </p>
-      <p className="break-all text-xs text-muted-foreground">Project scope: {scope}</p>
+      <p className="break-all text-xs text-muted-foreground">프로젝트 범위: {scope}</p>
       {!inventory ? (
         <p className="text-sm text-muted-foreground">
-          NOT EXPOSED / UNKNOWN. This connection has no Runtime capability inventory. Ordinary
-          read-only observation remains separate; inventory requires control observation access.
+          기능 목록이 제공되지 않아 확인할 수 없어요. 일반 읽기 전용 관찰과는 별도이며, 기능 목록을
+          보려면 제어 관찰 권한이 필요해요.
         </p>
       ) : (
         <>
           <dl className="grid gap-2 text-xs sm:grid-cols-2">
             {[
-              ["Coverage", inventory.coverage],
-              ["Owner / project revision", `${inventory.ownerId} / ${inventory.projectRevision}`],
-              ["Epoch / generation", `${inventory.brokerEpoch} / ${inventory.generation}`],
-              ["Runtime observation", `${inventory.status} / ${inventory.reason}`],
-              ["Observed time (Host Unix ms)", inventory.observedAt ?? "UNKNOWN"],
-              ["Total / omitted", `${inventory.total ?? "UNKNOWN"} / ${inventory.omitted}`],
+              ["제공 범위", inventory.coverage],
+              ["소유자 / 프로젝트 revision", `${inventory.ownerId} / ${inventory.projectRevision}`],
+              ["시대 / 세대", `${inventory.brokerEpoch} / ${inventory.generation}`],
+              ["Runtime 관찰", `${inventory.status} / ${inventory.reason}`],
+              ["관찰 시각(Host Unix ms)", inventory.observedAt ?? "확인 안 됨"],
+              ["전체 / 생략", `${inventory.total ?? "확인 안 됨"} / ${inventory.omitted}`],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt className="text-muted-foreground">{label}</dt>
@@ -52,12 +53,12 @@ export function CapabilityInventory({
           </dl>
           {historical && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
-              Historical observation — all retained rows NEEDS_REFRESH. A checked new Runtime
-              generation is required.
+              과거 관찰이에요. 보관된 모든 항목을 새로고침해야 해요. 검증된 새 Runtime 세대가
+              필요해요.
             </p>
           )}
           <ul
-            aria-label={historical ? "Historical capabilities" : "Capability observations"}
+            aria-label={historical ? "과거 기능 목록" : "관찰된 기능 목록"}
             className="divide-y divide-border"
           >
             {inventory.entries.map(({ descriptor, requirements, observation }) => (
@@ -65,28 +66,28 @@ export function CapabilityInventory({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-mono font-medium">{descriptor.name}</span>
                   <Badge variant="outline">
-                    {current ? observation.availability : "NEEDS_REFRESH"}
+                    {weavraLabel(current ? observation.availability : "NEEDS_REFRESH")}
                   </Badge>
                 </div>
                 <p className="break-all font-mono text-muted-foreground">{descriptor.id}</p>
                 <p>
-                  {descriptor.name.startsWith("runtime_lsp_") ? "LSP" : "File"} ·{" "}
-                  {descriptor.origin} · {observation.reason}
+                  {descriptor.name.startsWith("runtime_lsp_") ? "LSP" : "파일"} ·{" "}
+                  {weavraLabel(descriptor.origin)} · {weavraLabel(observation.reason)}
                 </p>
                 <p className="text-muted-foreground">
-                  {requirements.operation} · {requirements.mode} · {requirements.policy} ·{" "}
-                  {requirements.approval}
+                  {weavraLabel(requirements.operation)} · {weavraLabel(requirements.mode)} ·{" "}
+                  {weavraLabel(requirements.policy)} · {weavraLabel(requirements.approval)}
                 </p>
                 <p className="text-muted-foreground">
-                  Observed: {observation.observedAt ?? "UNKNOWN"} Host Unix ms ·{" "}
-                  {observation.source}
+                  관찰 시각: {observation.observedAt ?? "확인 안 됨"} Host Unix ms ·{" "}
+                  {weavraLabel(observation.source)}
                 </p>
               </li>
             ))}
           </ul>
           {current && inventory.entries.length === 0 && (
             <p className="text-xs text-muted-foreground">
-              No rows in this Runtime result. Omitted rows: {inventory.omitted}.
+              이 Runtime 결과에는 항목이 없어요. 생략한 항목: {inventory.omitted}.
             </p>
           )}
         </>

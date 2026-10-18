@@ -275,9 +275,9 @@ export const OpenInPicker = memo(function OpenInPicker({
   }, [enableShortcut, keybindings, openInCwd, openInEditor, preferredEditor]);
 
   return (
-    <Group aria-label="Open in editor">
+    <Group aria-label="편집기에서 열기">
       <Button
-        aria-label={compact ? "Open file in preferred editor" : undefined}
+        aria-label={compact ? "기본 편집기에서 파일 열기" : undefined}
         className="ps-[8.5px]"
         size="xs"
         variant="outline"
@@ -297,22 +297,20 @@ export const OpenInPicker = memo(function OpenInPicker({
               : "sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5"
           }
         >
-          Open
+          열기
         </span>
       </Button>
       <GroupSeparator {...(!compact ? { className: "hidden @3xl/header-actions:block" } : {})} />
       <Menu>
-        <MenuTrigger
-          render={<Button aria-label="Choose editor" size="icon-xs" variant="outline" />}
-        >
+        <MenuTrigger render={<Button aria-label="편집기 선택" size="icon-xs" variant="outline" />}>
           <ChevronDownIcon aria-hidden="true" className="size-4" />
         </MenuTrigger>
         <MenuPopup align="end">
           {remote.mode === "remote-unavailable" ? (
-            <MenuItem disabled>No SSH route to {environmentLabel}</MenuItem>
+            <MenuItem disabled>{environmentLabel}에 연결할 SSH 경로가 없어요</MenuItem>
           ) : (
             <>
-              {options.length === 0 && <MenuItem disabled>No installed editors found</MenuItem>}
+              {options.length === 0 && <MenuItem disabled>설치된 편집기가 없어요</MenuItem>}
               {options.map(({ label, Icon, value, kind }) => (
                 <MenuItem key={value} onClick={() => openInEditor(value)}>
                   <Icon aria-hidden="true" className={getOpenInIconClass(kind)} />
@@ -323,7 +321,7 @@ export const OpenInPicker = memo(function OpenInPicker({
                 </MenuItem>
               ))}
               {remote.mode === "remote-links" && !remoteHintSeen && (
-                <MenuItem disabled>Opens over SSH. Needs your key on {environmentLabel}</MenuItem>
+                <MenuItem disabled>SSH로 열어요. {environmentLabel}에 SSH 키가 필요해요</MenuItem>
               )}
             </>
           )}

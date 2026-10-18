@@ -124,6 +124,7 @@ import {
   type PromptStashEntry,
 } from "../../promptStashStore";
 import { ComposerStashBadge } from "./ComposerStashBadge";
+import { RecoveredComposerContent } from "./RejectedTurnNotice";
 import { ComposerStashMenu } from "./ComposerStashMenu";
 import { useComposerMenuState } from "./useComposerMenuState";
 import { useComposerFocusState } from "./useComposerFocusState";
@@ -1054,8 +1055,8 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   const RuntimeModeIcon = runtimeModeOption.icon;
   const interactionModeTooltip =
     props.interactionMode === "plan"
-      ? "Plan mode — click to return to normal build mode"
-      : "Default mode — click to enter plan mode";
+      ? "계획 모드예요. 클릭하면 기본 작업 모드로 돌아가요."
+      : "기본 작업 모드예요. 클릭하면 계획 모드로 전환해요.";
 
   const interactionModeToggle = props.showInteractionModeToggle ? (
     <>
@@ -1093,7 +1094,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
             />
           )}
           <span className="sr-only sm:not-sr-only">
-            {props.interactionMode === "plan" ? "Plan" : "Build"}
+            {props.interactionMode === "plan" ? "계획" : "Build"}
           </span>
         </TooltipTrigger>
         <TooltipPopup side="top">{interactionModeTooltip}</TooltipPopup>
@@ -1118,7 +1119,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
                 data-composer-shortcut="composer.mode"
                 size={size}
                 className={size === "xs" ? undefined : "font-medium"}
-                aria-label="Runtime mode"
+                aria-label="실행 모드"
               />
             }
           >
@@ -1700,14 +1701,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     (questionAttachmentTarget &&
     !supportsQuestionAttachments &&
     (composerImages.length > 0 || composerFiles.length > 0)
-      ? "Update this server to send files with question answers"
+      ? "질문 답변과 함께 파일을 보내려면 이 서버를 업데이트해 주세요"
       : null) ??
     fileCapabilityBlockReason ??
     (supportsAttachmentUploads
       ? needsReattachFileCount > 0
         ? needsReattachFileCount === 1
-          ? "Attach the interrupted file again or remove it"
-          : "Attach the interrupted files again or remove them"
+          ? "중단된 파일을 다시 첨부하거나 빼 주세요"
+          : "중단된 파일들을 다시 첨부하거나 빼 주세요"
         : attachmentUploadBlockReason({
             imageIds: [...composerImages, ...composerFiles].map((attachment) => attachment.id),
             uploadsByImageId,
@@ -1885,7 +1886,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         : undefined))
     : undefined;
   const resolvedCompactDisabledReason =
-    compactDisabledReason ?? (noProviderAvailable ? "Compacting is unavailable right now" : null);
+    compactDisabledReason ?? (noProviderAvailable ? "지금은 압축할 수 없어요" : null);
   // The driver kind follows the instance that will actually run the turn,
   // which can differ from the persisted selection when that selection is
   // disabled.
@@ -1907,7 +1908,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
   const sendDisabledReason =
     externalSendDisabledReason ??
-    (multipleModelSelections?.length === 0 ? "Select at least one model." : null) ??
+    (multipleModelSelections?.length === 0 ? "모델을 하나 이상 골라 주세요." : null) ??
     (activePendingProgress
       ? attachmentBlockReason
       : (attachmentBlockReason ??
@@ -2203,9 +2204,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     () =>
       deriveComposerSendState({
         prompt,
-        imageCount: composerImages.length + composerFiles.length,
+        imageCount:
+          composerImages.length +
+          composerFiles.length +
+          (composerDraft.rejectedTurn?.attachments.length ?? 0),
         terminalContexts: composerTerminalContexts,
-        elementContextCount: composerPreviewAnnotations.length + composerReviewComments.length,
+        elementContextCount:
+          composerPreviewAnnotations.length +
+          composerReviewComments.length +
+          (composerDraft.rejectedTurn?.context?.records.length ?? 0),
       }),
     [
       composerFiles.length,
@@ -2213,6 +2220,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       composerPreviewAnnotations.length,
       composerReviewComments.length,
       composerTerminalContexts,
+      composerDraft.rejectedTurn,
       prompt,
     ],
   );
@@ -2239,6 +2247,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     query: isPathTrigger ? pathTriggerQuery : null,
   });
   const compactSlashCommandAvailable =
+    composerDraft.rejectedTurn === undefined &&
     composerTrigger?.kind === "slash-command" &&
     prompt.slice(0, composerTrigger.rangeStart).trim() === "" &&
     !compactThreadUnavailable &&
@@ -2312,6 +2321,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
 
   const composerMenuItems = useMemo<ComposerCommandItem[]>(() => {
+    if (composerDraft.rejectedTurn) return [];
     if (!composerTrigger) return [];
     if (composerTrigger.kind === "path") {
       return workspaceEntries.entries.map((entry) => ({
@@ -2330,7 +2340,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           type: "slash-command",
           command: "model",
           label: "/model",
-          description: "Switch response model for this thread",
+          description: "이 대화의 응답 모델 바꾸기",
         },
         ...(planModeUiEnabled
           ? ([
@@ -2339,14 +2349,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 type: "slash-command",
                 command: "plan",
                 label: "/plan",
-                description: "Switch this thread into plan mode",
+                description: "이 대화를 계획 모드로 바꾸기",
               },
               {
                 id: "slash:default",
                 type: "slash-command",
                 command: "default",
                 label: "/default",
-                description: "Switch this thread back to normal build mode",
+                description: "이 대화를 일반 구현 모드로 되돌리기",
               },
             ] as const)
           : []),
@@ -2364,7 +2374,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         provider: selectedProvider,
         command,
         label: `/${command.name}`,
-        description: command.description ?? command.input?.hint ?? "Run provider command",
+        description: command.description ?? command.input?.hint ?? "공급자 명령 실행",
       }));
       const query = composerTrigger.query.trim().toLowerCase();
       const skillItems = slashMenuSkills.map((skill) => ({
@@ -2374,9 +2384,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         skill,
         label: `/skill:${skill.name}`,
         description:
-          skill.shortDescription ??
-          skill.description ??
-          (skill.scope ? `${skill.scope} skill` : ""),
+          skill.shortDescription ?? skill.description ?? (skill.scope ? `${skill.scope} 스킬` : ""),
       }));
       const visibleProviderSlashCommandItems = providerSlashCommandItems.filter(
         (item) => item.command.name !== "compact" || compactSlashCommandAvailable,
@@ -2397,7 +2405,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         description:
           skill.shortDescription ??
           skill.description ??
-          (skill.scope ? `${skill.scope} skill` : "Run provider skill"),
+          (skill.scope ? `${skill.scope} 스킬` : "공급자 스킬 실행"),
       }));
     }
     if (
@@ -2454,6 +2462,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     return [];
   }, [
     compactSlashCommandAvailable,
+    composerDraft.rejectedTurn,
     composerTrigger,
     exactPullRequestLookup.data,
     planModeUiEnabled,
@@ -2469,7 +2478,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     workspaceEntries.entries,
   ]);
 
-  const composerMenuOpen = Boolean(composerTrigger);
+  const composerMenuOpen = composerDraft.rejectedTurn === undefined && Boolean(composerTrigger);
   const composerMenuSearchKey = composerTrigger
     ? `${composerTrigger.kind}:${composerTrigger.query.trim().toLowerCase()}`
     : null;
@@ -2551,21 +2560,21 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     }
     if (composerTriggerKind === "pull-request") {
       if (pullRequestProjectId === null || pullRequestRepository === null) {
-        return "Pull requests are not available for this project.";
+        return "이 프로젝트에서는 PR을 쓸 수 없어요.";
       }
       if (
         pullRequestLookup.error !== null ||
         pullRequestLookup.data?.errors.some((error) => error.projectId === pullRequestProjectId)
       ) {
-        return "Pull requests could not be read for this project.";
+        return "이 프로젝트의 PR을 읽지 못했어요.";
       }
       return composerTrigger?.query
         ? `No pull request matches ${composerTrigger.query}.`
-        : "No pull requests found in this repository.";
+        : "이 저장소에서 PR을 찾지 못했어요.";
     }
     return composerTriggerKind === "path"
-      ? "No matching files or folders."
-      : "No matching command.";
+      ? "일치하는 파일이나 폴더가 없어요."
+      : "일치하는 명령이 없어요.";
   }, [
     composerTrigger,
     composerTriggerKind,
@@ -2657,7 +2666,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     projectSelectionRequired ||
     environmentUnavailable !== null ||
     !composerSendState.hasSendableContent;
-  const collapsedComposerPrimaryActionLabel = "Send message";
+  const collapsedComposerPrimaryActionLabel = "메시지 보내기";
   const showMobilePendingAnswerActions =
     isMobileViewport && !isComposerCollapsedMobile && pendingPrimaryAction !== null;
 
@@ -2808,13 +2817,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       const fail = (reason: string) => {
         toastManager.add({
           type: "error",
-          title: `Couldn't bring ${record.name} into this message`,
-          description: `${reason} Remove the chip or attach the file again.`,
+          title: `${record.name}을(를) 이 메시지에 넣지 못했어요`,
+          description: `${reason} 칩을 빼거나 파일을 다시 첨부해 주세요.`,
         });
       };
       const sourceConnection = readPreparedConnection(sourceEnvironmentId);
       if (!sourceConnection) {
-        fail("The environment it came from is not connected.");
+        fail("파일을 가져온 환경이 연결되어 있지 않아요.");
         return;
       }
       const result = await createAssetUrl({
@@ -2826,7 +2835,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           ? resolveAssetUrl(sourceConnection.httpBaseUrl, result.value.relativeUrl)
           : null;
       if (!url) {
-        fail("The original attachment is no longer available.");
+        fail("원래 첨부를 더 이상 쓸 수 없어요.");
         return;
       }
       let blob: Blob;
@@ -2835,7 +2844,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         blob = await response.blob();
       } catch {
-        fail("Downloading it from the source failed.");
+        fail("원본에서 내려받지 못했어요.");
         return;
       }
       const file = new File([blob], record.name, { type: record.mimeType || blob.type });
@@ -3554,6 +3563,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const { onUsageLimitsCommand } = props;
   const onSelectComposerItem = useCallback(
     (item: ComposerCommandItem) => {
+      if (useComposerDraftStore.getState().getComposerDraft(composerDraftTarget)?.rejectedTurn)
+        return;
       if (composerSelectLockRef.current) return;
       composerSelectLockRef.current = true;
       window.requestAnimationFrame(() => {
@@ -3775,8 +3786,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         event?.preventDefault();
         toastManager.add({
           type: "info",
-          title: "Still compressing a pasted image.",
-          description: "Send again once its thumbnail appears.",
+          title: "붙여 넣은 이미지를 아직 압축하고 있어요.",
+          description: "썸네일이 보이면 다시 보내 주세요.",
         });
         return;
       }
@@ -3786,8 +3797,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         event?.preventDefault();
         toastManager.add({
           type: "info",
-          title: "Still bringing a pasted attachment into this message.",
-          description: "Send again once its chip resolves.",
+          title: "붙여 넣은 첨부를 아직 이 메시지에 넣고 있어요.",
+          description: "첨부 칩이 준비되면 다시 보내 주세요.",
         });
         return;
       }
@@ -4071,8 +4082,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (filesToVerify.some((file) => file.environmentId !== environmentId)) {
         toastManager.add({
           type: "error",
-          title: "Stashed files belong to another environment",
-          description: "Restore this prompt in the environment that received its files.",
+          title: "보관한 파일은 다른 환경에 속해 있어요",
+          description: "파일을 받은 환경에서 이 프롬프트를 복원해 주세요.",
         });
         return;
       }
@@ -4111,7 +4122,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!durable) {
         toastManager.add({
           type: "warning",
-          title: "Restored prompt may reappear in the stash",
+          title: "복원한 프롬프트가 보관함에 다시 나타날 수 있어요",
           description:
             "Browser storage rejected the update, so this entry could still be there after a reload.",
           data: { hideCopyButton: true },
@@ -4178,7 +4189,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             file: null,
             ...(file.source ? { source: file.source } : {}),
             // An expired upload carries no ids, so it hydrates as a
-            // needs-reattach row and the "Attach again" flow takes over.
+            // needs-reattach row and the "다시 첨부" flow takes over.
             ...(expired
               ? {}
               : { uploadedAttachmentId: file.attachmentId, uploadEnvironmentId: environmentId }),
@@ -4339,7 +4350,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (missingImageReasons.length > 0) {
         toastManager.add({
           type: "warning",
-          title: "Some attachments were not restored",
+          title: "일부 첨부를 복원하지 못했어요",
           description: missingImageReasons.join(" "),
         });
       }
@@ -4384,7 +4395,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!durable) {
         toastManager.add({
           type: "warning",
-          title: "Stash entry may come back",
+          title: "보관 항목이 다시 나타날 수 있어요",
           description:
             "Browser storage rejected the delete, so this prompt could reappear after a reload.",
           data: { hideCopyButton: true },
@@ -4395,13 +4406,20 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
 
   const stashCurrentPrompt = useCallback(async () => {
+    if (getComposerDraft(composerDraftTarget)?.rejectedTurn) {
+      toastManager.add({
+        type: "info",
+        title: "보관하기 전에 복구한 초안을 보내거나 버려 주세요.",
+      });
+      return;
+    }
     // Stashing clears the draft. A pasted attachment still downloading would then land in the
     // emptied composer instead of travelling with the entry it belongs to.
     if (pendingDraftWork.has(attachmentTargetKeyRef.current)) {
       toastManager.add({
         type: "info",
-        title: "Still bringing a pasted attachment into this message.",
-        description: "Stash again once its chip resolves.",
+        title: "붙여 넣은 첨부를 아직 이 메시지에 넣고 있어요.",
+        description: "첨부 칩이 준비되면 다시 보관해 주세요.",
       });
       return;
     }
@@ -4436,7 +4454,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (composerFileNeedsReattach(file)) {
         toastManager.add({
           type: "error",
-          title: "Attach dropped files again or remove them before stashing",
+          title: "보관하기 전에 끌어 놓은 파일을 다시 첨부하거나 빼 주세요",
         });
         return;
       }
@@ -4444,7 +4462,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (upload?.status !== "ready" || upload.environmentId !== environmentId) {
         toastManager.add({
           type: "error",
-          title: "Wait for file uploads before stashing this prompt",
+          title: "이 프롬프트를 보관하기 전에 파일 업로드를 기다려 주세요",
         });
         return;
       }
@@ -4498,7 +4516,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!written) {
         toastManager.add({
           type: "error",
-          title: "Could not stash this prompt",
+          title: "이 프롬프트를 보관하지 못했어요",
           description:
             "Browser storage rejected the write, so the composer was left as-is. Free up site data and try again.",
           data: { hideCopyButton: true },
@@ -4511,7 +4529,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!durable) {
         toastManager.add({
           type: "warning",
-          title: "Stashed prompt will not survive a reload",
+          title: "보관한 프롬프트는 새로고침하면 사라져요",
           description:
             "Browser storage is unavailable, so this stash is kept in memory only for this session.",
           data: { hideCopyButton: true },
@@ -4547,8 +4565,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         }
         toastManager.add({
           type: "warning",
-          title: "Oldest stashed prompt discarded",
-          description: `The stash holds ${MAX_STASH_ENTRIES} prompts; the oldest was removed to make room.`,
+          title: "가장 오래된 보관 프롬프트를 버렸어요",
+          description: `보관함에는 프롬프트를 ${MAX_STASH_ENTRIES}개까지 둘 수 있어요. 자리를 만들려고 가장 오래된 것을 지웠어요.`,
           data: { hideCopyButton: true },
         });
       }
@@ -4598,7 +4616,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (!imagesDurable && durable && images.length > 0) {
           toastManager.add({
             type: "warning",
-            title: "Stashed images were not saved",
+            title: "보관한 이미지를 저장하지 못했어요",
             description:
               "The prompt was stashed, but browser storage rejected its images. They will be missing if you reload.",
             data: { hideCopyButton: true },
@@ -4610,8 +4628,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         // them evaporate.
         toastManager.add({
           type: "warning",
-          title: "Stashed images did not attach",
-          description: `That prompt was restored or deleted before ${kept.length} image${kept.length === 1 ? "" : "s"} finished saving. Re-attach ${kept.length === 1 ? "it" : "them"} if you still need ${kept.length === 1 ? "it" : "them"}.`,
+          title: "보관한 이미지를 첨부하지 못했어요",
+          description: `이미지 ${kept.length}개를 저장하기 전에 그 프롬프트가 복원되거나 삭제되었어요. 아직 필요하면 다시 첨부해 주세요.`,
           data: { hideCopyButton: true },
         });
       }
@@ -4638,6 +4656,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     pulseStashBadge,
     restoreStashEntry,
     stashEntryToQueue,
+    getComposerDraft,
   ]);
 
   const toggleStashMenu = useCallback(() => {
@@ -4740,7 +4759,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             key={image.id}
             type="button"
             className="relative size-7 shrink-0 cursor-zoom-in overflow-hidden rounded-md border border-border/70 bg-muted/60"
-            aria-label={`Preview ${image.name}`}
+            aria-label={`${image.name} 미리보기`}
             onPointerDown={(event) => event.preventDefault()}
             onClick={() => {
               const preview = buildExpandedImagePreview(composerImages, image.id);
@@ -4775,7 +4794,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           <button
             type="button"
             className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border/70 bg-muted/60 font-medium text-secondary-label text-xs tabular-nums outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
-            aria-label={`Show ${String(restingImagePreviewCounts.overflowCount)} more image attachments`}
+            aria-label={`이미지 첨부 ${String(restingImagePreviewCounts.overflowCount)}개 더 보기`}
             onPointerDown={(event) => event.preventDefault()}
             onClick={() => {
               if (isComposerCollapsedMobile) {
@@ -4961,7 +4980,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       className="shrink-0 gap-2 px-2 text-secondary-label sm:px-3"
     >
       <CircleAlertIcon className="size-4" />
-      {providerSetupInstanceId ? "Open provider settings" : "No provider available"}
+      {providerSetupInstanceId ? "공급자 설정 열기" : "사용할 수 있는 공급자가 없어요"}
     </Button>
   ) : (
     <>
@@ -5258,7 +5277,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     ) {
       toastManager.add({
         type: "error",
-        title: "This question cannot accept attachments.",
+        title: "이 질문에는 첨부를 넣을 수 없어요.",
       });
       return false;
     }
@@ -5316,7 +5335,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         acceptedImages.push(normalizeComposerImageFileMimeType(file));
       } else {
         if (fileStagingLimit === null) {
-          error = "This server does not support file attachments.";
+          error = "이 서버는 파일 첨부를 지원하지 않아요.";
           continue;
         }
         if (file.size <= 0) {
@@ -5362,7 +5381,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         const attached = storedFiles[0]!;
         toastManager.add({
           type: "info",
-          title: `Large paste attached as ${attached.name}`,
+          title: `긴 붙여 넣기를 ${attached.name}(으)로 첨부했어요`,
           description: `${formatAttachmentSize(attached.sizeBytes)} · Use ${
             isMacPlatform(navigator.platform) ? "⌘⇧V" : "Ctrl+Shift+V"
           } to keep a large paste inline.`,
@@ -5536,8 +5555,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       }
       toastManager.add({
         type: "error",
-        title: "Pasted text is too large for this message",
-        description: "Remove some text or an attachment, then paste again.",
+        title: "붙여 넣은 텍스트가 이 메시지에 너무 커요",
+        description: "텍스트나 첨부를 조금 줄인 뒤 다시 붙여 넣어 주세요.",
         data: { hideCopyButton: true },
       });
       return true;
@@ -5558,8 +5577,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!wouldExceedInputLimit) return false;
       toastManager.add({
         type: "error",
-        title: "Pasted text is too large to attach",
-        description: "Reduce the clipboard contents or save a smaller excerpt as a file.",
+        title: "붙여 넣은 텍스트가 첨부하기에 너무 커요",
+        description: "클립보드 내용을 줄이거나 더 작은 부분을 파일로 저장해 주세요.",
         data: { hideCopyButton: true },
       });
       return true;
@@ -5698,8 +5717,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onInsertRejected: () => {
       toastManager.add({
         type: "error",
-        title: "Unable to add to chat",
-        description: "The composer is busy; try again once it is ready.",
+        title: "채팅에 추가하지 못했어요",
+        description: "작성기가 사용 중이에요. 준비되면 다시 시도해 주세요.",
       });
     },
   });
@@ -5830,7 +5849,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (target === "remote") {
           toastManager.add({
             type: "error",
-            title: "Folders can't be dropped into remote environments",
+            title: "원격 환경에는 폴더를 끌어 놓을 수 없어요",
           });
           return;
         }
@@ -5839,8 +5858,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           if (path === null) {
             toastManager.add({
               type: "error",
-              title: `Couldn't get the path of "${folder.name}"`,
-              description: "Type the folder path with @ instead.",
+              title: `"${folder.name}" 경로를 가져오지 못했어요`,
+              description: "대신 @와 함께 폴더 경로를 입력해 주세요.",
             });
             continue;
           }
@@ -6066,10 +6085,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       >
         <label htmlFor={controlledMessageId} className="block text-sm font-medium">
           {controlledTask.mode === "analysis"
-            ? "Read-only analysis request"
+            ? "읽기 전용 분석 요청"
             : controlledTask.mode === "blocked"
-              ? "Controlled task message"
-              : "Save a follow-up"}
+              ? "통제 작업 메시지"
+              : "후속 메시지 저장"}
         </label>
         <Textarea
           id={controlledMessageId}
@@ -6094,15 +6113,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           <p id={`${controlledMessageId}-help`} className="min-w-0 text-xs text-muted-foreground">
             {controlledTask.disabledReason ??
               (controlledTask.mode === "analysis"
-                ? "Codex read-only; no attachments or tool context. Ctrl/⌘ Enter to send."
-                : "Saved in this conversation only. No provider turn, terminal or automatic next Run. Ctrl/⌘ Enter to save.")}
+                ? "Codex 읽기 전용 분석이에요. 첨부 파일이나 도구 참고 자료는 보내지 않아요. Ctrl/⌘ Enter로 보내세요."
+                : "이 대화에만 저장해요. 프로바이더 호출·터미널 실행·다음 Run 자동 시작은 없어요. Ctrl/⌘ Enter로 저장하세요.")}
           </p>
           <Button type="submit" disabled={disabled || !prompt.trim()}>
             {controlledTask.busy
-              ? "Saving…"
+              ? "저장 중…"
               : controlledTask.mode === "analysis"
-                ? "Send analysis request"
-                : "Save follow-up"}
+                ? "분석 요청 보내기"
+                : "후속 메시지 저장"}
           </Button>
         </div>
       </form>
@@ -6174,6 +6193,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       className="mx-auto w-full min-w-0 max-w-3xl"
       data-chat-composer-form="true"
     >
+      <RecoveredComposerContent target={composerDraftTarget} />
       {composerControlsInStrip && restingControlsHost
         ? createPortal(
             <div
@@ -6297,9 +6317,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               )}
                               onPointerDown={(event) => event.preventDefault()}
                               onClick={expandMobileComposer}
-                              aria-label="Write custom answer"
+                              aria-label="직접 답변 작성"
                             >
-                              {activePendingProgress?.customAnswer || "Write custom answer"}
+                              {activePendingProgress?.customAnswer || "직접 답변 작성"}
                             </button>
                           ) : null}
                           {activePendingProgress?.activeQuestion?.multiSelect ? (
@@ -6397,17 +6417,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={isChoiceOnlyPendingQuestion ? undefined : expandMobileComposer}
                   disabled={isChoiceOnlyPendingQuestion}
-                  aria-label="Expand composer"
+                  aria-label="메시지 입력창 펼치기"
                 >
                   {activePendingProgress
                     ? isChoiceOnlyPendingQuestion
-                      ? "Choose an option above"
+                      ? "위에서 항목을 선택해 주세요"
                       : activePendingProgress.customAnswer ||
-                        "Type your own answer, or leave this blank to use the selected option"
+                        "직접 답변을 입력하거나, 선택한 항목을 사용하려면 비워 두세요"
                     : prompt.trim() ||
                       (showProviderUnavailable
-                        ? "Enable a provider in Settings"
-                        : "Ask anything...")}
+                        ? "설정에서 프로바이더를 활성화해 주세요"
+                        : "무엇이든 물어보세요…")}
                 </button>
                 {collapsedComposerImagePreviews}
                 <button
@@ -6529,7 +6549,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               <button
                                 type="button"
                                 className="h-full w-full cursor-zoom-in"
-                                aria-label={`Preview ${image.name}`}
+                                aria-label={`${image.name} 미리보기`}
                                 onClick={() => {
                                   const preview = buildExpandedImagePreview(
                                     composerImages,
@@ -6570,7 +6590,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                   render={
                                     <span
                                       role="img"
-                                      aria-label="Draft attachment may not persist"
+                                      aria-label="초안 첨부가 유지되지 않을 수 있어요"
                                       className="absolute left-1 top-1 inline-flex items-center justify-center rounded bg-background/85 p-0.5 text-amber-600"
                                     >
                                       <CircleAlertIcon className="size-3" />
@@ -6581,8 +6601,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                   side="top"
                                   className="max-w-64 whitespace-normal leading-tight"
                                 >
-                                  Draft attachment could not be saved locally and may be lost on
-                                  navigation.
+                                  초안 첨부를 로컬에 저장하지 못해 다른 화면으로 이동하면 사라질 수
+                                  있어요.
                                 </TooltipPopup>
                               </Tooltip>
                             )}
@@ -6606,7 +6626,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                           draftTarget: attachmentDraftTarget,
                                         })
                                       }
-                                      aria-label={`Retry upload for ${image.name}`}
+                                      aria-label={`${image.name} 업로드 다시 시도`}
                                     />
                                   }
                                 >
@@ -6629,7 +6649,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                   "opacity-0 transition-opacity pointer-coarse:opacity-100 focus-visible:opacity-100 group-hover/attachment:opacity-100 group-focus-within/attachment:opacity-100",
                               )}
                               onClick={() => removeComposerImage(image.id)}
-                              aria-label={`Remove ${image.name}`}
+                              aria-label={`${image.name} 빼기`}
                             >
                               <XIcon />
                             </Button>
@@ -6667,7 +6687,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           <button
                             type="button"
                             className="flex h-full w-full cursor-zoom-in flex-col items-center justify-center gap-1 px-1 text-white"
-                            aria-label={`Play ${file.name}`}
+                            aria-label={`${file.name} 재생`}
                             onClick={() => {
                               if (file.file !== null) {
                                 const preview = buildExpandedImagePreview([file], file.id);
@@ -6706,7 +6726,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                         draftTarget: attachmentDraftTarget,
                                       })
                                     }
-                                    aria-label={`Retry upload for ${file.name}`}
+                                    aria-label={`${file.name} 업로드 다시 시도`}
                                   />
                                 }
                               >
@@ -6725,7 +6745,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                             size="icon-xs"
                             className="absolute right-1 top-1 bg-background/80 hover:bg-background/90"
                             onClick={() => removeComposerFileFromDraft(file.id)}
-                            aria-label={`Remove ${file.name}`}
+                            aria-label={`${file.name} 빼기`}
                           >
                             <XIcon />
                           </Button>
@@ -6769,8 +6789,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           <span className="shrink-0 text-xs text-secondary-label">
                             {needsReattach
                               ? canReattachFile
-                                ? "Attach again"
-                                : "Remove to send"
+                                ? "다시 첨부"
+                                : "보내려면 빼 주세요"
                               : upload?.status === "uploading"
                                 ? formatAttachmentUploadProgress(upload.progress)
                                 : formatAttachmentSize(file.sizeBytes)}
@@ -6789,7 +6809,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                         draftTarget: attachmentDraftTarget,
                                       })
                                     }
-                                    aria-label={`Retry upload for ${file.name}`}
+                                    aria-label={`${file.name} 업로드 다시 시도`}
                                   />
                                 }
                               >
@@ -6807,7 +6827,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                             variant="ghost"
                             size="icon-xs"
                             onClick={() => removeComposerFileFromDraft(file.id)}
-                            aria-label={`Remove ${file.name}`}
+                            aria-label={`${file.name} 빼기`}
                           >
                             <XIcon />
                           </Button>
@@ -6849,7 +6869,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                         mimeType={previewFile.mimeType}
                         sizeBytes={previewFile.sizeBytes}
                         file={previewFile.file}
-                        origin="Draft"
+                        origin="초안"
                         {...(previewFile.uploadedAttachmentId && previewFile.uploadEnvironmentId
                           ? {
                               asset: {
@@ -6904,20 +6924,20 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     onPaste={onComposerPaste}
                     placeholder={
                       isComposerApprovalState
-                        ? "Resolve this approval request to continue"
+                        ? "계속하려면 이 승인 요청을 처리해 주세요"
                         : activePendingProgress
                           ? isChoiceOnlyPendingQuestion
-                            ? "Choose an option above"
-                            : "Type your own answer, or leave this blank to use the selected option"
+                            ? "위에서 항목을 선택해 주세요"
+                            : "직접 답변을 입력하거나, 선택한 항목을 사용하려면 비워 두세요"
                           : showPlanFollowUpPrompt && activeProposedPlan
-                            ? "Add feedback to refine the plan, or leave this blank to implement it"
+                            ? "계획을 다듬을 의견을 남기거나, 바로 실행하려면 비워 두세요"
                             : projectSelectionRequired
-                              ? "Choose a project above to start a thread"
+                              ? "대화를 시작할 프로젝트를 위에서 선택해 주세요"
                               : showProviderUnavailable
-                                ? "Enable a provider in Settings to send a message"
+                                ? "메시지를 보내려면 설정에서 프로바이더를 활성화해 주세요"
                                 : phase === "disconnected"
                                   ? DISCONNECTED_COMPOSER_PLACEHOLDER
-                                  : "Ask anything, @tag files/folders, $use skills, or / for commands"
+                                  : "무엇이든 물어보세요. @로 파일·폴더를 지정하고, $로 스킬을 사용하거나 /로 명령을 실행하세요"
                     }
                     disabled={
                       isConnecting ||
@@ -7026,13 +7046,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               size="icon-sm"
                               onPointerDown={(event) => event.preventDefault()}
                               onClick={() => attachmentInputRef.current?.click()}
-                              aria-label="Attach files"
+                              aria-label="파일 첨부"
                             />
                           }
                         >
                           <PaperclipIcon />
                         </TooltipTrigger>
-                        <TooltipPopup>Attach files</TooltipPopup>
+                        <TooltipPopup>파일 첨부</TooltipPopup>
                       </Tooltip>
                     </>
                   ) : null}

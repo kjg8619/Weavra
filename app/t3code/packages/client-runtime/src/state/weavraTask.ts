@@ -115,7 +115,7 @@ export const makeEnvironmentWeavraTaskState = Effect.fn("EnvironmentWeavraTaskSt
           const active = yield* SubscriptionRef.get(supervisor.session);
           if (Option.isNone(active) || active.value !== session || cache.owner !== owner) return;
           producer = session;
-          const task = observation.task;
+          const task = taskFromObservation(observation);
           if (
             task.environmentId !== input.environmentId ||
             task.projectId !== input.projectId ||
@@ -237,6 +237,6 @@ export function isFreshWeavraTaskObservation(
   return state.support === "supported" && state.connection === "CONNECTED" && !state.stale;
 }
 
-export function taskFromObservation(observation: WeavraTaskObservation): WeavraTask {
+function taskFromObservation(observation: WeavraTaskObservation): WeavraTask {
   return observation.task;
 }

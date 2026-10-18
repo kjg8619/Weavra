@@ -274,7 +274,7 @@ function buildSnapShotTimelineEntry(previewUrl?: string) {
           source: {
             kind: "snap-shot" as const,
             capturedAt: "2026-03-17T19:12:28.000Z",
-            appName: "Terminal",
+            appName: "터미널",
             windowTitle: "t3code — Tests",
             appIconDataUrl: "data:image/png;base64,aWNvbg==",
           },
@@ -300,8 +300,8 @@ describe("MessagesTimeline", () => {
       <MessagesTimeline {...buildProps()} timelineEntries={[first, second]} />,
     );
 
-    expect(markup).toContain('aria-label="Previous turn"');
-    expect(markup).toContain('aria-label="Next turn"');
+    expect(markup).toContain('aria-label="이전 턴"');
+    expect(markup).toContain('aria-label="다음 턴"');
   });
 
   // Expanding history uses this suite's existing test renderer, deprecated in
@@ -557,8 +557,8 @@ describe("MessagesTimeline", () => {
     expect(markup).not.toContain("self-start");
     expect(markup).toContain("whitespace-nowrap");
     expect(markup).toContain("size-3");
-    expect(markup).not.toContain('aria-label="Collapse all folders"');
-    expect(markup).toContain('aria-label="Open diff"');
+    expect(markup).not.toContain('aria-label="모든 폴더 접기"');
+    expect(markup).toContain('aria-label="변경 사항 열기"');
     expect(markup).toContain("1 changed file");
   });
 
@@ -705,7 +705,7 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain('data-maintain-visible-content-position-data="true"');
     expect(markup).toContain('data-maintain-visible-content-position-size="true"');
     expect(markup).toContain('data-maintain-visible-content-position-restore="true"');
-    expect(markup).toContain("Terminal");
+    expect(markup).toContain("터미널");
     expect(markup).toContain("t3code — Tests");
     expect(markup).toContain('src="data:image/png;base64,aWNvbg=="');
     expect(markup).toContain("h-28 w-52 max-w-full");
@@ -719,7 +719,7 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain("screenshot.png");
-    expect(markup).not.toContain("Terminal");
+    expect(markup).not.toContain("터미널");
     expect(markup).not.toContain("t3code — Tests");
     expect(markup).not.toContain('src="data:image/png;base64,aWNvbg=="');
     expect(markup).not.toContain("h-28 w-52 max-w-full");
@@ -772,8 +772,8 @@ describe("MessagesTimeline", () => {
       <MessagesTimeline {...buildProps()} timelineEntries={[entry]} />,
     );
 
-    expect(markup).toContain('aria-label="Preview report.pdf"');
-    expect(markup).toContain('aria-label="Download report.pdf"');
+    expect(markup).toContain('aria-label="report.pdf 미리보기"');
+    expect(markup).toContain('aria-label="report.pdf 내려받기"');
     expect(markup).not.toContain('download="report.pdf"');
     expect(markup).not.toContain('alt="report.pdf"');
   });
@@ -851,8 +851,8 @@ describe("MessagesTimeline", () => {
       <MessagesTimeline {...buildProps()} timelineEntries={[entry]} />,
     );
 
-    expect(markup).toContain('aria-label="Preview archive.zip"');
-    expect(markup).toContain('aria-label="Download archive.zip"');
+    expect(markup).toContain('aria-label="archive.zip 미리보기"');
+    expect(markup).toContain('aria-label="archive.zip 내려받기"');
     expect(markup).not.toContain("<a href=");
   });
 
@@ -879,7 +879,7 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain("report.pdf");
-    expect(markup).not.toContain('aria-label="Download report.pdf"');
+    expect(markup).not.toContain('aria-label="report.pdf 내려받기"');
   });
 
   it("renders unknown attachment types as inert rows instead of crashing", () => {
@@ -906,7 +906,7 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain("voice-memo.ogg");
-    expect(markup).not.toContain('aria-label="Download voice-memo.ogg"');
+    expect(markup).not.toContain('aria-label="voice-memo.ogg 내려받기"');
     expect(markup).not.toContain('alt="voice-memo.ogg"');
     expect(markup).not.toContain("<a href=");
   });
@@ -1099,7 +1099,7 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    expect(markup).toContain("Show full message");
+    expect(markup).toContain("전체 메시지 보기");
     expect(markup).toContain('data-maintain-scroll-at-end="enabled"');
     expect(markup).toContain('data-maintain-scroll-at-end-animated="false"');
     expect(markup).toContain('data-maintain-scroll-at-end-data-change="true"');
@@ -1119,7 +1119,7 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    expect(markup).not.toContain("Show full message");
+    expect(markup).not.toContain("전체 메시지 보기");
     expect(markup).toContain('data-user-message-collapsible="false"');
     expect(markup).toContain("rounded-2xl bg-message p-3");
   });
@@ -1219,7 +1219,7 @@ describe("MessagesTimeline", () => {
       <MessagesTimeline
         {...buildProps()}
         timelineEntries={[
-          buildAssistantTimelineEntry("<details><summary>More</summary>Details</details>"),
+          buildAssistantTimelineEntry("<details><summary>More</summary>자세히</details>"),
         ]}
       />,
     );
@@ -1283,7 +1283,7 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain("lucide-terminal");
     expect(markup).toContain("yoo what&#x27;s");
     expect(markup).not.toContain("terminal_context");
-    expect(markup).toContain("Show full message");
+    expect(markup).toContain("전체 메시지 보기");
   }, 20_000);
 
   it("renders chips for standalone element-pick context messages", () => {
@@ -1299,7 +1299,7 @@ describe("MessagesTimeline", () => {
               "  selector: button.submit",
               "  source: /repo/src/Button.tsx:12:5",
               "  html:",
-              '  <button class="submit">Save</button>',
+              '  <button class="submit">저장</button>',
               "</element_context>",
             ].join("\n"),
           ),
@@ -1320,7 +1320,7 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    expect(markup).toContain('aria-label="Copy link"');
+    expect(markup).toContain('aria-label="링크 복사"');
     expect(markup).toContain('data-user-message-collapsed="true"');
     expect(markup).toContain('data-user-message-footer="true"');
   });
@@ -1410,7 +1410,7 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain("Ran 2 commands");
-    expect(markup).not.toContain('aria-label="Tool call failed"');
+    expect(markup).not.toContain('aria-label="도구 호출 실패"');
   });
 
   it("keeps the collapsed summary icon neutral when the group ends in a failure", () => {
@@ -1668,8 +1668,8 @@ describe("MessagesTimeline", () => {
         ["- first\n- second", "first second", 0],
         ["first  \nsecond", "first second", 0],
         ["![image description](image.png)", "image description", 0],
-        ["![](image.png)", "Thought", 0],
-        ["---", "Thought", 0],
+        ["![](image.png)", "생각함", 0],
+        ["---", "생각함", 0],
       ] as const
     ).flatMap(([markdown, expected, strongCount]) =>
       [false, true].map((streaming) => ({
@@ -1731,7 +1731,7 @@ describe("MessagesTimeline", () => {
             .filter((child) => typeof child === "string")
             .join(""),
         ).toBe(
-          (streaming && expected === "Thought" ? "Thinking" : expected).repeat(streaming ? 2 : 1),
+          (streaming && expected === "생각함" ? "생각 중" : expected).repeat(streaming ? 2 : 1),
         );
         expect(
           preview.findAll((node) =>
@@ -1766,7 +1766,7 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    expect(markup).toContain("Thinking");
+    expect(markup).toContain("생각 중");
     expect(markup).toContain("lucide-brain");
     expect(markup).toContain('data-timeline-row-id="live-activity-row"');
   });
@@ -1809,7 +1809,7 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain("Running pnpm");
     expect(markup).toContain("lucide-terminal");
     expect(markup).not.toContain("Ran pnpm");
-    expect(markup).not.toContain("Thinking");
+    expect(markup).not.toContain("생각 중");
     expect(markup).not.toContain('data-timeline-row-kind="thinking"');
   });
 
@@ -1847,7 +1847,7 @@ describe("MessagesTimeline", () => {
 
     expect(markup).toContain("contextWindow.test.ts +47 to +58");
     expect(markup).toContain("lucide-message-circle");
-    expect(markup).not.toContain(">Review comment<");
+    expect(markup).not.toContain(">리뷰 댓글<");
     expect(markup).not.toContain("&lt;review_comment");
     expect(markup).not.toContain("&lt;/review_comment&gt;");
   });
@@ -1965,7 +1965,7 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain('data-markdown-copy="![shot.png](t3-context://v1/image/img-1)"');
     expect(markup).toContain('aria-label="File attachment, notes.txt, 1 KB"');
     expect(markup).toContain(">1 KB</span>");
-    expect(markup).not.toContain('aria-label="Download notes.txt"');
+    expect(markup).not.toContain('aria-label="notes.txt 내려받기"');
     expect(markup).toContain("legacy.txt");
     expect(markup).not.toContain('href="t3-context://');
     // A picture keeps its tile even though it also has a chip: the chip names it, the tile is

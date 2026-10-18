@@ -49,3 +49,4 @@ export * from "./weavraControl.ts";
 export * from "./weavraTask.ts";
 export * from "./weavraTaskRpc.ts";
 export * from "./weavraFitness.ts";
+export * from "./weavraProjectSetup.ts";

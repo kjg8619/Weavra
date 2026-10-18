@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CompanyKernel } from "../src/kernel.ts";
 import {
 	evaluatePolicy,
+	evaluateRegisteredCheck,
 	executePolicyAction,
 	type InspectedPath,
 	NON_FILE_TARGET_REASON,
 	type PolicyAction,
 	type PolicyContext,
 	PolicyRecheckError,
+	registeredCheckCommandBlocker,
 } from "../src/policy.ts";
 import { FilePolicyPathInspector } from "../src/policy-paths.ts";
 import { FileStateStore } from "../src/state-store.ts";
@@ -170,6 +172,35 @@ describe("pure execution policy", () => {
 		expect(evaluatePolicy({ ...read, paths: ["src/.env"] }, context, facts(["src/.env"])).reason).toBe(
 			"Protected target",
 		);
+	});
+});
+
+describe("registered check command policy", () => {
+	it.each([
+		["/bin/bash", [], "SHELL_COMMAND"],
+		["/usr/bin/env", ["/bin/sh", "-c", "npm test"], "SHELL_COMMAND"],
+		["/usr/bin/xargs", ["-0", "sh", "-c"], "SHELL_COMMAND"],
+		["/usr/bin/node", ["--eval=process.exit(1)"], "INLINE_COMMAND"],
+		["/usr/bin/python", ["-c", "print(1)"], "INLINE_COMMAND"],
+		["/usr/bin/curl", ["--silent"], null],
+	] as const)("classifies %s %j as %s", (executable, argv, blocker) => {
+		expect(registeredCheckCommandBlocker(executable, argv)).toBe(blocker);
+	});
+
+	it("keeps exact safe registered argv allowed and rejects mismatched registration", () => {
+		const identity = { runId: "run-1", actionId: "check-1", actionDigest: "digest-1" };
+		const request = {
+			id: "test",
+			executable: "/usr/bin/node",
+			argv: ["./node_modules/.bin/vitest", "--run"],
+			cwd: ".",
+			timeoutMs: 10_000,
+			env: {},
+		};
+		const evaluate = (registered: typeof request) =>
+			evaluateRegisteredCheck(identity, request, registered, context, true);
+		expect(evaluate(request).decision).toBe("ALLOW");
+		expect(evaluate({ ...request, argv: ["./node_modules/.bin/vitest"] }).decision).toBe("DENY");
 	});
 });
 

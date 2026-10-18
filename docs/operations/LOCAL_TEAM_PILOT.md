@@ -40,19 +40,23 @@ weavra doctor
 
 실제 대상 Git 프로젝트의 루트에서 팀이 검토한 YAML을 입력해 `.ai/config.yaml`을 초기화한다. 저장소의 `runtime/pi/packages/company-runtime/examples/config.yaml`은 **편집용 예시**일 뿐이다. `your-provider`, `your-coding-model`, `scripts/check.mjs` 같은 값을 그대로 실행 가능한 설정으로 복사하지 말고, 승인된 SDK provider/model ID, 프로젝트의 실제 필수 검사와 실행 경로, sandbox 및 예산 정책으로 바꾼 뒤 검토한다.
 
+웹/데스크톱의 controlled-task 카드에서 `PROJECT_NOT_CONFIGURED`가 표시되면 `Set up this project`로 같은 설정을 만들 수 있다. 프로젝트 파일로 추론한 YAML 초안을 검토·편집하고 승인된 SDK provider/model ID를 채운 뒤 명시적으로 `Save`한다. Node/Python/Go/Rust/Godot를 감지하지만 안전한 검사를 추론할 근거가 없으면 checks를 비워 둔다. 이때 실제 필수 검사를 직접 등록해야 readiness가 통과한다. 초안 생성·저장·doctor는 모델이나 등록 검사 명령을 실행하지 않으며 저장 후 표시되는 readiness를 확인하고 `Start controlled task`를 누른다.
+
 ```sh
 cd /절대/대상/Git-프로젝트
 weavra project init --config /절대/경로/검토된-config.yaml
 git status --short
 # 편집기로 새 .ai/config.yaml을 열어 내용과 비밀값 포함 여부를 직접 검토한다.
-# 팀의 정상 변경 검토/승인 절차로 설정을 반영한 뒤:
+# 설정 내용 검토 뒤 (Weavra는 설정 커밋을 요구하지 않는다):
 weavra project doctor
 weavra project doctor --json
 ```
 
-초기화는 기존 설정을 덮어쓰지 않으며 검사 명령을 실행하거나 인증/상태를 수리하지 않는다. doctor도 읽기 전용이다. Git 루트, 초기 HEAD, 깨끗한 작업 트리, 필수 check 등록과 실행 파일, `.ai` 상태 및 sandbox 사전조건을 진단한다. 초기화 자체가 작업 트리를 변경하므로 정책상 별도 승인·커밋이 필요하면 먼저 그 절차를 끝낸 뒤 doctor를 다시 실행한다. `READY`는 로컬 사전조건일 뿐 모델 인증, provider 연결, sandbox 실행, check 통과 또는 검증 증거가 아니다. 실패 시 출력된 진단 코드와 다음 조치를 확인하고, 어떤 자동 복구도 기대하지 않는다.
+초기화는 기존 설정을 덮어쓰지 않으며 검사 명령을 실행하거나 인증/상태를 수리하지 않는다. doctor도 읽기 전용이다. Git 루트, 초기 HEAD, `.ai/` 밖의 깨끗한 작업 트리, 필수 check 등록과 실행 파일, `.ai` 상태 및 sandbox 사전조건을 진단한다. 루트 `.ai/` 전체의 미추적·수정 파일은 clean 검사에서 제외하며 커밋이나 `.gitignore` 변경 없이 설정을 사용할 수 있다. 다른 경로의 변경은 계속 거부한다. `READY`는 로컬 사전조건일 뿐 모델 인증, provider 연결, sandbox 실행, check 통과 또는 검증 증거가 아니다. 실패 시 출력된 진단 코드와 다음 조치를 확인하고, 어떤 자동 복구도 기대하지 않는다.
 
 Runtime이 쓰는 `.ai/state.json`, `tasks.json`, writer lock, `runs/` 등의 상태는 Git에 추적하지 않는다. 팀 정책에 따라 `.ai/` 전체를 무시하거나, `.ai/*`를 무시하고 `!.ai/config.yaml`로 검토된 설정만 예외 처리한다. 초기화 명령은 `.gitignore`를 대신 수정하지 않는다. `ACTIVE_RUN_PRESENT`나 `WRITER_LOCK_PRESENT`는 상태를 검토하라는 뜻이며, 진단 명령이 중단된 실행을 복구하거나 재개하지 않는다.
+
+clean 예외는 worker 쓰기 권한이 아니다. Run/worker는 `.ai/` 아래 어느 파일에도 쓸 수 없다. 증거 수집에서는 다른 `.ai/` 파일 내용을 제외하지만 `.ai/config.yaml`은 기존처럼 실제 내용을 해시한다. 별도의 configDigest/CONFIG_CHANGED 재검사도 유지하므로 설정 변경 후에는 새 미리보기·확인이 필요하다. Git HEAD/index/config identity 검사와 canonical Runtime 상태의 Git 추적 금지는 그대로다.
 
 Runtime workflow workers는 App의 일반 provider CLI가 아니라 Pi SDK 모델 프로필을 사용한다. 프로필 인증은 팀이 승인한 사용자 환경에서 별도로 준비하되, 유효성 확인 전까지 **인증 상태는 UNKNOWN**으로 취급한다. 비밀값, 설정 전문, 개인 홈 경로가 들어간 산출물을 저장소나 증거 자료에 올리지 않는다.
 

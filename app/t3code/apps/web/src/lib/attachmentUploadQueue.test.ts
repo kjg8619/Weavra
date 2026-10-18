@@ -43,6 +43,7 @@ vi.mock("../state/session", () => ({
 
 import {
   awaitAttachmentUploads,
+  prepareRecoveredTurnAttachmentsForSend,
   getUploadedAttachments,
   readAttachmentUpload,
   releaseAttachmentUpload,
@@ -62,6 +63,7 @@ type ProgressListener = (event: {
 
 class TestXmlHttpRequest {
   static requests: TestXmlHttpRequest[] = [];
+  static onSend: ((request: TestXmlHttpRequest) => void) | null = null;
 
   status = 0;
   timeout = 0;
@@ -70,6 +72,7 @@ class TestXmlHttpRequest {
   readonly headers = new Map<string, string>();
   readonly listeners = new Map<string, () => void>();
   progressListener: ProgressListener | null = null;
+  file: File | null = null;
 
   readonly upload = {
     addEventListener: (_event: string, listener: ProgressListener) => {
@@ -94,7 +97,10 @@ class TestXmlHttpRequest {
     this.listeners.set(event, listener);
   }
 
-  send(): void {}
+  send(file?: File): void {
+    this.file = file ?? null;
+    TestXmlHttpRequest.onSend?.(this);
+  }
 
   abort(): void {
     this.listeners.get("abort")?.();
@@ -112,6 +118,13 @@ class TestXmlHttpRequest {
 
 const firstEnvironment = EnvironmentId.make("environment-1");
 const secondEnvironment = EnvironmentId.make("environment-2");
+function deferred<A>() {
+  let complete: (value: A) => void;
+  const promise = new Promise<A>((resolve) => {
+    complete = resolve;
+  });
+  return { promise, resolve: (value: A) => complete(value) };
+}
 
 function makeImage(id: string): ComposerImageAttachment {
   const file = new File([new Uint8Array([1, 2, 3])], `${id}.png`, { type: "image/png" });
@@ -143,6 +156,7 @@ function makeFile(id: string): ComposerFileAttachment {
 describe("attachmentUploadQueue", () => {
   beforeEach(() => {
     TestXmlHttpRequest.requests = [];
+    TestXmlHttpRequest.onSend = null;
     mocks.createAssetUrl.mockReset();
     mocks.createAssetUrl.mockImplementation((target: unknown) => target);
     mocks.executeAtomQuery.mockReset();
@@ -232,6 +246,163 @@ describe("attachmentUploadQueue", () => {
       {
         environmentId: firstEnvironment,
         input: { attachmentId: "pending-environment-1-image-1.png" },
+      },
+      expect.anything(),
+    );
+  });
+
+  it("downloads exact recovered bytes only on explicit preparation and uploads fresh refs", async () => {
+    const sources = [
+      {
+        type: "file" as const,
+        id: "thread-1-00000000-0000-4000-8000-000000000001-pdf",
+        name: "first.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 3,
+        source: { _tag: "pasted-text" as const },
+      },
+      {
+        type: "image" as const,
+        id: "thread-1-00000000-0000-4000-8000-000000000002",
+        name: "second.png",
+        mimeType: "image/png",
+        sizeBytes: 3,
+      },
+    ];
+    mocks.executeAtomQuery.mockImplementation(
+      async (
+        _registry: unknown,
+        query: {
+          input: { resource: { attachmentId: string } };
+        },
+      ) => ({
+        _tag: "Success",
+        value: {
+          relativeUrl: `/api/assets/${query.input.resource.attachmentId}`,
+          expiresAt: 100,
+        },
+      }),
+    );
+    const fetchAsset = vi.fn(async () => new Response(new Uint8Array([4, 5, 6])));
+    vi.stubGlobal("fetch", fetchAsset);
+    const sent = deferred<void>();
+    TestXmlHttpRequest.onSend = () => {
+      if (TestXmlHttpRequest.requests.length === 2) sent.resolve();
+    };
+    const pending = prepareRecoveredTurnAttachmentsForSend({
+      environmentId: firstEnvironment,
+      attachments: sources,
+      isCurrent: () => true,
+    });
+    await sent.promise;
+    expect(fetchAsset.mock.calls).toHaveLength(2);
+    for (const request of TestXmlHttpRequest.requests) {
+      expect(new Uint8Array(await request.file!.arrayBuffer())).toEqual(new Uint8Array([4, 5, 6]));
+      expect(request.method).toBe("POST");
+    }
+    const completed = pending;
+    for (const request of TestXmlHttpRequest.requests) request.complete();
+    const prepared = await completed;
+    expect(prepared.attachments.map((attachment) => attachment.name)).toEqual([
+      "first.pdf",
+      "second.png",
+    ]);
+    expect(prepared.attachments.map((attachment) => attachment.id)).toEqual([
+      "pending-environment-1-first.pdf",
+      "pending-environment-1-second.png",
+    ]);
+    expect(prepared.attachments[0]).toMatchObject({
+      type: "file",
+      sizeBytes: 3,
+      source: { _tag: "pasted-text" },
+    });
+    expect(sources.map((attachment) => attachment.id)).toEqual([
+      "thread-1-00000000-0000-4000-8000-000000000001-pdf",
+      "thread-1-00000000-0000-4000-8000-000000000002",
+    ]);
+    prepared.release();
+    const deleted = mocks.runAtomCommand.mock.calls
+      .filter(([, command]) => command === mocks.removeUpload)
+      .map(([, , target]) => target.input.attachmentId);
+    expect(deleted).toEqual([
+      "pending-environment-1-first.pdf",
+      "pending-environment-1-second.png",
+    ]);
+  });
+
+  it.each(["missing", "wrong-size", "scope-change"] as const)(
+    "leaves sources untouched and starts no upload after %s",
+    async (failure) => {
+      const attachment = {
+        type: "file" as const,
+        id: "thread-1-00000000-0000-4000-8000-000000000001-pdf",
+        name: "source.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 3,
+      };
+      mocks.executeAtomQuery.mockResolvedValue({
+        _tag: "Success",
+        value: { relativeUrl: "/api/assets/source", expiresAt: 100 },
+      });
+      let current = true;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          if (failure === "scope-change") current = false;
+          return failure === "missing"
+            ? new Response(null, { status: 404 })
+            : new Response(new Uint8Array(failure === "wrong-size" ? [1] : [1, 2, 3]));
+        }),
+      );
+      await expect(
+        prepareRecoveredTurnAttachmentsForSend({
+          environmentId: firstEnvironment,
+          attachments: [attachment],
+          isCurrent: () => current,
+        }),
+      ).rejects.toThrow();
+      expect(TestXmlHttpRequest.requests).toEqual([]);
+      expect(mocks.runAtomCommand).not.toHaveBeenCalled();
+      expect(attachment.id).toBe("thread-1-00000000-0000-4000-8000-000000000001-pdf");
+    },
+  );
+
+  it("cleans fresh pending uploads when the recovered draft changes during upload", async () => {
+    mocks.executeAtomQuery.mockResolvedValue({
+      _tag: "Success",
+      value: { relativeUrl: "/api/assets/source", expiresAt: 100 },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(new Uint8Array([1, 2, 3]))),
+    );
+    const sent = deferred<TestXmlHttpRequest>();
+    TestXmlHttpRequest.onSend = (request) => sent.resolve(request);
+    let current = true;
+    const pending = prepareRecoveredTurnAttachmentsForSend({
+      environmentId: firstEnvironment,
+      attachments: [
+        {
+          type: "file",
+          id: "thread-1-00000000-0000-4000-8000-000000000001-pdf",
+          name: "source.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 3,
+        },
+      ],
+      isCurrent: () => current,
+    });
+    const rejected = expect(pending).rejects.toThrow();
+    const request = await sent.promise;
+    current = false;
+    request.complete();
+    await rejected;
+    expect(mocks.runAtomCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      mocks.removeUpload,
+      {
+        environmentId: firstEnvironment,
+        input: { attachmentId: "pending-environment-1-source.pdf" },
       },
       expect.anything(),
     );

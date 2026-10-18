@@ -86,6 +86,8 @@ function create(
 	executionMode: ExecutionMode = goal.startsWith("Explain") ? "READ_ONLY" : "EDIT",
 	riskOverride?: RiskOverride,
 ) {
+	// Tests adjust config in memory; the run's frozen config must match .ai/config.yaml (start recheck).
+	writeFileSync(join(cwd, ".ai/config.yaml"), JSON.stringify(config));
 	return new StandardWorkflow({
 		executionMode,
 		cwd,

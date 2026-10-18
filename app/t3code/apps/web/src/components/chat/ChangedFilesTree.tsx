@@ -77,9 +77,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                     type="button"
                     size="icon-xs"
                     variant="ghost-muted"
-                    aria-label={
-                      allDirectoriesExpanded ? "Collapse all folders" : "Expand all folders"
-                    }
+                    aria-label={allDirectoriesExpanded ? "모든 폴더 접기" : "모든 폴더 펼치기"}
                     data-scroll-anchor-ignore
                     onClick={onToggleAllDirectories}
                   />
@@ -92,7 +90,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                 )}
               </TooltipTrigger>
               <TooltipPopup side="top">
-                {allDirectoriesExpanded ? "Collapse all folders" : "Expand all folders"}
+                {allDirectoriesExpanded ? "모든 폴더 접기" : "모든 폴더 펼치기"}
               </TooltipPopup>
             </Tooltip>
           )}
@@ -103,15 +101,15 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                   type="button"
                   size="xs"
                   variant="ghost-muted"
-                  aria-label="Open diff"
+                  aria-label="변경 사항 열기"
                   onClick={() => onOpenTurnDiff(turnId, files[0]?.path)}
                 />
               }
             >
               <FileDiffIcon className="size-3" />
-              <span className="hidden @[24rem]/changed-files:inline">Open diff</span>
+              <span className="hidden @[24rem]/changed-files:inline">변경 사항 열기</span>
             </TooltipTrigger>
-            <TooltipPopup side="top">Open the full diff</TooltipPopup>
+            <TooltipPopup side="top">전체 변경 사항 열기</TooltipPopup>
           </Tooltip>
         </div>
       </div>

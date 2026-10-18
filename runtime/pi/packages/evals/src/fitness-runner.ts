@@ -204,7 +204,8 @@ export function fitnessConfiguration(
 				trust: { mode: "strict" },
 				sandbox: { mode: sandbox },
 				repair: { mode: fixture.category === "repair" ? "self-check-once" : "disabled" },
-				...(options.advisory ? { advisory: { mode: "developer" } } : {}),
+				// Advisory checks are default-on in the product; arms state it explicitly so only weavra-advisory gets them.
+				advisory_checks: { enabled: options.advisory === true },
 				checks: [
 					{
 						id: "regression",
@@ -280,7 +281,7 @@ export interface FitnessFixtureExecutionOptions {
 	signal?: AbortSignal;
 	/** Deterministic SDK tests may observe requests; no payload is retained by the runner. */
 	onRequest?: (request: AgentExecutionRequest) => void;
-	/** Benchmark-only: opt-in Developer advisory checks (`verification.advisory.mode: developer`). */
+	/** Benchmark-only: Developer advisory checks (`verification.advisory_checks.enabled`); off unless set. */
 	advisory?: boolean;
 	/** Benchmark-only: product revision limit instead of the Fitness calibration value 0. */
 	maxRevisionCycles?: number;

@@ -67,7 +67,7 @@ export function PullRequestCommentComposer({
     });
     if (result._tag === "Failure") {
       setSubmitting(null);
-      toastManager.add({ type: "error", title: "Could not post the comment" });
+      toastManager.add({ type: "error", title: "댓글을 올리지 못했어요" });
       return;
     }
     setBody("");
@@ -86,7 +86,7 @@ export function PullRequestCommentComposer({
             className="rounded-full shadow-lg [--glass-opacity:50%]"
           />
         }
-        aria-label="Comment on pull request"
+        aria-label="PR에 댓글"
       >
         <MessageSquareIcon className="size-4" />
       </PopoverTrigger>
@@ -98,10 +98,10 @@ export function PullRequestCommentComposer({
         initialFocus={textareaRef}
       >
         <div className="mb-3 flex items-center justify-between gap-2">
-          <PopoverTitle className="text-sm">Comment on pull request</PopoverTitle>
+          <PopoverTitle className="text-sm">PR에 댓글</PopoverTitle>
           <PopoverClose
             render={<Button size="icon-xs" variant="ghost" />}
-            aria-label="Close comment composer"
+            aria-label="댓글 작성 닫기"
           >
             <XIcon className="size-3.5" />
           </PopoverClose>
@@ -115,8 +115,8 @@ export function PullRequestCommentComposer({
             disabled={submitting !== null || actionPending}
             value={body}
             rows={3}
-            placeholder="Leave a comment"
-            aria-label="Comment on this pull request"
+            placeholder="댓글을 남겨 주세요"
+            aria-label="이 PR에 댓글"
             onChange={(event) => setBody(event.target.value)}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -150,8 +150,8 @@ export function PullRequestCommentComposer({
                     ? "Closing..."
                     : "Reopening..."
                   : followUpAction === "close"
-                    ? "Close with comment"
-                    : "Reopen with comment"}
+                    ? "댓글 달고 닫기"
+                    : "댓글 달고 다시 열기"}
               </Button>
             )}
             <Button
@@ -161,7 +161,7 @@ export function PullRequestCommentComposer({
               onClick={() => void submit("comment")}
             >
               <SendIcon className="size-3.5" />
-              {submitting === "comment" ? "Posting..." : "Comment"}
+              {submitting === "comment" ? "Posting..." : "댓글"}
             </Button>
           </div>
         </div>

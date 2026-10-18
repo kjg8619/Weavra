@@ -564,10 +564,7 @@ const platformConnectionSourceLayer = Layer.effect(
 const environmentOwnedDataCleanupLayer = Layer.succeed(
   EnvironmentOwnedDataCleanup,
   EnvironmentOwnedDataCleanup.of({
-    clear: (environmentId) =>
-      Effect.sync(() => {
-        clearComposerDraftsEnvironment(environmentId);
-      }),
+    clear: (environmentId) => Effect.promise(() => clearComposerDraftsEnvironment(environmentId)),
   }),
 );
 

@@ -71,7 +71,7 @@ const pullRequestViewerKey = (entry: ScopedEntry): string =>
   `${entry.environmentId ?? ""} ${entry.host}`;
 
 const GROUP_LABELS: Record<PullRequestGroupKey, string> = {
-  reviewRequested: "Review requested",
+  reviewRequested: "리뷰 요청됨",
   authored: "Authored",
   others: "Others",
 };

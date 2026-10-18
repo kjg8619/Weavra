@@ -787,7 +787,7 @@ function deriveTurnFolds(input: {
     const label = isLatestInterruptedTurn
       ? duration
         ? `You stopped after ${duration}`
-        : "You stopped this response"
+        : "이 응답을 직접 중지했어요"
       : duration
         ? `Worked for ${duration}`
         : "Worked";
@@ -1391,7 +1391,7 @@ export function deriveMessagesTimelineRows(input: {
   }
 
   // Until the agent's turn is live, the setup card sits under the send with
-  // the working header above it (the header reads "Setting up worktree…" and
+  // the working header above it (the header reads "worktree를 설정하는 중…" and
   // later swaps its text in place, so nothing moves at the handoff). "Live"
   // means the turn is in the timeline, not just that the server dispatched
   // it: the card must not vanish in the gap between. Once the turn is live

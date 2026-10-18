@@ -32,18 +32,16 @@ export function feedbackBannerItem(
               (error: unknown) => {
                 toastManager.add({
                   type: "error",
-                  title: "Could not copy thread ID",
-                  description: error instanceof Error ? error.message : "An error occurred.",
+                  title: "대화 ID를 복사하지 못했어요",
+                  description: error instanceof Error ? error.message : "오류가 발생했어요.",
                 });
               },
             );
           }}
         >
-          Copy ID
+          ID 복사
         </Button>
       ) : undefined,
-    ...(submission.status !== "uploading"
-      ? { dismissLabel: "Dismiss feedback notice", onDismiss }
-      : {}),
+    ...(submission.status !== "uploading" ? { dismissLabel: "피드백 알림 닫기", onDismiss } : {}),
   };
 }

@@ -11,7 +11,15 @@ import type {
 	HostEvidenceRecord,
 	HostEvidenceTrustSourceRecord,
 } from "./host-control-protocol.ts";
-import { HOST_EVIDENCE_PAGE_RECORD_LIMIT } from "./host-control-protocol.ts";
+import {
+	HOST_EVIDENCE_OUTPUT_TAIL_BYTES,
+	HOST_EVIDENCE_OUTPUT_TAIL_LINES,
+	HOST_EVIDENCE_PAGE_RECORD_LIMIT,
+	HOST_EVIDENCE_REVIEW_SUMMARY_CHARS,
+} from "./host-control-protocol.ts";
+import { displayText } from "./observations.ts";
+import { redactKnownSecrets } from "./project-facts.ts";
+import type { RunDiffRead } from "./run-diff.ts";
 
 export class EvidenceDetailsCursorError extends Error {}
 export class EvidenceDetailsResponseTooLargeError extends Error {}
@@ -23,6 +31,8 @@ export interface EvidenceDetailsProjectionInput {
 	admission?: TaskAdmission;
 	cursor: HostEvidenceCursor;
 	fits: (data: HostEvidenceDetailsPage | HostEvidenceDetailsUnavailable) => boolean;
+	/** Required for the `run-diff` category: the Run diff read from the workspace for this request. */
+	runDiff?: RunDiffRead;
 }
 
 const terminalStatuses = new Set(["BLOCKED", "FAILED", "CANCELLED", "INTERRUPTED", "COMPLETED"]);
@@ -73,6 +83,57 @@ function criterionRecords(run: Run): HostEvidenceCriterionRecord[] | null {
 	}));
 }
 
+/** Last lines of untrusted check output: secrets masked, controls escaped, never splitting a UTF-8 sequence. */
+function outputTail(value: string | undefined, maxLines: number, maxBytes: number): string {
+	if (!value || maxLines <= 0 || maxBytes <= 0) return "";
+	let tail = displayText(redactKnownSecrets(value), Number.POSITIVE_INFINITY, true)
+		.replace(/\n+$/, "")
+		.split("\n")
+		.slice(-maxLines)
+		.join("\n");
+	const bytes = Buffer.from(tail);
+	if (bytes.length > maxBytes) {
+		let start = bytes.length - maxBytes;
+		while (start < bytes.length && (bytes[start] & 0xc0) === 0x80) start++;
+		tail = bytes.subarray(start).toString("utf8");
+	}
+	return tail;
+}
+
+/**
+ * Display-only excerpt for a FAIL check. stderr first (where failures usually are), stdout gets the rest of one
+ * shared budget, so both together stay within the line and byte limits. Never read by completion decisions.
+ */
+function failedOutput(check: Run["verification"][number]): Pick<HostEvidenceCheckRecord, "stdoutTail" | "stderrTail"> {
+	if (check.status !== "FAIL") return {};
+	const stderrTail = outputTail(check.stderr, HOST_EVIDENCE_OUTPUT_TAIL_LINES, HOST_EVIDENCE_OUTPUT_TAIL_BYTES);
+	const stdoutTail = outputTail(
+		check.stdout,
+		HOST_EVIDENCE_OUTPUT_TAIL_LINES - (stderrTail ? stderrTail.split("\n").length : 0),
+		HOST_EVIDENCE_OUTPUT_TAIL_BYTES - Buffer.byteLength(stderrTail),
+	);
+	return { ...(stdoutTail ? { stdoutTail } : {}), ...(stderrTail ? { stderrTail } : {}) };
+}
+
+/** Short display-only REVISE reason from the structured review issues; never raw model prose or a decision input. */
+function reviseSummary(review: NonNullable<Run["review"]>): string | undefined {
+	if (review.result !== "REVISE" || review.issues.length === 0) return undefined;
+	const summary = displayText(
+		redactKnownSecrets(
+			review.issues
+				.map(
+					(issue) =>
+						`[${issue.severity}] ${issue.file ? `${issue.file}: ` : ""}${issue.description} -> ${issue.recommendation}`,
+				)
+				.join(" / "),
+		),
+		Number.POSITIVE_INFINITY,
+	);
+	return summary.length > HOST_EVIDENCE_REVIEW_SUMMARY_CHARS
+		? `${summary.slice(0, HOST_EVIDENCE_REVIEW_SUMMARY_CHARS - 1)}…`
+		: summary;
+}
+
 function checkRecords(run: Run): HostEvidenceCheckRecord[] | null {
 	if (run.taskContractDigest === undefined) return null;
 	return projectEvidencePack({ run }).checks.map((check, index) => ({
@@ -98,6 +159,7 @@ function checkRecords(run: Run): HostEvidenceCheckRecord[] | null {
 				}
 			: null,
 		sandbox: check.sandbox ? { ...check.sandbox } : null,
+		...failedOutput(run.verification[index]),
 	}));
 }
 
@@ -123,8 +185,11 @@ function trustSourceRecords(run: Run): HostEvidenceTrustSourceRecord[] | null {
 	);
 }
 
-function records(run: Run, category: HostEvidenceCategory): HostEvidenceRecord[] | null {
+function records(run: Run, category: HostEvidenceCategory, runDiff?: RunDiffRead): HostEvidenceRecord[] | null {
 	switch (category) {
+		case "run-diff":
+			if (!runDiff) throw new EvidenceDetailsCursorError("Run diff was not read");
+			return runDiff.kind === "files" ? runDiff.records : null;
 		case "criteria":
 			return criterionRecords(run);
 		case "checks":
@@ -166,7 +231,8 @@ export function projectHostEvidenceDetails(
 					? "confirmed"
 					: "UNKNOWN";
 	}
-	const available = records(run, cursor.category);
+	const available = records(run, cursor.category, input.runDiff);
+	const revise = run.review ? reviseSummary(run.review) : undefined;
 	const base = {
 		snapshot: {
 			executionId: binding.executionId,
@@ -189,10 +255,23 @@ export function projectHostEvidenceDetails(
 						revision: run.review.revision,
 						diffDigest: run.review.diffDigest,
 						criteriaCount: pack.review.criteria.length,
+						...(revise === undefined ? {} : { reviseSummary: revise }),
 					}
 				: null,
 		cursor: { ...cursor },
 	};
+	if (cursor.category === "run-diff" && input.runDiff?.kind === "refused") {
+		if (cursor.index !== 0 && cursor.index >= workspace.changedFiles.length)
+			throw new EvidenceDetailsCursorError("Evidence cursor is outside the category");
+		const refused: HostEvidenceDetailsUnavailable = {
+			kind: "evidence-detail-unavailable",
+			...base,
+			reason: input.runDiff.reason,
+			recordIndex: cursor.index,
+		};
+		if (!input.fits(refused)) throw new EvidenceDetailsResponseTooLargeError();
+		return refused;
+	}
 	if (!available) {
 		const unavailable: HostEvidenceDetailsUnavailable = {
 			kind: "evidence-detail-unavailable",

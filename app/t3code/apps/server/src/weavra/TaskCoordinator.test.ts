@@ -14,6 +14,7 @@ import {
   WEAVRA_CONTROL_COMMANDS,
   WeavraTaskReceipt,
   WeavraEvidenceDetailsRequest,
+  type WeavraControlResponse,
   type WeavraTaskReadInput,
 } from "@t3tools/contracts";
 import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
@@ -49,6 +50,8 @@ import * as Coordinator from "./TaskCoordinator.ts";
 import * as ProviderService from "../provider/Services/ProviderService.ts";
 
 const encode = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+const encodeCoordinatorError = Schema.encodeEffect(Coordinator.TaskCoordinatorError);
+const isCoordinatorError = Schema.is(Coordinator.TaskCoordinatorError);
 const decodeTask = Schema.decodeUnknownEffect(WeavraTask);
 const decodeEvidenceRequest = Schema.decodeEffect(
   Schema.fromJsonString(WeavraEvidenceDetailsRequest),
@@ -145,12 +148,39 @@ for await(const line of createInterface({input:process.stdin})){
   if(existsSync('state-patch.json'))Object.assign(state,JSON.parse(readFileSync('state-patch.json','utf8')));
   data={kind:'snapshot',state};
  }
- else if(r.type==='workflow.checkout'){process.stdout.write(JSON.stringify({...response(r,{kind:'checkout-identity',checkout:existsSync('checkout-patch.json')?{...checkout,...JSON.parse(readFileSync('checkout-patch.json','utf8'))}:checkout}),projectRevision:null,runId:null,stateRevision:null})+'\\n');continue;}
+ else if(r.type==='workflow.checkout'){
+  if(mode.startsWith('checkout-rejected:')){
+   const {data:ignored,...envelope}=response(r,null);
+   process.stdout.write(JSON.stringify({...envelope,success:false,error:{code:mode.slice('checkout-rejected:'.length)}})+'\\n');continue;
+  }
+  if(existsSync('checkout-dirty.json')){
+   const {data:ignored,...envelope}=response(r,null);
+   process.stdout.write(JSON.stringify({...envelope,projectRevision:null,runId:null,stateRevision:null,success:false,error:{code:'PROJECT_CHANGED',details:JSON.parse(readFileSync('checkout-dirty.json','utf8'))}})+'\\n');continue;
+  }
+  process.stdout.write(JSON.stringify({...response(r,{kind:'checkout-identity',checkout:existsSync('checkout-patch.json')?{...checkout,...JSON.parse(readFileSync('checkout-patch.json','utf8'))}:checkout}),projectRevision:null,runId:null,stateRevision:null})+'\\n');continue;
+ }
  else if(r.type==='workflow.prepare'){
+  if(mode==='prepare-lost'){process.stdout.write('{"invalid":true}\\n');continue;}
+  if(mode.startsWith('prepare-rejected:')||mode==='prepare-extra-error'||mode==='prepare-unknown-error'||mode==='prepare-dirty'){
+   const {data:ignored,...envelope}=response(r,null);
+   const code=mode.startsWith('prepare-rejected:')?mode.slice('prepare-rejected:'.length):mode==='prepare-unknown-error'?'UNREGISTERED_CODE':mode==='prepare-dirty'?'PROJECT_CHANGED':'INVALID_GOAL';
+   process.stdout.write(JSON.stringify({...envelope,success:false,error:{code,...(mode==='prepare-extra-error'?{message:'private Runtime text'}:{}),...(mode==='prepare-dirty'?{details:{reason:'DIRTY_WORKSPACE',files:['.gitignore','notes.txt'],truncated:false}}:{})}})+'\\n');continue;
+  }
   state.nextRequestId=ownerId+':'+(++seq);
   const taskBinding={taskId:r.task.taskId,environmentId:r.task.environmentId,projectId:r.task.projectId,threadId:r.task.threadId,checkout:r.task.checkout,executionId:randomUUID(),packetVersion:r.task.analysisContext.packetVersion,advisoryDigest:'sha256:'+createHash('sha256').update(JSON.stringify(stable({domain:'weavra.analysis-context.v1',packet:r.task.analysisContext}))).digest('hex'),...(r.task.symptomVerification?{symptomVerification:{criterionId:'AC-'+String(r.task.symptomVerification.criterionIndex).padStart(3,'0'),checkId:r.task.symptomVerification.checkId,registrationDigest:digest}}:{})};
   state.preview={taskBinding,configDigest:digest,previewId:'preview-'+seq,previewDigest:digest,ownerId,projectRevision:0,expiresAt:9999999999999,goal:r.goal,workflow:'STANDARD',executionMode:'EDIT',risk:'R1',allowedPaths:['src'],checks:[{id:'symptom',kind:'test',required:true}],acceptanceCriteria:r.acceptanceStatements.map((statement,i)=>({id:'AC-'+String(i+1).padStart(3,'0'),statement,checkIds:['symptom'],reviewRequired:true})),taskContractDigest:digest,recipe:null,configuration:{mutationMode:'compatible',verifierTrustMode:'compatible',verifierSandboxMode:'disabled',contextPackMode:'disabled',verificationRepairMode:'disabled',lspEnabled:false}};
-  data={kind:'prepared',preview:state.preview};
+  if(mode==='prepare-missing-binding')delete state.preview.taskBinding;
+  if(mode==='prepare-missing-config')delete state.preview.configDigest;
+  if(mode==='prepare-quick')state.preview.workflow='QUICK';
+  if(mode==='prepare-binding-missing')delete taskBinding.symptomVerification;
+  if(mode==='prepare-binding-unexpected')taskBinding.symptomVerification={criterionId:'AC-001',checkId:'symptom',registrationDigest:digest};
+  if(mode==='prepare-binding-check')taskBinding.symptomVerification.checkId='other';
+  if(mode==='prepare-binding-criterion')taskBinding.symptomVerification.criterionId='AC-002';
+  if(mode==='prepare-binding-not-required')state.preview.checks[0].required=false;
+  if(mode==='prepare-binding-unregistered')state.preview.checks=[];
+  if(mode==='prepare-binding-unlinked')state.preview.acceptanceCriteria[0].checkIds=[];
+  if(mode==='prepare-malformed-wire')state.preview.configDigest='invalid';
+  data=mode==='prepare-non-prepared-wire'?{kind:'checkout-identity',checkout}:{kind:'prepared',preview:state.preview};
  }else if(r.type==='workflow.confirm'){
   const binding=state.preview.taskBinding;
   const outcome=mode==='failed'?{status:'START_FAILED',reasonCode:'INITIALIZATION_FAILED'}:{status:'ACCEPTED'};
@@ -179,7 +209,8 @@ for await(const line of createInterface({input:process.stdin})){
    data={kind:'task-recovery',receipt,disposition:'RECOVERED',cleanup:receipt.admission.cleanup,reason:null};
   }
  }else if(r.type==='workflow.receipt'){
-  data={kind:'task-receipt',receipt:existsSync('receipt.json')?JSON.parse(readFileSync('receipt.json','utf8')):{status:'UNKNOWN',executionId:r.executionId}};
+  const receipt=existsSync('receipt.json')?JSON.parse(readFileSync('receipt.json','utf8')):{status:'UNKNOWN',executionId:r.executionId};
+  data={kind:'task-receipt',receipt,...(mode==='failure-summary'&&receipt.status==='FOUND'&&receipt.run&&receipt.admission.cleanup==='CONFIRMED'?{failureSummary:{code:'RUN_FAILED',nextAction:'REVIEW_RUN_FAILURE'}}:{})};
  }else if(r.type==='workflow.cancel'||r.type==='approval.resolve'){
   appendFileSync('controls',JSON.stringify(r)+'\\n');
   state.nextRequestId=ownerId+':'+(++seq);
@@ -305,6 +336,68 @@ const setup = Effect.fn("coordinatorTest.setup")(function* (
   });
   return { fs, root, cwd, ownership, input, open, task, engine, commandStates, retained };
 });
+
+it.effect("rejects a changed prepared target before observing Runtime or creating a task", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("accepted", false, undefined, false, false);
+    const { coordinator } = yield* fixture.open;
+    const result = yield* coordinator
+      .create(
+        {
+          environmentId: fixture.input.environmentId,
+          projectId: fixture.input.projectId,
+          threadId: fixture.input.threadId,
+          commandId: CommandId.make("prepared-target-change"),
+        },
+        fixture.cwd + "/different-prepared-folder",
+      )
+      .pipe(Effect.result);
+    assert.equal(result._tag, "Failure");
+    if (result._tag === "Failure") {
+      assert.ok(isCoordinatorError(result.failure));
+      if (isCoordinatorError(result.failure)) assert.equal(result.failure.code, "TARGET_CHANGED");
+    }
+    assert.isFalse(yield* fixture.fs.exists(fixture.cwd + "/requests"));
+  }).pipe(Effect.scoped, Effect.provide(system)),
+);
+
+it.effect("lists a selected non-Git project's tasks without admitting controlled execution", () =>
+  Effect.gen(function* () {
+    // Given a real selected project, SQLite and ownership, but no Git repository.
+    const fixture = yield* setup("accepted", false, undefined, false, false);
+    const { coordinator } = yield* fixture.open;
+    yield* fixture.fs.remove(`${fixture.root}/.git`, { recursive: true });
+    const scope = {
+      environmentId: fixture.input.environmentId,
+      projectId: fixture.input.projectId,
+      threadId: fixture.input.threadId,
+    };
+
+    // When discovery reads this thread's association.
+    const tasks = yield* coordinator.list(scope);
+
+    // Then an empty association is known, without a Runtime request or write admission.
+    assert.deepStrictEqual(tasks, []);
+    assert.isFalse(yield* fixture.fs.exists(`${fixture.cwd}/requests`));
+    for (const foreign of [
+      { ...scope, environmentId: EnvironmentId.make("foreign") },
+      { ...scope, projectId: ProjectId.make("foreign") },
+      { ...scope, threadId: ThreadId.make("foreign") },
+    ]) {
+      const rejected = yield* coordinator.list(foreign).pipe(Effect.result);
+      assert.equal(rejected._tag, "Failure");
+    }
+    const create = yield* coordinator
+      .create({ ...scope, commandId: CommandId.make("non-git-create") })
+      .pipe(Effect.result);
+    assert.equal(create._tag, "Failure");
+    if (create._tag === "Failure") {
+      assert.ok(isCoordinatorError(create.failure));
+      if (isCoordinatorError(create.failure)) assert.equal(create.failure.code, "TARGET_CHANGED");
+    }
+    assert.equal((yield* fixture.ownership.activeOperations).length, 0);
+  }).pipe(Effect.scoped, Effect.provide(system)),
+);
 
 for (const worktree of [false, true]) {
   it.effect(
@@ -567,6 +660,7 @@ it.effect("gates task preparation and receipt lookup on advertised capabilities"
     if (result._tag === "Failure") {
       assert.instanceOf(result.failure, Coordinator.TaskCoordinatorError);
       assert.propertyVal(result.failure, "code", "RUNTIME_UNAVAILABLE");
+      assert.notProperty(result.failure, "prepareReason");
     }
     assert.equal((yield* coordinator.read(fixture.input)).phase, "analysis");
     const requests = yield* fixture.fs.readFileString(`${fixture.cwd}/requests`);
@@ -574,6 +668,232 @@ it.effect("gates task preparation and receipt lookup on advertised capabilities"
     assert.isFalse(requests.includes("workflow.confirm"));
   }).pipe(Effect.scoped, Effect.provide(system)),
 );
+
+for (const code of [
+  "INVALID_GOAL",
+  "INVALID_CRITERIA",
+  "CONFIG_CHANGED",
+  "POLICY_DENIED",
+  "BUSY",
+] as const) {
+  it.effect(`preserves the bounded Runtime preparation rejection ${code}`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup(`prepare-rejected:${code}`);
+      const { coordinator } = yield* fixture.open;
+      const result = yield* prepare(coordinator, fixture.input, packet, "Fix fixture", [
+        "Fixture works",
+      ]).pipe(Effect.result);
+
+      assert.ok(result._tag === "Failure");
+      assert.ok(isCoordinatorError(result.failure));
+      assert.deepStrictEqual(yield* encodeCoordinatorError(result.failure), {
+        _tag: "TaskCoordinatorError",
+        code: "PREPARE_REJECTED",
+        prepareReason: { kind: "runtime", code },
+      });
+      const current = yield* coordinator.read(fixture.input);
+      assert.equal(current.phase, "analysis");
+      assert.equal(current.ownership.state, "analysis");
+      assert.equal(current.execution, null);
+      assert.deepStrictEqual(current.context, packet);
+      const requests = (yield* fixture.fs.readFileString(`${fixture.cwd}/requests`)).split("\n");
+      assert.equal(requests.filter((request) => request === "workflow.prepare").length, 1);
+      assert.isFalse(requests.includes("workflow.confirm"));
+      assert.isFalse(yield* fixture.fs.exists(`${fixture.cwd}/receipt.json`));
+      assert.equal((yield* fixture.ownership.activeOperations).length, 0);
+    }).pipe(Effect.scoped, Effect.provide(system)),
+  );
+}
+
+it.effect("forwards the dirty workspace paths of a Runtime PROJECT_CHANGED refusal", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("prepare-dirty");
+    const { coordinator } = yield* fixture.open;
+    const result = yield* prepare(coordinator, fixture.input, packet, "Fix fixture", [
+      "Fixture works",
+    ]).pipe(Effect.result);
+    assert.ok(result._tag === "Failure");
+    assert.ok(isCoordinatorError(result.failure));
+    assert.deepStrictEqual(yield* encodeCoordinatorError(result.failure), {
+      _tag: "TaskCoordinatorError",
+      code: "PREPARE_REJECTED",
+      prepareReason: {
+        kind: "runtime",
+        code: "PROJECT_CHANGED",
+        details: {
+          reason: "DIRTY_WORKSPACE",
+          files: [".gitignore", "notes.txt"],
+          truncated: false,
+        },
+      },
+    });
+    const current = yield* coordinator.read(fixture.input);
+    assert.equal(current.phase, "analysis");
+    assert.equal(current.execution, null);
+  }).pipe(Effect.scoped, Effect.provide(system)),
+);
+
+it.effect("names the dirty paths when the checkout identity read before prepare is refused", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup();
+    const { coordinator } = yield* fixture.open;
+    const details = {
+      reason: "DIRTY_WORKSPACE" as const,
+      files: ["a.txt", "b.txt"],
+      truncated: false,
+    };
+    // A dirty checkout has no clean identity, so Runtime refuses the read before prepare.
+    yield* fixture.fs.writeFileString(`${fixture.cwd}/checkout-dirty.json`, encode(details));
+    const result = yield* prepare(coordinator, fixture.input, packet, "Fix fixture", [
+      "Fixture works",
+    ]).pipe(Effect.result);
+    assert.ok(result._tag === "Failure");
+    assert.ok(isCoordinatorError(result.failure));
+    assert.equal(result.failure.code, "PREPARE_REJECTED");
+    assert.deepStrictEqual(result.failure.prepareReason, {
+      kind: "runtime",
+      code: "PROJECT_CHANGED",
+      details,
+    });
+    const current = yield* coordinator.read(fixture.input);
+    assert.equal(current.phase, "analysis", "The user can commit the baseline and prepare again");
+    assert.equal(current.execution, null);
+    const requests = (yield* fixture.fs.readFileString(`${fixture.cwd}/requests`)).split("\n");
+    assert.isFalse(requests.includes("workflow.prepare"));
+  }).pipe(Effect.scoped, Effect.provide(system)),
+);
+
+for (const [mode, code] of [
+  ["prepare-missing-binding", "INVALID_PREVIEW"],
+  ["prepare-missing-config", "INVALID_PREVIEW"],
+  ["prepare-quick", "STANDARD_REQUIRED"],
+  ["prepare-binding-missing", "BINDING_MISMATCH"],
+  ["prepare-binding-unexpected", "BINDING_MISMATCH"],
+  ["prepare-binding-check", "BINDING_MISMATCH"],
+  ["prepare-binding-criterion", "BINDING_MISMATCH"],
+  ["prepare-binding-not-required", "BINDING_MISMATCH"],
+  ["prepare-binding-unregistered", "BINDING_MISMATCH"],
+  ["prepare-binding-unlinked", "BINDING_MISMATCH"],
+] as const) {
+  it.effect(`reports ${code} for ${mode} without confirming`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup(mode);
+      const { coordinator } = yield* fixture.open;
+      const result = yield* coordinator
+        .prepare(
+          fixture.input,
+          {
+            context: packet,
+            goal: "Fix fixture",
+            acceptanceStatements: ["Fixture works"],
+            ...(mode === "prepare-binding-unexpected"
+              ? {}
+              : { symptomVerification: { criterionIndex: 1, checkId: "symptom" } }),
+          },
+          fixture.task.revision,
+        )
+        .pipe(Effect.result);
+
+      assert.ok(result._tag === "Failure");
+      assert.ok(isCoordinatorError(result.failure));
+      assert.equal(result.failure.code, "PREPARE_REJECTED");
+      assert.deepStrictEqual(result.failure.prepareReason, { kind: "preview", code });
+      const current = yield* coordinator.read(fixture.input);
+      assert.equal(current.phase, code === "BINDING_MISMATCH" ? "preparing" : "analysis");
+      assert.equal(current.execution, null);
+      assert.equal(current.ownership.state, "analysis");
+      assert.deepStrictEqual(current.context, packet);
+      const requests = (yield* fixture.fs.readFileString(`${fixture.cwd}/requests`)).split("\n");
+      assert.equal(requests.filter((request) => request === "workflow.prepare").length, 1);
+      assert.isFalse(requests.includes("workflow.confirm"));
+      assert.isFalse(yield* fixture.fs.exists(`${fixture.cwd}/receipt.json`));
+      assert.equal((yield* fixture.ownership.activeOperations).length, 0);
+    }).pipe(Effect.scoped, Effect.provide(system)),
+  );
+}
+
+for (const mode of ["non-prepared", "malformed-preview"] as const) {
+  it.effect(`rejects ${mode} at the coordinator preview boundary`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup();
+      const { runtime } = yield* fixture.open;
+      // Exercise the coordinator guard after a real, valid stdio exchange.
+      // Invalid wire responses are tested separately and remain transport failures.
+      const coordinator = yield* Coordinator.make().pipe(
+        Effect.provideService(Runtime.RuntimeController, {
+          ...runtime,
+          command: (...args) =>
+            runtime.command(...args).pipe(
+              Effect.map((response): WeavraControlResponse => {
+                assert.ok(response.success && response.data.kind === "prepared");
+                return {
+                  ...response,
+                  data:
+                    mode === "non-prepared"
+                      ? { kind: "checkout-identity", checkout: fixture.task.checkout }
+                      : {
+                          ...response.data,
+                          preview: { ...response.data.preview, goal: "" },
+                        },
+                };
+              }),
+            ),
+        }),
+      );
+      const result = yield* prepare(coordinator, fixture.input, packet, "Fix fixture", [
+        "Fixture works",
+      ]).pipe(Effect.result);
+
+      assert.ok(result._tag === "Failure");
+      assert.ok(isCoordinatorError(result.failure));
+      assert.equal(result.failure.code, "PREPARE_REJECTED");
+      assert.deepStrictEqual(result.failure.prepareReason, {
+        kind: "preview",
+        code: "INVALID_PREVIEW",
+      });
+      const current = yield* coordinator.read(fixture.input);
+      assert.equal(current.phase, mode === "non-prepared" ? "analysis" : "preparing");
+      assert.equal(current.execution, null);
+      assert.isFalse(
+        (yield* fixture.fs.readFileString(`${fixture.cwd}/requests`)).includes("workflow.confirm"),
+      );
+      assert.isFalse(yield* fixture.fs.exists(`${fixture.cwd}/receipt.json`));
+    }).pipe(Effect.scoped, Effect.provide(system)),
+  );
+}
+
+for (const mode of [
+  "prepare-lost",
+  "prepare-extra-error",
+  "prepare-unknown-error",
+  "prepare-malformed-wire",
+  "prepare-non-prepared-wire",
+]) {
+  it.effect(`keeps ${mode} uncertain instead of reporting a preparation refusal`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup(mode);
+      const { coordinator } = yield* fixture.open;
+      const result = yield* prepare(coordinator, fixture.input, packet, "Fix fixture", [
+        "Fixture works",
+      ]).pipe(Effect.result);
+
+      assert.ok(result._tag === "Failure");
+      assert.equal(result.failure._tag, "WeavraControlTransportError");
+      assert.propertyVal(result.failure, "code", "INVALID_PAYLOAD");
+      assert.notProperty(result.failure, "prepareReason");
+      const current = yield* coordinator.read(fixture.input);
+      assert.equal(current.phase, "preparing");
+      assert.equal(current.ownership.state, "analysis");
+      assert.equal(current.execution, null);
+      assert.deepStrictEqual(current.context, packet);
+      const requests = (yield* fixture.fs.readFileString(`${fixture.cwd}/requests`)).split("\n");
+      assert.equal(requests.filter((request) => request === "workflow.prepare").length, 1);
+      assert.isFalse(requests.includes("workflow.confirm"));
+      assert.isFalse(yield* fixture.fs.exists(`${fixture.cwd}/receipt.json`));
+      assert.equal((yield* fixture.ownership.activeOperations).length, 0);
+    }).pipe(Effect.scoped, Effect.provide(system)),
+  );
+}
 
 it.effect("restores the same task after SQLite and controller shutdown", () =>
   Effect.gen(function* () {
@@ -663,6 +983,58 @@ for (const status of ["RUNNING", "CANCELLED"] as const) {
     }).pipe(Effect.scoped, Effect.provide(system)),
   );
 }
+
+it.effect("projects a bounded failure summary only after confirmed cleanup", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("failure-summary");
+    const { coordinator } = yield* fixture.open;
+    yield* prepare(coordinator, fixture.input, packet, "Fix fixture", ["Fixture works"]);
+    const accepted = yield* coordinator.confirm(fixture.input, CommandId.make("confirm"), 3);
+    const receipt = accepted.execution?.receipt;
+    assert.ok(receipt?.status === "FOUND");
+    const failure: WeavraTaskReceipt = {
+      ...receipt,
+      admission: {
+        ...receipt.admission,
+        updatedAt: 2,
+        outcome: { status: "STARTED", runId: "run-1" },
+        cleanup: "CONFIRMED",
+      },
+      run: { runId: "run-1", status: "FAILED", revision: 2 },
+    };
+    yield* fixture.fs.writeFileString(`${fixture.cwd}/receipt.json`, encode(failure));
+    const result = yield* coordinator.reconcile(fixture.input);
+    assert.deepStrictEqual(result.failureSummary, {
+      code: "RUN_FAILED",
+      nextAction: "REVIEW_RUN_FAILURE",
+    });
+  }).pipe(Effect.scoped, Effect.provide(system)),
+);
+
+it.effect("withholds failure summaries until cleanup is confirmed", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("failure-summary");
+    const { coordinator } = yield* fixture.open;
+    yield* prepare(coordinator, fixture.input, packet, "Fix fixture", ["Fixture works"]);
+    const accepted = yield* coordinator.confirm(fixture.input, CommandId.make("confirm"), 3);
+    const receipt = accepted.execution?.receipt;
+    assert.ok(receipt?.status === "FOUND");
+    const failure: WeavraTaskReceipt = {
+      ...receipt,
+      admission: {
+        ...receipt.admission,
+        updatedAt: 2,
+        outcome: { status: "STARTED", runId: "run-1" },
+        cleanup: "UNCONFIRMED",
+      },
+      run: { runId: "run-1", status: "FAILED", revision: 2 },
+    };
+    yield* fixture.fs.writeFileString(`${fixture.cwd}/receipt.json`, encode(failure));
+    const retained = yield* coordinator.reconcile(fixture.input);
+    assert.equal(retained.phase, "attention-required");
+    assert.equal(retained.failureSummary, undefined);
+  }).pipe(Effect.scoped, Effect.provide(system)),
+);
 
 it.effect("retains finished ownership when physical writer cleanup is not proven", () =>
   Effect.gen(function* () {
@@ -905,6 +1277,43 @@ it.effect("creates from trusted worktree identity and reuses only the exact comm
     );
   }).pipe(Effect.scoped, Effect.provide(system)),
 );
+
+for (const [runtimeCode, taskCode] of [
+  ["PROJECT_NOT_CONFIGURED", "PROJECT_NOT_CONFIGURED"],
+  ["WORKSPACE_EVIDENCE_CAPACITY", "WORKSPACE_EVIDENCE_CAPACITY"],
+  ["WORKSPACE_EVIDENCE_UNSUPPORTED", "WORKSPACE_EVIDENCE_UNSUPPORTED"],
+  ["WORKSPACE_EVIDENCE_UNAVAILABLE", "WORKSPACE_EVIDENCE_UNAVAILABLE"],
+  ["PROJECT_CHANGED", "TARGET_CHANGED"],
+  ["CONFIG_CHANGED", "TARGET_CHANGED"],
+] as const) {
+  it.effect(`refuses task creation for ${runtimeCode} without persisting ownership`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup(
+        `checkout-rejected:${runtimeCode}`,
+        false,
+        undefined,
+        false,
+        false,
+      );
+      const { coordinator } = yield* fixture.open;
+      const result = yield* coordinator.create(createInput(fixture)).pipe(Effect.result);
+      assert.equal(result._tag, "Failure");
+      if (result._tag !== "Failure") return;
+      assert.isTrue(isCoordinatorError(result.failure));
+      if (isCoordinatorError(result.failure)) assert.equal(result.failure.code, taskCode);
+      assert.deepStrictEqual(yield* coordinator.list(createInput(fixture)), []);
+      assert.deepStrictEqual(yield* coordinator.listRecoverable, []);
+      const events = yield* fixture.engine.readEvents(0).pipe(Stream.runCollect);
+      assert.equal(events.filter((event) => event.type === "thread.weavra-task-set").length, 0);
+      const requests = (yield* fixture.fs.readFileString(`${fixture.cwd}/requests`))
+        .trim()
+        .split("\n");
+      assert.isTrue(requests.includes("workflow.checkout"));
+      assert.isFalse(requests.includes("workflow.prepare"));
+      assert.isFalse(requests.includes("workflow.confirm"));
+    }).pipe(Effect.scoped, Effect.provide(system)),
+  );
+}
 
 for (const wrong of ["environment", "project"] as const) {
   it.effect(`rejects a wrong creation ${wrong} before contacting Runtime`, () =>

@@ -21,6 +21,8 @@ import {
   ChevronRight,
   FileDiff,
   Files,
+  ListChecks,
+  Workflow,
   Globe2,
   Plus,
   TerminalSquare,
@@ -116,6 +118,8 @@ interface RightPanelTabsProps {
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddAgents: () => void;
+  onAddControl?: () => void;
+  onAddGraph?: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
   terminalAvailable: boolean;
@@ -148,14 +152,14 @@ export function shouldOpenDefaultBrowserProfileFromMenuClick(
 }
 
 const SURFACE_DISABLED_REASONS = {
-  browser: "Browser previews are only available in the Weavra desktop app.",
-  terminal: "Terminal surfaces are only available from a project thread.",
-  files: "Files are only available when a project is open.",
-  diff: "Diff is only available for server threads in Git repositories.",
-  pullRequest: "This thread's branch has no pull request yet.",
-  pullRequests: "No linked pull requests are available for this thread.",
-  agents: "Agents are only available from a thread.",
-  device: "Devices are only available from a thread.",
+  browser: "브라우저 미리보기는 Weavra 데스크톱 앱에서만 쓸 수 있어요.",
+  terminal: "터미널은 프로젝트 대화에서만 쓸 수 있어요.",
+  files: "파일은 프로젝트가 열려 있을 때만 쓸 수 있어요.",
+  diff: "변경 사항은 Git 저장소의 서버 대화에서만 볼 수 있어요.",
+  pullRequest: "이 대화의 branch에는 아직 PR이 없어요.",
+  pullRequests: "이 대화에 연결된 PR이 없어요.",
+  agents: "에이전트는 대화에서만 쓸 수 있어요.",
+  device: "기기는 대화에서만 쓸 수 있어요.",
 } as const;
 
 /** Overlays that must win over the launcher's letter shortcuts. */
@@ -172,14 +176,14 @@ const LAUNCHER_SHORTCUT_BLOCKING_LAYERS = [
 
 /** One-line unavailability hints for the empty-state rows. */
 const SURFACE_UNAVAILABLE_HINTS = {
-  browser: "Only available in the desktop app.",
-  terminal: "Available when a project is open.",
-  files: "Available when a project is open.",
-  diff: "Available for Git repositories.",
-  pullRequest: "No pull request on this branch yet.",
-  pullRequests: "No linked pull requests available.",
-  agents: "Available from a thread.",
-  device: "Available from a thread.",
+  browser: "데스크톱 앱에서만 쓸 수 있어요.",
+  terminal: "프로젝트가 열려 있을 때 쓸 수 있어요.",
+  files: "프로젝트가 열려 있을 때 쓸 수 있어요.",
+  diff: "Git 저장소에서 쓸 수 있어요.",
+  pullRequest: "이 branch에는 아직 PR이 없어요.",
+  pullRequests: "연결된 PR이 없어요.",
+  agents: "대화에서 쓸 수 있어요.",
+  device: "대화에서 쓸 수 있어요.",
 } as const;
 
 type TabContextMenuAction =
@@ -221,7 +225,7 @@ export function tabMuteMenuItem(input: {
 }): { label: string; disabled: boolean } {
   const muted = input.overlay?.audioMuted ?? false;
   return {
-    label: muted ? "Unmute tab" : "Mute tab",
+    label: muted ? "탭 소리 켜기" : "탭 소리 끄기",
     disabled: input.overlay === null || !input.canResolveRuntimeTabId,
   };
 }
@@ -319,6 +323,8 @@ function RightPanelEmptyState(props: {
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddAgents: () => void;
+  onAddControl?: () => void;
+  onAddGraph?: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
   terminalAvailable: boolean;
@@ -335,7 +341,7 @@ function RightPanelEmptyState(props: {
 
   const actions = [
     {
-      label: "Browser",
+      label: "브라우저",
       icon: Globe2,
       shortcut: "B",
       available: props.browserAvailable,
@@ -344,7 +350,7 @@ function RightPanelEmptyState(props: {
       badgeCount: 0,
     },
     {
-      label: "Terminal",
+      label: "터미널",
       icon: TerminalSquare,
       shortcut: "T",
       available: props.terminalAvailable,
@@ -353,7 +359,7 @@ function RightPanelEmptyState(props: {
       badgeCount: 0,
     },
     {
-      label: "Files",
+      label: "파일",
       icon: Files,
       shortcut: "F",
       available: props.filesAvailable,
@@ -362,7 +368,7 @@ function RightPanelEmptyState(props: {
       badgeCount: 0,
     },
     {
-      label: "Diff",
+      label: "변경 사항",
       icon: FileDiff,
       shortcut: "D",
       available: props.diffAvailable,
@@ -371,7 +377,7 @@ function RightPanelEmptyState(props: {
       badgeCount: 0,
     },
     {
-      label: "Pull request",
+      label: "PR",
       icon: PullRequestGlyph.pullRequest,
       shortcut: "P",
       available: props.pullRequestAvailable,
@@ -380,7 +386,7 @@ function RightPanelEmptyState(props: {
       badgeCount: 0,
     },
     {
-      label: "Linked pull requests",
+      label: "연결된 PR",
       icon: PullRequestGlyph.link,
       shortcut: "L",
       available: props.pullRequestsAvailable,
@@ -389,7 +395,7 @@ function RightPanelEmptyState(props: {
       badgeCount: 0,
     },
     {
-      label: "Agents",
+      label: "에이전트",
       icon: Bot,
       shortcut: "A",
       available: props.agentsAvailable,
@@ -397,9 +403,35 @@ function RightPanelEmptyState(props: {
       onClick: props.onAddAgents,
       badgeCount: props.liveAgentCount,
     },
+    ...(props.onAddControl
+      ? [
+          {
+            label: "통제 작업",
+            icon: ListChecks,
+            shortcut: "W",
+            available: true,
+            disabledReason: "",
+            onClick: props.onAddControl,
+            badgeCount: 0,
+          },
+        ]
+      : []),
+    ...(props.onAddGraph
+      ? [
+          {
+            label: "Run 그래프",
+            icon: Workflow,
+            shortcut: "G",
+            available: true,
+            disabledReason: "",
+            onClick: props.onAddGraph,
+            badgeCount: 0,
+          },
+        ]
+      : []),
     {
-      label: "Device",
-      description: "Watch an iOS Simulator or Android Emulator.",
+      label: "기기",
+      description: "iOS 시뮬레이터나 Android 에뮬레이터 화면을 봐요.",
       icon: Smartphone,
       shortcut: "M",
       available: props.deviceAvailable,
@@ -496,7 +528,7 @@ function RightPanelEmptyState(props: {
       ref={focusOnMount}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      aria-label="Open a surface"
+      aria-label="패널 열기"
       data-surface-launcher-keys={availableActions.map((action) => action.shortcut).join("")}
       className={cn(
         "flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-6 pt-6 outline-none",
@@ -506,7 +538,7 @@ function RightPanelEmptyState(props: {
       )}
     >
       <div className="w-full max-w-xs">
-        <h3 className="mb-3 text-center font-medium text-foreground text-sm">Open a surface</h3>
+        <h3 className="mb-3 text-center font-medium text-foreground text-sm">패널 열기</h3>
         <div className="flex flex-col gap-0.5">
           {actions.map((action) =>
             action.available ? (
@@ -536,7 +568,7 @@ function RightPanelEmptyState(props: {
                   <span
                     className={cn(
                       "min-w-0 flex-1 truncate",
-                      action.label === "Browser" && props.browserProfiles.length > 1 && "pr-7",
+                      action.label === "브라우저" && props.browserProfiles.length > 1 && "pr-7",
                     )}
                   >
                     {action.label}
@@ -548,12 +580,12 @@ function RightPanelEmptyState(props: {
                   default profile, the chevron picks another. Only worth showing
                   once there is something to choose between.
                 */}
-                {action.label === "Browser" && props.browserProfiles.length > 1 ? (
+                {action.label === "브라우저" && props.browserProfiles.length > 1 ? (
                   <Menu>
                     <MenuTrigger
                       render={
                         <Button
-                          aria-label="Open browser in a profile"
+                          aria-label="프로필로 브라우저 열기"
                           className="absolute top-1/2 right-8 -translate-y-1/2 [--control-icon-color:currentColor]"
                           size="icon-xs"
                           variant="ghost-muted"
@@ -611,9 +643,9 @@ function surfaceTitle(
 ): string {
   switch (surface.kind) {
     case "diff":
-      return "Diff";
+      return "변경 사항";
     case "files":
-      return "Files";
+      return "파일";
     case "file":
       return surface.relativePath.slice(
         Math.max(surface.relativePath.lastIndexOf("/"), surface.relativePath.lastIndexOf("\\")) + 1,
@@ -626,19 +658,23 @@ function surfaceTitle(
     case "pull-request":
       return `#${surface.number}`;
     case "pull-requests":
-      return "Pull requests";
+      return "PR";
     case "agents":
-      return "Agents";
+      return "에이전트";
+    case "control":
+      return "통제 작업";
+    case "graph":
+      return "Run 그래프";
     case "device":
-      return surface.title ?? surface.target?.name ?? "Device";
+      return surface.title ?? surface.target?.name ?? "기기";
     case "preview": {
       const snapshot = surface.resourceId ? sessions[surface.resourceId] : null;
-      if (!snapshot || snapshot.navStatus._tag === "Idle") return "Browser";
+      if (!snapshot || snapshot.navStatus._tag === "Idle") return "브라우저";
       if (snapshot.navStatus.title.trim().length > 0) return snapshot.navStatus.title;
       try {
-        return new URL(snapshot.navStatus.url).host || "Browser";
+        return new URL(snapshot.navStatus.url).host || "브라우저";
       } catch {
-        return "Browser";
+        return "브라우저";
       }
     }
   }
@@ -714,6 +750,10 @@ function SurfaceIcon({
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
     case "agents":
       return <Bot className="size-3 shrink-0" />;
+    case "control":
+      return <ListChecks className="size-3 shrink-0" />;
+    case "graph":
+      return <Workflow className="size-3 shrink-0" />;
     case "device":
       return surface.target?.platform === "ios" ? (
         <AppleIcon className="size-3 shrink-0" />
@@ -862,7 +902,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
 
   const addSurfaceActions = [
     {
-      label: "Browser",
+      label: "브라우저",
       icon: Globe2,
       shortcut: "B",
       available: props.browserAvailable,
@@ -870,7 +910,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddBrowser,
     },
     {
-      label: "Terminal",
+      label: "터미널",
       icon: TerminalSquare,
       shortcut: "T",
       available: props.terminalAvailable,
@@ -878,7 +918,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddTerminal,
     },
     {
-      label: "Files",
+      label: "파일",
       icon: Files,
       shortcut: "F",
       available: props.filesAvailable,
@@ -886,7 +926,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddFiles,
     },
     {
-      label: "Diff",
+      label: "변경 사항",
       icon: FileDiff,
       shortcut: "D",
       available: props.diffAvailable,
@@ -894,7 +934,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddDiff,
     },
     {
-      label: "Pull request",
+      label: "PR",
       icon: PullRequestGlyph.pullRequest,
       shortcut: "P",
       available: props.pullRequestAvailable,
@@ -902,7 +942,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddPullRequest,
     },
     {
-      label: "Linked pull requests",
+      label: "연결된 PR",
       icon: PullRequestGlyph.link,
       shortcut: "L",
       available: props.pullRequestsAvailable,
@@ -910,15 +950,39 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddPullRequests,
     },
     {
-      label: "Agents",
+      label: "에이전트",
       icon: Bot,
       shortcut: "A",
       available: props.agentsAvailable,
       disabledReason: SURFACE_DISABLED_REASONS.agents,
       onClick: props.onAddAgents,
     },
+    ...(props.onAddControl
+      ? [
+          {
+            label: "통제 작업",
+            icon: ListChecks,
+            shortcut: "W",
+            available: true,
+            disabledReason: "",
+            onClick: props.onAddControl,
+          },
+        ]
+      : []),
+    ...(props.onAddGraph
+      ? [
+          {
+            label: "Run 그래프",
+            icon: Workflow,
+            shortcut: "G",
+            available: true,
+            disabledReason: "",
+            onClick: props.onAddGraph,
+          },
+        ]
+      : []),
     {
-      label: "Device",
+      label: "기기",
       icon: Smartphone,
       shortcut: "M",
       available: props.deviceAvailable,
@@ -949,9 +1013,9 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
 
       const items: ContextMenuItem<TabContextMenuAction>[] = [];
       if (surface.kind === "device" && props.onRenameDevice)
-        items.push({ id: "rename", label: "Rename" });
+        items.push({ id: "rename", label: "이름 바꾸기" });
       if (surface.kind === "file" && surface.attachment === undefined) {
-        items.push({ id: "copy-path", label: "Copy path" });
+        items.push({ id: "copy-path", label: "경로 복사" });
       }
       const menuPreviewTabId = previewTabIdOf(surface, props.previewSessions);
       // Desktop overlay state only arrives once the preview manager has created
@@ -973,20 +1037,20 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
         });
       }
       items.push(
-        { id: "close", label: "Close" },
+        { id: "close", label: "닫기" },
         {
           id: "close-others",
-          label: "Close others",
+          label: "다른 탭 닫기",
           disabled: props.surfaces.length <= 1,
         },
         {
           id: "close-to-right",
-          label: "Close to the right",
+          label: "오른쪽 탭 닫기",
           disabled: surfaceIndex >= props.surfaces.length - 1,
         },
         {
           id: "close-all",
-          label: "Close all",
+          label: "모두 닫기",
           disabled: props.surfaces.length === 0,
         },
       );
@@ -1151,7 +1215,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   )}
                 >
                   <PanelTabCloseButton
-                    label={`Close ${title}`}
+                    label={`${title} 닫기`}
                     onClick={() => props.onCloseSurface(surface)}
                   >
                     <SurfaceIcon
@@ -1194,12 +1258,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                           </button>
                         }
                       />
-                      <TooltipPopup>{audio === "muted" ? "Unmute tab" : "Mute tab"}</TooltipPopup>
+                      <TooltipPopup>
+                        {audio === "muted" ? "탭 소리 켜기" : "탭 소리 끄기"}
+                      </TooltipPopup>
                     </Tooltip>
                   )}
                   {renamingDevice === surface.id ? (
                     <input
-                      aria-label="Device tab name"
+                      aria-label="기기 탭 이름"
                       className="w-24 min-w-0 rounded-sm bg-background px-1 outline-none ring-1 ring-ring"
                       defaultValue={title}
                       ref={(element) => {
@@ -1247,7 +1313,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                 <MenuTrigger
                   render={
                     <Button
-                      aria-label="Add panel surface"
+                      aria-label="패널 추가"
                       className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
                       size="icon-xs"
                       variant="ghost"
@@ -1270,7 +1336,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     // while hover or arrow reveals the profiles. The choice
                     // lives at open time because a tab's profile is fixed then —
                     // Electron only honours a partition before attach.
-                    if (action.label === "Browser" && action.available) {
+                    if (action.label === "브라우저" && action.available) {
                       return (
                         <MenuSub key={action.label}>
                           <MenuSubTrigger
@@ -1336,14 +1402,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           <div
             className="flex shrink-0 items-center gap-0.5 [-webkit-app-region:no-drag]"
             role="group"
-            aria-label="Scroll panel tabs"
+            aria-label="패널 탭 스크롤"
           >
             <Tooltip>
               <TooltipTrigger
                 render={
                   <span className="inline-flex">
                     <Button
-                      aria-label="Scroll tabs left"
+                      aria-label="탭 왼쪽으로 스크롤"
                       disabled={!tabScrollState.canScrollLeft}
                       onClick={() => scrollTabs(-1)}
                       size="icon-xs"
@@ -1354,14 +1420,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   </span>
                 }
               />
-              <TooltipPopup>Scroll tabs left</TooltipPopup>
+              <TooltipPopup>탭 왼쪽으로 스크롤</TooltipPopup>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger
                 render={
                   <span className="inline-flex">
                     <Button
-                      aria-label="Scroll tabs right"
+                      aria-label="탭 오른쪽으로 스크롤"
                       disabled={!tabScrollState.canScrollRight}
                       onClick={() => scrollTabs(1)}
                       size="icon-xs"
@@ -1372,7 +1438,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   </span>
                 }
               />
-              <TooltipPopup>Scroll tabs right</TooltipPopup>
+              <TooltipPopup>탭 오른쪽으로 스크롤</TooltipPopup>
             </Tooltip>
           </div>
         ) : null}
@@ -1396,6 +1462,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
             onAddAgents={props.onAddAgents}
+            {...(props.onAddControl ? { onAddControl: props.onAddControl } : {})}
+            {...(props.onAddGraph ? { onAddGraph: props.onAddGraph } : {})}
             onAddDevice={props.onAddDevice}
             browserAvailable={props.browserAvailable}
             terminalAvailable={props.terminalAvailable}

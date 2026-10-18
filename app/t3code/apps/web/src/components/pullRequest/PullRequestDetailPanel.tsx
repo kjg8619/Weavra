@@ -176,41 +176,41 @@ import { PullRequestGlyph } from "./pullRequestIcons";
 type DetailTab = "summary" | "timeline" | "code";
 
 const ACTION_SUCCESS_LABELS: Record<PullRequestAction, string> = {
-  merge: "Pull request merged",
-  ready: "Marked ready for review",
-  draft: "Converted to draft",
-  close: "Pull request closed",
-  reopen: "Pull request reopened",
-  "update-branch": "Branch updated with the base branch",
+  merge: "PR 병합됨",
+  ready: "리뷰 준비 완료로 표시했어요",
+  draft: "초안으로 바꿨어요",
+  close: "PR 닫힘",
+  reopen: "PR을 다시 열었어요",
+  "update-branch": "base branch로 branch를 업데이트했어요",
   // True whichever it did: a pull request that was already mergeable merges the moment this is
   // armed, and the client has no way to tell that apart from one still waiting on something.
   "enable-auto-merge":
     "Auto-merge turned on — merges as soon as this is ready, sooner if it already is",
-  "disable-auto-merge": "Auto-merge turned off",
-  revert: "Revert pull request opened",
-  "approve-workflows": "Workflows approved",
+  "disable-auto-merge": "자동 병합을 껐어요",
+  revert: "되돌리기 PR을 열었어요",
+  "approve-workflows": "워크플로를 승인했어요",
 };
 
 /** Said as the thing that did not happen, rather than as the operation that returned an error. */
 const ACTION_FAILURE_LABELS: Record<PullRequestAction, string> = {
-  merge: "Could not merge this pull request",
-  ready: "Could not mark this ready for review",
-  draft: "Could not convert this to a draft",
-  close: "Could not close this pull request",
-  reopen: "Could not reopen this pull request",
-  "update-branch": "Could not update this branch",
-  "enable-auto-merge": "Could not turn on auto-merge",
-  "disable-auto-merge": "Could not turn off auto-merge",
-  revert: "Could not open a revert pull request",
-  "approve-workflows": "Could not approve workflows",
+  merge: "이 PR을 병합하지 못했어요",
+  ready: "리뷰 준비 완료로 표시하지 못했어요",
+  draft: "초안으로 바꾸지 못했어요",
+  close: "이 PR을 닫지 못했어요",
+  reopen: "이 PR을 다시 열지 못했어요",
+  "update-branch": "이 branch를 업데이트하지 못했어요",
+  "enable-auto-merge": "자동 병합을 켜지 못했어요",
+  "disable-auto-merge": "자동 병합을 끄지 못했어요",
+  revert: "되돌리기 PR을 열지 못했어요",
+  "approve-workflows": "워크플로를 승인하지 못했어요",
 };
 
 /** What to try, for the times the host says only that it refused. */
 const ACTION_FAILURE_HINTS: Record<PullRequestAction, string> = {
   merge:
     "The host refused the merge. Check that you have write access, that the checks it requires have passed, and that the branch is not conflicting.",
-  ready: "The host refused it. Check that you have write access to this repository.",
-  draft: "The host refused it. Check that you have write access to this repository.",
+  ready: "host가 거절했어요. 이 저장소에 쓰기 권한이 있는지 확인해 주세요.",
+  draft: "host가 거절했어요. 이 저장소에 쓰기 권한이 있는지 확인해 주세요.",
   close: "The host refused it. Check that you have write access, or that you opened it.",
   reopen:
     "The host refused it. Check that you have write access, and that the branch still exists.",
@@ -224,10 +224,9 @@ const ACTION_FAILURE_HINTS: Record<PullRequestAction, string> = {
     "The host refused it. Check that this repository allows auto-merge, that you have write access, and that there is something left for it to wait on.",
   "disable-auto-merge":
     "The host refused it. Check that you have write access, and that the merge has not already happened.",
-  revert:
-    "The host refused it. Check that you have write access and that this pull request was merged on the host.",
+  revert: "host가 거절했어요. 쓰기 권한이 있는지, 이 PR이 host에서 병합되었는지 확인해 주세요.",
   "approve-workflows":
-    "The host refused it. Check that you have Actions write access and that these workflow runs are still awaiting approval.",
+    "host가 거절했어요. Actions 쓰기 권한이 있는지, 워크플로 실행이 아직 승인 대기인지 확인해 주세요.",
 };
 
 /**
@@ -239,9 +238,9 @@ const UPDATE_BRANCH_REBASE_FAILURE_HINT =
   "The host refused it. A rebase stops at the first commit that does not apply cleanly; updating with a merge commit may still work.";
 
 const TABS: ReadonlyArray<{ value: DetailTab; label: string }> = [
-  { value: "summary", label: "Summary" },
-  { value: "timeline", label: "Timeline" },
-  { value: "code", label: "Code" },
+  { value: "summary", label: "요약" },
+  { value: "timeline", label: "타임라인" },
+  { value: "code", label: "코드" },
 ];
 
 // The diff viewer pulls in its worker pool, so load it only when the reader approaches Code.
@@ -372,11 +371,11 @@ function PullRequestCopyableCode({
             isCopied ? "opacity-100" : "opacity-0",
           )}
         >
-          Copied
+          복사했어요
         </span>
       </TooltipTrigger>
       <TooltipPopup className="max-w-96 wrap-anywhere font-mono" side={tooltipSide}>
-        {`${isCopied ? "Copied" : copyLabel}: ${value}`}
+        {`${isCopied ? "복사했어요" : copyLabel}: ${value}`}
       </TooltipPopup>
     </Tooltip>
   );
@@ -438,7 +437,7 @@ function PullRequestBaseFreshnessWarning({
         viewportClassName="py-2.5 [--viewport-inline-padding:--spacing(3)]"
       >
         <p className="text-xs text-foreground">{summary}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Changes can be cleanly merged.</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">충돌 없이 병합할 수 있어요.</p>
         {/* Each way the host offers and this reader may take, as its own button: a split button
             would need a menu inside a popover, and two buttons say the same thing in one layer. */}
         {freshness.methods.length > 0 ? (
@@ -452,7 +451,7 @@ function PullRequestBaseFreshnessWarning({
                 onClick={() => onUpdate(method)}
               >
                 <PullRequestGlyph.merged aria-hidden className="size-3" />
-                {method === "rebase" ? "Update with rebase" : "Update branch"}
+                {method === "rebase" ? "rebase로 업데이트" : "branch 업데이트"}
               </Button>
             ))}
           </span>
@@ -627,7 +626,7 @@ export function PullRequestDetailPanel({
     readonly action: "merge" | "close" | "enable-auto-merge" | "revert" | "approve-workflows";
   }>({ open: false, action: "merge" });
   const confirmAction = confirmation.action;
-  // Which handoff is preparing, keyed so a per-finding button can say "Preparing..." on itself
+  // Which handoff is preparing, keyed so a per-finding button can say "준비 중..." on itself
   // alone. One at a time whatever the key: they all check the same pull request out.
   const [handoff, setHandoff] = useState<string | null>(null);
   const detailQuery = useEnvironmentQuery(
@@ -727,7 +726,7 @@ export function PullRequestDetailPanel({
     onError: (error, label) =>
       toastManager.add({
         type: "error",
-        title: `Failed to copy ${label}`,
+        title: `${label}을(를) 복사하지 못했어요`,
         description: error.message,
       }),
   });
@@ -1018,7 +1017,7 @@ export function PullRequestDetailPanel({
     });
     if (commentResult._tag === "Failure") {
       setPendingAction(null);
-      toastManager.add({ type: "error", title: "Could not post the comment" });
+      toastManager.add({ type: "error", title: "댓글을 올리지 못했어요" });
       return { commentPosted: false };
     }
     const actionSucceeded = await finishAction(action);
@@ -1043,10 +1042,10 @@ export function PullRequestDetailPanel({
       // rewritten is the one thing a failed save must not cost them.
       toastManager.add({
         type: "error",
-        title: "The title could not be saved",
+        title: "제목을 저장하지 못했어요",
         description: readableFailure(
           squashAtomCommandFailure(result),
-          "The host refused the new title.",
+          "host가 새 제목을 거절했어요.",
         ),
       });
       return;
@@ -1135,7 +1134,7 @@ export function PullRequestDetailPanel({
       writeTaskToComposer(attachTarget, task);
       toastManager.add({
         type: "success",
-        title: "Added to the composer",
+        title: "작성기에 추가했어요",
         description:
           task.prompt.length > 0
             ? "The question is in the composer — read it over, then send."
@@ -1150,14 +1149,14 @@ export function PullRequestDetailPanel({
     if (opened === null) {
       toastManager.add({
         type: "error",
-        title: "Could not open a thread",
-        description: "Try again from the project, or open a thread first.",
+        title: "대화를 열지 못했어요",
+        description: "프로젝트에서 다시 시도하거나 먼저 대화를 열어 주세요.",
       });
       return;
     }
     toastManager.add({
       type: "success",
-      title: "Asked in a thread",
+      title: "대화에서 물어봤어요",
       // "Ask" leaves the composer empty on purpose, so saying the question is in it would send
       // the reader looking for something that is not there. The chips are what landed.
       description:
@@ -1183,18 +1182,18 @@ export function PullRequestDetailPanel({
       writeTaskToComposer(attachTarget, task);
       toastManager.add({
         type: "success",
-        title: "Added to the composer",
-        description: "The task is in the composer — read it over, then send.",
+        title: "작성기에 추가했어요",
+        description: "작업을 작성기에 넣었어요. 읽어 본 뒤 보내 주세요.",
       });
       return;
     }
     setHandoff(kind);
-    // The menu closes on the press and takes its "Preparing..." label with it, so this is the
+    // The menu closes on the press and takes its "준비 중..." label with it, so this is the
     // only thing answering for the checkout. It carries no timeout of its own: a loading toast
     // never expires, and an explicit one would survive the update and pin the result on screen.
     const toastId = toastManager.add({
       type: "loading",
-      title: "Preparing the pull request checkout...",
+      title: "PR checkout을 준비하는 중...",
     });
     // Wherever the reader chose to act: the thread, the checkout it is pointed at and the composer
     // the task lands in are all one server's, and picking another one moves all three.
@@ -1213,8 +1212,8 @@ export function PullRequestDetailPanel({
       // working tree than to prepare a worktree nobody asked for.
       toastManager.update(toastId, {
         type: "error",
-        title: "Could not open a thread for the checkout",
-        description: "Try again from the project, or open a thread first.",
+        title: "checkout용 대화를 열지 못했어요",
+        description: "프로젝트에서 다시 시도하거나 먼저 대화를 열어 주세요.",
       });
       return;
     }
@@ -1231,7 +1230,7 @@ export function PullRequestDetailPanel({
         prepareThread.error instanceof Error ? prepareThread.error.message : null;
       toastManager.update(toastId, {
         type: "error",
-        title: "Could not prepare the pull request checkout",
+        title: "PR checkout을 준비하지 못했어요",
         ...(detailMessage ? { description: detailMessage } : {}),
       });
       return;
@@ -1253,8 +1252,8 @@ export function PullRequestDetailPanel({
       // outcome worth stopping for, since it reads as success and is not.
       toastManager.update(toastId, {
         type: "error",
-        title: "Checked out, but the thread stayed where it was",
-        description: `The checkout is ready on \`${prepared.value.branch}\`. Point a thread at it from the branch picker, then ask again.`,
+        title: "checkout은 했지만 대화는 그대로예요",
+        description: `\`${prepared.value.branch}\`에 checkout이 준비됐어요. branch 선택기에서 대화를 이 branch로 옮긴 뒤 다시 물어봐 주세요.`,
       });
       return;
     }
@@ -1266,7 +1265,7 @@ export function PullRequestDetailPanel({
     // success, because everything else about the handoff did happen.
     const staleCheckoutToast = {
       type: "warning",
-      title: "Checked out, but not on the latest commits",
+      title: "checkout은 했지만 최신 commit이 아니에요",
       description:
         "The checkout could not be moved onto the pull request's latest commits, so the code there is older than the pull request. Uncommitted work or local commits keep it where it is.",
     } as const;
@@ -1276,7 +1275,7 @@ export function PullRequestDetailPanel({
         prepared.value.isOnPullRequestHead
           ? {
               type: "success",
-              title: mode === "local" ? "Checked out here" : "Checked out",
+              title: mode === "local" ? "여기에 checkout했어요" : "checkout했어요",
               description:
                 mode === "local"
                   ? "This repository is on the pull request's branch, with a thread open on it."
@@ -1292,8 +1291,8 @@ export function PullRequestDetailPanel({
       prepared.value.isOnPullRequestHead
         ? {
             type: "success",
-            title: "Checkout ready",
-            description: "The task is in the composer — read it over, then send.",
+            title: "checkout 준비됨",
+            description: "작업을 작성기에 넣었어요. 읽어 본 뒤 보내 주세요.",
           }
         : staleCheckoutToast,
     );
@@ -1420,7 +1419,7 @@ export function PullRequestDetailPanel({
   const armedMergeMethod = detail?.autoMergeMethod;
   const armedAutoMergeLabel = armedMergeMethod
     ? `Auto-merge (${PULL_REQUEST_MERGE_METHOD_LABELS[armedMergeMethod].toLowerCase()})`
-    : "Auto-merge";
+    : "자동 병합";
   const workflowApprovalsRequired =
     detail?.state === "open" ? (detail.workflowApprovalsRequired ?? 0) : 0;
   // Out of date with the base, and still cleanly mergeable — the one pairing an update button
@@ -1557,13 +1556,13 @@ export function PullRequestDetailPanel({
                           variant="ghost-muted"
                           onClick={onBack}
                           className="-ml-1.5"
-                          aria-label="Back to this thread's pull requests"
+                          aria-label="이 대화의 PR로 돌아가기"
                         >
                           <ArrowLeftIcon aria-hidden className="size-3.5" />
                         </Button>
                       }
                     />
-                    <TooltipPopup side="top">Back to pull requests</TooltipPopup>
+                    <TooltipPopup side="top">PR 목록으로 돌아가기</TooltipPopup>
                   </Tooltip>
                 ) : null}
                 <Tooltip>
@@ -1599,7 +1598,7 @@ export function PullRequestDetailPanel({
                           "inline-flex shrink-0 cursor-pointer items-center gap-0.5 font-medium underline-offset-2 hover:underline",
                           statePresentation.toneClassName,
                         )}
-                        aria-label={`Open pull request #${detail.number} on host`}
+                        aria-label={`host에서 PR #${detail.number} 열기`}
                       >
                         #{detail.number}
                         <ExternalLinkIcon aria-hidden className="size-2.5" />
@@ -1633,13 +1632,13 @@ export function PullRequestDetailPanel({
                           tabIndex={condensed ? 0 : -1}
                           onClick={onBack}
                           className="-ml-1.5"
-                          aria-label="Back to this thread's pull requests"
+                          aria-label="이 대화의 PR로 돌아가기"
                         >
                           <ArrowLeftIcon aria-hidden className="size-3.5" />
                         </Button>
                       }
                     />
-                    <TooltipPopup side="top">Back to pull requests</TooltipPopup>
+                    <TooltipPopup side="top">PR 목록으로 돌아가기</TooltipPopup>
                   </Tooltip>
                 ) : null}
                 <Tooltip>
@@ -1654,7 +1653,7 @@ export function PullRequestDetailPanel({
                           "inline-flex shrink-0 cursor-pointer items-center gap-0.5 font-medium underline-offset-2 hover:underline",
                           statePresentation.toneClassName,
                         )}
-                        aria-label={`Open pull request #${detail.number} on host`}
+                        aria-label={`host에서 PR #${detail.number} 열기`}
                       >
                         #{detail.number}
                         <ExternalLinkIcon aria-hidden className="size-2.5" />
@@ -1682,7 +1681,7 @@ export function PullRequestDetailPanel({
             <TooltipProvider delay={150} closeDelay={150} timeout={400}>
               {!nativeStack && supportsStackActions && nativeStackQuery.error ? (
                 <Button variant="ghost" size="xs" onClick={nativeStackQuery.refresh}>
-                  Retry stack lookup
+                  스택 다시 찾기
                 </Button>
               ) : null}
               {nativeStack ? (
@@ -1737,12 +1736,14 @@ export function PullRequestDetailPanel({
                               size="xs"
                               variant="outline"
                               aria-label={
-                                handoff?.startsWith("checkout") ? "Checking out..." : "Check out"
+                                handoff?.startsWith("checkout") ? "checkout 하는 중..." : "checkout"
                               }
                             >
                               <GitBranchIcon aria-hidden className="size-3.5" />
                               <span className="@max-[35rem]/pr-header:hidden">
-                                {handoff?.startsWith("checkout") ? "Checking out..." : "Check out"}
+                                {handoff?.startsWith("checkout")
+                                  ? "checkout 하는 중..."
+                                  : "checkout"}
                               </span>
                               <ChevronDownIcon
                                 aria-hidden
@@ -1753,22 +1754,22 @@ export function PullRequestDetailPanel({
                         />
                       }
                     />
-                    <TooltipPopup>Check out this pull request</TooltipPopup>
+                    <TooltipPopup>이 PR checkout</TooltipPopup>
                   </Tooltip>
                   <MenuPopup align="end" side="bottom" className="min-w-72">
                     <MenuItem onClick={() => startCheckout("worktree")}>
                       <GitBranchIcon className="mt-0.5 size-3.5 shrink-0 self-start" />
                       <span className="flex min-w-0 flex-col">
-                        <span>In a separate worktree</span>
+                        <span>별도 worktree에서</span>
                         <span className="text-xs text-muted-foreground">
-                          Its own folder and thread. Nothing you have open moves.
+                          전용 폴더와 대화를 만들어요. 열어 둔 것은 그대로예요.
                         </span>
                       </span>
                     </MenuItem>
                     <MenuItem onClick={() => startCheckout("local")}>
                       <FolderGit2Icon className="mt-0.5 size-3.5 shrink-0 self-start" />
                       <span className="flex min-w-0 flex-col">
-                        <span>In this repository</span>
+                        <span>이 저장소에서</span>
                         <span className="text-xs text-muted-foreground">
                           Switches the branch you are working in, like `gh pr checkout`.
                         </span>
@@ -1818,20 +1819,18 @@ export function PullRequestDetailPanel({
                           variant="destructive-outline"
                           disabled={handoff !== null}
                           onClick={startResolveConflicts}
-                          aria-label={
-                            handoff === "conflicts" ? "Preparing..." : "Resolve conflicts"
-                          }
+                          aria-label={handoff === "conflicts" ? "준비 중..." : "충돌 해결"}
                         >
                           <PullRequestGlyph.conflicting aria-hidden className="size-3.5" />
                           <span className="@max-[30rem]/pr-header:hidden">
-                            {handoff === "conflicts" ? "Preparing..." : "Resolve conflicts"}
+                            {handoff === "conflicts" ? "준비 중..." : "충돌 해결"}
                           </span>
                         </Button>
                       </span>
                     }
                   />
                   <TooltipPopup side="top">
-                    {handoff === "conflicts" ? "Preparing..." : "Resolve conflicts"}
+                    {handoff === "conflicts" ? "준비 중..." : "충돌 해결"}
                   </TooltipPopup>
                 </Tooltip>
               ) : primaryAction === "ready" ? (
@@ -1844,15 +1843,15 @@ export function PullRequestDetailPanel({
                           variant="default"
                           disabled={actionPending}
                           onClick={() => void perform("ready")}
-                          aria-label="Ready for review"
+                          aria-label="리뷰 준비 완료"
                         >
                           <PullRequestGlyph.pullRequest aria-hidden className="size-3.5" />
-                          <span className="@max-[30rem]/pr-header:hidden">Ready for review</span>
+                          <span className="@max-[30rem]/pr-header:hidden">리뷰 준비 완료</span>
                         </Button>
                       </span>
                     }
                   />
-                  <TooltipPopup side="top">Ready for review</TooltipPopup>
+                  <TooltipPopup side="top">리뷰 준비 완료</TooltipPopup>
                 </Tooltip>
               ) : primaryAction === "enable-auto-merge" ? (
                 <Tooltip>
@@ -1946,7 +1945,7 @@ export function PullRequestDetailPanel({
                       <MenuTrigger
                         render={
                           <Button
-                            aria-label="More pull request actions"
+                            aria-label="PR 작업 더 보기"
                             className="size-6"
                             size="icon-xs"
                             variant="ghost-muted"
@@ -1957,7 +1956,7 @@ export function PullRequestDetailPanel({
                       </MenuTrigger>
                     }
                   />
-                  <TooltipPopup>More pull request actions</TooltipPopup>
+                  <TooltipPopup>PR 작업 더 보기</TooltipPopup>
                 </Tooltip>
                 <MenuPopup align="end" side="bottom" className="min-w-72">
                   <PullRequestThreadLinks
@@ -1979,23 +1978,23 @@ export function PullRequestDetailPanel({
                       className="size-3.5"
                       refreshing={isInvalidating || detailQuery.isPending}
                     />
-                    Refresh
+                    새로고침
                   </MenuItem>
                   <MenuItem disabled={handoff !== null} onClick={askAboutPullRequest}>
                     <MessageCircleQuestionIcon className="mt-0.5 size-3.5 shrink-0 self-start" />
                     <span className="flex min-w-0 flex-col">
-                      <span>{handoff === "ask" ? "Opening..." : "Ask a question"}</span>
+                      <span>{handoff === "ask" ? "여는 중..." : "질문하기"}</span>
                       <span className="text-xs text-muted-foreground">
                         {attachTarget !== null
-                          ? "Adds the pull request to this thread's composer."
-                          : "Opens a thread that knows which pull request you mean."}
+                          ? "이 대화의 작성기에 PR을 넣어요."
+                          : "어떤 PR인지 아는 대화를 열어요."}
                       </span>
                     </span>
                   </MenuItem>
                   <MenuItem disabled={handoff !== null} onClick={explainPullRequest}>
                     <BookOpenIcon className="mt-0.5 size-3.5 shrink-0 self-start" />
                     <span className="flex min-w-0 flex-col">
-                      <span>{handoff === "explain" ? "Opening..." : "Explain this PR"}</span>
+                      <span>{handoff === "explain" ? "여는 중..." : "이 PR 설명"}</span>
                       <span className="text-xs text-muted-foreground">
                         A walk through the diff and what to read closely.
                       </span>
@@ -2003,7 +2002,7 @@ export function PullRequestDetailPanel({
                   </MenuItem>
                   <MenuItem disabled={handoff !== null} onClick={startFixFindings}>
                     <HammerIcon className="size-3.5" />
-                    {handoff === "findings" ? "Preparing..." : handoffLabels.fixFindings}
+                    {handoff === "findings" ? "준비 중..." : handoffLabels.fixFindings}
                   </MenuItem>
                   {pickableEnvironments.length > 0 ? (
                     <ActOnEnvironmentPicker
@@ -2016,7 +2015,7 @@ export function PullRequestDetailPanel({
                   <MenuSeparator />
                   {detail.state === "open" ? (
                     <>
-                      {/* Only where the button row could not take it: "Ready for review" on a
+                      {/* Only where the button row could not take it: "리뷰 준비 완료" on a
                           draft is the primary header button, so offering it here as well would
                           show the same action twice. */}
                       {showsDraftToggle ? (
@@ -2029,7 +2028,7 @@ export function PullRequestDetailPanel({
                           ) : (
                             <PullRequestGlyph.draft className="size-3.5" />
                           )}
-                          {detail.isDraft ? "Ready for review" : "Convert to draft"}
+                          {detail.isDraft ? "리뷰 준비 완료" : "초안으로 바꾸기"}
                         </MenuItem>
                       ) : null}
                       {showsMergeNow ? (
@@ -2038,7 +2037,7 @@ export function PullRequestDetailPanel({
                           onClick={() => setConfirmation({ open: true, action: "merge" })}
                         >
                           <PullRequestGlyph.merged className="size-3.5" />
-                          Merge now
+                          지금 병합
                         </MenuItem>
                       ) : null}
                       {/* The same merge, left with the host to carry out once its requirements
@@ -2050,7 +2049,7 @@ export function PullRequestDetailPanel({
                           onClick={() => void perform("disable-auto-merge")}
                         >
                           <PullRequestGlyph.merged className="size-3.5" />
-                          Disable auto-merge
+                          자동 병합 끄기
                         </MenuItem>
                       ) : showsAutoMerge ? (
                         <MenuItem
@@ -2060,7 +2059,7 @@ export function PullRequestDetailPanel({
                           }
                         >
                           <PullRequestGlyph.merged className="size-3.5" />
-                          Enable auto-merge
+                          자동 병합 켜기
                         </MenuItem>
                       ) : null}
                       {/* A preference for the merge action rather than a second action, so it
@@ -2117,14 +2116,14 @@ export function PullRequestDetailPanel({
                   </MenuItem>
                   <MenuItem onClick={() => copyReference(detail.url, "PR link")}>
                     <LinkIcon className="size-3.5" />
-                    Copy link
+                    링크 복사
                     <MenuShortcut>
                       {shortcutLabelForCommand(keybindings, "thread.copyReference")}
                     </MenuShortcut>
                   </MenuItem>
                   <MenuItem onClick={() => copyReference(`#${reference.number}`, "PR number")}>
                     <CopyIcon className="size-3.5" />
-                    Copy PR number
+                    PR 번호 복사
                     <MenuShortcut>
                       {shortcutLabelForCommand(keybindings, "pullRequest.copyNumber")}
                     </MenuShortcut>
@@ -2138,7 +2137,7 @@ export function PullRequestDetailPanel({
                         onClick={() => setConfirmation({ open: true, action: "close" })}
                       >
                         <PullRequestGlyph.closed className="size-3.5" />
-                        Close pull request
+                        PR 닫기
                       </MenuItem>
                     </>
                   ) : detail.state === "closed" && can("reopen") ? (
@@ -2146,7 +2145,7 @@ export function PullRequestDetailPanel({
                       <MenuSeparator />
                       <MenuItem disabled={actionPending} onClick={() => void perform("reopen")}>
                         <PullRequestGlyph.reopen className="size-3.5" />
-                        Reopen pull request
+                        PR 다시 열기
                       </MenuItem>
                     </>
                   ) : detail.state === "merged" && can("revert") ? (
@@ -2157,7 +2156,7 @@ export function PullRequestDetailPanel({
                         onClick={() => setConfirmation({ open: true, action: "revert" })}
                       >
                         <RotateCcwIcon className="size-3.5" />
-                        Revert changes
+                        변경 되돌리기
                       </MenuItem>
                     </>
                   ) : null}
@@ -2166,12 +2165,7 @@ export function PullRequestDetailPanel({
             </TooltipProvider>
           ) : null}
           {onClose ? (
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label="Collapse pull request panel"
-              onClick={onClose}
-            >
+            <Button size="icon-xs" variant="ghost" aria-label="PR 패널 접기" onClick={onClose}>
               <PanelRightIcon className="size-3.5" />
             </Button>
           ) : null}
@@ -2215,7 +2209,7 @@ export function PullRequestDetailPanel({
                           <span className="inline-flex min-w-0 max-w-[40%] shrink-0 items-center gap-1">
                             {isStackedPullRequest ? (
                               <PullRequestGlyph.stack
-                                aria-label="Stacked pull request"
+                                aria-label="스택 PR"
                                 className="size-3 shrink-0"
                               />
                             ) : null}
@@ -2309,7 +2303,7 @@ export function PullRequestDetailPanel({
                     </Tooltip>
                     {canEditPullRequestChangeRequest(detail) ? (
                       <PullRequestEditButton
-                        aria-label="Edit title"
+                        aria-label="제목 편집"
                         onClick={() => setTitleScope({ pullRequestKey, text: detail.title })}
                       />
                     ) : null}
@@ -2323,7 +2317,7 @@ export function PullRequestDetailPanel({
                       size="sm"
                       disabled={titleSaving}
                       value={titleDraft}
-                      aria-label="Pull request title"
+                      aria-label="PR 제목"
                       onChange={(event) =>
                         setTitleScope({ pullRequestKey, text: event.target.value })
                       }
@@ -2344,7 +2338,7 @@ export function PullRequestDetailPanel({
                         disabled={titleSaving}
                         onClick={() => setTitleScope(null)}
                       >
-                        Cancel
+                        취소
                       </Button>
                       <Button
                         size="xs"
@@ -2352,7 +2346,7 @@ export function PullRequestDetailPanel({
                         disabled={titleSaving || titleDraft.trim().length === 0}
                         onClick={() => void saveTitle(titleDraft)}
                       >
-                        {titleSaving ? "Saving..." : "Save"}
+                        {titleSaving ? "Saving..." : "저장"}
                       </Button>
                     </div>
                   </div>
@@ -2371,14 +2365,14 @@ export function PullRequestDetailPanel({
                       key={checkoutCommand}
                       value={checkoutCommand}
                       target="pull request checkout command"
-                      copyLabel="Copy checkout command"
-                      copiedLabel="Checkout command copied"
+                      copyLabel="checkout 명령 복사"
+                      copiedLabel="checkout 명령을 복사했어요"
                       className="ml-auto font-mono"
                       tooltipSide="bottom"
                       onError={(error) =>
                         toastManager.add({
                           type: "error",
-                          title: "Could not copy checkout command",
+                          title: "checkout 명령을 복사하지 못했어요",
                           description: error.message,
                         })
                       }
@@ -2394,7 +2388,7 @@ export function PullRequestDetailPanel({
                           <span className="inline-flex min-w-0 max-w-[40%] shrink-0 items-center gap-1">
                             {isStackedPullRequest ? (
                               <PullRequestGlyph.stack
-                                aria-label="Stacked pull request"
+                                aria-label="스택 PR"
                                 className="size-3 shrink-0"
                               />
                             ) : null}
@@ -2424,8 +2418,8 @@ export function PullRequestDetailPanel({
                       key={detail.headBranch}
                       value={detail.headBranch}
                       target="branch name"
-                      copyLabel="Copy pull request branch"
-                      copiedLabel="Branch name copied"
+                      copyLabel="PR branch 복사"
+                      copiedLabel="branch 이름을 복사했어요"
                     />
                   </span>
                   <span className="ml-auto inline-flex shrink-0 items-center justify-end gap-2">
@@ -2449,7 +2443,7 @@ export function PullRequestDetailPanel({
         {detail ? (
           <nav
             className="col-span-2 flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2"
-            aria-label="Pull request tabs"
+            aria-label="PR 탭"
           >
             <ToggleGroup
               className="shrink-0"
@@ -2489,14 +2483,14 @@ export function PullRequestDetailPanel({
                             aria-label={
                               pendingAction === "approve-workflows"
                                 ? "Approving..."
-                                : "Approve workflows to run"
+                                : "워크플로 실행 승인"
                             }
                           >
                             <PlayIcon aria-hidden className="size-3.5" />
                             <span>
                               {pendingAction === "approve-workflows"
                                 ? "Approving..."
-                                : "Approve workflows to run"}
+                                : "워크플로 실행 승인"}
                             </span>
                           </Button>
                         </span>
@@ -2505,13 +2499,13 @@ export function PullRequestDetailPanel({
                     <TooltipPopup side="top">
                       {pendingAction === "approve-workflows"
                         ? "Approving..."
-                        : "Approve workflows to run"}
+                        : "워크플로 실행 승인"}
                     </TooltipPopup>
                   </Tooltip>
                 ) : (
                   <span
                     className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
-                    aria-label={checksSummary ? `Checks: ${checksSummary}` : "Checks"}
+                    aria-label={checksSummary ? `Checks: ${checksSummary}` : "검사"}
                   >
                     {checksState !== null ? (
                       <PullRequestChecksPopover
@@ -2538,7 +2532,7 @@ export function PullRequestDetailPanel({
                     className="inline-flex items-center gap-1"
                     aria-label={
                       activityError
-                        ? "Comments unavailable"
+                        ? "댓글을 볼 수 없어요"
                         : `${detail.commentCount.toLocaleString()} ${
                             detail.commentCount === 1 ? "comment" : "comments"
                           }`
@@ -2555,7 +2549,7 @@ export function PullRequestDetailPanel({
                     className="inline-flex items-center gap-1"
                     aria-label={
                       activityError
-                        ? "Commits unavailable"
+                        ? "commit을 볼 수 없어요"
                         : `${detail.commits.length.toLocaleString()} ${
                             detail.commits.length === 1 ? "commit" : "commits"
                           }`
@@ -2588,16 +2582,14 @@ export function PullRequestDetailPanel({
                   variant="ghost"
                   className="h-7 px-2 text-[10px] text-muted-foreground"
                   aria-label={
-                    timelineOrder === "newest"
-                      ? "Show oldest activity first"
-                      : "Show newest activity first"
+                    timelineOrder === "newest" ? "오래된 활동부터 보기" : "최신 활동부터 보기"
                   }
                   onClick={() =>
                     setTimelineOrder((value) => (value === "newest" ? "oldest" : "newest"))
                   }
                 >
                   <ArrowDownUpIcon aria-hidden className="size-3" />
-                  {timelineOrder === "newest" ? "Newest first" : "Oldest first"}
+                  {timelineOrder === "newest" ? "최신순" : "오래된순"}
                 </Button>
               </div>
             ) : null}
@@ -2682,7 +2674,9 @@ export function PullRequestDetailPanel({
             ) : null}
             {mountedTabs.has("code") ? (
               <div className={cn("absolute inset-0", tab !== "code" && "invisible")}>
-                <Suspense fallback={<DiffPanelLoadingState label="Loading pull request diff..." />}>
+                <Suspense
+                  fallback={<DiffPanelLoadingState label="PR 변경 사항을 불러오는 중..." />}
+                >
                   <PullRequestCodeTab
                     onAddToAgentSelection={addSelectionToAgent}
                     environmentId={environmentId}
@@ -2735,14 +2729,14 @@ export function PullRequestDetailPanel({
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirmAction === "merge"
-                ? "Merge pull request?"
+                ? "PR을 병합할까요?"
                 : confirmAction === "enable-auto-merge"
-                  ? "Enable auto-merge?"
+                  ? "자동 병합을 켤까요?"
                   : confirmAction === "revert"
-                    ? "Revert these changes?"
+                    ? "이 변경을 되돌릴까요?"
                     : confirmAction === "approve-workflows"
-                      ? "Approve workflows to run?"
-                      : "Close pull request?"}
+                      ? "워크플로 실행을 승인할까요?"
+                      : "PR을 닫을까요?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmAction === "merge"
@@ -2761,7 +2755,7 @@ export function PullRequestDetailPanel({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogClose render={<Button variant="outline" size="sm" />}>
-              Cancel
+              취소
             </AlertDialogClose>
             <Button
               size="sm"
@@ -2781,12 +2775,12 @@ export function PullRequestDetailPanel({
               {confirmAction === "merge"
                 ? selectedMergeMethodLabel
                 : confirmAction === "enable-auto-merge"
-                  ? "Enable auto-merge"
+                  ? "자동 병합 켜기"
                   : confirmAction === "revert"
-                    ? "Create revert PR"
+                    ? "되돌리기 PR 만들기"
                     : confirmAction === "approve-workflows"
-                      ? "Approve and run"
-                      : "Close"}
+                      ? "승인하고 실행"
+                      : "닫기"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

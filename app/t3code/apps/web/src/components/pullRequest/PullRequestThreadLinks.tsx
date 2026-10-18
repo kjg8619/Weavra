@@ -81,7 +81,7 @@ function EnabledPullRequestThreadLinks({
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: remove ? "Could not unlink the pull request" : "Could not link the pull request",
+        title: remove ? "PR 연결을 해제하지 못했어요" : "PR을 연결하지 못했어요",
         description: error instanceof Error ? error.message : String(error),
       });
       return;
@@ -105,7 +105,7 @@ function EnabledPullRequestThreadLinks({
   const linkedThreadsLabel =
     linkedThreads.length > 0
       ? `Linked from ${linkedThreads.length} ${linkedThreads.length === 1 ? "thread" : "threads"}`
-      : "Linked threads";
+      : "연결된 대화";
   return (
     <>
       {display === "count" && (linkedThreads.length > 0 || relations.error !== null) ? (
@@ -150,16 +150,16 @@ function EnabledPullRequestThreadLinks({
             <PullRequestGlyph.link aria-hidden className="size-3.5" />
           )}
           {linkedHere
-            ? "Unlink from this thread"
+            ? "이 대화에서 연결 해제"
             : currentThreadRef
-              ? "Link to this thread"
-              : "Link to thread"}
+              ? "이 대화에 연결"
+              : "대화에 연결"}
         </MenuItem>
       ) : null}
       {display === "picker" ? (
         <Dialog open onOpenChange={onPickerOpenChange}>
           <DialogPopup className="max-w-md" showCloseButton={false}>
-            <DialogTitle className="sr-only">Link pull request to a thread</DialogTitle>
+            <DialogTitle className="sr-only">PR을 대화에 연결</DialogTitle>
             <ThreadPicker
               environmentId={environmentId}
               url={url}
@@ -205,12 +205,12 @@ function ThreadPicker({
     )
     .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return (
-    <Command mode="none" value={query} onValueChange={setQuery} aria-label="Choose a thread">
-      <CommandInput placeholder="Search threads or projects..." disabled={pending} />
+    <Command mode="none" value={query} onValueChange={setQuery} aria-label="대화 선택">
+      <CommandInput placeholder="대화나 프로젝트 검색..." disabled={pending} />
       <CommandList className="max-h-80 overflow-y-auto">
         {candidates.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No active threads found.
+            진행 중인 대화가 없어요.
           </div>
         ) : (
           candidates.map((thread) => {
@@ -224,7 +224,7 @@ function ThreadPicker({
               >
                 <MessageSquareIcon aria-hidden className="size-4 shrink-0" />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate">{thread.title || "Untitled thread"}</span>
+                  <span className="truncate">{thread.title || "제목 없는 대화"}</span>
                   <span className="truncate text-xs text-muted-foreground">
                     {projectNames.get(thread.projectId)}
                   </span>
@@ -232,7 +232,7 @@ function ThreadPicker({
                 {linked ? (
                   <>
                     <CheckIcon aria-hidden className="size-3.5" />
-                    <span className="text-xs text-muted-foreground">Linked</span>
+                    <span className="text-xs text-muted-foreground">연결됨</span>
                   </>
                 ) : null}
               </CommandItem>

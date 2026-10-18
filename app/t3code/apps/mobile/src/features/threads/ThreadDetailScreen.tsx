@@ -27,6 +27,7 @@ import type {
   ThreadId,
   UsageLimitsReport,
   UserInputQuestion,
+  WeavraTaskScopeInput,
 } from "@t3tools/contracts";
 import * as Haptics from "expo-haptics";
 import {
@@ -109,8 +110,13 @@ import {
 import { ThreadFeed } from "./ThreadFeed";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
 import { resolveThreadFeedSubmissionAnchor } from "./thread-feed-live-follow";
+import { WeavraTaskStatus } from "./WeavraTaskStatus";
+import { getComposerDraftSnapshot } from "../../state/use-composer-drafts";
+import { RejectedComposerNotice, type ThreadRecoveryPresentation } from "./RejectedComposerNotice";
 
 export interface ThreadDetailScreenProps {
+  readonly recovery?: ThreadRecoveryPresentation;
+  readonly weavraTaskScope: WeavraTaskScopeInput | null;
   readonly worktreeSetup?: WorktreeSetupCardProps | null;
   readonly setupWorkingStartedAt?: string | null;
   readonly selectedThread: OrchestrationThreadShell;
@@ -131,6 +137,7 @@ export interface ThreadDetailScreenProps {
   readonly creationState:
     | { readonly kind: "preparing"; readonly preparingWorktree: boolean }
     | { readonly kind: "failed"; readonly reason: string; readonly onEditTask: () => void }
+    | { readonly kind: "retained" }
     | null;
   readonly activePendingApproval: PendingApproval | null;
   readonly respondingApprovalId: ApprovalRequestId | null;
@@ -390,7 +397,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
         label: props.creationState.preparingWorktree ? "Setting up worktree…" : "Starting…",
       };
     }
-    if (props.creationState?.kind === "failed") {
+    if (props.creationState?.kind === "failed" || props.creationState?.kind === "retained") {
       return null;
     }
     if (threadSyncLabel !== null) {
@@ -764,11 +771,17 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
 
   const handleSendMessage = useCallback(async () => {
     const targetThreadKey = selectedThreadKey;
+    const marked = getComposerDraftSnapshot(targetThreadKey).rejectedTurn !== undefined;
+    const owner = marked ? props.recovery?.capture() : undefined;
     const hasUserMessage = selectedThreadFeed.some(
       (entry) => entry.type === "message" && entry.message.role === "user",
     );
     const messageId = await props.onSendMessage();
-    if (messageId === null || selectedThreadKeyRef.current !== targetThreadKey) {
+    if (
+      messageId === null ||
+      selectedThreadKeyRef.current !== targetThreadKey ||
+      (owner !== undefined && !owner.isCurrent())
+    ) {
       return messageId;
     }
 
@@ -785,17 +798,20 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
         queuedMessageCount: props.selectedThreadQueueCount,
       }),
     );
-    composerEditorRef.current?.blur();
+    if (!marked || props.recovery?.canFocusSend(messageId)) composerEditorRef.current?.blur();
     return messageId;
-  }, [
-    anchorMessageId,
-    clearUsageLimitsFor,
-    props.onSendMessage,
-    props.selectedThread.latestTurn,
-    props.selectedThreadQueueCount,
-    selectedThreadFeed,
-    selectedThreadKey,
-  ]);
+  }, [anchorMessageId, clearUsageLimitsFor, props, selectedThreadFeed, selectedThreadKey]);
+
+  const handleRecoverMessage = useCallback(
+    async (messageId: MessageId) => {
+      if (props.recovery === undefined) return;
+      const owner = props.recovery.capture();
+      if ((await props.recovery.recover(messageId)) && owner.isCurrent()) {
+        composerEditorRef.current?.focus();
+      }
+    },
+    [props.recovery],
+  );
 
   const handleEditPendingMessage = useCallback(async (message: QueuedThreadMessage) => {
     try {
@@ -893,6 +909,8 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
             }
           />
           <ThreadFeed
+            recovery={props.recovery}
+            onRecoverMessage={handleRecoverMessage}
             key={selectedThreadKey}
             environmentId={props.environmentId}
             threadId={props.selectedThread.id}
@@ -965,6 +983,18 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                 onScrollToEnd={handleScrollToEnd}
               />
               <View className="w-full self-center" style={{ maxWidth: contentMaxWidth }}>
+                {props.recovery ? <RejectedComposerNotice recovery={props.recovery} /> : null}
+                {props.weavraTaskScope !== null ? (
+                  <WeavraTaskStatus
+                    key={JSON.stringify([
+                      props.weavraTaskScope.environmentId,
+                      props.weavraTaskScope.projectId,
+                      props.weavraTaskScope.threadId,
+                    ])}
+                    scope={props.weavraTaskScope}
+                    connectionState={props.connectionStateLabel}
+                  />
+                ) : null}
                 {props.feedbackSubmissions.map((submission) => (
                   <ComposerFeedback
                     key={submission.id}
@@ -1053,6 +1083,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                 }
               >
                 <ThreadComposer
+                  recovered={props.recovery?.marker !== undefined}
                   editorRef={composerEditorRef}
                   draftMessage={props.draftMessage}
                   draftAttachments={props.draftAttachments}
@@ -1070,7 +1101,17 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                   // them against a thread id the server may still reject
                   // would strand them in the outbox.
                   sendBlockedReason={
-                    props.creationState?.kind === "preparing" ? "Starting the task…" : null
+                    props.creationState?.kind === "preparing"
+                      ? "Starting the task…"
+                      : props.creationState?.kind === "retained"
+                        ? "Retained local work"
+                        : props.recovery?.state?.busy
+                          ? "Saving recovered work"
+                          : props.recovery?.state?.needsCheck
+                            ? "Check saved recovery"
+                            : props.recovery?.marker && !props.recovery.synchronized
+                              ? "Waiting for synchronized source"
+                              : null
                   }
                   bottomInset={composerBottomInset}
                   onChangeDraftMessage={props.onChangeDraftMessage}

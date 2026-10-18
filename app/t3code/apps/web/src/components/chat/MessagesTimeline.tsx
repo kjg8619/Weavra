@@ -360,7 +360,7 @@ function TimelineLoadEarlierHeader({
           disabled={loading}
           className="w-full py-1.5 text-xs text-muted-foreground/60 hover:text-foreground disabled:cursor-default"
         >
-          {loading ? "Loading earlier turns…" : "Load earlier turns"}
+          {loading ? "이전 턴을 불러오는 중…" : "이전 턴 불러오기"}
         </button>
       </div>
     </div>
@@ -477,6 +477,90 @@ interface MessagesTimelineProps {
 // ---------------------------------------------------------------------------
 // MessagesTimeline — list owner
 // ---------------------------------------------------------------------------
+
+type WeavraTaskFocusTarget = Pick<HTMLElement, "focus" | "scrollIntoView" | "isConnected">;
+
+export function useWeavraTaskFocus({
+  scope,
+  listRef,
+  onNavigate,
+}: {
+  scope: string | null;
+  listRef: React.RefObject<Pick<LegendListRef, "scrollToEnd"> | null>;
+  onNavigate: () => void;
+}) {
+  const committedScope = useRef(scope);
+  const mounted = useRef(false);
+  const target = useRef<{
+    scope: string | null;
+    element: WeavraTaskFocusTarget;
+  } | null>(null);
+  const pending = useRef<{ scope: string; settled: boolean } | null>(null);
+  const [focusRequest, setFocusRequest] = useState(0);
+  const finishFocus = useCallback(() => {
+    const request = pending.current;
+    const currentTarget = target.current;
+    if (
+      !mounted.current ||
+      !request?.settled ||
+      request.scope !== committedScope.current ||
+      currentTarget?.scope !== request.scope ||
+      !currentTarget.element.isConnected
+    ) {
+      return;
+    }
+    pending.current = null;
+    currentTarget.element.scrollIntoView({ block: "start", behavior: "instant" });
+    currentTarget.element.focus({ preventScroll: true });
+  }, []);
+  const attachTarget = useCallback(
+    (element: WeavraTaskFocusTarget | null) => {
+      if (element) {
+        target.current = { scope, element };
+        finishFocus();
+      } else if (target.current?.scope === scope) {
+        target.current = null;
+      }
+    },
+    [finishFocus, scope],
+  );
+  useLayoutEffect(() => {
+    committedScope.current = scope;
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      pending.current = null;
+    };
+  }, [scope]);
+  const requestFocus = useCallback(() => {
+    if (!mounted.current || scope === null || committedScope.current !== scope) return;
+    pending.current = { scope, settled: false };
+    onNavigate();
+    setFocusRequest((value) => value + 1);
+  }, [onNavigate, scope]);
+  useLayoutEffect(() => {
+    const request = pending.current;
+    const list = listRef.current;
+    if (focusRequest === 0 || !request || request.scope !== scope) return;
+    if (!list) {
+      pending.current = null;
+      return;
+    }
+    // Start after navigation's anchor changes commit. A footer ref may arrive
+    // before or after the virtualizer's scroll completes; both must be ready.
+    void list.scrollToEnd({ animated: false }).then(
+      () => {
+        if (pending.current !== request) return;
+        request.settled = true;
+        finishFocus();
+      },
+      () => {
+        if (pending.current === request) pending.current = null;
+      },
+    );
+  }, [finishFocus, focusRequest, listRef, scope]);
+  return { attachTarget, requestFocus };
+}
 
 export const MessagesTimeline = memo(function MessagesTimeline({
   citationRequest = null,
@@ -1272,7 +1356,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     }
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-placeholder text-sm">Send a message to start the conversation.</p>
+        <p className="text-placeholder text-sm">메시지를 보내 대화를 시작해 보세요.</p>
       </div>
     );
   }
@@ -1508,7 +1592,7 @@ function TimelineMinimap({
             }}
           />
           <button
-            aria-label={`Jump to message: ${activeItem?.userText ?? "User message"}`}
+            aria-label={`메시지로 이동: ${activeItem?.userText ?? "사용자 메시지"}`}
             className="absolute inset-y-0 left-0 w-full cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
             onBlur={() => setActiveIndex(null)}
             onClick={(event) => {
@@ -1597,7 +1681,7 @@ function TimelineMinimap({
               >
                 <span className="dropdown-glass block rounded-xl p-3 text-left text-popover-foreground shadow-xl shadow-black/25">
                   <span className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium leading-5">
-                    {activeItem.userText ?? "User message"}
+                    {activeItem.userText ?? "사용자 메시지"}
                   </span>
                   {activeItem.assistantText ? (
                     <span
@@ -1638,7 +1722,7 @@ function TimelineMinimapNavigationButton({
   onClick: () => void;
 }) {
   const previous = direction === "previous";
-  const label = previous ? "Previous turn" : "Next turn";
+  const label = previous ? "이전 턴" : "다음 턴";
   const Icon = previous ? ChevronUpIcon : ChevronDownIcon;
 
   return (
@@ -1786,10 +1870,10 @@ function QueuedMessageTimelineRow({
     queuedMessage.reviewComments.length;
   const text = queuedMessage.prompt.trim();
   const statusLabel = queuedMessage.holdUntilUserAction
-    ? "Waits for Send now"
+    ? "지금 보내기를 기다려요"
     : row.isNext
-      ? "Sends after the next tool call or when the turn ends"
-      : "Sends after the messages above it";
+      ? "다음 도구 호출 뒤나 턴이 끝나면 보내요"
+      : "위 메시지들 다음에 보내요";
   return (
     <div className="flex flex-col items-end" data-queued-message-id={queuedMessage.id}>
       <div className="max-w-[80%] rounded-2xl border border-dashed border-border p-3 text-message-foreground/80">
@@ -1817,10 +1901,10 @@ function QueuedMessageTimelineRow({
           <Tooltip>
             <TooltipTrigger
               render={<span className="inline-flex h-6 items-center gap-1" />}
-              aria-label={`Queued. ${statusLabel}.`}
+              aria-label={`대기 중. ${statusLabel}.`}
             >
               <ClockIcon className="size-3.5" aria-hidden />
-              Queued
+              대기 중
             </TooltipTrigger>
             <TooltipPopup side="bottom">{statusLabel}</TooltipPopup>
           </Tooltip>
@@ -1835,14 +1919,14 @@ function QueuedMessageTimelineRow({
                     className="size-6"
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={() => ctx.onSteerQueuedMessage(queuedMessage.id)}
-                    aria-label="Send now"
+                    aria-label="지금 보내기"
                   />
                 }
               >
                 <ArrowUpIcon className="size-3.5" aria-hidden />
               </TooltipTrigger>
               <TooltipPopup side="bottom">
-                Send now
+                지금 보내기
                 {row.isNext && ctx.steerQueuedMessageShortcutLabel
                   ? ` (${ctx.steerQueuedMessageShortcutLabel})`
                   : null}
@@ -1858,13 +1942,13 @@ function QueuedMessageTimelineRow({
                     className="size-6"
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={() => ctx.onRemoveQueuedMessage(queuedMessage.id)}
-                    aria-label="Cancel and return to the composer"
+                    aria-label="취소하고 작성기로 돌아가기"
                   />
                 }
               >
                 <XIcon className="size-3.5" aria-hidden />
               </TooltipTrigger>
-              <TooltipPopup side="bottom">Cancel and return to the composer</TooltipPopup>
+              <TooltipPopup side="bottom">취소하고 작성기로 돌아가기</TooltipPopup>
             </Tooltip>
           </div>
         </div>
@@ -2106,7 +2190,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   return (
     <div className="group flex flex-col items-end gap-1">
       <div className="relative max-w-[80%] rounded-2xl bg-message p-3 text-message-foreground">
-        <MessageAuthorHeading>You</MessageAuthorHeading>
+        <MessageAuthorHeading>나</MessageAuthorHeading>
         {(regularImages.length > 0 || userVideos.length > 0) && (
           <div className="mb-2 grid max-w-[210px] grid-cols-2 gap-2">
             {regularImages.map((image) => (
@@ -2123,7 +2207,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                   <button
                     type="button"
                     className="block h-full w-full cursor-zoom-in"
-                    aria-label={`Preview ${image.name}`}
+                    aria-label={`${image.name} 미리보기`}
                     onClick={() => {
                       const preview = buildExpandedImagePreview(regularImages, image.id);
                       if (!preview) return;
@@ -2165,7 +2249,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                   <div key={file.id} className="flex min-w-0 items-center gap-1">
                     <button
                       type="button"
-                      aria-label={`Preview ${file.name}`}
+                      aria-label={`${file.name} 미리보기`}
                       onClick={() => ctx.onFileOpen(file)}
                       className="focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 text-left text-sm hover:underline focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
                     >
@@ -2178,14 +2262,14 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                           <Button
                             size="icon-xs"
                             variant="ghost-muted"
-                            aria-label={`Download ${file.name}`}
+                            aria-label={`${file.name} 내려받기`}
                             onClick={() => ctx.onFileDownload(file)}
                           />
                         }
                       >
                         <DownloadIcon />
                       </TooltipTrigger>
-                      <TooltipPopup side="top">Download {file.name}</TooltipPopup>
+                      <TooltipPopup side="top">{file.name} 내려받기</TooltipPopup>
                     </Tooltip>
                   </div>
                 );
@@ -2300,13 +2384,13 @@ function RevertUserMessageButton({
             variant="ghost"
             disabled={activity.isRevertingCheckpoint || activity.isWorking}
             onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
-            aria-label="Edit from here"
+            aria-label="여기부터 편집"
           />
         }
       >
         <Undo2Icon className="size-3" />
       </TooltipTrigger>
-      <TooltipPopup side="top">Edit from here</TooltipPopup>
+      <TooltipPopup side="top">여기부터 편집</TooltipPopup>
     </Tooltip>
   );
 }
@@ -2530,7 +2614,7 @@ function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "workin
   // place instead of remounting the row.
   const shimmer = isPreparingWorktree || isCompacting;
   const label = isPreparingWorktree ? (
-    "Setting up worktree…"
+    "worktree를 설정하는 중…"
   ) : isCompacting ? (
     <CompactingLabel />
   ) : row.createdAt ? (
@@ -2571,7 +2655,7 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
     () => (openTerminal && terminalId ? () => openTerminal(terminalId) : null),
     [openTerminal, terminalId],
   );
-  const scriptName = snapshot.setupScript?.name ?? "Setup script";
+  const scriptName = snapshot.setupScript?.name ?? "설정 스크립트";
   return (
     <Popover>
       <PopoverTrigger
@@ -2632,7 +2716,7 @@ function ActivityGroupTimelineRow({
   const label = row.active
     ? liveWork
       ? liveWorkEntryLabel(liveWork, ctx.workspaceRoot, true)
-      : "Thinking"
+      : "생각 중"
     : work.length > 0
       ? summarizeToolGroup(work)
       : `Thought${thoughtCount > 1 ? ` (×${thoughtCount})` : ""}`;
@@ -2702,7 +2786,7 @@ function ThinkingTimelineRow() {
   return (
     <div className="min-h-7">
       {isPreparingWorktree || isCompacting ? null : (
-        <LiveActivityRow label="Thinking" iconName="brain" active shimmer />
+        <LiveActivityRow label="생각 중" iconName="brain" active shimmer />
       )}
     </div>
   );
@@ -2732,7 +2816,7 @@ function remarkThoughtPreview(fallback: string) {
 
 /**
  * Thinking inside a tool group has its own disclosure, preserved across recycling.
- * A group whose row already reads "Thought" (no visible tool) skips the header.
+ * A group whose row already reads "생각함" (no visible tool) skips the header.
  */
 function ReasoningTraceBlock({
   anchorKey,
@@ -2761,7 +2845,7 @@ function ReasoningTraceBlock({
   ) {
     return null;
   }
-  const label = streaming ? "Thinking" : "Thought";
+  const label = streaming ? "생각 중" : "생각함";
   const collapsedPreview = messages.find((message) => message.text.trim().length > 0)?.text.trim();
   const headerText = expanded ? (
     label
@@ -2857,7 +2941,7 @@ const ReasoningTimelineRow = memo(function ReasoningTimelineRow({
         </span>
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           <span className="relative min-w-0 flex-1 truncate text-secondary-label text-sm leading-relaxed">
-            Thought
+            생각함
           </span>
           <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden>
             <ChevronRightIcon
@@ -2892,7 +2976,7 @@ function CompactingLabel() {
   return (
     <span className="inline-flex items-center gap-1.5">
       <Minimize2Icon aria-hidden="true" className="size-3" />
-      Compacting…
+      압축하는 중…
     </span>
   );
 }
@@ -2968,7 +3052,7 @@ const WorkGroupSection = memo(function WorkGroupSection({
   }
 
   return (
-    <section className="-mx-1 space-y-0.5 px-1 py-0.5" aria-label="Activity">
+    <section className="-mx-1 space-y-0.5 px-1 py-0.5" aria-label="활동">
       <div className="space-y-px">
         {nonEmptyEntries.map((workEntry) => (
           <SimpleWorkEntryRow
@@ -3116,7 +3200,7 @@ function ExpandedWorkGroupEntries({
         onLayout={updateScrollFades}
         tabIndex={0}
         role="region"
-        aria-label="Tool calls"
+        aria-label="도구 호출"
         data-tool-group-scroll
         className={cn(
           "scrollbar-gutter-stable max-h-[min(18rem,50dvh)] scroll-py-6 overflow-x-hidden rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70",
@@ -3227,7 +3311,7 @@ function LiveActivityContent({
             failed ? failedToolIconClassName : highlighted ? "text-foreground" : "text-icon-muted",
           )}
           role={announceFailure ? "img" : undefined}
-          aria-label={announceFailure ? "Tool call failed" : undefined}
+          aria-label={announceFailure ? "도구 호출 실패" : undefined}
         >
           <ToolActivityIconView
             icon={toolIcon}
@@ -3467,7 +3551,7 @@ function UserMessageMentionChip(props: {
         render={
           <button
             type="button"
-            aria-label={`Preview ${props.record.path}`}
+            aria-label={`${props.record.path} 미리보기`}
             className={cn(
               CHAT_INLINE_CHIP_CLASS_NAME,
               CONTEXT_INLINE_CHIP_TONE_CLASS_NAMES.mention,
@@ -3552,7 +3636,7 @@ function UserMessagePreviewAnnotationDetails(props: {
         <button
           type="button"
           className="block max-h-64 w-full cursor-zoom-in overflow-hidden border-b border-border/70 bg-muted"
-          aria-label={`Preview ${props.image.name}`}
+          aria-label={`${props.image.name} 미리보기`}
           onClick={() => {
             if (!props.image) return;
             const preview = buildExpandedImagePreview([props.image], props.image.id);
@@ -3561,18 +3645,18 @@ function UserMessagePreviewAnnotationDetails(props: {
         >
           <img
             src={props.image.previewUrl}
-            alt="Annotated preview crop"
+            alt="주석을 단 미리보기 일부"
             className="max-h-64 w-full object-contain"
           />
         </button>
       ) : (
         <div className="border-b border-border/70 bg-muted/40 px-3 py-2 text-secondary-label text-xs">
-          Screenshot unavailable
+          스크린샷을 사용할 수 없어요
         </div>
       )}
       <div className="min-w-0 px-3 py-2.5">
         <div className="text-message-foreground text-xs font-medium">
-          {props.record.pageTitle?.trim() || props.record.pageUrl || "Preview annotation"}
+          {props.record.pageTitle?.trim() || props.record.pageUrl || "미리보기 주석"}
         </div>
         {props.record.comment ? (
           <div className="mt-1 whitespace-pre-wrap wrap-break-word text-sm">
@@ -3689,7 +3773,7 @@ function UnavailableUserMessageContextChip(props: UserMessageContextRenderContex
       className={CHAT_INLINE_CHIP_CLASS_NAME}
       labelClassName={CHAT_INLINE_CHIP_LABEL_CLASS_NAME}
       copyMarkdown={props.copyMarkdown}
-      tooltip="This context is no longer available."
+      tooltip="이 컨텍스트는 더 이상 사용할 수 없어요."
       tooltipClassName="max-w-96 whitespace-pre-wrap leading-tight"
     />
   );
@@ -3841,7 +3925,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
                   />
                 }
                 label={record.label}
-                kindLabel="Browser element"
+                kindLabel="브라우저 요소"
                 copyMarkdown={context.copyMarkdown}
                 interactive
                 toneClassName={CONTEXT_INLINE_CHIP_TONE_CLASS_NAMES.element}
@@ -3863,7 +3947,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         }
         const isPullRequest = isPullRequestSummaryContext(record);
         const label = reviewCommentContextLabel(record);
-        const kindLabel = isPullRequest ? pullRequestContextKindLabel(record) : "Review comment";
+        const kindLabel = isPullRequest ? pullRequestContextKindLabel(record) : "리뷰 댓글";
         const pullRequestState = pullRequestContextDisplayState(record) ?? "unknown";
         if (isPullRequest && record.pullRequest !== undefined) {
           return (
@@ -3952,7 +4036,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
                   />
                 }
                 label={record.label}
-                kindLabel="Preview annotation"
+                kindLabel="미리보기 주석"
                 copyMarkdown={context.copyMarkdown}
                 interactive
                 toneClassName={CONTEXT_INLINE_CHIP_TONE_CLASS_NAMES["preview-annotation"]}
@@ -4069,7 +4153,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
               onClick={() => setExpanded((value) => !value)}
               className="-ml-1 h-6 rounded-md px-1.5 text-secondary-label text-xs hover:bg-muted/55 hover:text-message-foreground"
             >
-              {expanded ? "Show less" : "Show full message"}
+              {expanded ? "접기" : "전체 메시지 보기"}
             </Button>
           ) : null}
           {props.footer ? (
@@ -4681,14 +4765,14 @@ const AgentSpawnRow = memo(function AgentSpawnRow(props: {
 });
 
 const AGENT_MEMBER_STATUS_LABEL: Record<RuntimeSubagent["status"], string> = {
-  pending: "Working",
-  running: "Working",
-  waiting: "Working",
-  idle: "Idle",
-  completed: "Completed",
-  failed: "Failed",
-  cancelled: "Stopped",
-  interrupted: "Stopped",
+  pending: "작업 중",
+  running: "작업 중",
+  waiting: "작업 중",
+  idle: "대기",
+  completed: "완료",
+  failed: "실패",
+  cancelled: "중지됨",
+  interrupted: "중지됨",
 };
 
 function AgentSpawnMemberRow({
@@ -4947,7 +5031,7 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
         <span
           className={iconWrapperClass}
           role={showFailedIndicator ? "img" : undefined}
-          aria-label={showFailedIndicator ? "Tool call failed" : undefined}
+          aria-label={showFailedIndicator ? "도구 호출 실패" : undefined}
         >
           <ToolActivityIconView
             icon={entryToolIcon}

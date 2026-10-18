@@ -9,6 +9,7 @@ import {
   WeavraCheckoutIdentity,
   WeavraTaskExecution,
   isImportedAgentSessionMessageId,
+  type WeavraTask,
   type OrchestrationCommand,
   type OrchestrationEvent,
   type OrchestrationReadModel,
@@ -61,6 +62,17 @@ const threadPullRequestLinksEqual = Schema.toEquivalence(Schema.NullOr(ThreadLin
 const advisoryEncoder = new TextEncoder();
 const taskContextsEqual = Schema.toEquivalence(Schema.NullOr(WeavraAnalysisContext));
 const taskCheckoutsEqual = Schema.toEquivalence(WeavraCheckoutIdentity);
+// After a consented dirty-baseline commit, an unprepared analysis task moves to the new HEAD of
+// the same checkout. Any task with a prepared or confirmed execution keeps its checkout.
+const isBaselineRebind = (previous: WeavraTask, task: WeavraTask) =>
+  previous.phase === "analysis" &&
+  task.phase === "analysis" &&
+  previous.ownership.state === "analysis" &&
+  task.ownership.state === "analysis" &&
+  previous.execution === null &&
+  task.execution === null &&
+  previous.checkout.canonicalCwd === task.checkout.canonicalCwd &&
+  previous.checkout.repositoryRoot === task.checkout.repositoryRoot;
 const taskExecutionsEqual = Schema.toEquivalence(WeavraTaskExecution);
 
 /**
@@ -273,7 +285,8 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
             previous.createdAt !== task.createdAt ||
             previous.target.workspaceRoot !== task.target.workspaceRoot ||
             previous.target.worktreePath !== task.target.worktreePath ||
-            !taskCheckoutsEqual(previous.checkout, task.checkout) ||
+            (!taskCheckoutsEqual(previous.checkout, task.checkout) &&
+              !isBaselineRebind(previous, task)) ||
             previous.ownership.state === "released" ||
             (previous.context !== null &&
               !taskContextsEqual(previous.context, task.context) &&

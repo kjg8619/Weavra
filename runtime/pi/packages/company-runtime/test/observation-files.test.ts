@@ -208,7 +208,8 @@ describe("Git evidence ownership boundary", () => {
 		expect(changed.changedFiles).toContain(".ai/decisions.md");
 		expect(changed.safe).toBe(false);
 		expect(await readFile(join(cwd, ".gitignore"), "utf8")).toBe(ignore);
-		await expect(GitWorkspace.open(cwd, policy)).rejects.toThrow("Dirty workspace");
+		// Root .ai/ changes never block a clean start (docs/operations/LOCAL_TEAM_PILOT.md); evidence still flags them above.
+		await expect(GitWorkspace.open(cwd, policy)).resolves.toBeInstanceOf(GitWorkspace);
 	});
 	it("does not exclude manually authored tracked decisions", async () => {
 		const { cwd, store, policy, git } = await fixture();

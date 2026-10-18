@@ -50,7 +50,7 @@ function PullRequestGitHubVideo({
     <MediaVideoPlayer
       src={src === null ? null : src + markdownImageSourceFragment(url)}
       originalUrl={url}
-      label="Pull request video"
+      label="PR 동영상"
       className="w-full"
       videoClassName="rounded-lg border border-border/60"
       onRetry={refreshAssetUrl}
@@ -122,7 +122,7 @@ export function PullRequestMarkdown({
               key={`${segment.id}:${segment.url}`}
               src={segment.url}
               originalUrl={segment.url}
-              label="Pull request video"
+              label="PR 동영상"
               className="w-full"
               videoClassName="rounded-lg border border-border/60"
             />
@@ -140,7 +140,7 @@ export function PullRequestMarkdown({
             className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm hover:bg-muted/60"
           >
             <PaperclipIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">Open attachment on GitHub</span>
+            <span className="min-w-0 flex-1 truncate">GitHub에서 첨부 열기</span>
             <ExternalLinkIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
           </a>
         );

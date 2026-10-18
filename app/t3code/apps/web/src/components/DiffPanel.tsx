@@ -231,10 +231,10 @@ export default function DiffPanel({
   const selectedScopeLabel =
     selectedTurnId === null
       ? selectedGitScope === "unstaged"
-        ? "Working tree"
-        : "Branch changes"
+        ? "작업 트리"
+        : "branch 변경"
       : selectedTurn?.turnId === latestTurn?.turnId
-        ? "Latest turn"
+        ? "최근 턴"
         : `Turn ${selectedCheckpointTurnCount ?? "?"}`;
   const reviewSectionId = selectedTurn ? `turn:${selectedTurn.turnId}` : selectedGitScope;
   const collapseScopeKey = routeThreadRef
@@ -244,8 +244,8 @@ export default function DiffPanel({
   const reviewSectionTitle = selectedTurn
     ? `Turn ${selectedCheckpointTurnCount ?? "?"}`
     : selectedGitScope === "unstaged"
-      ? "Working tree"
-      : "Branch changes";
+      ? "작업 트리"
+      : "branch 변경";
   const selectedCheckpointRange = useMemo(
     () =>
       typeof selectedCheckpointTurnCount === "number"
@@ -652,7 +652,7 @@ export default function DiffPanel({
         <DropdownMenu>
           <DropdownMenuTrigger
             className="inline-flex h-6 max-w-full items-center gap-1 rounded-md bg-accent px-2 text-xs font-medium text-accent-foreground outline-none transition-colors hover:bg-accent/80 focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`Diff scope: ${selectedScopeLabel}`}
+            aria-label={`변경 범위: ${selectedScopeLabel}`}
           >
             <span className="truncate">{selectedScopeLabel}</span>
             <ChevronDownIcon className="size-3.5 shrink-0 opacity-70" />
@@ -666,7 +666,7 @@ export default function DiffPanel({
               }
               onClick={() => selectGitScope("unstaged")}
             >
-              <span>Working tree</span>
+              <span>작업 트리</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className={
@@ -676,7 +676,7 @@ export default function DiffPanel({
               }
               onClick={() => selectGitScope("branch")}
             >
-              <span>Branch changes</span>
+              <span>branch 변경</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className={
@@ -688,10 +688,10 @@ export default function DiffPanel({
                 if (latestTurn) selectTurn(latestTurn.turnId);
               }}
             >
-              <span>Latest turn</span>
+              <span>최근 턴</span>
             </DropdownMenuItem>
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger>Turn</DropdownMenuSubTrigger>
+              <DropdownMenuSubTrigger>턴</DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="w-64">
                 {orderedTurnDiffSummaries.map((summary) => {
                   const turnCount =
@@ -706,7 +706,7 @@ export default function DiffPanel({
                       }
                       onClick={() => selectTurn(summary.turnId)}
                     >
-                      <span>Turn {turnCount}</span>
+                      <span>턴 {turnCount}</span>
                       <span className="ml-auto text-xs tabular-nums text-muted-foreground">
                         {formatShortTimestamp(summary.completedAt, settings.timestampFormat)}
                       </span>
@@ -720,7 +720,7 @@ export default function DiffPanel({
         {selectedTurnId === null && selectedGitScope === "branch" && selectedGitSource?.baseRef && (
           <div
             className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden text-xs text-muted-foreground"
-            aria-label={`Comparing ${selectedGitSource.headRef ?? "HEAD"} against ${selectedGitSource.baseRef}`}
+            aria-label={`비교: ${selectedGitSource.headRef ?? "HEAD"} ↔ ${selectedGitSource.baseRef}`}
           >
             <Tooltip>
               <TooltipTrigger render={<span className="flex min-w-0 items-center gap-2" />}>
@@ -747,7 +747,7 @@ export default function DiffPanel({
             >
               <ComboboxTrigger
                 className="inline-flex min-w-0 max-w-48 items-center gap-1 overflow-hidden rounded-md px-1.5 py-1 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={`Change comparison target. Currently ${selectedGitSource.baseRef}`}
+                aria-label={`비교 대상 바꾸기. 현재 ${selectedGitSource.baseRef}`}
               >
                 <span className="min-w-0 truncate">{selectedGitSource.baseRef}</span>
                 <ChevronDownIcon className="size-3.5 shrink-0 opacity-70" />
@@ -757,25 +757,25 @@ export default function DiffPanel({
                 className="w-72 min-w-0 max-w-[calc(100vw-1rem)] overflow-hidden"
               >
                 <ComboboxSearchInput
-                  placeholder="Search refs..."
+                  placeholder="ref 검색..."
                   value={baseRefQuery}
                   onChange={(event) => setBaseRefQuery(event.target.value)}
                 />
                 <div className="grid shrink-0 grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 border-b border-border/70 ps-3 pe-6.5 pt-2 pb-1.5 font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
                   <span aria-hidden="true" />
                   <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2rem] items-center">
-                    <span>Branch</span>
-                    <span className="text-right">Remote</span>
+                    <span>branch</span>
+                    <span className="text-right">원격</span>
                   </div>
                 </div>
-                <ComboboxEmpty>No matching refs.</ComboboxEmpty>
+                <ComboboxEmpty>일치하는 ref가 없어요.</ComboboxEmpty>
                 <ComboboxList className="max-h-64 min-w-0 overflow-x-hidden">
                   <ComboboxItem
                     className="h-8 w-full min-w-0 grid-cols-[1rem_minmax(0,1fr)] py-0"
                     contentClassName="w-full min-w-0 overflow-hidden"
                     value={AUTOMATIC_BASE_REF}
                   >
-                    <span className="block min-w-0 truncate">Automatic</span>
+                    <span className="block min-w-0 truncate">자동</span>
                   </ComboboxItem>
                   {baseRefChoices.map((choice) => {
                     const item = valueForBaseRefChoice(choice);
@@ -797,7 +797,7 @@ export default function DiffPanel({
                               onPointerDown={(event) => event.stopPropagation()}
                             >
                               <Switch
-                                aria-label={`Use remote version of ${choice.label}`}
+                                aria-label={`${choice.label}의 원격 버전 사용`}
                                 checked={useRemote}
                                 className="[--thumb-size:--spacing(3)]"
                                 onCheckedChange={(checked) => {
@@ -815,13 +815,13 @@ export default function DiffPanel({
                                   <span className="flex justify-end text-muted-foreground">
                                     <CheckIcon
                                       role="img"
-                                      aria-label="Remote only"
+                                      aria-label="원격에만 있음"
                                       className="size-3"
                                     />
                                   </span>
                                 }
                               />
-                              <TooltipPopup side="top">Remote only</TooltipPopup>
+                              <TooltipPopup side="top">원격에만 있음</TooltipPopup>
                             </Tooltip>
                           ) : null}
                         </div>
@@ -851,7 +851,7 @@ export default function DiffPanel({
                   type="button"
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={isRefreshingDiff ? "Refreshing diff" : "Refresh diff"}
+                  aria-label={isRefreshingDiff ? "변경 사항 새로고침 중" : "변경 사항 새로고침"}
                   onClick={refreshDiffFromUserAction}
                 />
               }
@@ -859,7 +859,7 @@ export default function DiffPanel({
               <RefreshIcon className="size-3.5" refreshing={isRefreshingDiff} />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {isRefreshingDiff ? "Refreshing diff…" : "Refresh diff"}
+              {isRefreshingDiff ? "변경 사항 새로고침 중…" : "변경 사항 새로고침"}
             </TooltipPopup>
           </Tooltip>
         )}
@@ -871,7 +871,7 @@ export default function DiffPanel({
                   type="button"
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={allDiffFilesCollapsed ? "Expand all files" : "Collapse all files"}
+                  aria-label={allDiffFilesCollapsed ? "모든 파일 펼치기" : "모든 파일 접기"}
                   onClick={toggleDiffFileCollapse}
                 />
               }
@@ -883,12 +883,12 @@ export default function DiffPanel({
               )}
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {allDiffFilesCollapsed ? "Expand all files" : "Collapse all files"}
+              {allDiffFilesCollapsed ? "모든 파일 펼치기" : "모든 파일 접기"}
             </TooltipPopup>
           </Tooltip>
         )}
         <ToggleGroup
-          aria-label="Diff layout"
+          aria-label="변경 사항 보기 방식"
           className="shrink-0"
           variant="segmented"
           value={[diffLayout]}
@@ -899,10 +899,10 @@ export default function DiffPanel({
             }
           }}
         >
-          <Toggle aria-label="Stacked diff view" value="stacked">
+          <Toggle aria-label="위아래로 보기" value="stacked">
             <Rows3Icon className="size-3.5" />
           </Toggle>
-          <Toggle aria-label="Split diff view" value="split">
+          <Toggle aria-label="나란히 보기" value="split">
             <Columns2Icon className="size-3.5" />
           </Toggle>
         </ToggleGroup>
@@ -910,7 +910,7 @@ export default function DiffPanel({
           <TooltipTrigger
             render={
               <Toggle
-                aria-label={wordWrap ? "Disable diff line wrapping" : "Enable diff line wrapping"}
+                aria-label={wordWrap ? "변경 사항 줄바꿈 끄기" : "변경 사항 줄바꿈 켜기"}
                 variant="ghost"
                 size="sm"
                 pressed={wordWrap}
@@ -922,17 +922,13 @@ export default function DiffPanel({
           >
             <TextWrapIcon className="size-3.5" />
           </TooltipTrigger>
-          <TooltipPopup side="top">
-            {wordWrap ? "Disable line wrapping" : "Enable line wrapping"}
-          </TooltipPopup>
+          <TooltipPopup side="top">{wordWrap ? "줄바꿈 끄기" : "줄바꿈 켜기"}</TooltipPopup>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger
             render={
               <Toggle
-                aria-label={
-                  diffIgnoreWhitespace ? "Show whitespace changes" : "Hide whitespace changes"
-                }
+                aria-label={diffIgnoreWhitespace ? "공백 변경 보기" : "공백 변경 숨기기"}
                 variant="ghost"
                 size="sm"
                 pressed={diffIgnoreWhitespace}
@@ -945,7 +941,7 @@ export default function DiffPanel({
             <PilcrowIcon className="size-3.5" />
           </TooltipTrigger>
           <TooltipPopup side="top">
-            {diffIgnoreWhitespace ? "Show whitespace changes" : "Hide whitespace changes"}
+            {diffIgnoreWhitespace ? "공백 변경 보기" : "공백 변경 숨기기"}
           </TooltipPopup>
         </Tooltip>
         {diffFileKeys.length > 0 && (
@@ -953,7 +949,7 @@ export default function DiffPanel({
             <TooltipTrigger
               render={
                 <Toggle
-                  aria-label={fileTreeOpen ? "Hide file tree" : "Show file tree"}
+                  aria-label={fileTreeOpen ? "파일 트리 숨기기" : "파일 트리 보기"}
                   variant="ghost"
                   size="sm"
                   pressed={fileTreeOpen}
@@ -964,7 +960,7 @@ export default function DiffPanel({
               <FolderTreeIcon className="size-3.5" />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {fileTreeOpen ? "Hide file tree" : "Show file tree"}
+              {fileTreeOpen ? "파일 트리 숨기기" : "파일 트리 보기"}
             </TooltipPopup>
           </Tooltip>
         )}
@@ -976,23 +972,23 @@ export default function DiffPanel({
     <DiffPanelShell mode={mode} header={headerRow}>
       {!activeThread ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-          Select a thread to inspect turn diffs.
+          턴 변경 사항을 보려면 대화를 골라 주세요.
         </div>
       ) : !isGitRepo ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-          Turn diffs are unavailable because this project is not a git repository.
+          이 프로젝트는 Git 저장소가 아니라서 턴 변경 사항을 볼 수 없어요.
         </div>
       ) : selectedTurnId !== null && orderedTurnDiffSummaries.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-          No completed turns yet.
+          아직 완료된 턴이 없어요.
         </div>
       ) : (
         <>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
             {isSelectedPatchTruncated && !lazySource && (
               <p className="shrink-0 border-b border-border/70 bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground">
-                This preview exceeds the size limit. Changes shown are incomplete.
-                {selectedGitSource?.files ? " Totals include all changes." : ""}
+                미리보기가 크기 한도를 넘었어요. 일부 변경 사항만 보여요.
+                {selectedGitSource?.files ? " 합계에는 모든 변경이 포함돼요." : ""}
               </p>
             )}
             {selectedPatchError && !renderablePatch && (
@@ -1005,18 +1001,18 @@ export default function DiffPanel({
                 <DiffPanelLoadingState
                   label={
                     selectedTurn
-                      ? "Loading checkpoint diff..."
+                      ? "체크포인트 변경 사항을 불러오는 중..."
                       : selectedGitScope === "unstaged"
-                        ? "Loading working tree diff..."
-                        : "Loading branch diff..."
+                        ? "작업 트리 변경 사항을 불러오는 중..."
+                        : "branch 변경 사항을 불러오는 중..."
                   }
                 />
               ) : (
                 <div className="flex h-full items-center justify-center px-3 py-2 text-xs text-muted-foreground/70">
                   <p>
                     {hasNoNetChanges
-                      ? "No net changes in this selection."
-                      : "No patch available for this selection."}
+                      ? "이 범위에는 실제 변경이 없어요."
+                      : "이 범위에는 patch가 없어요."}
                   </p>
                 </div>
               )
@@ -1146,7 +1142,7 @@ export default function DiffPanel({
                             )}
                           </TooltipTrigger>
                           <TooltipPopup side="top">
-                            {collapsed ? "Expand diff" : "Collapse diff"}
+                            {collapsed ? "변경 사항 펼치기" : "변경 사항 접기"}
                           </TooltipPopup>
                         </Tooltip>
                       );

@@ -3,6 +3,9 @@ import * as Option from "effect/Option";
 
 import { CommandId, MessageId, NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import {
+  WEAVRA_DIRTY_WORKSPACE_MAX_FILES,
+  WeavraControlErrorCode,
+  WeavraDirtyWorkspaceDetails,
   WeavraEvidenceCursor,
   WeavraEvidenceDetailsPage,
   WeavraEvidenceDetailsUnavailable,
@@ -14,11 +17,40 @@ import {
   WeavraTaskScopeInput,
 } from "./weavraTask.ts";
 
+const prepareReason = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("runtime"),
+    code: WeavraControlErrorCode,
+    details: Schema.optionalKey(WeavraDirtyWorkspaceDetails),
+  }).check(
+    Schema.makeFilter(
+      (reason) => reason.details === undefined || reason.code === "PROJECT_CHANGED",
+    ),
+  ),
+  Schema.Struct({
+    kind: Schema.Literal("preview"),
+    code: Schema.Literals(["INVALID_PREVIEW", "STANDARD_REQUIRED", "BINDING_MISMATCH"]),
+  }),
+]);
+const decodePrepareReason = Schema.decodeUnknownOption(prepareReason, {
+  onExcessProperty: "error",
+});
+export const WeavraTaskPrepareReason = Schema.Unknown.check(
+  Schema.makeFilter((value) => Option.isSome(decodePrepareReason(value))),
+).pipe(Schema.decodeTo(prepareReason));
+export type WeavraTaskPrepareReason = typeof WeavraTaskPrepareReason.Type;
+
 export class WeavraTaskRpcError extends Schema.TaggedError<WeavraTaskRpcError>()(
   "WeavraTaskRpcError",
-  {
+  Schema.Struct({
     code: Schema.Literals([
       "TARGET_CHANGED",
+      "PROJECT_NOT_CONFIGURED",
+      "PROJECT_PREPARATION_BUSY",
+      "PROJECT_PREPARATION_FAILED",
+      "WORKSPACE_EVIDENCE_CAPACITY",
+      "WORKSPACE_EVIDENCE_UNSUPPORTED",
+      "WORKSPACE_EVIDENCE_UNAVAILABLE",
       "NOT_PREPARED",
       "RUNTIME_UNAVAILABLE",
       "INVALID_RECEIPT",
@@ -37,12 +69,19 @@ export class WeavraTaskRpcError extends Schema.TaggedError<WeavraTaskRpcError>()
       "RECOVERY_OWNER_UNPROVEN",
       "RECOVERY_STALE",
       "RECOVERY_CONFLICT",
+      "DIRTY_SET_CHANGED",
+      "DIRTY_BASELINE_REFUSED",
 
       "ANALYSIS_UNAVAILABLE",
       "UNSUPPORTED_PROVIDER",
       "INTERNAL_ERROR",
     ]),
-  },
+    prepareReason: Schema.optionalKey(WeavraTaskPrepareReason),
+  }).check(
+    Schema.makeFilter(
+      (error) => error.prepareReason === undefined || error.code === "PREPARE_REJECTED",
+    ),
+  ),
 ) {}
 
 export const WeavraTaskAnalyzeInput = Schema.Struct({
@@ -97,6 +136,18 @@ export const WeavraTaskReprepareInput = Schema.Struct({
   expectedRevision: NonNegativeInt,
 });
 export type WeavraTaskReprepareInput = typeof WeavraTaskReprepareInput.Type;
+
+/** Explicit consent to commit exactly the dirty paths the user reviewed into the task's own checkout. */
+export const WeavraTaskCommitDirtyBaselineInput = Schema.Struct({
+  task: WeavraTaskReadInput,
+  expectedRevision: NonNegativeInt,
+  files: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(WEAVRA_DIRTY_WORKSPACE_MAX_FILES),
+  ),
+  consent: Schema.Literal(true),
+});
+export type WeavraTaskCommitDirtyBaselineInput = typeof WeavraTaskCommitDirtyBaselineInput.Type;
 
 export const WeavraTaskRunInput = Schema.Struct({
   task: WeavraTaskReadInput,

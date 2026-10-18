@@ -180,7 +180,7 @@ export function ComposerBannerStack({ className, items }: ComposerBannerStackPro
               <ComposerBanner.Peek
                 ref={peekRef}
                 variant={firstStackedItem.variant}
-                aria-label="Show other notices"
+                aria-label="다른 알림 보기"
                 aria-expanded={stackExpanded}
                 aria-controls={expandedItemsId}
                 aria-hidden={stackExpanded || undefined}
@@ -197,7 +197,7 @@ export function ComposerBannerStack({ className, items }: ComposerBannerStackPro
               id={expandedItemsId}
               ref={expandedItemsRef}
               role="group"
-              aria-label="Other notices"
+              aria-label="다른 알림"
               tabIndex={-1}
               data-composer-banner-stack-expanded-items="true"
               className={cn(
@@ -294,7 +294,7 @@ function ComposerBannerStackAlert({
                     <Button
                       size="icon-xs"
                       variant="ghost"
-                      aria-label="Show notice details"
+                      aria-label="알림 자세히 보기"
                       className={cn(
                         "flex-none text-muted-foreground hover:text-foreground",
                         item.compact && "hidden @max-[400px]:inline-flex",
@@ -305,7 +305,7 @@ function ComposerBannerStackAlert({
                   <InfoIcon className="size-3.5" />
                 </PopoverTrigger>
                 <PopoverPopup
-                  aria-label="Notice details"
+                  aria-label="알림 자세히"
                   tooltipStyle
                   side="top"
                   className="max-w-80 whitespace-normal text-pretty wrap-anywhere"
@@ -323,7 +323,7 @@ function ComposerBannerStackAlert({
             {item.actions}
             {item.onDismiss ? (
               <ComposerBanner.Dismiss
-                aria-label={item.dismissLabel ?? "Dismiss warning"}
+                aria-label={item.dismissLabel ?? "경고 닫기"}
                 disabled={exiting}
                 onClick={onDismissRequest}
               />

@@ -21,10 +21,10 @@ interface ComposerPendingApprovalActionsProps {
 }
 
 const DEFAULT_APPROVAL_OPTIONS = [
-  { decision: "cancel", label: "Cancel" },
-  { decision: "decline", label: "Decline" },
-  { decision: "acceptForSession", label: "Always allow this session" },
-  { decision: "accept", label: "Approve" },
+  { decision: "cancel", label: "취소" },
+  { decision: "decline", label: "거절" },
+  { decision: "acceptForSession", label: "이 세션에서 항상 허용" },
+  { decision: "accept", label: "승인" },
 ] satisfies ReadonlyArray<ProviderApprovalOption>;
 
 export const ComposerPendingApprovalActions = memo(function ComposerPendingApprovalActions({
@@ -71,7 +71,7 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
         <Menu>
           <MenuTrigger
             disabled={isResponding}
-            render={<Button size="icon-xs" variant="outline" aria-label="More approval options" />}
+            render={<Button size="icon-xs" variant="outline" aria-label="승인 옵션 더 보기" />}
           >
             <EllipsisIcon />
           </MenuTrigger>

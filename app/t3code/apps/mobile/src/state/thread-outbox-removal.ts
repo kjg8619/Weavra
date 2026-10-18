@@ -1,91 +1,107 @@
-import type { EnvironmentId } from "@t3tools/contracts";
-
+import type { DispatchResult } from "@t3tools/contracts";
+import { stableStringify } from "@t3tools/shared/relaySigning";
 import { appAtomRegistry } from "./atom-registry";
-import { threadOutboxManager } from "./thread-outbox";
+import { pendingTaskDraftKey } from "./pending-task-identity";
+import type { ThreadOutboxClaim } from "./thread-outbox-authority";
+import { threadOutboxManager, threadOutboxContent } from "./thread-outbox";
 import type { QueuedThreadMessage } from "./thread-outbox-model";
+import type { ThreadOutboxRecord } from "./thread-outbox-record";
 import {
-  clearComposerDraft,
   composerDraftsAtom,
-  flushComposerDrafts,
   scheduleUnusedComposerAttachmentCleanup,
   waitForComposerDraftsLoaded,
 } from "./use-composer-drafts";
 
-async function cleanUpRemovedMessages(
-  removedMessages: ReadonlyArray<QueuedThreadMessage>,
-): Promise<void> {
-  const attachments = removedMessages.flatMap((message) => message.attachments);
-  const removedCreations = removedMessages.filter((message) => message.creation !== undefined);
-  if (removedCreations.length === 0) {
-    scheduleUnusedComposerAttachmentCleanup(attachments);
-    return;
-  }
-
-  try {
-    await waitForComposerDraftsLoaded();
-    const liveMessageIds = new Set(
-      Object.values(appAtomRegistry.get(threadOutboxManager.queuedMessagesByThreadKeyAtom))
-        .flat()
-        .map((message) => message.messageId),
-    );
-    const drafts = appAtomRegistry.get(composerDraftsAtom);
-    let clearedDraft = false;
-    for (const message of removedCreations) {
-      if (liveMessageIds.has(message.messageId)) {
-        continue;
-      }
-      const draftKey = `pending-task:${message.messageId}`;
-      const draft = drafts[draftKey];
-      if (draft === undefined) {
-        continue;
-      }
-      attachments.push(...draft.attachments);
-      clearComposerDraft(draftKey, { deferAttachmentCleanup: true });
-      clearedDraft = true;
-    }
-    if (clearedDraft) {
-      await flushComposerDrafts();
-    }
-  } catch (error) {
-    // The outbox removal is already durable. Keep the files and report the
-    // secondary cleanup failure without changing the successful result.
-    console.warn("[thread-outbox] failed to clean up removed pending task drafts", error);
-    return;
-  }
-
-  scheduleUnusedComposerAttachmentCleanup(attachments);
+export function sameOutboxContent(left: QueuedThreadMessage, right: QueuedThreadMessage): boolean {
+  const content = (message: QueuedThreadMessage) => ({
+    ...threadOutboxContent(message),
+    attachments: message.attachments.map(
+      ({ uploadedAttachmentId: _upload, uploadEnvironmentId: _environment, ...attachment }) =>
+        attachment,
+    ),
+  });
+  return stableStringify(content(left)) === stableStringify(content(right));
 }
 
-/**
- * The only way a queued message leaves the outbox. Removal also releases the
- * message's local attachment files (via the reference-counting sweep, so a
- * file still referenced by a draft or another queued message survives).
- * Keeping release inside the removal call means no call site can forget it.
- *
- * `expectedRevision` (from `threadOutboxRevision`) and `canRemove` make the
- * removal a compare-and-set: when an edit was accepted or an editor takes the
- * message, it stays queued, nothing is released, and this returns false.
- */
-export async function removeThreadOutboxMessage(
-  message: QueuedThreadMessage,
-  expectedRevision?: number,
-  canRemove?: () => boolean,
-): Promise<boolean> {
-  const removed = await threadOutboxManager.remove(message, expectedRevision, canRemove);
-  if (removed === null) {
-    return false;
-  }
-  // The removed payload, not the caller's snapshot: an accepted update may
-  // have added files the snapshot never saw.
-  await cleanUpRemovedMessages([removed]);
+/** Legacy ambiguity is a content owner, never permission to clear a draft. */
+export function hasPendingEditorDraft(message: QueuedThreadMessage): boolean {
+  const drafts = appAtomRegistry.get(composerDraftsAtom);
+  return (
+    drafts[pendingTaskDraftKey(message)] !== undefined ||
+    drafts[`pending-task:${message.messageId}`] !== undefined
+  );
+}
+
+async function releaseCompletedContent(record: ThreadOutboxRecord, authorize: () => boolean) {
+  const released = await threadOutboxManager.authority.releaseRetained(record, authorize);
+  if (released === null) return false;
+  scheduleUnusedComposerAttachmentCleanup(
+    released.released.flatMap((message) => message.attachments),
+  );
   return true;
 }
 
-/** Removes every queued message of an environment and releases their files. */
-export async function clearThreadOutboxEnvironment(environmentId: EnvironmentId): Promise<void> {
-  // clearEnvironment loads and merges persisted messages itself and reports
-  // what it actually removed, so the release set cannot miss messages a
-  // failed earlier hydration would have hidden.
-  const removed = await threadOutboxManager.clearEnvironment(environmentId);
-  await cleanUpRemovedMessages(removed);
+/** Explicit discard only. A newer edit or another editor retains the content. */
+export async function removeThreadOutboxMessage(message: QueuedThreadMessage): Promise<boolean> {
+  const expected = threadOutboxManager.recordFor(message);
+  if (expected === null) return false;
+  await waitForComposerDraftsLoaded();
+  const retired = await threadOutboxManager.authority.retire(
+    expected.storageIdentity,
+    "discarded",
+    () => threadOutboxManager.recordAt(expected.storageIdentity) === expected,
+  );
+  if (retired === null) return false;
+  return releaseCompletedContent(retired, () => !hasPendingEditorDraft(message));
+}
+
+/** Destination persistence must finish before this explicit transfer is requested. */
+export async function retireTransferredMessage(
+  expected: ThreadOutboxRecord,
+  destinationCurrent: () => boolean,
+): Promise<ThreadOutboxRecord | null> {
+  return threadOutboxManager.authority.retire(
+    expected.storageIdentity,
+    "draft-transfer",
+    () =>
+      threadOutboxManager.recordAt(expected.storageIdentity) === expected && destinationCurrent(),
+  );
+}
+
+export async function releaseTransferredMessage(
+  retired: ThreadOutboxRecord,
+  transferred: QueuedThreadMessage,
+  destinationCurrent: () => boolean,
+): Promise<boolean> {
+  // Transferring latest edits does not transfer a different original snapshot.
+  if (retired.original && !sameOutboxContent(retired.original.localSnapshot, transferred))
+    return false;
+  return releaseCompletedContent(
+    retired,
+    () => destinationCurrent() && !hasPendingEditorDraft(transferred),
+  );
+}
+
+/** A transport receipt retires even with newer edits; release is a separate decision. */
+export async function retireAcknowledgedMessage(input: {
+  readonly token: ThreadOutboxClaim;
+  readonly receipt: DispatchResult;
+  readonly submitted: QueuedThreadMessage;
+}): Promise<ThreadOutboxRecord | null> {
+  const retired = await threadOutboxManager.authority.retireAcknowledged(
+    input.token,
+    input.receipt,
+  );
+  if (retired === null) return null;
+  await waitForComposerDraftsLoaded();
+  if (
+    retired.kind === "retired" &&
+    retired.reason === "acknowledged" &&
+    retired.retainedMessage !== undefined &&
+    retired.original?.kind === "claim" &&
+    sameOutboxContent(retired.retainedMessage, retired.original.localSnapshot)
+  ) {
+    await releaseCompletedContent(retired, () => !hasPendingEditorDraft(input.submitted));
+  }
+  return retired;
 }

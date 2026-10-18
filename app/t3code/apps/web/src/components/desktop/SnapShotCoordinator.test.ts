@@ -36,15 +36,40 @@ const storage = vi.hoisted(() => {
       values.delete(key);
     },
     clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
   };
   vi.stubGlobal("localStorage", storage);
   return storage;
 });
 
+const authorityFailure = vi.hoisted(() => ({ quota: false }));
+vi.mock("../../lib/composerPersistence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/composerPersistence")>();
+  const backend = actual.createMemoryComposerBackend();
+  return {
+    ...actual,
+    createComposerBackend: () => ({
+      transact: (update: Parameters<typeof backend.transact>[0]) =>
+        backend.transact((current) => {
+          const next = update(current);
+          if (authorityFailure.quota && next !== current) {
+            throw new DOMException("QuotaExceededError", "QuotaExceededError");
+          }
+          return next;
+        }),
+    }),
+  };
+});
+
 const environmentId = EnvironmentId.make("snap-shot-environment");
 const projectRef = scopeProjectRef(environmentId, ProjectId.make("snap-shot-project"));
 
-beforeEach(() => {
+beforeEach(async () => {
+  authorityFailure.quota = false;
+  await useComposerDraftStore.persist.clearStorage();
   storage.clear();
   vi.stubGlobal("localStorage", storage);
   useComposerDraftStore.setState({
@@ -54,9 +79,12 @@ beforeEach(() => {
     stickyModelSelectionByProvider: {},
     stickyActiveProvider: null,
   });
+  await useComposerDraftStore.persist.rehydrate();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  authorityFailure.quota = false;
+  await useComposerDraftStore.persist.clearStorage();
   dismissAllSnapShotAnimations();
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -315,10 +343,7 @@ describe("durable snapshot delivery", () => {
         acknowledgeSnapShot,
       } as unknown as DesktopSnapShotBridge;
       vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
-      const write = storage.setItem.getMockImplementation()!;
-      storage.setItem.mockImplementation(() => {
-        throw new Error("QuotaExceededError");
-      });
+      authorityFailure.quota = true;
       try {
         if (staged) {
           const store = useComposerDraftStore.getState();
@@ -337,7 +362,7 @@ describe("durable snapshot delivery", () => {
         expect(
           useComposerDraftStore.getState().getComposerDraft(target)?.nonPersistedImageIds,
         ).toContain(capture.id);
-        storage.setItem.mockImplementation(write);
+        authorityFailure.quota = false;
         await deliverSnapShot(bridge, capture, target);
         expect(acknowledgeSnapShot).toHaveBeenCalledExactlyOnceWith(capture.id);
         expect(useComposerDraftStore.getState().getComposerDraft(target)?.images).toHaveLength(1);
@@ -345,7 +370,7 @@ describe("durable snapshot delivery", () => {
           useComposerDraftStore.getState().getComposerDraft(target)?.persistedAttachments,
         ).toHaveLength(1);
       } finally {
-        storage.setItem.mockImplementation(write);
+        authorityFailure.quota = false;
       }
     },
   );

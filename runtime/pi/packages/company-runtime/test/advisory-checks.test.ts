@@ -21,9 +21,12 @@ const base = {
 	files: { allowed_paths: ["src"] },
 	verification: { checks: [{ id: "check", kind: "test", executable: "node", args: ["check.mjs"] }] },
 };
-function configWith(advisory?: Record<string, unknown>): RuntimeConfig {
+function configWith(advisory_checks?: Record<string, unknown>): RuntimeConfig {
 	return parseRuntimeConfig(
-		JSON.stringify({ ...base, verification: { ...base.verification, ...(advisory ? { advisory } : {}) } }),
+		JSON.stringify({
+			...base,
+			verification: { ...base.verification, ...(advisory_checks ? { advisory_checks } : {}) },
+		}),
 	);
 }
 const passed: AdvisoryCheckResult = {
@@ -51,7 +54,7 @@ afterEach(async () => {
 async function developerTools(
 	options: { config?: RuntimeConfig; mode?: "EDIT" | "READ_ONLY"; r3?: boolean; port?: AdvisoryCheckPort | null } = {},
 ) {
-	const config = options.config ?? configWith({ mode: "developer", max_runs: 2 });
+	const config = options.config ?? configWith({ max_runs_per_attempt: 2 });
 	const mode = options.mode ?? "EDIT";
 	const port: AdvisoryCheckPort | undefined =
 		options.port === null ? undefined : (options.port ?? { advise: vi.fn(async () => structuredClone(passed)) });
@@ -91,7 +94,7 @@ async function developerTools(
 const text = (result: { content: Array<{ type: string; text?: string }> }) =>
 	result.content.map((part) => part.text ?? "").join("");
 
-describe("opt-in Developer advisory checks", () => {
+describe("Developer advisory checks", () => {
 	it("runs a registered check through the trusted port and labels the output advisory", async () => {
 		const { worker, tool, port, signal, requestCheck } = await developerTools();
 		expect(worker.advisoryRunLimit).toBe(2);
@@ -117,13 +120,11 @@ describe("opt-in Developer advisory checks", () => {
 		await requestCheck();
 		const limited = await requestCheck();
 		expect(port?.advise).toHaveBeenCalledTimes(2);
-		expect(text(limited)).toContain("advisory run limit (2) for this attempt is reached");
+		expect(text(limited)).toContain("advisory run budget exhausted (2 runs in this attempt)");
 		expect(limited.details).toMatchObject({ status: "UNAVAILABLE", advisory: false });
 	});
 
 	it.each([
-		["no advisory configuration", { config: configWith() }],
-		["disabled mode", { config: configWith({ mode: "disabled" }) }],
 		["READ_ONLY contract", { mode: "READ_ONLY" as const }],
 		["R3 deletion run", { r3: true }],
 		["missing trusted port", { port: null }],
@@ -151,13 +152,19 @@ describe("opt-in Developer advisory checks", () => {
 		expect(unknown.worker.fatalToolError()).toBeUndefined();
 	});
 
-	it("parses opt-in configuration without changing absent configuration", () => {
-		expect("advisory" in configWith().verification).toBe(false);
-		expect(configWith({ mode: "developer" }).verification.advisory).toEqual({ mode: "developer", max_runs: 5 });
+	it("parses advisory configuration without changing absent configuration", () => {
+		expect("advisory_checks" in configWith().verification).toBe(false);
+		expect(configWith({ enabled: false }).verification.advisory_checks).toEqual({
+			enabled: false,
+			max_runs_per_attempt: 3,
+			max_output_bytes: 16384,
+		});
 		for (const invalid of [
-			{ mode: "developer", max_runs: 0 },
-			{ mode: "developer", max_runs: 21 },
-			{ mode: "always" },
+			{ max_runs_per_attempt: 0 },
+			{ max_runs_per_attempt: 21 },
+			{ max_output_bytes: 1023 },
+			{ max_output_bytes: 65537 },
+			{ mode: "developer" },
 		])
 			expect(() => configWith(invalid)).toThrow("Invalid runtime config");
 	});

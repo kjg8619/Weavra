@@ -1,8 +1,10 @@
-import { MessageId, ThreadId, type WeavraTask } from "@t3tools/contracts";
+import { MessageId, ThreadId, WeavraTaskDraft, type WeavraTask } from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 import {
   buildTaskDraft,
   selectedMessageFinding,
+  taskDraftContextBytes,
   taskConfirmBlocker,
   taskDraftFields,
   taskMatchesScope,
@@ -10,6 +12,8 @@ import {
   taskStatus,
 } from "./weavraTaskLogic";
 import { preparedTask, taskScope } from "./weavraTaskTestFixture";
+
+const decodeWireDraft = Schema.decodeUnknownSync(WeavraTaskDraft);
 
 describe("controlled handoff draft", () => {
   it("round-trips the reviewed symptom binding without inventing a registration digest", () => {
@@ -24,11 +28,82 @@ describe("controlled handoff draft", () => {
     });
     expect(draft).not.toHaveProperty("checkout");
     expect(draft).not.toHaveProperty("executionId");
+    expect(decodeWireDraft(draft)).toEqual(draft);
   });
   it("retains a missing criterion mapping as invalid rather than silently dropping the binding", () => {
     const fields = taskDraftFields(preparedTask());
     expect(() => buildTaskDraft({ ...fields, symptomCriterion: "" }, 2, 1)).toThrow();
     expect(() => buildTaskDraft({ ...fields, symptomCheck: "" }, 2, 1)).toThrow();
+  });
+  it("measures normalized context rather than the full draft", () => {
+    const fields = {
+      ...taskDraftFields(preparedTask()),
+      symptom: "  한글 failure  ",
+      uncertainties: " first \n\n second ",
+      observations: [
+        selectedMessageFinding({
+          threadId: ThreadId.make("thread"),
+          messageId: MessageId.make("message-ä"),
+          role: "assistant",
+          text: 'A "quoted" finding with \\ and 한글',
+        }),
+      ],
+    };
+    const draft = buildTaskDraft(fields, 7, 123456);
+    const bytes = new TextEncoder().encode(JSON.stringify(draft.context)).byteLength;
+    expect(taskDraftContextBytes(fields, 7, 123456)).toBe(bytes);
+    expect(
+      taskDraftContextBytes(
+        { ...fields, goal: "A different goal", criteria: "Different criteria", symptomCheck: "" },
+        7,
+        123456,
+      ),
+    ).toBe(bytes);
+    expect(taskDraftContextBytes(fields, 8, 123457)).toBe(bytes);
+    expect(taskDraftContextBytes(fields, 10, 1234567)).toBe(bytes + 2);
+    expect(draft.context.observations[0]?.provenance).toBe("MODEL");
+  });
+
+  it.each([8192, 8193])("measures an otherwise-valid context at %i bytes", (targetBytes) => {
+    const fields = {
+      ...taskDraftFields(preparedTask()),
+      observations: [
+        selectedMessageFinding({
+          threadId: ThreadId.make("thread"),
+          messageId: MessageId.make("x"),
+          role: "user",
+          text: "Visible finding",
+        }),
+      ],
+    };
+    const baseBytes = new TextEncoder().encode(
+      JSON.stringify(buildTaskDraft(fields, 2, 123).context),
+    ).byteLength;
+    const messageId = MessageId.make("x".repeat(1 + targetBytes - baseBytes));
+    const sizedFields = {
+      ...fields,
+      observations: [
+        selectedMessageFinding({
+          threadId: ThreadId.make("thread"),
+          messageId,
+          role: "user",
+          text: "Visible finding",
+        }),
+      ],
+    };
+    expect(taskDraftContextBytes(sizedFields, 2, 123)).toBe(targetBytes);
+    if (targetBytes === 8192) {
+      const draft = buildTaskDraft(sizedFields, 2, 123);
+      expect(new TextEncoder().encode(JSON.stringify(draft.context)).byteLength).toBe(targetBytes);
+    } else {
+      expect(() => buildTaskDraft(sizedFields, 2, 123)).toThrow();
+    }
+  });
+
+  it("rejects malformed source JSON when measuring without weakening submission validation", () => {
+    const fields = { ...taskDraftFields(preparedTask()), sources: "{" };
+    expect(() => taskDraftContextBytes(fields, 2, 123)).toThrow();
+    expect(() => buildTaskDraft(fields, 2, 123)).toThrow();
   });
   it("rejects excessive fields and UTF-8 bytes without truncating", () => {
     const fields = taskDraftFields(preparedTask());
@@ -55,6 +130,18 @@ describe("controlled handoff draft", () => {
     expect(() => buildTaskDraft({ ...fields, sources: '[{"path":"src/fix.ts"}]' }, 2, 1)).toThrow();
     expect(() =>
       buildTaskDraft({ ...fields, sources: '[{"path":"../secret","digest":"sha256:bad"}]' }, 2, 1),
+    ).toThrow();
+    expect(() =>
+      buildTaskDraft(
+        {
+          ...fields,
+          sources: JSON.stringify([
+            { path: "src/fix.ts", digest: `sha256:${"a".repeat(64)}`, extra: true },
+          ]),
+        },
+        2,
+        1,
+      ),
     ).toThrow();
   });
   it("requires explicit visible findings and retains source provenance", () => {

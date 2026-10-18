@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ComponentProps, type ReactNode } from "react";
 
 import {
   RIGHT_PANEL_SHEET_CLASS_NAME,
@@ -11,6 +11,8 @@ export function RightPanelSheet(props: {
   children: ReactNode;
   open: boolean;
   underFloatingPreview?: boolean;
+  /** Lets a selected surface own focus instead of the sheet's first tabbable control. */
+  initialFocus?: ComponentProps<typeof SheetPopup>["initialFocus"];
   onClose: () => void;
 }) {
   return (
@@ -27,6 +29,7 @@ export function RightPanelSheet(props: {
         side="right"
         showCloseButton={false}
         keepMounted
+        {...(props.initialFocus === undefined ? {} : { initialFocus: props.initialFocus })}
         {...(props.underFloatingPreview
           ? {
               backdropClassName: RIGHT_PANEL_SHEET_LAYER_CLASS_NAME,

@@ -15,11 +15,7 @@ import {
   type ServerConfig as T3ServerConfig,
   type UsageLimitsReport,
 } from "@t3tools/contracts";
-import {
-  collectProviderUsageLimits,
-  hasProviderUsageLimits,
-  isUsageLimitsCommand,
-} from "@t3tools/shared/usageLimits";
+import { collectProviderUsageLimits, hasProviderUsageLimits } from "@t3tools/shared/usageLimits";
 import { StackActions, useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { ReactNode } from "react";
 import {
@@ -51,9 +47,11 @@ import Animated, {
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { themeColorWithAlpha } from "../../lib/mobileTheme";
 import { scopedThreadKey } from "../../lib/scopedEntities";
+import { consumeComposerUsageLimits } from "../../state/composer-command-consumption";
 import {
   composerContextImportsAtom,
   countComposerDraftAttachmentsAfterSelection,
+  getComposerDraftSnapshot,
 } from "../../state/use-composer-drafts";
 import type { ComposerDocumentAttachment } from "../../lib/composerContext";
 import { useProject } from "../../state/entities";
@@ -122,6 +120,7 @@ export const COMPOSER_COLLAPSED_CHROME = 60;
 export const COMPOSER_EXPANDED_CHROME = 156;
 
 export interface ThreadComposerProps {
+  readonly recovered?: boolean;
   readonly draftMessage: string;
   readonly draftAttachments: ReadonlyArray<DraftComposerAttachment>;
   readonly placeholder: string;
@@ -293,8 +292,15 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   const hasContent = props.draftMessage.trim().length > 0 || props.draftAttachments.length > 0;
   // Only media belongs above the composer; every other file reads as its inline chip.
   const stripAttachments = useMemo(
-    () => composerStripAttachments(props.draftAttachments),
-    [props.draftAttachments],
+    () =>
+      composerStripAttachments(props.draftAttachments).filter(
+        (attachment) =>
+          !props.recovered ||
+          !getComposerDraftSnapshot(
+            scopedThreadKey(props.environmentId, props.selectedThread.id),
+          ).rejectedTurn?.message.attachments?.some((source) => source.id === attachment.id),
+      ),
+    [props.draftAttachments, props.recovered, props.environmentId, props.selectedThread.id],
   );
   const showStopAction =
     !hasContent &&
@@ -303,6 +309,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
 
   const uploadStates = useAtomValue(composerAttachmentUploadsAtom);
   const attachmentsUploading =
+    !props.recovered &&
     props.connectionState === "connected" &&
     composerAttachmentsStillUploading({
       environmentId: props.environmentId,
@@ -368,6 +375,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   }, [currentModelSelection.instanceId, onShowUsageLimits, props.serverConfig]);
 
   const composerMenu = useComposerCommandMenu({
+    enabled: !props.recovered,
     draftMessage: props.draftMessage,
     ownerKey: composerOwnerKey,
     environmentId: props.environmentId,
@@ -476,13 +484,14 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     // Typed out in full rather than picked from the menu. Attachments mean the
     // user is sending a prompt, so those go through as usual.
     if (
-      usageLimitsOffered &&
-      isUsageLimitsCommand(props.draftMessage) &&
-      props.draftAttachments.length === 0
-    ) {
-      if (openUsageLimits()) onChangeDraftMessage("");
+      consumeComposerUsageLimits({
+        draftKey: composerOwnerKey,
+        offered: usageLimitsOffered,
+        open: openUsageLimits,
+        changeText: onChangeDraftMessage,
+      })
+    )
       return;
-    }
     const threadKey = scopedThreadKey(props.environmentId, props.selectedThread.id);
     if (inFlightThreadIdsRef.current.has(threadKey)) return;
     inFlightThreadIdsRef.current.add(threadKey);
@@ -492,8 +501,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
       inFlightThreadIdsRef.current.delete(threadKey);
     }
   }, [
-    props.draftMessage,
-    props.draftAttachments.length,
+    composerOwnerKey,
     onChangeDraftMessage,
     openUsageLimits,
     usageLimitsOffered,
@@ -682,7 +690,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                 exiting={FadeOut.duration(120)}
               >
                 <ComposerAttachmentStrip
-                  environmentId={props.environmentId}
+                  environmentId={props.recovered ? undefined : props.environmentId}
                   attachments={stripAttachments}
                   onRemove={voiceInput.isBusy ? () => undefined : props.onRemoveDraftImage}
                   onPressPreview={voiceInput.isBusy ? undefined : onPressPreview}
@@ -830,7 +838,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
               <View className="flex-row gap-1 pl-1">
                 {stripAttachments.slice(0, 3).map((attachment) => (
                   <ComposerAttachmentThumbnail
-                    environmentId={props.environmentId}
+                    environmentId={props.recovered ? undefined : props.environmentId}
                     key={attachment.id}
                     attachment={attachment}
                     size={30}

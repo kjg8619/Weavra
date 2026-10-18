@@ -7,6 +7,7 @@ import {
   type WeavraTaskScopeInput,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import { weavraLabel } from "../weavraLabels";
 
 export interface TaskDraftFields {
   goal: string;
@@ -43,12 +44,45 @@ export function taskDraftFields(task: WeavraTask | null): TaskDraftFields {
   };
 }
 
-const decodeDraft = Schema.decodeUnknownSync(WeavraTaskDraft);
+// Keep field paths for the editor; the wire boundary still uses the closed schema.
+const decodeDraft = Schema.decodeUnknownSync(Schema.toType(WeavraTaskDraft), {
+  onExcessProperty: "error",
+  errors: "all",
+});
 const lines = (value: string) =>
   value
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+
+function taskDraftContext(fields: TaskDraftFields, packetVersion: number, reviewedAt: number) {
+  const sourceReferences: unknown = JSON.parse(fields.sources);
+  return {
+    version: 1,
+    packetVersion,
+    authority: "ADVISORY_ONLY",
+    reviewedAt,
+    symptom: fields.symptom.trim(),
+    candidateCause: fields.hypothesis.trim()
+      ? { kind: "HYPOTHESIS", text: fields.hypothesis.trim() }
+      : null,
+    observations: fields.observations,
+    uncertainties: lines(fields.uncertainties),
+    constraints: lines(fields.constraints),
+    sourceReferences,
+  };
+}
+
+const utf8 = new TextEncoder();
+
+export function taskDraftContextBytes(
+  fields: TaskDraftFields,
+  packetVersion: number,
+  reviewedAt: number,
+): number {
+  return utf8.encode(JSON.stringify(taskDraftContext(fields, packetVersion, reviewedAt)))
+    .byteLength;
+}
 
 export function buildTaskDraft(
   fields: TaskDraftFields,
@@ -66,20 +100,7 @@ export function buildTaskDraft(
           },
         }
       : {}),
-    context: {
-      version: 1,
-      packetVersion,
-      authority: "ADVISORY_ONLY",
-      reviewedAt,
-      symptom: fields.symptom.trim(),
-      candidateCause: fields.hypothesis.trim()
-        ? { kind: "HYPOTHESIS", text: fields.hypothesis.trim() }
-        : null,
-      observations: fields.observations,
-      uncertainties: lines(fields.uncertainties),
-      constraints: lines(fields.constraints),
-      sourceReferences: JSON.parse(fields.sources),
-    },
+    context: taskDraftContext(fields, packetVersion, reviewedAt),
   });
 }
 
@@ -91,7 +112,7 @@ export function selectedMessageFinding(input: {
   text: string;
 }): WeavraAnalysisContext["observations"][number] {
   if (!input.text.trim() || input.text.length > 500)
-    throw new Error("Select at most 500 characters of visible message text.");
+    throw new Error("화면에 표시된 메시지에서 최대 500자를 선택해 주세요.");
   return {
     text: input.text,
     provenance: input.role === "assistant" ? "MODEL" : "USER",
@@ -138,9 +159,9 @@ export function taskConfirmBlocker(input: {
   reviewed: boolean;
   now: number;
 }): string | null {
-  if (!input.fresh) return "Reconnect and synchronize this task before acting.";
-  if (!input.canOperate) return "This session does not have orchestration:operate access.";
-  if (input.edited) return "The draft changed. Prepare a new snapshot before confirming.";
+  if (!input.fresh) return "작업 전에 다시 연결하고 이 작업을 동기화해 주세요.";
+  if (!input.canOperate) return "이 세션에는 orchestration:operate 권한이 없어요.";
+  if (input.edited) return "초안이 바뀌었어요. 확인하기 전에 새 스냅샷을 준비해 주세요.";
   const { task } = input;
   const preview = task.execution?.preview;
   if (
@@ -148,26 +169,27 @@ export function taskConfirmBlocker(input: {
     task.ownership.state !== "analysis" ||
     task.execution?.confirmCommandId
   )
-    return "This attempt cannot be confirmed. Reconcile its current state.";
-  if (!preview) return "The saved preview is unavailable. Prepare a new attempt.";
-  if (preview.expiresAt <= input.now) return "This preview expired. Prepare a new attempt.";
+    return "이 시도를 확인할 수 없어요. 현재 상태를 다시 조회해 주세요.";
+  if (!preview) return "저장된 미리보기를 사용할 수 없어요. 새 시도를 준비해 주세요.";
+  if (preview.expiresAt <= input.now) return "미리보기가 만료됐어요. 새 시도를 준비해 주세요.";
   if (!preview.modelRoutes)
-    return "Frozen Runtime model routes are unavailable. Prepare with a compatible Runtime.";
-  if (!preview.checks.some((check) => check.required))
-    return "No required registered check is present.";
-  if (!input.reviewed) return "Review the exact snapshot and acknowledge it below.";
+    return "확정된 Runtime 모델 경로를 확인할 수 없어요. 호환되는 Runtime에서 다시 준비해 주세요.";
+  if (!preview.checks.some((check) => check.required)) return "필수로 등록된 검사가 없어요.";
+  if (!input.reviewed) return "이 스냅샷을 검토한 뒤 아래에서 확인해 주세요.";
   return null;
 }
 
 export function taskStatus(task: WeavraTask): string {
   const receipt = task.execution?.receipt;
   if (receipt?.status === "FOUND") {
-    if (receipt.run) return `Run ${receipt.run.status}`;
+    if (receipt.run) return `Run ${weavraLabel(receipt.run.status)}`;
     const outcome = receipt.admission.outcome;
     return "reasonCode" in outcome
-      ? `${outcome.status}: ${outcome.reasonCode} (no Run)`
-      : `${outcome.status} (no Run observed)`;
+      ? `${weavraLabel(outcome.status)}: ${outcome.reasonCode} (Run 없음)`
+      : `${weavraLabel(outcome.status)} (Run 미확인)`;
   }
-  if (receipt?.status === "UNKNOWN") return "Execution receipt unknown - ownership is not cleared";
-  return task.phase === "finished" ? "Task finished - no canonical completion claim" : task.phase;
+  if (receipt?.status === "UNKNOWN") return "실행 응답 미확인 - 소유권을 해제하지 않았어요";
+  return task.phase === "finished"
+    ? "작업 종료 - Runtime 완료 판정은 없어요"
+    : weavraLabel(task.phase);
 }

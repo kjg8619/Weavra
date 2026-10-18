@@ -27,7 +27,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
   rightPanelAvailable,
   rightPanelOpen,
   rightPanelShortcutLabel,
-  rightPanelUnavailableLabel = "Right panel is unavailable",
+  rightPanelUnavailableLabel = "오른쪽 패널을 쓸 수 없어요",
   liveAgentCount,
   onToggleTerminal,
   onToggleRightPanel,
@@ -44,7 +44,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
               className="shrink-0 [-webkit-app-region:no-drag]"
               pressed={terminalOpen}
               onPressedChange={onToggleTerminal}
-              aria-label="Toggle terminal drawer"
+              aria-label="터미널 서랍 열기/닫기"
               variant="ghost"
               size="sm"
               disabled={!terminalAvailable}
@@ -54,8 +54,8 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
           </TooltipTrigger>
           <TooltipPopup side="bottom">
             {terminalAvailable
-              ? `Toggle terminal drawer${terminalShortcutLabel ? ` (${terminalShortcutLabel})` : ""}`
-              : "Terminal drawer is unavailable"}
+              ? `터미널 서랍 열기/닫기${terminalShortcutLabel ? ` (${terminalShortcutLabel})` : ""}`
+              : "터미널 서랍을 쓸 수 없어요"}
           </TooltipPopup>
         </Tooltip>
       ) : null}
@@ -67,8 +67,8 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
             onPressedChange={onToggleRightPanel}
             aria-label={
               liveAgentCount > 0
-                ? `Toggle right panel, ${liveAgentCount} ${liveAgentCount === 1 ? "agent" : "agents"} working`
-                : "Toggle right panel"
+                ? `오른쪽 패널 열기/닫기, 에이전트 ${liveAgentCount}개 작업 중`
+                : "오른쪽 패널 열기/닫기"
             }
             variant="ghost"
             size="sm"
@@ -87,10 +87,8 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
         </TooltipTrigger>
         <TooltipPopup side="bottom">
           {rightPanelAvailable
-            ? `Toggle right panel${rightPanelShortcutLabel ? ` (${rightPanelShortcutLabel})` : ""}${
-                liveAgentCount > 0
-                  ? ` · ${liveAgentCount} ${liveAgentCount === 1 ? "agent" : "agents"} working`
-                  : ""
+            ? `오른쪽 패널 열기/닫기${rightPanelShortcutLabel ? ` (${rightPanelShortcutLabel})` : ""}${
+                liveAgentCount > 0 ? ` · 에이전트 ${liveAgentCount}개 작업 중` : ""
               }`
             : rightPanelUnavailableLabel}
         </TooltipPopup>
@@ -106,7 +104,7 @@ export const RightPanelMaximizeControl = memo(function RightPanelMaximizeControl
   maximized: boolean;
   onToggle: () => void;
 }) {
-  const label = maximized ? "Restore panel size" : "Maximize panel";
+  const label = maximized ? "패널 크기 되돌리기" : "패널 최대화";
   return (
     <Tooltip>
       <TooltipTrigger

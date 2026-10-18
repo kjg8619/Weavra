@@ -11,6 +11,7 @@ import {
   composerAttachmentsStillUploading,
   composerAttachmentUploadKey,
   composerDraftEnvironmentId,
+  composerBackgroundUploadEnvironmentId,
   createComposerAttachmentUploadQueue,
   type ComposerAttachmentUploadRequest,
   type ComposerAttachmentUploadState,
@@ -32,6 +33,79 @@ function request(id: string, environment = environmentId): ComposerAttachmentUpl
 }
 
 describe("composer attachment upload queue", () => {
+  it("resolves scoped retargeted ownership without enabling pending editor upload", () => {
+    const original = { environmentId, threadId: "thread", messageId: "shared" };
+    const target = EnvironmentId.make("retargeted");
+    const queued = [
+      { ...original, environmentId: target, storageIdentity: original },
+      { ...original, threadId: "other-thread" },
+      { ...original, environmentId: EnvironmentId.make("foreign") },
+    ];
+    const key = `pending-task:${JSON.stringify([environmentId, "thread", "shared"])}`;
+    expect(composerDraftEnvironmentId(key, queued)).toBe(target);
+    expect(composerBackgroundUploadEnvironmentId(key, queued)).toBeNull();
+    expect(composerDraftEnvironmentId("pending-task:shared", queued)).toBeNull();
+  });
+
+  it("does not infer a legacy editor's environment from an ambiguous message ID", () => {
+    const own = { messageId: "shared", environmentId };
+    const queued = [own, { messageId: "shared", environmentId: EnvironmentId.make("foreign") }];
+    expect(composerDraftEnvironmentId("pending-task:shared", queued)).toBeNull();
+    expect(composerDraftEnvironmentId("pending-task:shared", queued.toReversed())).toBeNull();
+    expect(composerDraftEnvironmentId("pending-task:shared", [own, own])).toBe(environmentId);
+  });
+
+  it("retains recovered draft ownership without background upload on reconnect or retry", async () => {
+    const draft = { rejectedTurn: { version: 1 as const } };
+    const key = "environment-1:thread";
+    const upload = vi.fn(async () => true);
+    const queue = createComposerAttachmentUploadQueue({ upload, onChange: () => {} });
+    const target = composerBackgroundUploadEnvironmentId(key, [], draft);
+    try {
+      expect(composerDraftEnvironmentId(key, [], draft)).toBe(environmentId);
+      expect(target).toBeNull();
+      queue.sync(target === null ? [] : [request("recovered", target)]);
+      await queue.settled();
+      queue.sync([]);
+      queue.sync(target === null ? [] : [request("recovered", target)]);
+      queue.retry(environmentId, "recovered");
+      await queue.settled();
+      expect(upload).not.toHaveBeenCalled();
+    } finally {
+      queue.dispose();
+    }
+  });
+
+  it("keeps pending-task editor ownership without granting background upload", async () => {
+    const queued = [{ messageId: "message", environmentId }];
+    expect(composerDraftEnvironmentId("pending-task:message", queued)).toBe(environmentId);
+    const target = composerBackgroundUploadEnvironmentId("pending-task:message", queued);
+    const upload = vi.fn(async () => true);
+    const queue = createComposerAttachmentUploadQueue({ upload, onChange: () => {} });
+    try {
+      queue.sync(target === null ? [] : [request("held", target)]);
+      await queue.settled();
+      expect(upload).not.toHaveBeenCalled();
+      expect(target).toBeNull();
+    } finally {
+      queue.dispose();
+    }
+  });
+
+  it("keeps normal thread and new-task background uploads eligible", () => {
+    expect(composerBackgroundUploadEnvironmentId("environment-1:thread", [])).toBe(environmentId);
+    expect(composerBackgroundUploadEnvironmentId("new-task:environment-1:project", [])).toBe(
+      environmentId,
+    );
+    expect(composerBackgroundUploadEnvironmentId("pending-task:missing", [])).toBeNull();
+    expect(
+      composerBackgroundUploadEnvironmentId("pending-task:message", [
+        { messageId: "message", environmentId },
+        { messageId: "message", environmentId: EnvironmentId.make("foreign") },
+      ]),
+    ).toBeNull();
+  });
+
   it("bounds concurrency, deduplicates updates, and drains all attachments", async () => {
     const gates = new Map<string, ReturnType<typeof Promise.withResolvers<boolean>>>();
     const fourthStarted = Promise.withResolvers<void>();

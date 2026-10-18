@@ -5,6 +5,7 @@ import { buildPendingNewTasks, type PendingNewTask } from "./pending-new-tasks-m
 import { flattenQueuedThreadMessages } from "./thread-outbox-model";
 import { composerDraftsAtom } from "./use-composer-drafts";
 import { useThreadOutboxMessages } from "./use-thread-outbox";
+import { showcasePendingTasksAtom } from "../features/showcase/showcase-pending-tasks";
 
 export type {
   PendingDraftTask,
@@ -15,12 +16,13 @@ export type {
 export function usePendingNewTasks(): ReadonlyArray<PendingNewTask> {
   const queuedMessagesByThreadKey = useThreadOutboxMessages();
   const drafts = useAtomValue(composerDraftsAtom);
+  const showcase = useAtomValue(showcasePendingTasksAtom);
   return useMemo(
     () =>
       buildPendingNewTasks({
-        queuedMessages: flattenQueuedThreadMessages(queuedMessagesByThreadKey),
+        queuedMessages: [...flattenQueuedThreadMessages(queuedMessagesByThreadKey), ...showcase],
         drafts,
       }),
-    [queuedMessagesByThreadKey, drafts],
+    [queuedMessagesByThreadKey, drafts, showcase],
   );
 }

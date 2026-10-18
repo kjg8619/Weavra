@@ -96,7 +96,7 @@ interface BranchToolbarBranchSelectorProps {
 }
 
 function toBranchActionErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "An error occurred.";
+  return error instanceof Error ? error.message : "오류가 발생했어요.";
 }
 
 export function BranchToolbarBranchSelector({
@@ -353,9 +353,9 @@ export function BranchToolbarBranchSelector({
   const [isBranchActionPending, startBranchActionTransition] = useTransition();
   const totalBranchCount = branchRefState.data?.totalCount ?? 0;
   const branchStatusText = isInitialBranchesLoadPending
-    ? "Loading refs..."
+    ? "ref를 불러오는 중..."
     : isFetchingNextPage
-      ? "Loading more refs..."
+      ? "ref를 더 불러오는 중..."
       : hasNextPage
         ? `Showing ${refs.length} of ${totalBranchCount} refs`
         : null;
@@ -369,7 +369,7 @@ export function BranchToolbarBranchSelector({
         if (!didCopy) return;
         toastManager.add({
           type: "success",
-          title: "Branch name copied",
+          title: "branch 이름을 복사했어요",
           description: branchName,
         });
       },
@@ -377,7 +377,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to copy branch name",
+            title: "branch 이름을 복사하지 못했어요",
             description: toBranchActionErrorMessage(error),
           }),
         );
@@ -393,7 +393,7 @@ export function BranchToolbarBranchSelector({
       event.preventDefault();
       event.stopPropagation();
       const items: ContextMenuItem<"copy-branch-name">[] = [
-        { id: "copy-branch-name", label: "Copy branch name", icon: "copy" },
+        { id: "copy-branch-name", label: "branch 이름 복사", icon: "copy" },
       ];
       void api.contextMenu.show(items, { x: event.clientX, y: event.clientY }).then((action) => {
         if (action === "copy-branch-name") copyBranchName(branchName);
@@ -463,7 +463,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to switch ref.",
+            title: "ref를 전환하지 못했어요.",
             description: toBranchActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
           }),
         );
@@ -499,7 +499,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to create and switch ref.",
+            title: "ref를 만들고 전환하지 못했어요.",
             description: toBranchActionErrorMessage(squashAtomCommandFailure(createBranchResult)),
           }),
         );
@@ -825,12 +825,12 @@ export function BranchToolbarBranchSelector({
         {...composerFloatingLayerProps}
       >
         <ComboboxSearchInput
-          placeholder="Search refs..."
+          placeholder="ref 검색..."
           value={branchQuery}
           onChange={(event) => setBranchQuery(event.target.value)}
         />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <ComboboxEmpty>No refs found.</ComboboxEmpty>
+          <ComboboxEmpty>ref를 찾지 못했어요.</ComboboxEmpty>
           <div className="relative min-h-0 w-full max-h-56 flex-1 overflow-hidden">
             <ComboboxListVirtualized className="size-full min-w-0 p-0">
               <LegendList<string>
@@ -877,21 +877,20 @@ export function BranchToolbarBranchSelector({
                   >
                     <span className="flex min-w-0 items-center gap-1.5 font-medium text-muted-foreground">
                       <RefreshIcon aria-hidden="true" className="size-3 shrink-0 opacity-70" />
-                      <span className="truncate">Start from origin</span>
+                      <span className="truncate">origin에서 시작</span>
                     </span>
                     <Switch
                       id={startFromOriginSwitchId}
                       checked={startFromOrigin}
                       size="sm"
-                      aria-label="Start worktree from origin"
+                      aria-label="origin에서 worktree 시작"
                       onCheckedChange={(checked) => onStartFromOriginChange(Boolean(checked))}
                     />
                   </label>
                 }
               />
               <TooltipPopup side="top" className="max-w-72 whitespace-normal leading-tight">
-                Creates the worktree from the latest matching branch on origin instead of your local
-                branch.
+                로컬 branch 대신 origin의 최신 일치 branch에서 worktree를 만들어요.
               </TooltipPopup>
             </Tooltip>
           ) : null}

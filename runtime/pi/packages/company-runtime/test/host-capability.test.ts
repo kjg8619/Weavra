@@ -611,7 +611,11 @@ describe("COMPLEX execution projection over Host Control (#16 stage C)", () => {
 		expect(complexConsumerIssues(second, first)).toEqual([]);
 		expect(second.state.complexExecution).toEqual(state.complexExecution);
 		// The ordinary read-only summary keeps its existing fields and values; task detail lives only in the DTO.
-		expect(JSON.stringify(state.snapshot)).not.toMatch(/CT-00\d|complexExecution|complexContext/);
+		// Since the stage C graph the summary graph names plan task nodes by their opaque Runtime ids (task:CT-00x,
+		// as the COMPLEX graph test requires), but never copies task titles, claimed paths or the execution DTO.
+		const summary = JSON.stringify(state.snapshot);
+		expect(summary).not.toMatch(/complexExecution|complexContext|src\//);
+		for (const task of stored.complex!.plan.tasks) expect(summary).not.toContain(task.title);
 		expect(Object.keys(state.snapshot.status.run ?? {}).sort()).toEqual([
 			"activeAgentCount",
 			"codeRevision",
@@ -626,7 +630,9 @@ describe("COMPLEX execution projection over Host Control (#16 stage C)", () => {
 			"updatedAt",
 			"workflow",
 		]);
-		expect(state.snapshot.graph?.nodes).toEqual([{ id: "preflight", kind: "preflight", status: "unknown" }]);
+		expect(state.snapshot.graph).toEqual(projections.projectHostGraph(stored));
+		for (const node of state.snapshot.graph?.nodes ?? [])
+			expect(Object.keys(node).every((key) => ["id", "kind", "status", "attempt", "wave"].includes(key))).toBe(true);
 	});
 
 	it("projects historical, unowned and recovered COMPLEX Runs, and never one from an older Run", async () => {

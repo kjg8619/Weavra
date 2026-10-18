@@ -20,9 +20,9 @@ export interface ComposerTaskStep {
 const MAX_TASK_SEGMENTS = 10;
 
 const taskStatusLabels = {
-  pending: "Pending",
-  inProgress: "Running",
-  completed: "Completed",
+  pending: "대기 중",
+  inProgress: "진행 중",
+  completed: "완료",
 } satisfies Record<ComposerTaskStep["status"], string>;
 
 function keyedTaskSteps(steps: readonly ComposerTaskStep[]) {
@@ -77,7 +77,7 @@ function TaskSummary({
         <ListTodoIcon />
       </ComposerBanner.Icon>
       <ComposerBanner.Content>
-        <span className="shrink-0 text-muted-foreground">Tasks</span>
+        <span className="shrink-0 text-muted-foreground">작업 목록</span>
         <span
           className="min-w-0 flex-1 truncate text-left font-medium text-foreground/80"
           data-composer-task-current="true"
@@ -118,7 +118,7 @@ export const ComposerTasksBadge = memo(function ComposerTasksBadge({
     <ComposerBanner.Row
       render={<button type="button" />}
       aria-expanded={expanded}
-      aria-label={`${expanded ? "Collapse tasks" : "Tasks"}: ${progress.completedSteps} of ${progress.totalSteps} complete. Current task: ${progress.step}`}
+      aria-label={`${expanded ? "작업 목록 접기" : "작업 목록"}: ${progress.totalSteps}개 중 ${progress.completedSteps}개 완료. 현재 작업: ${progress.step}`}
       data-composer-tasks-badge="true"
       onClick={onToggle}
       onPointerDown={(event) => event.preventDefault()}
@@ -162,7 +162,7 @@ export const ComposerTasksContent = memo(function ComposerTasksContent({
         <ComposerBanner.Scroll data-composer-tasks-scroll="true">
           <ComposerBanner.Children
             render={<ul role="list" />}
-            aria-label={`Task list. ${progress.completedSteps} of ${progress.totalSteps} complete.`}
+            aria-label={`작업 목록. ${progress.totalSteps}개 중 ${progress.completedSteps}개 완료.`}
             data-composer-tasks-list="true"
           >
             {keyedTaskSteps(steps).map(({ key, step }) => (

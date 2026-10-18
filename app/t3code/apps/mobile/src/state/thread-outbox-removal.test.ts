@@ -1,305 +1,230 @@
+import { fixture, harness } from "./testing/drain-harness";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { CommandId, EnvironmentId, MessageId, ProjectId, ThreadId } from "@t3tools/contracts";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-
-const harness = vi.hoisted(() => ({
-  cleanup: vi.fn(),
-  clearDraft: vi.fn<typeof import("./use-composer-drafts").clearComposerDraft>(),
-  flushDrafts: vi.fn<typeof import("./use-composer-drafts").flushComposerDrafts>(async () => {}),
-  waitForDrafts: vi.fn<typeof import("./use-composer-drafts").waitForComposerDraftsLoaded>(
-    async () => {},
-  ),
-  manager: null as unknown as ReturnType<
-    typeof import("./thread-outbox-manager").createThreadOutboxManager
-  >,
-}));
-
-vi.mock("./thread-outbox", async () => {
-  const { createThreadOutboxManager } = await import("./thread-outbox-manager");
-  const { appAtomRegistry } = await import("./atom-registry");
-  harness.manager = createThreadOutboxManager({
-    registry: appAtomRegistry,
-    storage: {
-      load: async () => ({ messages: [], errors: [] }),
-      write: async () => undefined,
-      remove: async () => undefined,
-    },
-  });
-  return { threadOutboxManager: harness.manager };
-});
-
-vi.mock("./use-composer-drafts", async (importOriginal) => {
-  const original = await importOriginal<typeof import("./use-composer-drafts")>();
-  return {
-    ...original,
-    clearComposerDraft: harness.clearDraft,
-    flushComposerDrafts: harness.flushDrafts,
-    scheduleUnusedComposerAttachmentCleanup: harness.cleanup,
-    waitForComposerDraftsLoaded: harness.waitForDrafts,
-  };
-});
-
 import { appAtomRegistry } from "./atom-registry";
-import { clearThreadOutboxEnvironment, removeThreadOutboxMessage } from "./thread-outbox-removal";
+import {
+  removeThreadOutboxMessage,
+  retireTransferredMessage,
+  releaseTransferredMessage,
+} from "./thread-outbox-removal";
+import { editPendingThreadMessage } from "./edit-pending-thread-message";
+import { holdEditingQueuedMessage } from "./use-thread-outbox";
+import { pendingTaskDraftKey } from "./pending-task-identity";
 import type { QueuedThreadMessage } from "./thread-outbox-model";
-import { composerDraftsAtom } from "./use-composer-drafts";
+import * as drafts from "./use-composer-drafts";
 
-function queuedMessage(input: {
-  readonly environmentId: string;
-  readonly messageId: string;
-  readonly fileUri: string;
-  readonly creation?: true;
-}): QueuedThreadMessage {
+function message(creation = false): QueuedThreadMessage {
   return {
-    environmentId: EnvironmentId.make(input.environmentId),
-    threadId: ThreadId.make(`thread-${input.messageId}`),
-    messageId: MessageId.make(input.messageId),
-    commandId: CommandId.make(`command-${input.messageId}`),
-    text: "Review the report",
+    environmentId: EnvironmentId.make("environment"),
+    threadId: ThreadId.make("thread"),
+    messageId: MessageId.make("message"),
+    commandId: CommandId.make("command"),
+    text: "retained text",
     attachments: [
       {
-        id: `file-${input.messageId}`,
+        id: "file",
         type: "file",
-        name: "report.pdf",
-        mimeType: "application/pdf",
-        sizeBytes: 42,
-        fileUri: input.fileUri,
+        name: "file.txt",
+        mimeType: "text/plain",
+        sizeBytes: 1,
+        fileUri: "file:///documents/source.txt",
       },
     ],
-    ...(input.creation
+    ...(creation
       ? {
           creation: {
-            projectId: ProjectId.make(`project-${input.messageId}`),
+            projectId: ProjectId.make("project"),
             workspaceMode: "local" as const,
             branch: null,
             worktreePath: null,
           },
         }
       : {}),
-    createdAt: "2026-08-24T12:00:00.000Z",
+    createdAt: "2026-10-04T00:00:00.000Z",
   };
 }
-
-afterEach(() => {
-  appAtomRegistry.set(harness.manager.queuedMessagesByThreadKeyAtom, {});
-  appAtomRegistry.set(composerDraftsAtom, {});
-  harness.cleanup.mockClear();
-  harness.clearDraft.mockClear();
-  harness.flushDrafts.mockReset();
-  harness.flushDrafts.mockResolvedValue(undefined);
-  harness.waitForDrafts.mockReset();
-  harness.waitForDrafts.mockResolvedValue(undefined);
+function latest(row: QueuedThreadMessage) {
+  const record = fixture().manager.recordAt(row.storageIdentity ?? row);
+  if (record === null) throw new Error("Expected durable record");
+  return record;
+}
+beforeEach(async () => {
+  fixture().reset();
+  drafts.resetComposerDraftsLoadState();
+  await drafts.waitForComposerDraftsLoaded();
 });
-
-describe("thread outbox removal", () => {
-  it("releases a removed message's attachment files with the removal itself", async () => {
-    const message = queuedMessage({
-      environmentId: "environment-1",
-      messageId: "message-1",
-      fileUri: "file:///documents/t3-composer-attachments/report.pdf",
-    });
-    await harness.manager.enqueue(message);
-
-    await removeThreadOutboxMessage(message);
-
-    expect(appAtomRegistry.get(harness.manager.queuedMessagesByThreadKeyAtom)).toEqual({});
-    expect(harness.cleanup).toHaveBeenCalledExactlyOnceWith(message.attachments);
+afterEach(async () => {
+  harness.draftFile.error = null;
+  await drafts.flushComposerDrafts();
+  appAtomRegistry.set(drafts.composerDraftsAtom, {});
+  harness.draftFile.document = JSON.stringify({ schemaVersion: 1, drafts: {} });
+  harness.removeFile.mockClear();
+  vi.restoreAllMocks();
+});
+describe("reason-specific outbox retirement", () => {
+  it("releases explicit discard content while retaining the durable marker", async () => {
+    const row = await fixture().admit(message());
+    await expect(removeThreadOutboxMessage(row)).resolves.toBe(true);
+    expect(latest(row)).toMatchObject({ kind: "retired", reason: "discarded" });
+    expect(latest(row)).not.toHaveProperty("retainedMessage");
+    await fixture().restart();
+    await expect(fixture().admit(message())).rejects.toMatchObject({ reason: "identity-occupied" });
   });
-
-  it("keeps an edited message and its files when a revision-checked removal loses", async () => {
-    const message = queuedMessage({
-      environmentId: "environment-1",
-      messageId: "message-edited",
-      fileUri: "file:///documents/t3-composer-attachments/report.pdf",
-      creation: true,
+  it("keeps an unrelated accepted edit when discard loses its captured CAS", async () => {
+    const row = await fixture().admit(message());
+    const entered = Promise.withResolvers<void>();
+    const barrier = Promise.withResolvers<void>();
+    vi.spyOn(drafts, "waitForComposerDraftsLoaded").mockImplementationOnce(async () => {
+      entered.resolve();
+      await barrier.promise;
     });
-    await harness.manager.enqueue(message);
-    const revision = harness.manager.revisionOf(message.messageId);
-    const edited = { ...message, text: "edited while restoring" };
-    await harness.manager.update(edited);
-
-    await expect(removeThreadOutboxMessage(message, revision)).resolves.toBe(false);
-
-    expect(harness.cleanup).not.toHaveBeenCalled();
-    expect(harness.waitForDrafts).not.toHaveBeenCalled();
-    expect(harness.clearDraft).not.toHaveBeenCalled();
-    expect(harness.flushDrafts).not.toHaveBeenCalled();
-    const remaining = Object.values(
-      appAtomRegistry.get(harness.manager.queuedMessagesByThreadKeyAtom),
-    ).flat();
-    expect(remaining).toEqual([edited]);
+    const removal = removeThreadOutboxMessage(row);
+    await entered.promise;
+    await fixture().edit({ ...row, text: "newest" }, fixture().record(row));
+    barrier.resolve();
+    await expect(removal).resolves.toBe(false);
+    expect(latest(row)).toMatchObject({ kind: "message", message: { text: "newest" } });
+    expect(harness.removeFile).not.toHaveBeenCalled();
   });
-
-  it("clears a removed pending task draft and includes its editor-only files", async () => {
-    const message = queuedMessage({
-      environmentId: "environment-1",
-      messageId: "message-pending",
-      fileUri: "file:///documents/t3-composer-attachments/queued.pdf",
-      creation: true,
+  it.each(["scoped", "legacy"] as const)(
+    "retains editor-only files and %s drafts on explicit discard",
+    async (kind) => {
+      const row = await fixture().admit(message(true));
+      const key = kind === "scoped" ? pendingTaskDraftKey(row) : `pending-task:${row.messageId}`;
+      const edited = {
+        text: "editor-only",
+        attachments: [
+          {
+            id: "editor",
+            type: "file" as const,
+            name: "editor.txt",
+            mimeType: "text/plain",
+            sizeBytes: 1,
+            fileUri: "file:///documents/editor-only.txt",
+          },
+        ],
+      };
+      drafts.setComposerDraftText(key, edited.text);
+      drafts.replaceComposerDraftAttachments(key, edited.attachments);
+      await drafts.flushComposerDrafts();
+      await expect(removeThreadOutboxMessage(row)).resolves.toBe(false);
+      expect(latest(row)).toMatchObject({ kind: "retired", retainedMessage: { text: row.text } });
+      expect(drafts.getComposerDraftSnapshot(key).text).toBe("editor-only");
+      expect(drafts.getComposerDraftSnapshot(key).attachments).toEqual(edited.attachments);
+      expect(harness.removeFile).not.toHaveBeenCalled();
+    },
+  );
+  it("releases a creation without any editor draft after discard", async () => {
+    const row = await fixture().admit(message(true));
+    await expect(removeThreadOutboxMessage(row)).resolves.toBe(true);
+    expect(latest(row)).not.toHaveProperty("retainedMessage");
+  });
+  it("does not release another editor's independent lease", async () => {
+    const row = await fixture().admit(message(true));
+    const one = holdEditingQueuedMessage(row);
+    const two = holdEditingQueuedMessage(row);
+    one?.();
+    await expect(removeThreadOutboxMessage(row)).resolves.toBe(false);
+    expect(latest(row)).toHaveProperty("retainedMessage");
+    two?.();
+  });
+  it("preserves other environments and raw-ID siblings during scoped discard", async () => {
+    const row = await fixture().admit(message());
+    const other = await fixture().admit({
+      ...message(),
+      environmentId: EnvironmentId.make("other"),
     });
-    const editorOnlyFile = {
-      id: "file-editor-only",
-      type: "file" as const,
-      name: "editor-only.pdf",
-      mimeType: "application/pdf",
-      sizeBytes: 84,
-      fileUri: "file:///documents/t3-composer-attachments/editor-only.pdf",
-    };
-    const draftKey = `pending-task:${message.messageId}`;
-    appAtomRegistry.set(composerDraftsAtom, {
-      [draftKey]: { text: "edited", attachments: [editorOnlyFile] },
-    });
-    await harness.manager.enqueue(message);
-
-    await expect(removeThreadOutboxMessage(message)).resolves.toBe(true);
-
-    expect(harness.waitForDrafts).toHaveBeenCalledOnce();
-    expect(harness.clearDraft).toHaveBeenCalledExactlyOnceWith(draftKey, {
-      deferAttachmentCleanup: true,
-    });
-    expect(harness.flushDrafts).toHaveBeenCalledOnce();
-    expect(harness.cleanup).toHaveBeenCalledExactlyOnceWith([
-      ...message.attachments,
-      editorOnlyFile,
-    ]);
-    expect(harness.flushDrafts.mock.invocationCallOrder[0]).toBeLessThan(
-      harness.cleanup.mock.invocationCallOrder[0]!,
+    await removeThreadOutboxMessage(row);
+    expect(latest(other)).toMatchObject({ kind: "message", delivery: { state: "ready" } });
+  });
+  it("retains pending drafts even when their persistence is unavailable", async () => {
+    const row = await fixture().admit(message(true));
+    const key = pendingTaskDraftKey(row);
+    drafts.setComposerDraftText(key, "editor work");
+    harness.draftFile.error = new Error("draft unavailable");
+    await expect(removeThreadOutboxMessage(row)).resolves.toBe(false);
+    expect(drafts.getComposerDraftSnapshot(key).text).toBe("editor work");
+    expect(latest(row)).toHaveProperty("retainedMessage");
+    expect(harness.removeFile).not.toHaveBeenCalled();
+  });
+});
+describe("durable draft transfer", () => {
+  it("retains a distinct original snapshot after transferring the newest edit", async () => {
+    const row = await fixture().admit(message());
+    await fixture().manager.authority.claimForDelivery(
+      fixture().record(row),
+      {
+        environmentId: row.environmentId,
+        command: {
+          type: "thread.turn.start",
+          commandId: row.commandId,
+          threadId: row.threadId,
+          message: { messageId: row.messageId, role: "user", text: row.text, attachments: [] },
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          createdAt: row.createdAt,
+        },
+      },
+      () => true,
     );
+    const edited = await fixture().edit({ ...row, text: "newest edit" }, latest(row));
+    const projection = edited === null ? null : fixture().manager.messageFor(edited);
+    if (projection === null) throw new Error("Expected edited retained row");
+    await expect(editPendingThreadMessage(projection)).resolves.toBe(false);
+    expect(drafts.getComposerDraftSnapshot("environment:thread").text).toBe("");
+    // A separately authorized durable destination still cannot release the
+    // distinct original snapshot. This is the production release boundary.
+    await drafts.restoreComposerDraftSnapshot("environment:thread", {
+      text: projection.text,
+      attachments: projection.attachments,
+    });
+    const retired = await retireTransferredMessage(latest(row), () => true);
+    if (retired === null) throw new Error("Expected explicit transfer retirement");
+    await expect(releaseTransferredMessage(retired, projection, () => true)).resolves.toBe(false);
+    expect(latest(row)).toMatchObject({
+      kind: "retired",
+      reason: "draft-transfer",
+      retainedMessage: { text: "newest edit" },
+      original: { localSnapshot: { text: row.text, attachments: row.attachments } },
+    });
+    expect(drafts.getComposerDraftSnapshot("environment:thread").text).toBe("newest edit");
+    expect(harness.removeFile).not.toHaveBeenCalled();
   });
 
-  it("does not flush composer drafts when a removed creation has no editor draft", async () => {
-    const message = queuedMessage({
-      environmentId: "environment-1",
-      messageId: "message-without-editor-draft",
-      fileUri: "file:///documents/t3-composer-attachments/queued.pdf",
-      creation: true,
-    });
-    await harness.manager.enqueue(message);
-
-    await expect(removeThreadOutboxMessage(message)).resolves.toBe(true);
-
-    expect(harness.waitForDrafts).toHaveBeenCalledOnce();
-    expect(harness.clearDraft).not.toHaveBeenCalled();
-    expect(harness.flushDrafts).not.toHaveBeenCalled();
-    expect(harness.cleanup).toHaveBeenCalledExactlyOnceWith(message.attachments);
-  });
-
-  it("releases only the cleared environment's queued attachment files", async () => {
-    const cleared = queuedMessage({
-      environmentId: "environment-1",
-      messageId: "message-cleared",
-      fileUri: "file:///documents/t3-composer-attachments/cleared.pdf",
-    });
-    const kept = queuedMessage({
-      environmentId: "environment-2",
-      messageId: "message-kept",
-      fileUri: "file:///documents/t3-composer-attachments/kept.pdf",
-    });
-    await harness.manager.enqueue(cleared);
-    await harness.manager.enqueue(kept);
-
-    await clearThreadOutboxEnvironment(cleared.environmentId);
-
-    expect(harness.cleanup).toHaveBeenCalledExactlyOnceWith(cleared.attachments);
-    const remaining = Object.values(
-      appAtomRegistry.get(harness.manager.queuedMessagesByThreadKeyAtom),
-    ).flat();
-    expect(remaining.map((message) => message.messageId)).toEqual([kept.messageId]);
-  });
-
-  it("clears only removed pending drafts and keeps drafts for live messages", async () => {
-    const cleared = queuedMessage({
-      environmentId: "environment-1",
-      messageId: "message-cleared-pending",
-      fileUri: "file:///documents/t3-composer-attachments/cleared-pending.pdf",
-      creation: true,
-    });
-    const replaced = queuedMessage({
-      environmentId: "environment-1",
-      messageId: "message-replaced-pending",
-      fileUri: "file:///documents/t3-composer-attachments/replaced-pending.pdf",
-      creation: true,
-    });
-    const kept = queuedMessage({
-      environmentId: "environment-2",
-      messageId: "message-kept-pending",
-      fileUri: "file:///documents/t3-composer-attachments/kept-pending.pdf",
-      creation: true,
-    });
-    const replacement = { ...replaced, text: "replacement queued while drafts hydrate" };
-    const editorOnlyFile = {
-      id: "file-cleared-editor",
-      type: "file" as const,
-      name: "cleared-editor.pdf",
-      mimeType: "application/pdf",
-      sizeBytes: 84,
-      fileUri: "file:///documents/t3-composer-attachments/cleared-editor.pdf",
-    };
-    const hydrationStarted = Promise.withResolvers<void>();
-    const hydrationBarrier = Promise.withResolvers<void>();
-    harness.waitForDrafts.mockImplementationOnce(async () => {
-      hydrationStarted.resolve();
-      await hydrationBarrier.promise;
-    });
-    const clearedDraftKey = `pending-task:${cleared.messageId}`;
-    appAtomRegistry.set(composerDraftsAtom, {
-      [clearedDraftKey]: { text: "edited", attachments: [editorOnlyFile] },
-      [`pending-task:${replaced.messageId}`]: { text: "replacement", attachments: [] },
-      [`pending-task:${kept.messageId}`]: { text: "other environment", attachments: [] },
-    });
-    await Promise.all([
-      harness.manager.enqueue(cleared),
-      harness.manager.enqueue(replaced),
-      harness.manager.enqueue(kept),
-    ]);
-
-    const clearing = clearThreadOutboxEnvironment(cleared.environmentId);
-    await hydrationStarted.promise;
-    const replacing = harness.manager.enqueue(replacement);
-    hydrationBarrier.resolve();
-    await clearing;
-    await replacing;
-
-    expect(harness.clearDraft).toHaveBeenCalledExactlyOnceWith(clearedDraftKey, {
-      deferAttachmentCleanup: true,
-    });
-    expect(harness.cleanup).toHaveBeenCalledExactlyOnceWith([
-      ...cleared.attachments,
-      ...replaced.attachments,
-      editorOnlyFile,
-    ]);
-    const remaining = Object.values(
-      appAtomRegistry.get(harness.manager.queuedMessagesByThreadKeyAtom),
-    ).flat();
-    expect(remaining).toEqual(expect.arrayContaining([replacement, kept]));
-  });
-
-  it("keeps removal successful when pending draft persistence fails", async () => {
-    const message = queuedMessage({
-      environmentId: "environment-1",
-      messageId: "message-draft-flush-fails",
-      fileUri: "file:///documents/t3-composer-attachments/queued.pdf",
-      creation: true,
-    });
-    const flushError = new Error("composer storage unavailable");
-    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
-    harness.flushDrafts.mockRejectedValueOnce(flushError);
-    appAtomRegistry.set(composerDraftsAtom, {
-      [`pending-task:${message.messageId}`]: { text: "edited", attachments: [] },
-    });
-    await harness.manager.enqueue(message);
-
-    try {
-      await expect(removeThreadOutboxMessage(message)).resolves.toBe(true);
-
-      expect(harness.clearDraft).toHaveBeenCalledOnce();
-      expect(harness.cleanup).not.toHaveBeenCalled();
-      expect(warning).toHaveBeenCalledWith(
-        "[thread-outbox] failed to clean up removed pending task drafts",
-        flushError,
+  it("persists the destination before retiring and releasing the source", async () => {
+    const row = await fixture().admit(message());
+    fixture().gates.push(async (record) => {
+      expect(record).toMatchObject({ kind: "retired", reason: "draft-transfer" });
+      expect(JSON.parse(harness.draftFile.document).drafts["environment:thread"].text).toBe(
+        row.text,
       );
-      expect(appAtomRegistry.get(harness.manager.queuedMessagesByThreadKeyAtom)).toEqual({});
-    } finally {
-      warning.mockRestore();
-    }
+    });
+    await expect(editPendingThreadMessage(row)).resolves.toBe(true);
+    expect(latest(row)).toMatchObject({ kind: "retired", reason: "draft-transfer" });
+    expect(latest(row)).not.toHaveProperty("retainedMessage");
+  });
+  it("retains the source and newest draft when destination persistence fails", async () => {
+    const row = await fixture().admit(message());
+    harness.draftFile.error = new Error("disk full");
+    await expect(editPendingThreadMessage(row)).rejects.toThrow();
+    expect(latest(row)).toMatchObject({ kind: "message", message: { text: row.text } });
+    expect(harness.removeFile).not.toHaveBeenCalled();
+  });
+  it("retains the latest source when another edit wins during destination persistence", async () => {
+    const row = await fixture().admit(message());
+    const entered = Promise.withResolvers<void>();
+    const barrier = Promise.withResolvers<void>();
+    const flush = drafts.flushComposerDrafts;
+    vi.spyOn(drafts, "flushComposerDrafts").mockImplementationOnce(async () => {
+      await flush();
+      entered.resolve();
+      await barrier.promise;
+    });
+    const transfer = editPendingThreadMessage(row);
+    await entered.promise;
+    await fixture().edit({ ...row, text: "newest" }, fixture().record(row));
+    barrier.resolve();
+    await expect(transfer).resolves.toBe(false);
+    expect(latest(row)).toMatchObject({ kind: "message", message: { text: "newest" } });
   });
 });

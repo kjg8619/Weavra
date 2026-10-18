@@ -38,7 +38,7 @@ vi.mock("../state/use-atom-query-runner", () => ({ useAtomQueryRunner: () => vi.
 vi.mock("../state/use-atom-command", () => ({ useAtomCommand: () => vi.fn() }));
 vi.mock("../state/session", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../state/session")>()),
-  usePreparedConnection: () => ({ _tag: "Loading" }),
+  usePreparedConnection: () => ({ _tag: "불러오는 중" }),
 }));
 vi.mock("../state/entities", () => ({
   readThreadShell: () => null,
@@ -223,7 +223,7 @@ describe("ChatMarkdown streaming", () => {
       const mounted = renderer!;
       const codeBlock = mounted.root.findByProps({ "data-language": "text" });
       const initialWrap = codeBlock.props["data-wrap"] === "true";
-      const wrap = codeButton(mounted, initialWrap ? "Disable line wrap" : "Wrap lines");
+      const wrap = codeButton(mounted, initialWrap ? "줄바꿈 끄기" : "줄바꿈");
       await act(async () => {
         wrap.onClick?.({} as Parameters<NonNullable<typeof wrap.onClick>>[0]);
       });
@@ -274,8 +274,8 @@ describe("ChatMarkdown streaming", () => {
       const mounted = renderer!;
       const codeBlock = mounted.root.findByProps({ "data-language": "text" });
       const initialWrap = codeBlock.props["data-wrap"] === "true";
-      const wrap = codeButton(mounted, initialWrap ? "Disable line wrap" : "Wrap lines");
-      const copy = codeButton(mounted, "Copy code");
+      const wrap = codeButton(mounted, initialWrap ? "줄바꿈 끄기" : "줄바꿈");
+      const copy = codeButton(mounted, "코드 복사");
       await act(async () => {
         wrap.onClick?.({} as Parameters<NonNullable<typeof wrap.onClick>>[0]);
         copy.onClick?.({} as Parameters<NonNullable<typeof copy.onClick>>[0]);
@@ -313,7 +313,7 @@ describe("ChatMarkdown streaming", () => {
           />,
         );
       });
-      const copyUpdated = codeButton(mounted, "Copied");
+      const copyUpdated = codeButton(mounted, "복사했어요");
       await act(async () => {
         copyUpdated.onClick?.({} as Parameters<NonNullable<typeof copyUpdated.onClick>>[0]);
       });
@@ -644,7 +644,7 @@ describe("ChatMarkdown artifact-template cards", () => {
     expect(html).toContain('data-skill-name="artifact-template-hello-world"');
     expect(html).toContain("Hello World");
     expect(html).toContain("Document template");
-    expect(html).toContain("Use template");
+    expect(html).toContain("템플릿 사용");
     expect(html).not.toContain("<p><div");
   });
 
@@ -654,7 +654,7 @@ describe("ChatMarkdown artifact-template cards", () => {
     );
 
     expect(html).toContain("chat-markdown-artifact-template");
-    expect(html).not.toContain("Use template");
+    expect(html).not.toContain("템플릿 사용");
   });
 
   it("leaves malformed and unfinished artifact-template directives literal", () => {

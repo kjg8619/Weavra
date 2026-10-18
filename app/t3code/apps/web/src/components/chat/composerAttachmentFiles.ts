@@ -120,11 +120,11 @@ export function fileAttachmentCapabilityBlockReason(
     return null;
   }
   if (!input.attachmentUploadsCapabilityKnown) {
-    return "Waiting for the server before file attachments can send";
+    return "파일 첨부를 보내려면 서버를 기다려야 해요";
   }
   const maxFileAttachmentBytes = fileAttachmentStagingLimit(input);
   if (maxFileAttachmentBytes === null) {
-    return "This server does not accept file attachments right now. Remove the files to send.";
+    return "이 서버는 지금 파일 첨부를 받지 않아요. 보내려면 파일을 빼 주세요.";
   }
   const oversizedFile = input.files.find((file) => file.sizeBytes > maxFileAttachmentBytes);
   if (oversizedFile) {

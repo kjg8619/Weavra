@@ -198,8 +198,9 @@ to resend confirmation.
 interruption, cancellation or failed checks. Even canonical COMPLETED means
 task checks complete; original issue verification additionally needs the exact
 reviewed symptom binding, matching fresh final-revision registration/diff
-evidence, MET criterion and independent review. No resolution badge is
-implemented by this increment.
+evidence, MET criterion and independent review. This initial contract increment
+did not implement a resolution badge; the current task-result UI evaluates those
+conditions before displaying original-issue verification.
 
 ## Bound Runtime execution (task 2)
 
@@ -296,7 +297,8 @@ Configuration and canonical state are fenced before and after collection; a
 change during collection returns an error rather than an identity from mixed
 generations. The App adapter additionally requires the returned canonical cwd
 and repository root to equal its server-resolved trusted root. The task
-coordinator and UI remain outside this prerequisite.
+coordinator and UI were outside this initial prerequisite; the completed
+controlled-chat integration consumes this checkout identity.
 
 Source references are checked against Policy, protected paths and verifier
 oracle restrictions before bounded anchored reads. Host compares the supplied

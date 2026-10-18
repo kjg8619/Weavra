@@ -29,6 +29,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { cn } from "../../lib/cn";
 import { EmptyState } from "../../components/EmptyState";
+import { RetainedInventoryNotice } from "../threads/RetainedWorkNotice";
 import { MaterialFloatingActionButton } from "../../components/MaterialFloatingActionButton";
 import type { WorkspaceEnvironment, WorkspaceState } from "../../state/workspaceModel";
 import type { SavedRemoteConnection } from "../../lib/connection";
@@ -1118,6 +1119,7 @@ export function HomeScreen(props: HomeScreenProps) {
           }}
         >
           <View className="w-full max-w-[430px]">
+            <RetainedInventoryNotice />
             <EmptyState
               title={emptyState.title}
               detail={emptyState.detail}
@@ -1231,7 +1233,12 @@ export function HomeScreen(props: HomeScreenProps) {
               renderItem={renderV2Item}
               keyExtractor={v2KeyExtractor}
               extraData={v2ExtraData}
-              ListHeaderComponent={v2ListHeader}
+              ListHeaderComponent={
+                <>
+                  <RetainedInventoryNotice />
+                  {v2ListHeader}
+                </>
+              }
               ListFooterComponent={
                 settledShelfExpanded && threadListV2Layout.hiddenSettledCount > 0 ? (
                   <ThreadListV2ShowMoreRow
@@ -1287,7 +1294,12 @@ export function HomeScreen(props: HomeScreenProps) {
             drawDistance={500}
             estimatedItemSize={ESTIMATED_THREAD_ROW_HEIGHT}
             extraData={extraData}
-            ListHeaderComponent={listHeader}
+            ListHeaderComponent={
+              <>
+                <RetainedInventoryNotice />
+                {listHeader}
+              </>
+            }
             ListEmptyComponent={listEmpty}
             style={{ flex: 1 }}
             automaticallyAdjustsScrollIndicatorInsets={NATIVE_LIQUID_GLASS_SUPPORTED}

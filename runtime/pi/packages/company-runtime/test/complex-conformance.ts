@@ -164,7 +164,7 @@ const FAILURE_CODES = [
 const CHECK_GATES = ["NOT_RUN", "RUNNING", "PASS", "FAIL", "UNAVAILABLE", "STALE"];
 const REVIEW_GATES = ["NOT_RUN", "RUNNING", "PASS", "REVISE", "BLOCK", "UNAVAILABLE", "STALE"];
 const FRESHNESS = ["NONE", "CURRENT", "STALE", "UNKNOWN"];
-const GRAPH_KINDS = ["preflight", "agent", "verification", "review", "completion", "approval", "mutation"];
+const GRAPH_KINDS = ["preflight", "agent", "verification", "review", "completion", "approval", "mutation", "task"];
 const GRAPH_STATUSES = [
 	"pending",
 	"running",
@@ -727,7 +727,8 @@ function graphShapeIssues(value: unknown, path: string): Issues {
 	if (!Array.isArray(value.nodes) || !Array.isArray(value.edges)) return [...issues, `${path}: nodes/edges arrays`];
 	value.nodes.forEach((node, index) => {
 		const at = `${path}.nodes[${index}]`;
-		if (!closed(node, at, ["id", "kind", "status"], issues, ["stepId", "attempt", "role", "parentId"])) return;
+		if (!closed(node, at, ["id", "kind", "status"], issues, ["stepId", "attempt", "role", "parentId", "wave"]))
+			return;
 		rule(issues, matches(node.id, IDENTIFIER), `${at}.id`, "not an identifier");
 		rule(issues, oneOf(node.kind, GRAPH_KINDS), `${at}.kind`, "unknown kind");
 		rule(issues, oneOf(node.status, GRAPH_STATUSES), `${at}.status`, "unknown status");
@@ -736,6 +737,7 @@ function graphShapeIssues(value: unknown, path: string): Issues {
 		if (Object.hasOwn(node, "role"))
 			rule(issues, oneOf(node.role, ["Executor", "Developer", "Reviewer", "Lead"]), `${at}.role`, "unknown role");
 		if (Object.hasOwn(node, "parentId")) rule(issues, matches(node.parentId, IDENTIFIER), `${at}.parentId`, "id");
+		if (Object.hasOwn(node, "wave")) rule(issues, isCounter(node.wave), `${at}.wave`, "counter");
 	});
 	value.edges.forEach((edge, index) => {
 		const at = `${path}.edges[${index}]`;

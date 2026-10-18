@@ -192,6 +192,33 @@ const snapshotResponse = {
     },
   },
 } as const satisfies WeavraControlResponse;
+const candidatesRequest = {
+  protocolVersion: 1,
+  id: "facts-candidates:1",
+  ownerId: "owner-1",
+  expectedProjectRevision: 8,
+  type: "facts.candidates",
+} as const satisfies WeavraControlRequest;
+const candidatesResponse = {
+  ...helloResponse,
+  id: candidatesRequest.id,
+  command: candidatesRequest.type,
+  projectRevision: 8,
+  data: {
+    kind: "fact-candidates",
+    projectRevision: 8,
+    candidates: [
+      {
+        id: `sha256:${"c".repeat(64)}`,
+        source: { runId: "run-1", kind: "check_failed" },
+        statement:
+          "검사 unit가 실패로 기록되었으므로 작업을 마치기 전에 이 검사를 통과시켜야 한다.",
+        evidenceRef: "check:run-1:unit",
+        sourceRef: `run:run-1#sha256:${"c".repeat(64)}`,
+      },
+    ],
+  },
+} as const satisfies WeavraControlResponse;
 const stderrMarker = "FAKE_SECRET_STDERR_NOT_FOR_CLIENT";
 const source = `
 import { createInterface } from 'node:readline';
@@ -211,6 +238,7 @@ const responses = ${JSON.stringify({
   "control.snapshot": snapshotResponse,
   "workflow.checkout": checkoutResponse,
   "workflow.prepare": prepareResponse,
+  "facts.candidates": candidatesResponse,
 })};
 for await (const line of createInterface({input:process.stdin})) {
  appendFileSync('request-lines', line+'\\n');
@@ -286,6 +314,23 @@ it.effect("uses exact control argv, split JSONL replies and owner-correlated req
       failure: { cause: { code: "ESRCH" } },
     });
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect(
+  "sends facts.candidates as the Runtime's read-only envelope, without owner or revision",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "weavra-control-candidates-" });
+      const executable = writeFakeCli({ directory: cwd, name: "controller", source });
+      yield* Effect.gen(function* () {
+        const bridge = yield* openControlTransport(executable, cwd, env);
+        expect(yield* bridge.exchange(candidatesRequest)).toEqual(candidatesResponse);
+        expect(yield* fs.readFileString(`${cwd}/request-lines`)).toBe(
+          requestLines({ protocolVersion: 1, id: candidatesRequest.id, type: "facts.candidates" }),
+        );
+      }).pipe(Effect.scoped);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
 it.live("accepts a real child reply before the stdin write continuation returns", () =>

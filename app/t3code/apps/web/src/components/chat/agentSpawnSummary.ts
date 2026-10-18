@@ -26,38 +26,36 @@ export function deriveAgentSpawnSummary({
   const live =
     coordinatorStatus !== undefined ? !isTerminalSubagentStatus(coordinatorStatus) : working > 0;
   const subjects = [
-    individuals > 0 ? `${individuals} subagent${individuals === 1 ? "" : "s"}` : null,
-    batches > 0
-      ? `${batches} ${individuals > 0 ? "" : "subagent "}batch${batches === 1 ? "" : "es"}`
-      : null,
+    individuals > 0 ? `하위 에이전트 ${individuals}개` : null,
+    batches > 0 ? `${individuals > 0 ? "" : "하위 에이전트 "}배치 ${batches}개` : null,
   ]
     .filter(Boolean)
-    .join(" and ");
-  const lead = `${batches > 0 ? "Launched" : live ? "Kicked off" : "Ran"} ${subjects || "subagents"}`;
+    .join(", ");
+  const lead = `${subjects || "하위 에이전트"} ${batches > 0 ? "실행" : live ? "시작" : "실행 완료"}`;
 
   const status = live
     ? working > 0
-      ? `${working} working`
-      : "working"
+      ? `${working}개 작업 중`
+      : "작업 중"
     : coordinatorStatus === "failed"
-      ? "Workflow failed"
+      ? "워크플로 실패"
       : coordinatorStatus === "cancelled" || coordinatorStatus === "interrupted"
-        ? "Workflow stopped"
+        ? "워크플로 중지됨"
         : failed > 0
-          ? `${failed} failed`
+          ? `${failed}개 실패`
           : stopped > 0
-            ? `${stopped} stopped`
+            ? `${stopped}개 중지됨`
             : idle > 0
-              ? `${idle} idle`
+              ? `${idle}개 대기`
               : coordinatorStatus !== "completed" &&
                   (agents.length === 0 || agents.length < agentCount)
-                ? "Status unavailable"
-                : "✓ completed";
+                ? "상태를 확인할 수 없어요"
+                : "✓ 완료";
   const tone = live
     ? "working"
     : failed > 0 || coordinatorStatus === "failed"
       ? "failed"
-      : status === "✓ completed"
+      : status === "✓ 완료"
         ? "completed"
         : "inactive";
   return { live, lead, status, tone };

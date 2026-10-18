@@ -467,13 +467,13 @@ export function buildMultiSelectThreadContextMenuItems(input: {
   hasRunningThread: boolean;
 }): readonly ContextMenuItem<"mark-unread" | "archive" | "delete">[] {
   return [
-    { id: "mark-unread", label: `Mark unread (${input.count})` },
+    { id: "mark-unread", label: `읽지 않음으로 표시 (${input.count})` },
     {
       id: "archive",
-      label: `Archive (${input.count})`,
+      label: `보관 (${input.count})`,
       disabled: input.hasRunningThread,
     },
-    { id: "delete", label: `Delete (${input.count})`, destructive: true },
+    { id: "delete", label: `삭제 (${input.count})`, destructive: true },
   ];
 }
 
@@ -485,13 +485,13 @@ export function buildBulkTitleRegenerationContextMenuItem(input: {
   if (input.actionableCount === 0) {
     return {
       id: "regenerate-title",
-      label: `Regenerating… (${input.supportedCount})`,
+      label: `제목 다시 만드는 중… (${input.supportedCount})`,
       disabled: true,
     };
   }
   return {
     id: "regenerate-title",
-    label: `Regenerate titles (${input.actionableCount})`,
+    label: `제목 다시 만들기 (${input.actionableCount})`,
   };
 }
 
@@ -504,18 +504,11 @@ export function buildBulkUnpinContextMenuItem(input: {
   pinnedCount: number;
 }): ContextMenuItem<"unpin"> | null {
   if (input.pinnedCount === 0) return null;
-  return { id: "unpin", label: `Unpin (${input.pinnedCount})` };
+  return { id: "unpin", label: `고정 해제 (${input.pinnedCount})` };
 }
 
 export interface ThreadStatusPill {
-  label:
-    | "Working"
-    | "Monitoring"
-    | "Connecting"
-    | "Completed"
-    | "Pending Approval"
-    | "Awaiting Input"
-    | "Plan Ready";
+  label: "작업 중" | "지켜보는 중" | "연결 중" | "완료" | "승인 대기" | "입력 대기" | "계획 준비됨";
   colorClass: string;
   dotClass: string;
   pulse: boolean;
@@ -525,13 +518,13 @@ export interface ThreadStatusPill {
 // then active work, then the actionable plan prompt, then passive
 // monitoring. A Monitoring sibling must never hide a Plan Ready thread.
 const THREAD_STATUS_PRIORITY: Record<ThreadStatusPill["label"], number> = {
-  "Pending Approval": 6,
-  "Awaiting Input": 5,
-  Working: 4,
-  Connecting: 4,
-  "Plan Ready": 3,
-  Monitoring: 2,
-  Completed: 1,
+  "승인 대기": 6,
+  "입력 대기": 5,
+  "작업 중": 4,
+  "연결 중": 4,
+  "계획 준비됨": 3,
+  "지켜보는 중": 2,
+  완료: 1,
 };
 
 type ThreadStatusInput = Pick<
@@ -1014,7 +1007,7 @@ export function resolveThreadStatusPill(input: {
 
   if (thread.hasPendingApprovals) {
     return {
-      label: "Pending Approval",
+      label: "승인 대기",
       colorClass: "text-amber-600 dark:text-amber-300/90",
       dotClass: "bg-amber-500 dark:bg-amber-300/90",
       pulse: false,
@@ -1023,7 +1016,7 @@ export function resolveThreadStatusPill(input: {
 
   if (thread.hasPendingUserInput) {
     return {
-      label: "Awaiting Input",
+      label: "입력 대기",
       colorClass: "text-indigo-600 dark:text-indigo-300/90",
       dotClass: "bg-indigo-500 dark:bg-indigo-300/90",
       pulse: false,
@@ -1032,7 +1025,7 @@ export function resolveThreadStatusPill(input: {
 
   if (thread.session?.status === "running") {
     return {
-      label: "Working",
+      label: "작업 중",
       colorClass: "text-sky-600 dark:text-sky-300/80",
       dotClass: "bg-sky-500 dark:bg-sky-300/80",
       pulse: true,
@@ -1041,7 +1034,7 @@ export function resolveThreadStatusPill(input: {
 
   if (thread.session?.status === "starting") {
     return {
-      label: "Connecting",
+      label: "연결 중",
       colorClass: "text-sky-600 dark:text-sky-300/80",
       dotClass: "bg-sky-500 dark:bg-sky-300/80",
       pulse: true,
@@ -1057,7 +1050,7 @@ export function resolveThreadStatusPill(input: {
     thread.hasActionableProposedPlan;
   if (hasPlanReadyPrompt) {
     return {
-      label: "Plan Ready",
+      label: "계획 준비됨",
       colorClass: "text-violet-600 dark:text-violet-300/90",
       dotClass: "bg-violet-500 dark:bg-violet-300/90",
       pulse: false,
@@ -1070,7 +1063,7 @@ export function resolveThreadStatusPill(input: {
   // live work. Same recede treatment as Working per inbox-zero.
   if (thread.backgroundLiveness === "working") {
     return {
-      label: "Working",
+      label: "작업 중",
       colorClass: "text-sky-600 dark:text-sky-300/80",
       dotClass: "bg-sky-500 dark:bg-sky-300/80",
       pulse: true,
@@ -1079,7 +1072,7 @@ export function resolveThreadStatusPill(input: {
 
   if (thread.backgroundLiveness === "monitoring") {
     return {
-      label: "Monitoring",
+      label: "지켜보는 중",
       colorClass: "text-sky-600 dark:text-sky-300/80",
       dotClass: "bg-sky-500 dark:bg-sky-300/80",
       pulse: false,
@@ -1088,7 +1081,7 @@ export function resolveThreadStatusPill(input: {
 
   if (hasUnseenCompletion(thread)) {
     return {
-      label: "Completed",
+      label: "완료",
       colorClass: "text-emerald-600 dark:text-emerald-300/90",
       dotClass: "bg-emerald-500 dark:bg-emerald-300/90",
       pulse: false,

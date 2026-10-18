@@ -11,6 +11,7 @@ import {
   verifyPersistedAttachmentUpload,
   type PersistedAttachmentVerification,
 } from "@t3tools/client-runtime/state/attachments";
+import { executeAtomQuery, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { create } from "zustand";
 
 import {
@@ -19,12 +20,14 @@ import {
   type ComposerFileAttachment,
   type ComposerImageAttachment,
   type ComposerThreadTarget,
+  type RejectedTurnDraft,
 } from "../composerDraftStore";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { assetEnvironment } from "../state/assets";
 import { attachmentEnvironment } from "../state/attachments";
 import { readPreparedConnection } from "../state/session";
 import type { AttachmentUploadState, ReadyAttachmentUpload } from "./attachmentUploadState";
+import { randomUUID } from "./utils";
 
 const MAX_UPLOADS_PER_ENVIRONMENT = 3;
 const UPLOAD_TIMEOUT_MS = 5 * 60_000;
@@ -545,6 +548,85 @@ export function verifyStashedAttachmentUpload(input: {
 
 export async function awaitAttachmentUploads(imageIds: ReadonlyArray<string>): Promise<void> {
   await Promise.all(imageIds.map((imageId) => jobsByImageId.get(imageId)?.settled));
+}
+
+/** Called only by an explicit Send; recovered references never enter mount effects. */
+export async function prepareRecoveredTurnAttachmentsForSend(input: {
+  environmentId: EnvironmentId;
+  attachments: RejectedTurnDraft["attachments"];
+  isCurrent: () => boolean;
+}): Promise<{ attachments: ChatAttachment[]; release: () => void }> {
+  const checkCurrent = () => {
+    if (!input.isCurrent()) throw new Error("The recovered draft or conversation changed.");
+  };
+  checkCurrent();
+  const connection = readPreparedConnection(input.environmentId);
+  if (!connection) throw new Error("The environment is not connected.");
+  // Finish all downloads before starting any upload. A missing source never
+  // leaves a partially prepared transport message.
+  const files = await Promise.all(
+    input.attachments.map(async (attachment) => {
+      const result = await executeAtomQuery(
+        appAtomRegistry,
+        assetEnvironment.createUrl({
+          environmentId: input.environmentId,
+          input: {
+            resource: {
+              _tag: "attachment",
+              attachmentId: attachment.id,
+              fileName: attachment.name,
+              mimeType: attachment.mimeType,
+            },
+          },
+        }),
+        { reportFailure: false, reportDefect: false, refresh: true },
+      );
+      if (result._tag === "Failure") throw squashAtomCommandFailure(result);
+      checkCurrent();
+      const url = resolveAssetUrl(connection.httpBaseUrl, result.value.relativeUrl);
+      if (url === null) throw new Error("The environment returned an invalid attachment URL.");
+      const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) throw new Error("A recovered attachment is unavailable.");
+      const blob = await response.blob();
+      if (blob.size !== attachment.sizeBytes) {
+        throw new Error("Recovered attachment bytes do not match their recorded size.");
+      }
+      checkCurrent();
+      return new File([blob], attachment.name, { type: attachment.mimeType });
+    }),
+  );
+  const prepared: Array<ComposerImageAttachment | ComposerFileAttachment> = input.attachments.map(
+    (attachment, index) =>
+      attachment.type === "image"
+        ? {
+            ...attachment,
+            id: randomUUID(),
+            file: files[index]!,
+            previewUrl: "",
+          }
+        : { ...attachment, id: randomUUID(), file: files[index]! },
+  );
+  const release = () => releaseDraftAttachments(prepared);
+  try {
+    checkCurrent();
+    // Use the existing bounded queue and ordinary pending-upload mechanism.
+    // No draftTarget is supplied: fresh transport IDs must not replace source refs.
+    for (const image of prepared) {
+      checkCurrent();
+      startAttachmentUpload({ environmentId: input.environmentId, image });
+    }
+    await awaitAttachmentUploads(prepared.map((attachment) => attachment.id));
+    checkCurrent();
+    const attachments = getUploadedAttachments({
+      environmentId: input.environmentId,
+      images: prepared,
+    });
+    if (attachments === null) throw new Error("Recovered attachments did not finish uploading.");
+    return { attachments, release };
+  } catch (error) {
+    release();
+    throw error;
+  }
 }
 
 export function getUploadedAttachments(input: {

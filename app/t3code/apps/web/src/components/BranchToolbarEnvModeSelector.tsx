@@ -84,7 +84,7 @@ export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSe
         </TooltipTrigger>
         <TooltipPopup>
           {forceNewWorktree
-            ? "Each model starts in its own worktree."
+            ? "모델마다 각자의 worktree에서 시작해요."
             : resolveLockedWorkspaceLabel(activeWorktreePath)}
         </TooltipPopup>
       </Tooltip>
@@ -111,7 +111,7 @@ export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSe
               variant="ghost"
               size="xs"
               className="min-w-0 shrink font-normal text-xs!"
-              aria-label="Workspace"
+              aria-label="작업 공간"
               data-composer-shortcut="composer.workspace"
               data-composer-context-control
             />
@@ -144,7 +144,7 @@ export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSe
       </Tooltip>
       <SelectPopup alignItemWithTrigger={false} {...composerFloatingLayerProps}>
         <SelectGroup>
-          <SelectGroupLabel>Workspace</SelectGroupLabel>
+          <SelectGroupLabel>작업 공간</SelectGroupLabel>
           <SelectItem value="local">
             <span className="inline-flex items-center gap-1.5">
               {activeWorktreePath ? (

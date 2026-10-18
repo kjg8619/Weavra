@@ -76,7 +76,7 @@ const sourceReference = Schema.Struct({
     ),
   ),
 });
-const observation = Schema.Struct({
+export const WeavraTaskFinding = Schema.Struct({
   text: text(500),
   provenance: Schema.Literals(["MODEL", "USER", "HOST_OBSERVATION"]),
   reference: Schema.Union([
@@ -95,7 +95,7 @@ export const WeavraAnalysisContext = Schema.Struct({
   authority: Schema.Literal("ADVISORY_ONLY"),
   reviewedAt: counter,
   symptom: text(1000),
-  observations: Schema.Array(observation).check(Schema.isMaxLength(8)),
+  observations: Schema.Array(WeavraTaskFinding).check(Schema.isMaxLength(8)),
   candidateCause: Schema.NullOr(
     Schema.Struct({ kind: Schema.Literal("HYPOTHESIS"), text: text(1000) }),
   ),
@@ -239,6 +239,38 @@ export const WeavraTaskReceipt = Schema.Union([
   ),
 ]).pipe(closed);
 export type WeavraTaskReceipt = typeof WeavraTaskReceipt.Type;
+
+export const WeavraTaskFailureSummary = Schema.Struct({
+  code: Schema.Literals([
+    "RUN_FAILED",
+    "CHECK_FAILED",
+    "RUN_BLOCKED",
+    "RUN_CANCELLED",
+    "RUN_INTERRUPTED",
+  ]),
+  nextAction: Schema.Literals([
+    "REVIEW_RUN_FAILURE",
+    "REVIEW_CHECK_FAILURE",
+    "REVIEW_BLOCKED_RUN",
+    "REVIEW_CANCELLED_RUN",
+    "REVIEW_INTERRUPTED_RUN",
+  ]),
+})
+  .check(
+    Schema.makeFilter((summary) =>
+      summary.code === "RUN_FAILED"
+        ? summary.nextAction === "REVIEW_RUN_FAILURE"
+        : summary.code === "CHECK_FAILED"
+          ? summary.nextAction === "REVIEW_CHECK_FAILURE"
+          : summary.code === "RUN_BLOCKED"
+            ? summary.nextAction === "REVIEW_BLOCKED_RUN"
+            : summary.code === "RUN_CANCELLED"
+              ? summary.nextAction === "REVIEW_CANCELLED_RUN"
+              : summary.nextAction === "REVIEW_INTERRUPTED_RUN",
+    ),
+  )
+  .pipe(closed);
+export type WeavraTaskFailureSummary = typeof WeavraTaskFailureSummary.Type;
 
 export const WeavraTaskPhase = Schema.Literals([
   "analysis",
@@ -395,6 +427,7 @@ export const WeavraTask = Schema.Struct({
   revision: positive,
   context: Schema.NullOr(WeavraAnalysisContext),
   execution: Schema.NullOr(WeavraTaskExecution),
+  failureSummary: Schema.optionalKey(WeavraTaskFailureSummary),
   ownership: Schema.Struct({ generation: positive, state: WeavraTaskOwnershipState }),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -406,6 +439,14 @@ export const WeavraTask = Schema.Struct({
         task.context?.observations.some(
           (item) => item.reference.kind === "message" && item.reference.threadId !== task.threadId,
         )
+      )
+        return false;
+      if (
+        task.failureSummary !== undefined &&
+        (task.execution?.receipt?.status !== "FOUND" ||
+          task.execution.receipt.run === null ||
+          task.execution.receipt.run.status === "COMPLETED" ||
+          task.execution.receipt.admission.cleanup !== "CONFIRMED")
       )
         return false;
       const binding = task.execution?.binding;

@@ -14,6 +14,8 @@ import {
   OrchestrationSession,
   OrchestrationThread,
   WORKTREE_SETUP_ACTIVITY_KIND,
+  decodeWorkspaceTurnStartRefusalPayload,
+  makeWorkspaceTurnStartRefusalIdentity,
 } from "@t3tools/contracts";
 import {
   legacyLinkedPullRequestOf,
@@ -24,6 +26,7 @@ import { compareDateTimeStrings } from "@t3tools/shared/dateTime";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as Predicate from "effect/Predicate";
+import * as Option from "effect/Option";
 
 import { toProjectorDecodeError, type OrchestrationProjectorDecodeError } from "./Errors.ts";
 import {
@@ -61,7 +64,11 @@ const MAX_THREAD_CHECKPOINTS = 500;
 
 // Async questions can stay open while the agent produces more activity.
 // Match the database snapshot's pending-question retention.
-function retainThreadActivities(activities: OrchestrationThread["activities"]) {
+function retainThreadActivities(
+  activities: OrchestrationThread["activities"],
+  threadId: ThreadId,
+  messages: OrchestrationThread["messages"],
+) {
   const recentStart = activities.length - 500;
   if (recentStart <= 0) return activities;
   const pending = new Map<string, OrchestrationThread["activities"][number]>();
@@ -76,10 +83,32 @@ function retainThreadActivities(activities: OrchestrationThread["activities"]) {
     }
   }
   const pendingActivities = new Set(pending.values());
+  const userMessageIds = new Set(
+    messages.filter((message) => message.role === "user").map((message) => message.id),
+  );
+  const refusalActivities = new Set(
+    activities.filter((activity) => {
+      if (
+        activity.kind !== "provider.turn.start.failed" ||
+        activity.tone !== "error" ||
+        activity.turnId !== null
+      ) {
+        return false;
+      }
+      const refusal = decodeWorkspaceTurnStartRefusalPayload(activity.payload);
+      return (
+        Option.isSome(refusal) &&
+        userMessageIds.has(refusal.value.requestId) &&
+        activity.id ===
+          makeWorkspaceTurnStartRefusalIdentity(threadId, refusal.value.requestId).activityId
+      );
+    }),
+  );
   return activities.filter(
     (activity, index) =>
       index >= recentStart ||
       pendingActivities.has(activity) ||
+      refusalActivities.has(activity) ||
       // The worktree setup record is upserted under one id for the thread's
       // whole life and is the only durable copy of a running setup; an async
       // setup script can outlast a chatty first turn.
@@ -833,6 +862,7 @@ export function projectEvent(
           ...nextBase,
           threads: updateThread(nextBase.threads, payload.threadId, {
             messages: cappedMessages,
+            activities: retainThreadActivities(thread.activities, thread.id, cappedMessages),
             updatedAt: event.occurredAt,
           }),
         };
@@ -1081,6 +1111,8 @@ export function projectEvent(
               ...thread.activities.filter((entry) => entry.id !== payload.activity.id),
               payload.activity,
             ].toSorted(compareThreadActivities),
+            thread.id,
+            thread.messages,
           );
 
           return {

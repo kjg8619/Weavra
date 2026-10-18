@@ -21,6 +21,8 @@ Weavra Desktop/Web/Host
 
 Production app modules do not import Runtime implementation source. The root cross-boundary validation scenario imports both sides solely to exercise their existing contracts. The duplicated schema/DTO definitions are deliberately retained; no shared protocol package or schema generation is introduced.
 
+Project onboarding uses the same trusted absolute launcher with fixed `project draft --json` or `project init --stdin --json` arguments. The operate-scoped App RPC accepts thread/project selectors and reviewed YAML, never launcher executable, cwd, argv or environment; the server resolves and binds the checkout and holds the existing workspace operation guard. Runtime alone validates and atomically publishes without replacement, then returns read-only project readiness. YAML check registrations are reviewed configuration, not caller authority over the launcher process.
+
 ## C08 remains bounded
 
 - Browser/Jev captures observations only. Saved candidates have `CANDIDATE_ONLY` authority.

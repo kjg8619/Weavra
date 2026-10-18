@@ -89,6 +89,7 @@ export function projectHostGraph(run: Run): HostGraphSummary {
 			...(node.attempt !== undefined ? { attempt: node.attempt } : {}),
 			...(node.role ? { role: node.role } : {}),
 			...(node.parentId ? { parentId: node.parentId } : {}),
+			...(node.wave !== undefined ? { wave: node.wave } : {}),
 		})),
 		edges: graph.edges.map((edge) => ({ from: edge.from, to: edge.to, kind: edge.kind })),
 	};

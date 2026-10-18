@@ -112,7 +112,7 @@ describe("resolveLinkPullRequestInput", () => {
   it("asks for a URL when a bare number has no project to resolve against", () => {
     expect(
       resolveLinkPullRequestInput({ reference: "12", project: null, hasProject: () => true }),
-    ).toMatchObject({ error: expect.stringContaining("full URL") });
+    ).toMatchObject({ error: expect.stringContaining("전체 URL") });
   });
 
   it("accepts a checkout command as a reference", () => {

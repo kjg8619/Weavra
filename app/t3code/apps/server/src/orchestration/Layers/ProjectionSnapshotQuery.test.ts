@@ -12,6 +12,8 @@ import {
   TurnId,
   ProviderInstanceId,
   OrchestrationMessageContext,
+  CommandId,
+  makeWorkspaceTurnStartRefusalIdentity,
 } from "@t3tools/contracts";
 import { assert, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -46,6 +48,7 @@ const encodeThreadLinkedPullRequest = Schema.encodeSync(
 const encodeMessageContext = Schema.encodeEffect(
   Schema.fromJsonString(OrchestrationMessageContext),
 );
+const encodeActivityPayloadJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
 it.effect("reads project shells without loading threads or resolving excluded projects", () => {
   const resolved: string[] = [];
@@ -2625,6 +2628,184 @@ projectionSnapshotLayer("ProjectionSnapshotQuery windowed thread detail", (it) =
     snapshot.thread.messages.map((message) => message.id).toSorted();
   const activityIds = (snapshot: { thread: { activities: ReadonlyArray<{ id: string }> } }) =>
     snapshot.thread.activities.map((activity) => activity.id).toSorted();
+
+  it.effect("retains each loaded message refusal beyond both page activity caps", () =>
+    Effect.gen(function* () {
+      yield* seedFanOutThread();
+      const sql = yield* SqlClient.SqlClient;
+      const query = yield* ProjectionSnapshotQuery;
+      const refusedIds = ["user-msg-1", "user-msg-4", "user-msg-straggler", "user-msg-5"];
+      const refusalIds = refusedIds.map(
+        (id) => makeWorkspaceTurnStartRefusalIdentity(threadW, asMessageId(id)).activityId,
+      );
+      for (const [index, requestId] of refusedIds.entries()) {
+        const identity = makeWorkspaceTurnStartRefusalIdentity(threadW, asMessageId(requestId));
+        const payload = {
+          version: 1,
+          source: "workspace-ownership",
+          requestId,
+          reason: "owned",
+          originCommandId: CommandId.make(`start-${requestId}`),
+          originSequence: index + 1,
+        };
+        yield* sql`
+          INSERT INTO projection_thread_activities
+            (activity_id, thread_id, turn_id, tone, kind, summary, payload_json, sequence, created_at)
+          VALUES (${identity.activityId}, ${threadW}, NULL, 'error', 'provider.turn.start.failed',
+            'Not started', ${encodeActivityPayloadJson(payload)}, ${index + 1},
+            '2026-02-28T00:00:00.000Z')
+        `;
+      }
+      for (const [page, at] of [
+        ["older", "2026-03-01T00:01:00.000Z"],
+        ["recent", "2026-03-01T00:04:00.000Z"],
+      ] as const) {
+        yield* sql`
+          WITH RECURSIVE rows(n) AS (
+            SELECT 1 UNION ALL SELECT n + 1 FROM rows WHERE n < 501
+          )
+          INSERT INTO projection_thread_activities
+            (activity_id, thread_id, turn_id, tone, kind, summary, payload_json, sequence, created_at)
+          SELECT ${page} || '-' || printf('%04d', n), ${threadW}, NULL, 'tool',
+            'tool.completed', 'Ran tool', '{}',
+            ${page === "older" ? 1000 : 2000} + n, ${at}
+          FROM rows
+        `;
+      }
+
+      const recent = Option.getOrThrow(
+        yield* query.getThreadDetailSnapshot(threadW, { turnLimit: 2 }),
+      );
+      const recentRefusals = recent.thread.activities.filter(
+        (activity) => activity.kind === "provider.turn.start.failed",
+      );
+      assert.deepEqual(
+        recentRefusals.map((activity) => activity.id).toSorted(),
+        refusalIds.slice(1).toSorted(),
+      );
+      assert.equal(recent.thread.activities.length, 503);
+      assert.equal(new Set(activityIds(recent)).size, recent.thread.activities.length);
+      assert.isFalse(recent.thread.messages.some((message) => message.id === "user-msg-1"));
+      const cursor = recent.page?.beforeCursor;
+      assert.isTrue(typeof cursor === "string");
+      if (typeof cursor !== "string") throw new Error("Missing older-page cursor");
+
+      const older = Option.getOrThrow(
+        yield* query.getThreadDetailSnapshot(threadW, { turnLimit: 2, beforeCursor: cursor }),
+      );
+      assert.deepEqual(
+        older.thread.activities
+          .filter((activity) => activity.kind === "provider.turn.start.failed")
+          .map((activity) => activity.id),
+        [refusalIds[0]],
+      );
+      assert.equal(older.thread.activities.length, 501);
+      assert.equal(new Set(activityIds(older)).size, older.thread.activities.length);
+      assert.isFalse(older.thread.messages.some((message) => message.id === "user-msg-5"));
+      assert.deepEqual(
+        yield* query.getThreadDetailSnapshot(threadW, { turnLimit: 2, beforeCursor: cursor }),
+        Option.some(older),
+      );
+
+      const raw = Option.getOrThrow(yield* query.getThreadDetailById(threadW));
+      assert.equal(raw.activities.length, 504);
+      assert.deepEqual(
+        raw.activities
+          .filter((activity) => activity.kind === "provider.turn.start.failed")
+          .map((activity) => activity.id)
+          .toSorted(),
+        refusalIds.toSorted(),
+      );
+      const filtered = Option.getOrThrow(
+        yield* query.getThreadDetailById(threadW, { activityKinds: ["tool.completed"] }),
+      );
+      assert.equal(filtered.activities.length, 500);
+      assert.isTrue(filtered.activities.every((activity) => activity.kind === "tool.completed"));
+      assert.deepEqual(
+        Option.getOrThrow(yield* query.getThreadDetailById(threadW, { activityKinds: [] }))
+          .activities,
+        [],
+      );
+    }),
+  );
+
+  it.effect("only supplements valid canonical refusals for this page's user messages", () =>
+    Effect.gen(function* () {
+      yield* seedFanOutThread();
+      const sql = yield* SqlClient.SqlClient;
+      const query = yield* ProjectionSnapshotQuery;
+      const validPayload = (requestId: string) => ({
+        version: 1,
+        source: "workspace-ownership",
+        requestId,
+        reason: "owned",
+        originCommandId: "start-original",
+        originSequence: 1,
+      });
+      const cases = [
+        { requestId: "bad-extra", payload: { ...validPayload("bad-extra"), detail: "/foreign" } },
+        { requestId: "bad-source", payload: { ...validPayload("bad-source"), source: "other" } },
+        { requestId: "bad-reason", payload: { ...validPayload("bad-reason"), reason: "other" } },
+        {
+          requestId: "bad-sequence",
+          payload: { ...validPayload("bad-sequence"), originSequence: -1 },
+        },
+        { requestId: "bad-correlation", payload: validPayload("user-msg-1") },
+        { requestId: "bad-tone", payload: validPayload("bad-tone"), tone: "info" },
+        { requestId: "bad-turn", payload: validPayload("bad-turn"), turnId: "turn-1" },
+        { requestId: "bad-id", payload: validPayload("bad-id"), activityId: "noncanonical" },
+        {
+          requestId: "foreign-row",
+          payload: validPayload("foreign-row"),
+          threadId: "thread-other",
+        },
+      ];
+      for (const entry of cases) {
+        yield* sql`
+          INSERT INTO projection_thread_messages
+            (message_id, thread_id, turn_id, role, text, is_streaming, created_at, updated_at)
+          VALUES (${entry.requestId}, ${threadW}, NULL, 'user', 'intent', 0,
+            '2026-03-01T00:03:40.000Z', '2026-03-01T00:03:40.000Z')
+        `;
+        yield* sql`
+          INSERT INTO projection_thread_activities
+            (activity_id, thread_id, turn_id, tone, kind, summary, payload_json, created_at)
+          VALUES (
+            ${
+              entry.activityId ??
+              makeWorkspaceTurnStartRefusalIdentity(threadW, asMessageId(entry.requestId))
+                .activityId
+            },
+            ${entry.threadId ?? threadW}, ${entry.turnId ?? null}, ${entry.tone ?? "error"},
+            'provider.turn.start.failed', 'Not started', ${encodeActivityPayloadJson(entry.payload)},
+            '2026-02-28T00:00:00.000Z'
+          )
+        `;
+      }
+      for (const requestId of ["user-msg-5", "user-msg-1", "turn-5-reply", "missing-message"]) {
+        yield* sql`
+          INSERT INTO projection_thread_activities
+            (activity_id, thread_id, turn_id, tone, kind, summary, payload_json, created_at)
+          VALUES (
+            ${makeWorkspaceTurnStartRefusalIdentity(threadW, asMessageId(requestId)).activityId},
+            ${threadW}, NULL, 'error', 'provider.turn.start.failed', 'Not started',
+            ${encodeActivityPayloadJson(validPayload(requestId))}, '2026-02-28T00:00:00.000Z'
+          )
+        `;
+      }
+      const page = Option.getOrThrow(
+        yield* query.getThreadDetailSnapshot(threadW, { turnLimit: 2 }),
+      );
+      const refusals = page.thread.activities.filter(
+        (activity) => activity.kind === "provider.turn.start.failed",
+      );
+      assert.deepEqual(
+        refusals.map((activity) => activity.id),
+        [makeWorkspaceTurnStartRefusalIdentity(threadW, asMessageId("user-msg-5")).activityId],
+      );
+      assert.deepEqual(refusals[0]?.payload, validPayload("user-msg-5"));
+    }),
+  );
 
   it.effect("returns the full thread with no page metadata when no window is requested", () =>
     Effect.gen(function* () {

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { join } from "node:path";
 import { workerDigest } from "./agent-tools.ts";
 import { evaluateBrowserAssertion, invalidateBrowserCheck, validBrowserCheckEvidence } from "./browser-evidence.ts";
 import { observeLocalBrowser } from "./browser-observation.ts";
@@ -30,23 +30,22 @@ import type {
 } from "./ports.ts";
 import { ProcessCleanupError, resolveExecutable, runProcess, verificationEnvironment } from "./process-runner.ts";
 import {
-	buildSandboxPolicy,
-	canonicalHostPath,
-	probeSandboxBackend,
 	runSandboxedCheck,
 	type SandboxPolicySnapshot,
-	SandboxUnavailableError,
 	sandboxEvidence,
 	validateSandboxBackend,
+	verifierSandbox,
 } from "./sandbox.ts";
 import {
-	resolveVerifierTrustSources,
 	snapshotCheckTrust,
 	type VerifierTrustSnapshot,
 	validateVerifierTrust,
 	verifierTrustEvidence,
 } from "./verifier-trust.ts";
 import type { DiffEvidence, GitWorkspace } from "./workspace.ts";
+
+/** Fixed reason for a registered check refused by execution Policy; memory candidates match on it. */
+export const POLICY_BLOCKED_CHECK_REASON = "Check blocked by execution policy";
 
 const ADVISORY_OUTPUT_UNITS = 2000;
 
@@ -115,7 +114,10 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 				}
 				let executable: string;
 				try {
-					executable = await resolveExecutable(check.executable, env.PATH);
+					executable = await resolveExecutable(check.executable, env.PATH, {
+						root: workspace.cwd,
+						cwd: check.cwd,
+					});
 				} catch {
 					if (check.kind === "browser") throw new Error("Registered browser executable unavailable");
 					return undefined;
@@ -151,45 +153,11 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 				return undefined;
 			}
 		});
-		// Sandbox preflight runs before any worker model interaction; required mode never falls back unsandboxed.
-		const sandboxMode = config.verification.sandbox?.mode ?? "disabled";
-		let sandbox: SandboxPolicySnapshot | undefined;
-		if (sandboxMode === "required" && config.verification.checks.some((check) => check.kind !== "browser")) {
-			const trustedSources = [
-				...new Set(
-					config.verification.checks.flatMap((check) => resolveVerifierTrustSources(workspace.cwd, check)),
-				),
-			];
-			const canonicalTrust = trustedSources.map((path) => canonicalHostPath(join(workspace.cwd, path)));
-			const protectedCandidates = [
-				...new Set([
-					...(policy.protectedPaths ?? []),
-					...(policy.projectInstruction?.path ? [policy.projectInstruction.path] : []),
-					".git",
-					".ai",
-					".env",
-				]),
-			].map((path) => canonicalHostPath(join(workspace.cwd, path)));
-			// Worker protection is not the sandbox read boundary, but a trusted source nested inside a
-			// protected read region (or equal to it) would stop the verifier from reading its own oracle.
-			for (const source of canonicalTrust) {
-				for (const protectedPath of protectedCandidates) {
-					// Exact equality is a Worker-protection entry, not a read-boundary conflict.
-					if (source.startsWith(`${protectedPath}${sep}`))
-						throw new SandboxUnavailableError(
-							"trusted verifier source conflicts with sandbox protected read boundary",
-						);
-				}
-			}
-			sandbox = buildSandboxPolicy({
-				workspace: canonicalHostPath(workspace.cwd),
-				trustedSources,
-				// Trusted sources stay write-denied through trustedSources; they are not read-denied here.
-				protectedPaths: protectedCandidates.filter((path) => !canonicalTrust.includes(path)),
-			});
-			const probe = await probeSandboxBackend(sandbox);
-			if (!probe.ok) throw new SandboxUnavailableError(probe.reason ?? "OS sandbox backend preflight failed");
-		}
+		// Sandbox preflight runs before any worker model interaction.
+		const sandbox = await verifierSandbox(config, workspace.cwd, [
+			...(policy.protectedPaths ?? []),
+			...(policy.projectInstruction?.path ? [policy.projectInstruction.path] : []),
+		]);
 		return new RegisteredVerifier(
 			config,
 			structuredClone(policy),
@@ -330,7 +298,7 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 			await this.cwdSafe(action.cwd),
 		);
 		await this.audit.prepare(decision);
-		if (decision.decision !== "ALLOW") return unavailable("Check blocked by execution policy");
+		if (decision.decision !== "ALLOW") return unavailable(POLICY_BLOCKED_CHECK_REASON);
 		let intentOpen = true;
 		try {
 			await this.audit.assertWritable();
@@ -589,7 +557,7 @@ export class RegisteredVerifier implements Verifier, AdvisoryCheckPort {
 						request.handoff.role === "Executor" || this.policy.r2RunId || this.policy.r3Scope
 							? "FAIL"
 							: "UNAVAILABLE",
-					reason: "Check blocked by execution policy",
+					reason: POLICY_BLOCKED_CHECK_REASON,
 				});
 				continue;
 			}

@@ -37,7 +37,7 @@ describe("resolveSnoozePresets", () => {
     for (const preset of presets) {
       // Day words live in the label column; the time column is time-only
       // (plus a weekday for next week, which names a different day).
-      expect(preset.whenLabel.toLowerCase()).not.toContain("tomorrow");
+      expect(preset.whenLabel.toLowerCase()).not.toContain("내일");
     }
     const tomorrow = presets.find((preset) => preset.id === "tomorrow");
     expect(tomorrow!.whenLabel).toMatch(/9/);
@@ -73,12 +73,12 @@ describe("resolveSnoozePresets", () => {
 describe("snoozeWakeDescription", () => {
   const now = localDate(2026, 4, 8, 10);
 
-  it("uses bare time today, 'tomorrow' next day, weekday within the week", () => {
+  it("uses bare time today, '내일' next day, weekday within the week", () => {
     expect(
       snoozeWakeDescription(localDate(2026, 4, 8, 18).toISOString(), now, "locale"),
-    ).not.toContain("tomorrow");
+    ).not.toContain("내일");
     expect(snoozeWakeDescription(localDate(2026, 4, 9, 9).toISOString(), now, "locale")).toContain(
-      "tomorrow",
+      "내일",
     );
     expect(snoozeWakeDescription(localDate(2026, 4, 13, 9).toISOString(), now, "locale")).toMatch(
       /Mon/,

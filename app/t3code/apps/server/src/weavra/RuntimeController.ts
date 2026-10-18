@@ -633,7 +633,8 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
           input.request.complexDraft !== undefined &&
           capabilities.complexContractVersion === undefined) ||
         (planner && capabilities.plannerContractVersion !== 1) ||
-        (input.request.type === "workflow.derive" && capabilities.rerunContractVersion !== 1)
+        (input.request.type === "workflow.derive" && capabilities.rerunContractVersion !== 1) ||
+        (input.request.type === "facts.candidates" && capabilities.factCandidates !== 1)
       )
         return yield* new WeavraControlTransportError({ code: "INCOMPATIBLE_CAPABILITIES" });
       const bridge = entry.bridge;
@@ -764,22 +765,24 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
                             data.preview.statement === request.statement
                           : request.type === "facts.confirm"
                             ? data.kind === "fact-confirmed"
-                            : request.type === "planner.read"
-                              ? // Exactly the requested proposal, with only Planner-shaped claims.
-                                data.kind === "planner-draft" &&
-                                data.planId === request.planId &&
-                                plannerDraftConsistent(data.draft)
-                              : request.type === "workflow.derive"
-                                ? // The candidate draft of exactly the requested Run (COMPLEX_RERUN.md
-                                  // §4): `create` and `modify` claims only, never a deletion.
-                                  data.kind === "derived-draft" &&
-                                  data.runId === request.runId &&
-                                  data.draft.tasks.every((task) =>
-                                    task.ownership.every((claim) => claim.operation !== "delete"),
-                                  )
-                                : data.kind === "accepted" &&
-                                  data.command === request.type &&
-                                  data.requestId === request.id;
+                            : request.type === "facts.candidates"
+                              ? data.kind === "fact-candidates"
+                              : request.type === "planner.read"
+                                ? // Exactly the requested proposal, with only Planner-shaped claims.
+                                  data.kind === "planner-draft" &&
+                                  data.planId === request.planId &&
+                                  plannerDraftConsistent(data.draft)
+                                : request.type === "workflow.derive"
+                                  ? // The candidate draft of exactly the requested Run (COMPLEX_RERUN.md
+                                    // §4): `create` and `modify` claims only, never a deletion.
+                                    data.kind === "derived-draft" &&
+                                    data.runId === request.runId &&
+                                    data.draft.tasks.every((task) =>
+                                      task.ownership.every((claim) => claim.operation !== "delete"),
+                                    )
+                                  : data.kind === "accepted" &&
+                                    data.command === request.type &&
+                                    data.requestId === request.id;
             if (!valid) return yield* new WeavraControlTransportError({ code: "INVALID_PAYLOAD" });
           }
           if (runtimeOperation) {
@@ -800,7 +803,8 @@ export const make = Effect.fn("weavra.runtimeController.make")(function* () {
       const readOnly =
         input.request.type === "planner.read" ||
         input.request.type === "browser.inspect" ||
-        input.request.type === "workflow.derive";
+        input.request.type === "workflow.derive" ||
+        input.request.type === "facts.candidates";
       const guarded = readOnly
         ? operation(undefined)
         : ownership

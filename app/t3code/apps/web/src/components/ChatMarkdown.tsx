@@ -162,6 +162,7 @@ import { useAssetUrlRefresh, useAssetUrlState } from "../assets/assetUrls";
 import { cn } from "../lib/utils";
 import { useRemoteOpenResolution, type RemoteOpenMode } from "../remoteOpen";
 import { useRightPanelStore } from "../rightPanelStore";
+import { decodeChatControlDraft } from "./chat/projectControlDraft";
 import { readThreadShell, useProjects } from "../state/entities";
 import { serverEnvironment } from "../state/server";
 import { shellEnvironment } from "../state/shell";
@@ -326,7 +327,7 @@ function CodexArtifactTemplateCard(props: {
           className="shrink-0"
           onClick={() => props.onUse?.(props.template)}
         >
-          Use template
+          템플릿 사용
         </Button>
       ) : null}
     </div>
@@ -516,31 +517,31 @@ const GITHUB_ALERT_PRESENTATIONS: Record<
   { label: string; Icon: typeof InfoIcon; borderClassName: string; titleClassName: string }
 > = {
   note: {
-    label: "Note",
+    label: "참고",
     Icon: InfoIcon,
     borderClassName: "border-blue-500/70",
     titleClassName: "text-blue-600 dark:text-blue-400",
   },
   tip: {
-    label: "Tip",
+    label: "팁",
     Icon: LightbulbIcon,
     borderClassName: "border-emerald-500/70",
     titleClassName: "text-emerald-600 dark:text-emerald-400",
   },
   important: {
-    label: "Important",
+    label: "중요",
     Icon: MessageSquareWarningIcon,
     borderClassName: "border-purple-500/70",
     titleClassName: "text-purple-600 dark:text-purple-400",
   },
   warning: {
-    label: "Warning",
+    label: "경고",
     Icon: TriangleAlertIcon,
     borderClassName: "border-amber-500/70",
     titleClassName: "text-amber-600 dark:text-amber-500",
   },
   caution: {
-    label: "Caution",
+    label: "주의",
     Icon: OctagonAlertIcon,
     borderClassName: "border-red-500/70",
     titleClassName: "text-red-600 dark:text-red-400",
@@ -704,8 +705,8 @@ function MarkdownTable({ children, ...props }: React.ComponentProps<"table">) {
   const [expanded, setExpanded] = useState(readInitialWordWrapSetting);
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const expandLabel = expanded ? "Collapse table cells" : "Expand table cells";
-  const copyLabel = copied ? "Copied" : "Copy table";
+  const expandLabel = expanded ? "표 셀 접기" : "표 셀 펼치기";
+  const copyLabel = copied ? "복사했어요" : "표 복사";
 
   function toggleExpanded() {
     const table = tableRef.current;
@@ -819,8 +820,8 @@ function MarkdownTable({ children, ...props }: React.ComponentProps<"table">) {
             <TooltipPopup side="top">{copyLabel}</TooltipPopup>
           </Tooltip>
           <MenuPopup align="end">
-            <MenuItem onClick={() => handleCopy("markdown")}>Copy as Markdown</MenuItem>
-            <MenuItem onClick={() => handleCopy("csv")}>Copy as CSV</MenuItem>
+            <MenuItem onClick={() => handleCopy("markdown")}>Markdown으로 복사</MenuItem>
+            <MenuItem onClick={() => handleCopy("csv")}>CSV로 복사</MenuItem>
           </MenuPopup>
         </Menu>
       </div>
@@ -841,7 +842,7 @@ function MarkdownDetails({
   const summary =
     isValidElement<{ children?: ReactNode }>(summaryNode) && summaryNode.props.children
       ? summaryNode.props.children
-      : "Details";
+      : "자세히";
   const content = childNodes.filter((_, index) => index !== summaryIndex);
 
   return (
@@ -902,7 +903,7 @@ function MarkdownCodeBlockTitleContent({
     <Tooltip>
       <TooltipTrigger
         render={
-          <span className="inline-flex shrink-0 rounded-sm" aria-label={`Language: ${language}`} />
+          <span className="inline-flex shrink-0 rounded-sm" aria-label={`언어: ${language}`} />
         }
       >
         <PierreEntryIcon pathValue={fileName} kind="file" theme={theme} className="size-3.5" />
@@ -928,8 +929,8 @@ function MarkdownCodeBlock({
   const [copied, setCopied] = useState(false);
   const [wrapped, setWrapped] = useState(readInitialWordWrapSetting);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wrapLabel = wrapped ? "Disable line wrap" : "Wrap lines";
-  const copyLabel = copied ? "Copied" : "Copy code";
+  const wrapLabel = wrapped ? "줄바꿈 끄기" : "줄바꿈";
+  const copyLabel = copied ? "복사했어요" : "코드 복사";
 
   const handleCopy = useCallback(() => {
     if (typeof navigator === "undefined" || navigator.clipboard == null) {
@@ -983,7 +984,7 @@ function MarkdownCodeBlock({
             theme={theme}
           />
         </span>
-        <span className="flex items-center gap-0.5" role="toolbar" aria-label="Code block actions">
+        <span className="flex items-center gap-0.5" role="toolbar" aria-label="코드 블록 작업">
           <Tooltip>
             <TooltipTrigger
               render={
@@ -1362,7 +1363,7 @@ function ChatMarkdownMediaUnavailableLabel(props: {
   readonly alt: string;
   readonly kind?: "image" | "video" | undefined;
 }) {
-  const label = props.kind === "video" ? "Video unavailable" : "Image unavailable";
+  const label = props.kind === "video" ? "동영상을 사용할 수 없어요" : "이미지를 사용할 수 없어요";
   return (
     <span className="inline-flex items-center gap-1.5">
       <TriangleAlertIcon aria-hidden className="size-3.5 shrink-0" />
@@ -1498,7 +1499,7 @@ function ChatMarkdownImage(props: {
         id={props.imageProps?.id}
         data-markdown-copy={props.copyMarkdown}
         role="status"
-        aria-label="Loading image"
+        aria-label="이미지를 불러오는 중"
         className={CHAT_MARKDOWN_MEDIA_LAYOUT_CLASS_NAME}
       />
     );
@@ -1516,7 +1517,7 @@ function ChatMarkdownImage(props: {
         style={props.style}
         {...(failed
           ? { role: "alert" as const }
-          : { role: "status" as const, "aria-label": "Loading image" })}
+          : { role: "status" as const, "aria-label": "이미지를 불러오는 중" })}
       >
         {failed ? (
           <span className="flex size-full items-center justify-center p-2 text-center text-xs text-muted-foreground">
@@ -1912,8 +1913,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "파일을 열지 못했어요",
+            description: error instanceof Error ? error.message : "오류가 발생했어요.",
           }),
         );
       } catch (cause) {
@@ -1924,8 +1925,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file",
-            description: cause instanceof Error ? cause.message : "An error occurred.",
+            title: "파일을 열지 못했어요",
+            description: cause instanceof Error ? cause.message : "오류가 발생했어요.",
           }),
         );
       }
@@ -1962,8 +1963,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file in browser",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "브라우저에서 파일을 열지 못했어요",
+            description: error instanceof Error ? error.message : "오류가 발생했어요.",
           }),
         );
       } catch (cause) {
@@ -1974,8 +1975,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file in browser",
-            description: cause instanceof Error ? cause.message : "An error occurred.",
+            title: "브라우저에서 파일을 열지 못했어요",
+            description: cause instanceof Error ? cause.message : "오류가 발생했어요.",
           }),
         );
       }
@@ -2000,8 +2001,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to reveal file",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "파일 위치를 열지 못했어요",
+            description: error instanceof Error ? error.message : "오류가 발생했어요.",
           }),
         );
       } catch (cause) {
@@ -2012,8 +2013,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to reveal file",
-            description: cause instanceof Error ? cause.message : "An error occurred.",
+            title: "파일 위치를 열지 못했어요",
+            description: cause instanceof Error ? cause.message : "오류가 발생했어요.",
           }),
         );
       }
@@ -2026,8 +2027,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: `Failed to copy ${title.toLowerCase()}`,
-            description: "Clipboard API unavailable.",
+            title: `${title}을(를) 복사하지 못했어요`,
+            description: "클립보드를 사용할 수 없어요.",
           }),
         );
         return;
@@ -2049,8 +2050,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: `Failed to copy ${title.toLowerCase()}`,
-              description: error instanceof Error ? error.message : "An error occurred.",
+              title: `${title}을(를) 복사하지 못했어요`,
+              description: error instanceof Error ? error.message : "오류가 발생했어요.",
             }),
           );
         },
@@ -2067,14 +2068,14 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
       try {
         const clicked = await api.contextMenu.show(
           [
-            ...(onOpenMedia ? ([{ id: "preview-media", label: "Preview media" }] as const) : []),
+            ...(onOpenMedia ? ([{ id: "preview-media", label: "미디어 미리보기" }] as const) : []),
             ...(onOpen ? ([{ id: "open", label: openInEditorMenuLabel }] as const) : []),
             ...(onOpenInBrowser
-              ? ([{ id: "open-in-browser", label: "Open in integrated browser" }] as const)
+              ? ([{ id: "open-in-browser", label: "내장 브라우저에서 열기" }] as const)
               : []),
             ...(onReveal && revealLabel ? ([{ id: "reveal", label: revealLabel }] as const) : []),
-            { id: "copy-relative", label: "Copy relative path" },
-            { id: "copy-full", label: "Copy full path" },
+            { id: "copy-relative", label: "상대 경로 복사" },
+            { id: "copy-full", label: "전체 경로 복사" },
           ] as const,
           position,
         );
@@ -2096,11 +2097,11 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
           return;
         }
         if (clicked === "copy-relative") {
-          handleCopy(displayPath, "Relative path");
+          handleCopy(displayPath, "상대 경로");
           return;
         }
         if (clicked === "copy-full") {
-          handleCopy(targetPath, "Full path");
+          handleCopy(targetPath, "전체 경로");
         }
       } catch (cause) {
         reportMarkdownActionFailure(
@@ -2190,7 +2191,7 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
           ) : (
             <button
               type="button"
-              aria-label={`File options for ${label}`}
+              aria-label={`${label} 파일 옵션`}
               aria-haspopup="menu"
               className={cn(
                 CHAT_FILE_TAG_CHIP_CLASS_NAME,
@@ -2323,11 +2324,11 @@ function useChatMarkdownState({
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Media unavailable",
+              title: "미디어를 사용할 수 없어요",
               description:
                 error instanceof Error
                   ? error.message
-                  : "The file could not be loaded. It may have been moved or deleted.",
+                  : "파일을 불러오지 못했어요. 옮겨지거나 삭제되었을 수 있어요.",
             }),
           );
         },
@@ -2468,7 +2469,7 @@ function useChatMarkdownState({
           AsyncResult.failure<void, BrowserPreviewUnavailableError>(
             Cause.fail(
               new BrowserPreviewUnavailableError({
-                message: "Thread context is unavailable.",
+                message: "대화 컨텍스트를 사용할 수 없어요.",
               }),
             ),
           ),
@@ -2482,7 +2483,7 @@ function useChatMarkdownState({
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "Unable to open link in browser",
+                title: "브라우저에서 링크를 열지 못했어요",
                 description: error.message,
               }),
             );
@@ -2500,7 +2501,7 @@ function useChatMarkdownState({
           AsyncResult.failure<void, BrowserPreviewUnavailableError>(
             Cause.fail(
               new BrowserPreviewUnavailableError({
-                message: "Environment is not connected.",
+                message: "환경이 연결되어 있지 않아요.",
               }),
             ),
           ),
@@ -2825,7 +2826,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
         {...props}
         type="checkbox"
         name="markdown-task"
-        aria-label="Toggle task"
+        aria-label="작업 체크 전환"
         checked={checked}
         onChange={(event) => {
           const markerOffset = Number(event.currentTarget.closest("li")?.dataset.taskMarkerOffset);
@@ -3029,9 +3030,9 @@ const CHAT_MARKDOWN_COMPONENTS = {
                       type: "error",
                       title:
                         operation === "link-pull-request-to-thread"
-                          ? "Unable to link pull request"
-                          : "Unable to unlink pull request",
-                      description: cause instanceof Error ? cause.message : "The request failed.",
+                          ? "PR을 연결하지 못했어요"
+                          : "PR 연결을 해제하지 못했어요",
+                      description: cause instanceof Error ? cause.message : "요청에 실패했어요.",
                     }),
                   );
                 }
@@ -3255,13 +3256,45 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return <MarkdownDetails open={detailsOpen}>{children}</MarkdownDetails>;
   },
   pre: function MarkdownPre({ node, children, ...props }) {
-    const { resolvedTheme, diffThemeName, isStreaming } = use(ChatMarkdownRendererContext);
+    const { resolvedTheme, diffThemeName, isStreaming, threadRef } = use(
+      ChatMarkdownRendererContext,
+    );
     const codeBlock = extractCodeBlock(children);
     if (!codeBlock) {
       return <pre {...props}>{children}</pre>;
     }
 
     const language = extractFenceLanguage(codeBlock.className);
+    if (language === "weavra-control") {
+      if (isStreaming)
+        return <p className="text-sm text-muted-foreground">작업 초안을 정리하고 있어요...</p>;
+      const draft = decodeChatControlDraft(codeBlock.code);
+      if (draft)
+        return (
+          <div
+            data-weavra="chat-control-summary"
+            className="my-3 min-w-0 space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-sm [overflow-wrap:anywhere]"
+          >
+            <p className="font-medium">작업 초안을 정리했어요</p>
+            <p>{draft.goal}</p>
+            <p className="text-xs text-muted-foreground">
+              수용 기준 {draft.criteria.length}개를 패널에서 검토할 수 있어요. 실행을 승인한 것은
+              아니에요.
+            </p>
+            {threadRef ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-weavra-action="open-chat-control-summary"
+                onClick={() => useRightPanelStore.getState().open(threadRef, "control")}
+              >
+                패널에서 검토
+              </Button>
+            ) : null}
+          </div>
+        );
+    }
     const fenceTitle = extractFenceTitle(extractPreCodeMeta(node));
     return (
       <MarkdownCodeBlock

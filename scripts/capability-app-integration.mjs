@@ -15,6 +15,7 @@ import * as Tool from "../app/t3code/apps/server/node_modules/effect/dist/unstab
 import { HostProcessEnvironment } from "../app/t3code/packages/shared/src/hostProcess.ts";
 import { ProjectionSnapshotQuery } from "../app/t3code/apps/server/src/orchestration/Services/ProjectionSnapshotQuery.ts";
 import { make } from "../app/t3code/apps/server/src/weavra/RuntimeController.ts";
+import * as OwnershipTest from "../app/t3code/apps/server/src/workspace/WorkspaceExecutionOwnershipTest.ts";
 import { WeavraControlState, WeavraControlRequest, WeavraCapabilityInventory } from "../app/t3code/packages/contracts/src/weavraControl.ts";
 import { makeCapabilityInventoryTracker } from "../app/t3code/packages/client-runtime/src/state/capabilityInventory.ts";
 import { PreviewToolkit } from "../app/t3code/apps/server/src/mcp/toolkits/preview/tools.ts";
@@ -39,7 +40,9 @@ export async function runAppIntegration({ executable, project, env, configPath, 
   let markup;
   await Effect.runPromise(Effect.gen(function* () {
     const projectId = "broker-project";
+    const ownership = yield* Layer.build(OwnershipTest.layer);
     const controller = yield* make().pipe(
+      Effect.provide(ownership),
       Effect.provide(Layer.mock(ProjectionSnapshotQuery)({ getProjectShellById: (id) => Effect.succeed(id === projectId ? Option.some({ id, workspaceRoot: project, title: "Broker integration", defaultModelSelection: null, scripts: [], createdAt: "2026-09-22T00:00:00.000Z", updatedAt: "2026-09-22T00:00:00.000Z" }) : Option.none()) })),
       Effect.provideService(HostProcessEnvironment, { ...env, T3_WEAVRA_EXECUTABLE: guarded, T3_WEAVRA_CONTROL: "1" }),
     );
@@ -66,9 +69,8 @@ export async function runAppIntegration({ executable, project, env, configPath, 
     yield* Fiber.interrupt(consumer);
     const received = performance.now();
     tracker.receive(advanced, received);
-    yield* Effect.sleep("5100 millis");
+    const workflowFresh = yield* next(initialQueue, (value) => value.status === "CONNECTED" && !value.stale && value.observedAt >= advanced.observedAt + 5000 && performance.now() - received > 5000);
     assert.equal(tracker.view(performance.now()).status, "NEEDS_REFRESH");
-    const workflowFresh = yield* next(initialQueue, (value) => value.status === "CONNECTED" && !value.stale && value.observedAt >= advanced.observedAt + 5000);
     assert.ok(workflowFresh.state.capabilityInventory.generation > advanced.state.capabilityInventory.generation);
     assert.deepEqual(workflowFresh.state.snapshot.status, advanced.state.snapshot.status);
     assert.equal(workflowFresh.stale, false);
@@ -78,10 +80,10 @@ export async function runAppIntegration({ executable, project, env, configPath, 
     const staleHtml = render(staleView);
     const currentHtml = render(currentView);
     const expiredHtml = render(tracker.view(performance.now()));
-    assert.match(staleHtml, /Historical observation/);
+    assert.match(staleHtml, /과거 관찰이에요/);
     assert.match(currentHtml, /LSP_NOT_OBSERVED/);
-    assert.match(currentHtml, /AVAILABLE/);
-    assert.match(expiredHtml, /Historical observation/);
+    assert.match(currentHtml, /제공됨/);
+    assert.match(expiredHtml, /과거 관찰이에요/);
     assert.doesNotMatch(currentHtml, /<(?:button|input|select)\b/);
     for (const sentinel of sentinels) assert.equal((staleHtml + currentHtml + expiredHtml).includes(sentinel), false);
     markup = `<!doctype html><meta charset="utf-8"><title>Actual Broker boundary capture</title><main><h1>Actual Runtime → App inventory</h1><h2>First subscription cache</h2>${staleHtml}<h2>Checked generation</h2>${currentHtml}<h2>After five seconds</h2>${expiredHtml}</main>`;

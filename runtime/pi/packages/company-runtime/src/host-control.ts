@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
@@ -35,6 +35,7 @@ import {
 	type Run,
 	type TaskAdmission,
 	type TaskBinding,
+	type TaskReceipt,
 } from "./contracts.ts";
 import { taskContractDigest } from "./criterion-evidence.ts";
 import type { RuntimeEventSink } from "./events.ts";
@@ -43,6 +44,7 @@ import {
 	EvidenceDetailsResponseTooLargeError,
 	projectHostEvidenceDetails,
 } from "./evidence-details.ts";
+import { fingerprint } from "./fingerprint.ts";
 import type { HostBridgeConnection } from "./host-bridge.ts";
 import {
 	projectHostConfiguration,
@@ -58,7 +60,10 @@ import {
 	HOST_CONTROL_MAX_RESPONSE_BYTES,
 	HOST_CONTROL_PREVIEW_TTL_MS,
 	HOST_CONTROL_RESULT_LIMIT,
+	HOST_DIRTY_WORKSPACE_MAX_BYTES,
+	HOST_DIRTY_WORKSPACE_MAX_FILES,
 	HOST_EVIDENCE_COMMANDS,
+	HOST_FACT_CANDIDATE_COMMANDS,
 	HOST_PLANNER_COMMANDS,
 	HOST_PLANNER_DRAFT_MAX_RESPONSE_BYTES,
 	HOST_RERUN_COMMANDS,
@@ -77,6 +82,7 @@ import {
 	type HostControlRequest,
 	HostControlRequestSchema,
 	type HostControlResponse,
+	type HostDirtyWorkspaceDetails,
 	type HostEvidenceDetailsRequest,
 	type HostFactPreview,
 	type HostPlannerFailureCode,
@@ -93,6 +99,7 @@ import {
 	HostWorkflowError,
 	prepareHostWorkflowDraft,
 } from "./host-workflow.ts";
+import { deriveMemoryCandidates } from "./memory-candidates.ts";
 import { type PlannerRoute, resolvePlannerRoute } from "./model-routing.ts";
 import {
 	buildPlanningContext,
@@ -114,27 +121,81 @@ import {
 	prepareProjectFact,
 	projectFactStillCurrent,
 } from "./project-facts.ts";
+import { type RunDiffRead, readRunDiff } from "./run-diff.ts";
 import { FileStateStore } from "./state-store.ts";
 import { listTaskRecipes, recipeInputTemplate } from "./task-recipes.ts";
 import type { StandardWorkflow } from "./workflow.ts";
-import { readCheckoutIdentity, readCleanStartBlockers } from "./workspace.ts";
+import { readCheckoutIdentity, readCleanStartBlockers, WorkspaceEvidenceError } from "./workspace.ts";
+
+const workspaceEvidenceCodes = {
+	capacity: "WORKSPACE_EVIDENCE_CAPACITY",
+	unsupported: "WORKSPACE_EVIDENCE_UNSUPPORTED",
+	unavailable: "WORKSPACE_EVIDENCE_UNAVAILABLE",
+} satisfies Record<WorkspaceEvidenceError["kind"], HostControlErrorCode>;
 
 class ControlError extends Error {
 	readonly code: HostControlErrorCode;
-	constructor(code: HostControlErrorCode) {
+	readonly details?: HostDirtyWorkspaceDetails;
+	constructor(code: HostControlErrorCode, details?: HostDirtyWorkspaceDetails) {
 		super(code);
 		this.code = code;
+		if (details) this.details = details;
 	}
 }
-function fingerprint(value: unknown): string {
-	return `sha256:${createHash("sha256")
-		.update(
-			JSON.stringify(value, (_key, item: unknown) => {
-				if (!item || typeof item !== "object" || Array.isArray(item)) return item;
-				return Object.fromEntries(Object.entries(item).sort(([left], [right]) => left.localeCompare(right)));
-			}),
-		)
-		.digest("hex")}`;
+export type HostTaskFailureSummary = {
+	code: "RUN_FAILED" | "CHECK_FAILED" | "RUN_BLOCKED" | "RUN_CANCELLED" | "RUN_INTERRUPTED";
+	nextAction:
+		| "REVIEW_RUN_FAILURE"
+		| "REVIEW_CHECK_FAILURE"
+		| "REVIEW_BLOCKED_RUN"
+		| "REVIEW_CANCELLED_RUN"
+		| "REVIEW_INTERRUPTED_RUN";
+};
+export function projectTaskFailureSummary(
+	run: Pick<Run, "status" | "lastError"> & {
+		verification: ReadonlyArray<Pick<Run["verification"][number], "status" | "reason">>;
+	},
+): HostTaskFailureSummary | undefined {
+	if (
+		run.status === "COMPLETED" ||
+		run.status === "CREATED" ||
+		run.status === "RUNNING" ||
+		run.status === "WAITING_APPROVAL"
+	)
+		return undefined;
+	const latestCheck = run.verification.at(-1);
+	if (
+		(run.status === "FAILED" || run.status === "BLOCKED") &&
+		latestCheck?.status === "FAIL" &&
+		latestCheck.reason.trim().length > 0
+	)
+		return { code: "CHECK_FAILED", nextAction: "REVIEW_CHECK_FAILURE" };
+	if (run.status === "FAILED" && run.lastError?.trim())
+		return { code: "RUN_FAILED", nextAction: "REVIEW_RUN_FAILURE" };
+	if (run.status === "BLOCKED") return { code: "RUN_BLOCKED", nextAction: "REVIEW_BLOCKED_RUN" };
+	if (run.status === "CANCELLED") return { code: "RUN_CANCELLED", nextAction: "REVIEW_CANCELLED_RUN" };
+	if (run.status === "INTERRUPTED") return { code: "RUN_INTERRUPTED", nextAction: "REVIEW_INTERRUPTED_RUN" };
+	return undefined;
+}
+async function taskFailureSummary(
+	projectPath: string,
+	receipt: TaskReceipt,
+): Promise<HostTaskFailureSummary | undefined> {
+	if (
+		receipt.status !== "FOUND" ||
+		receipt.run === null ||
+		receipt.run.status === "COMPLETED" ||
+		receipt.admission.cleanup !== "CONFIRMED"
+	)
+		return undefined;
+	const { state } = await FileStateStore.readSnapshot(projectPath);
+	const admission = state?.taskAdmissions?.find((item) => item.metadata.binding.executionId === receipt.executionId);
+	if (!admission || admission.outcome.status !== "STARTED" || admission.outcome.runId !== receipt.run.runId)
+		return undefined;
+	let run = state?.runs.find((item) => item.runId === receipt.run?.runId);
+	if (!run) run = (await FileStateStore.readArchivedRun(projectPath, receipt.run.runId))?.run;
+	if (!run || run.status !== receipt.run.status || run.revision !== receipt.run.revision) return undefined;
+	return projectTaskFailureSummary(run);
 }
 function isActive(run: Run | undefined): boolean {
 	return !!run && ["CREATED", "RUNNING", "WAITING_APPROVAL"].includes(run.status);
@@ -258,7 +319,12 @@ export class HostControlBridge {
 			throw new ControlError("PROJECT_CHANGED");
 		}
 	}
-	private failure(code: HostControlErrorCode, id: string | null, command: string | null): HostControlResponse {
+	private failure(
+		code: HostControlErrorCode,
+		id: string | null,
+		command: string | null,
+		details?: HostDirtyWorkspaceDetails,
+	): HostControlResponse {
 		return {
 			...this.identity(),
 			type: "control_response",
@@ -266,7 +332,7 @@ export class HostControlBridge {
 			command,
 			ownerId: this.ownerId,
 			success: false,
-			error: { code },
+			error: details ? { code, details } : { code },
 		};
 	}
 	private success(
@@ -294,13 +360,11 @@ export class HostControlBridge {
 		}
 	}
 	private async configuration() {
-		try {
-			const loaded = await loadRuntimeConfig(this.root.path);
-			if (loaded.status !== "configured") throw new Error("missing");
-			return loaded.config;
-		} catch {
+		const loaded = await loadRuntimeConfig(this.root.path).catch(() => {
 			throw new ControlError("CONTROL_UNAVAILABLE");
-		}
+		});
+		if (loaded.status === "missing") throw new ControlError("PROJECT_NOT_CONFIGURED");
+		return loaded.config;
 	}
 	private async idleRevision(expected: number): Promise<void> {
 		if (this.execution) throw new ControlError("ACTIVE_RUN");
@@ -323,8 +387,25 @@ export class HostControlBridge {
 			);
 			if (fingerprint(current) !== fingerprint(binding.checkout)) throw new Error("Changed checkout");
 		} catch {
-			throw new ControlError("PROJECT_CHANGED");
+			throw await this.changedCheckout(signal);
 		}
+	}
+	/** The refusal itself is unchanged; when the cause is leftover changes, their names let the user act on them. */
+	private async changedCheckout(signal?: AbortSignal): Promise<ControlError> {
+		const dirty = await readCleanStartBlockers(this.root.path, signal);
+		if (!dirty?.length) return new ControlError("PROJECT_CHANGED");
+		const files: string[] = [];
+		let bytes = 0;
+		for (const path of dirty) {
+			bytes += Buffer.byteLength(JSON.stringify(path)) + 1;
+			if (files.length >= HOST_DIRTY_WORKSPACE_MAX_FILES || bytes > HOST_DIRTY_WORKSPACE_MAX_BYTES) break;
+			files.push(path);
+		}
+		return new ControlError("PROJECT_CHANGED", {
+			reason: "DIRTY_WORKSPACE",
+			files,
+			truncated: files.length < dirty.length,
+		});
 	}
 	/**
 	 * `workflow.prepare` only; snapshots and confirm never recover. When this Host is idle, the project is exactly the
@@ -881,7 +962,7 @@ export class HostControlBridge {
 		if (!source) throw new ControlError("RERUN_NOT_APPLICABLE");
 		if (this.execution || snapshot.state?.runs.some(isActive)) throw new ControlError("ACTIVE_RUN");
 		if ((snapshot.state?.revision ?? 0) !== request.expectedProjectRevision) throw new ControlError("STALE_PROJECT");
-		// The dry run needs the configuration; without one there is nothing to check (CONTROL_UNAVAILABLE).
+		// The dry run needs the configuration; without one there is nothing to check (PROJECT_NOT_CONFIGURED).
 		const config = await this.configuration();
 		// §4: the claim-fact inspector's answers for the current files, then the pure derivation.
 		const paths = rerunFactPaths(source);
@@ -956,6 +1037,20 @@ export class HostControlBridge {
 			(request.binding.diffDigest !== null && request.binding.diffDigest !== run.workspace?.diffDigest)
 		)
 			throw new ControlError("STALE_RUN");
+		let runDiff: RunDiffRead | undefined;
+		if (request.cursor.category === "run-diff" && run.workspace) {
+			const config = await this.configuration();
+			try {
+				runDiff = await readRunDiff(
+					this.root.path,
+					{ allowedPaths: config.files.allowed_paths, evidenceMode: config.workspace?.evidence.mode },
+					run.workspace,
+				);
+			} catch (error) {
+				if (error instanceof WorkspaceEvidenceError) throw new ControlError(workspaceEvidenceCodes[error.kind]);
+				throw error;
+			}
+		}
 		const after = await this.canonical();
 		if (
 			(after.state?.revision ?? 0) !== (before.state?.revision ?? 0) ||
@@ -974,6 +1069,7 @@ export class HostControlBridge {
 				source,
 				writerPresent: before.writerPresent,
 				cursor: request.cursor,
+				runDiff,
 				fits: (candidate) =>
 					Buffer.byteLength(JSON.stringify(this.success(request, candidate, identity))) + 1 <=
 					HOST_CONTROL_MAX_RESPONSE_BYTES,
@@ -1004,8 +1100,10 @@ export class HostControlBridge {
 				allowedPaths: config.files.allowed_paths,
 				evidenceMode: config.workspace?.evidence.mode,
 			});
-		} catch {
-			throw new ControlError("PROJECT_CHANGED");
+		} catch (error) {
+			if (error instanceof WorkspaceEvidenceError) throw new ControlError(workspaceEvidenceCodes[error.kind]);
+			// A dirty checkout has no clean identity; name its paths so the App can show them before prepare.
+			throw await this.changedCheckout();
 		}
 		let currentConfig: RuntimeConfig;
 		try {
@@ -1539,6 +1637,7 @@ export class HostControlBridge {
 					analysisContext: 1,
 					evidenceDetails: 1,
 					checkoutIdentity: 1,
+					factCandidates: 1,
 					recipes: listTaskRecipes().map(({ id, version, title }) => ({
 						id,
 						version,
@@ -1549,12 +1648,31 @@ export class HostControlBridge {
 			});
 		if (request.type === "control.snapshot") return this.snapshot(request);
 		if (request.type === "workflow.checkout") return this.checkoutIdentity(request);
+		if (request.type === "facts.candidates") {
+			const { state } = await this.canonical();
+			const projectRevision = state?.revision ?? 0;
+			const response = this.success(
+				request,
+				{
+					kind: "fact-candidates",
+					projectRevision,
+					candidates: deriveMemoryCandidates(state?.runs ?? [], state?.projectFacts ?? []),
+				},
+				{ projectRevision },
+			);
+			if (Buffer.byteLength(JSON.stringify(response)) + 1 > HOST_CONTROL_MAX_RESPONSE_BYTES)
+				throw new ControlError("RESPONSE_TOO_LARGE");
+			return response;
+		}
 		if (request.type === "workflow.receipt") {
 			await this.assertRoot();
 			try {
+				const receipt = await FileStateStore.readTaskReceipt(this.root.path, request.executionId);
+				const failureSummary = await taskFailureSummary(this.root.path, receipt);
 				return this.success(request, {
 					kind: "task-receipt",
-					receipt: await FileStateStore.readTaskReceipt(this.root.path, request.executionId),
+					receipt,
+					...(failureSummary ? { failureSummary } : {}),
 				});
 			} catch {
 				throw new ControlError("STATE_UNAVAILABLE");
@@ -1589,6 +1707,7 @@ export class HostControlBridge {
 					: "CONTROL_UNAVAILABLE",
 				request.id,
 				request.type,
+				error instanceof ControlError ? error.details : undefined,
 			);
 		}
 		this.receipts.set(sequence, { fingerprint: payload, response });
@@ -1686,6 +1805,7 @@ export class HostControlBridge {
 										...HOST_TASK_RECOVERY_COMMANDS,
 										...HOST_EVIDENCE_COMMANDS,
 										...HOST_CHECKOUT_COMMANDS,
+										...HOST_FACT_CANDIDATE_COMMANDS,
 									] as readonly string[]
 								).includes(command)
 							)
@@ -1698,7 +1818,12 @@ export class HostControlBridge {
 							send(response);
 						} catch (error) {
 							send(
-								this.failure(error instanceof ControlError ? error.code : "CONTROL_UNAVAILABLE", id, command),
+								this.failure(
+									error instanceof ControlError ? error.code : "CONTROL_UNAVAILABLE",
+									id,
+									command,
+									error instanceof ControlError ? error.details : undefined,
+								),
 							);
 						}
 					})

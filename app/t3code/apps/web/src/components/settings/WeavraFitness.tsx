@@ -1,3 +1,4 @@
+import { weavraLabel } from "../weavraLabels";
 import { createEnvironmentWeavraFitnessCommand } from "@t3tools/client-runtime/state/weavraFitness";
 import type {
   EnvironmentId,
@@ -25,51 +26,48 @@ function Evidence({ run }: { run: WeavraFitnessSummary }) {
   return (
     <div className="space-y-2 text-xs text-muted-foreground">
       <p>
-        Calibration: <span className="font-mono">{run.calibration ?? "UNKNOWN"}</span>
+        보정 상태: <span className="font-mono">{run.calibration ?? "확인 안 됨"}</span>
       </p>
       <p>
-        Evaluation: <span className="font-mono">{run.evaluation ?? "UNKNOWN"}</span>
+        평가 상태: <span className="font-mono">{run.evaluation ?? "확인 안 됨"}</span>
       </p>
       <p>
-        Stop reasons:{" "}
+        중단 사유:{" "}
         <span className="font-mono">
           {run.stopReasons === undefined ? "UNKNOWN" : run.stopReasons.join(", ") || "none"}
         </span>
       </p>
       {run.fixtureResults === undefined ? (
-        <p>Fixture outcomes UNKNOWN (historical record)</p>
+        <p>검증 사례 결과 미확인(과거 기록)</p>
       ) : (
         <details>
-          <summary className="cursor-pointer">Fixture outcomes</summary>
+          <summary className="cursor-pointer">검증 사례 결과</summary>
           <div className="mt-2 overflow-x-auto">
-            <table
-              className="w-full text-left text-xs"
-              aria-label={`Fixture outcomes for ${run.id}`}
-            >
+            <table className="w-full text-left text-xs" aria-label={`검증 사례 결과: ${run.id}`}>
               <thead className="text-muted-foreground">
                 <tr>
                   <th scope="col" className="py-2 pr-4">
-                    Fixture
+                    검증 사례
                   </th>
                   <th scope="col" className="pr-4">
-                    Terminal
+                    종료 상태
                   </th>
                   <th scope="col" className="pr-4">
-                    Oracle
+                    판정 기준
                   </th>
                   <th scope="col" className="pr-4">
-                    False complete
+                    잘못된 완료 판정
                   </th>
                   <th scope="col" className="pr-4">
-                    Task contract adherence
+                    작업 계약 준수
                   </th>
                   <th scope="col" className="pr-4">
-                    Usage
+                    사용량
                   </th>
                   <th scope="col" className="pr-4">
-                    Integrity / reasons
+                    무결성 / 사유
                   </th>
-                  <th scope="col">Latency (ms)</th>
+                  <th scope="col">소요 시간(ms)</th>
                 </tr>
               </thead>
               <tbody>
@@ -116,11 +114,11 @@ function Target({ run }: { run: WeavraFitnessSummary }) {
       </p>
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline">{run.kind}</Badge>
-        <Badge variant="secondary">{run.status}</Badge>
+        <Badge variant="secondary">{weavraLabel(run.status)}</Badge>
       </div>
       <Evidence run={run} />
       <details className="text-xs text-muted-foreground">
-        <summary className="cursor-pointer">Exact target identity</summary>
+        <summary className="cursor-pointer">정확한 대상 식별 정보</summary>
         <dl className="mt-2 space-y-2">
           {Object.entries(run.target).map(([key, text]) => (
             <div key={key}>
@@ -150,7 +148,7 @@ export function WeavraFitness({
   const [right, setRight] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
-    "Read existing records only. No evaluation or model call can be started here.",
+    "기존 기록만 읽어요. 이 화면에서 평가나 모델 호출을 시작할 수 없어요.",
   );
   const lifecycle = useRef({ connected: false, active: false });
   const pending = useRef(false);
@@ -171,7 +169,7 @@ export function WeavraFitness({
       if (!current.active || !current.connected) return;
       if (!AsyncResult.isSuccess(result)) {
         setMessage(
-          "Fitness history unavailable or incompatible. No repair, evaluation, or automatic retry was performed.",
+          "적합성 기록을 불러올 수 없거나 호환되지 않아요. 수정·평가·자동 재시도는 하지 않았어요.",
         );
         return;
       }
@@ -181,11 +179,11 @@ export function WeavraFitness({
         setLeft("");
         setRight("");
         setMessage(
-          `Read ${result.value.data.runs.length} historical records. Runtime status and oracle result are separate.`,
+          `과거 기록 ${result.value.data.runs.length}개를 읽었어요. Runtime 상태와 판정 기준 결과는 별도예요.`,
         );
       } else {
         setComparison(result.value.data);
-        setMessage("Raw recorded dimensions. No score, winner, or routing recommendation.");
+        setMessage("기록된 측정값을 그대로 표시해요. 점수·순위·모델 선택을 추천하지 않아요.");
       }
     } finally {
       pending.current = false;
@@ -193,13 +191,13 @@ export function WeavraFitness({
     }
   };
   return (
-    <SettingsSection id="weavra-fitness" title="Provider fitness · Read-only">
+    <SettingsSection id="weavra-fitness" title="프로바이더 적합성 · 읽기 전용">
       <SettingsGroup divided={false} className="space-y-5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-medium">Contract evidence, not a leaderboard</h3>
+            <h3 className="text-sm font-medium">순위가 아닌 계약 준수 증거</h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              One provider / model / endpoint / harness per record.
+              기록마다 하나의 프로바이더·모델·endpoint·검증 환경을 나타내요.
             </p>
           </div>
           <Button
@@ -210,19 +208,20 @@ export function WeavraFitness({
               void read({ projectId, command: "list" });
             }}
           >
-            Read history
+            기록 불러오기
           </Button>
         </div>
         <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
           {!connected
-            ? "Disconnected. Displayed records are historical; refresh after reconnecting."
+            ? "연결이 끊겼어요. 표시된 기록은 과거 정보이니 다시 연결한 뒤 새로고침해 주세요."
             : message}
         </p>
         {history && (
           <>
             <div className="border-l-2 border-border pl-3 text-xs">
               <p className="font-mono">
-                Current corpus: {history.corpusRevision} · {history.fixtures.length} fixtures
+                현재 검증 사례 집합: {history.corpusRevision} · {history.fixtures.length} 개 검증
+                사례
               </p>
               <p className="mt-1 break-all font-mono text-muted-foreground">
                 {history.corpusDigest}
@@ -230,25 +229,25 @@ export function WeavraFitness({
             </div>
             {history.runs.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No Fitness records for this project. Use the opt-in CLI separately to collect
-                evidence.
+                이 프로젝트의 적합성 기록이 없어요. 별도의 명시적 CLI 실행으로 증거를 수집할 수
+                있어요.
               </p>
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs" aria-label="Provider fitness history">
+                  <table className="w-full text-left text-xs" aria-label="프로바이더 적합성 기록">
                     <thead className="text-muted-foreground">
                       <tr>
                         <th scope="col" className="py-2 pr-4">
-                          Target / record
+                          대상 / 기록
                         </th>
                         <th scope="col" className="pr-4">
-                          Collection
+                          수집 상태
                         </th>
                         <th scope="col" className="pr-4">
-                          Oracle P / F / invalid
+                          판정 통과 / 실패 / 무효
                         </th>
-                        <th scope="col">False complete</th>
+                        <th scope="col">잘못된 완료 판정</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -265,7 +264,7 @@ export function WeavraFitness({
                             </p>
                           </th>
                           <td className="space-y-2 pr-4">
-                            <p>{run.status}</p>
+                            <p>{weavraLabel(run.status)}</p>
                             <Evidence run={run} />
                           </td>
                           <td className="pr-4 font-mono">
@@ -284,9 +283,9 @@ export function WeavraFitness({
                       key={side}
                       className="min-w-0 flex-1 space-y-1 text-xs text-muted-foreground"
                     >
-                      <span>Record {side}</span>
+                      <span>기록 {side}</span>
                       <select
-                        aria-label={`Fitness record ${side}`}
+                        aria-label={`적합성 기록 ${side}`}
                         className="block w-full rounded-md border border-input bg-background p-2 text-foreground"
                         value={side === "A" ? left : right}
                         onChange={(event) => {
@@ -294,7 +293,7 @@ export function WeavraFitness({
                           setComparison(null);
                         }}
                       >
-                        <option value="">Select a record</option>
+                        <option value="">기록 선택</option>
                         {history.runs.map((run) => (
                           <option key={run.id} value={run.id}>
                             {run.target.provider}/{run.target.model} · {run.id.slice(0, 8)} ·{" "}
@@ -312,7 +311,7 @@ export function WeavraFitness({
                       void read({ projectId, command: "compare", left, right });
                     }}
                   >
-                    Compare records
+                    기록 비교
                   </Button>
                 </div>
               </>
@@ -323,13 +322,13 @@ export function WeavraFitness({
           <div className="space-y-4 border-t border-border/50 pt-4">
             <div className="flex flex-wrap gap-2">
               <Badge variant={comparison.comparable ? "outline" : "warning"}>
-                {comparison.comparable ? "MATCHED CONDITIONS" : "NOT COMPARABLE"}
+                {comparison.comparable ? "조건 일치" : "비교할 수 없음"}
               </Badge>
               {Object.entries(comparison.compatibility)
                 .filter(([, compatible]) => !compatible)
                 .map(([key]) => (
                   <Badge key={key} variant="outline">
-                    {key} differs
+                    {key} 다름
                   </Badge>
                 ))}
             </div>
@@ -337,14 +336,11 @@ export function WeavraFitness({
               <Target run={comparison.left} />
               <Target run={comparison.right} />
             </div>
-            <table
-              className="w-full text-left text-xs"
-              aria-label="Raw provider fitness comparison"
-            >
+            <table className="w-full text-left text-xs" aria-label="프로바이더 적합성 측정값 비교">
               <thead className="text-muted-foreground">
                 <tr>
                   <th scope="col" className="py-2">
-                    Dimension
+                    측정 항목
                   </th>
                   <th scope="col">A</th>
                   <th scope="col">B</th>
@@ -374,9 +370,9 @@ export function WeavraFitness({
           </div>
         )}
         <p className="text-xs text-muted-foreground">
-          UNKNOWN is not zero. Controlled review/repair and faux probes are not natural model error
-          rates. Cost, HTTP attempts, and upstream backend identity may be unknown. No prompts,
-          reasoning, credentials, or tool transcripts are transported.
+          미확인은 0이 아니에요. 통제된 검토·수정과 모의 검사는 실제 모델 오류율을 뜻하지 않아요.
+          비용·HTTP 시도 횟수·상위 backend 식별 정보는 알 수 없을 수 있어요. 프롬프트·추론·인증
+          정보·도구 기록은 전송하지 않아요.
         </p>
       </SettingsGroup>
     </SettingsSection>

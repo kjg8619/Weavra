@@ -18,9 +18,10 @@ and stop verification. Do not install or switch to another automation system.
 ## Use an isolated backend
 
 Reuse this task's healthy backend. Otherwise run `vp run dev` from the
-repository root, retain its terminal session, and read the actual backend port
-from the dev-runner output. Use the worktree's ignored `.t3` state. Never run
-against `~/.t3/userdata`. The Browser panel is not required for this workflow.
+App package root (`app/t3code`), retain its terminal session, and read the actual
+backend port and isolated base directory from the dev-runner output. Never run
+against the owner's live App userdata or a separate `~/.t3` install. The Browser
+panel is not required for this workflow.
 
 Test with meaningful project and thread data. Read the shared
 [SQLite fixture reference](../test-t3-app/references/sqlite-fixtures.md) only
@@ -28,7 +29,7 @@ when inspecting or seeding SQLite. Stop the test server before fixture writes.
 
 ## Launch T3 Code Dev
 
-From the checkout being tested on the selected device host, run:
+From its App package root (`app/t3code`) on the selected device host, run:
 
 ```bash
 node scripts/mobile-native-client.ts ensure <ios|android> <device-id>
@@ -39,12 +40,12 @@ mobile verification includes that build step unless the user prohibits it.
 
 Start `vp run dev:client` from `apps/mobile`, or reuse a healthy Metro belonging
 to this checkout. Open its printed development-client URL with AgentDevice
-`open com.t3tools.t3code.dev <url>` and all returned target arguments.
+`open com.weavra.app.dev <url>` and all returned target arguments.
 The device must be able to reach both Metro and the isolated backend.
 
 ## Pair and verify
 
-Use the helper from the repository root, with the returned executable and target
+Use the helper from the App package root (`app/t3code`), with the returned executable and target
 arguments stored in `agent_device_command` and the Bash array
 `agent_device_target_args`:
 

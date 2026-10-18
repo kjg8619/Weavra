@@ -1,11 +1,13 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentShellStatus } from "@t3tools/client-runtime/state/shell";
-import type { EnvironmentId, MessageId } from "@t3tools/contracts";
+import type { EnvironmentId } from "@t3tools/contracts";
 import { Atom } from "effect/unstable/reactivity";
 
 import { appAtomRegistry } from "./atom-registry";
 import { environmentShell } from "./shell";
 import { threadOutboxManager } from "./thread-outbox";
+import { threadOutboxStorageIdentity, type QueuedThreadMessage } from "./thread-outbox-model";
+import { currentThreadOutboxPresentation } from "./thread-outbox-presentation";
 
 const threadOutboxShellStatusesAtom = Atom.make(
   (get): ReadonlyMap<EnvironmentId, EnvironmentShellStatus> => {
@@ -26,33 +28,45 @@ const threadOutboxShellStatusesAtom = Atom.make(
  * back yet (delivering those would send stale content). Editing sessions hold
  * their message id here and release it once the queued payload is current.
  */
-export const editingQueuedMessageIdsAtom = Atom.make<Readonly<Record<MessageId, true>>>({}).pipe(
+export const editingQueuedMessageIdsAtom = Atom.make<Readonly<Record<string, true>>>({}).pipe(
   Atom.keepAlive,
   Atom.withLabel("mobile:thread-outbox:editing-message-ids"),
 );
 
-export const dispatchingQueuedMessageIdAtom = Atom.make<MessageId | null>(null).pipe(
+export const dispatchingQueuedMessageIdAtom = Atom.make<string | null>(null).pipe(
   Atom.keepAlive,
   Atom.withLabel("mobile:thread-outbox:dispatching-message-id"),
 );
 
-export function holdEditingQueuedMessage(messageId: MessageId): void {
-  const current = appAtomRegistry.get(editingQueuedMessageIdsAtom);
-  if (current[messageId]) {
-    return;
-  }
-  appAtomRegistry.set(editingQueuedMessageIdsAtom, { ...current, [messageId]: true });
+const editorLeases = new Map<string, Set<symbol>>();
+
+/** Each caller owns its own release handle; presentation never grants authority. */
+export function holdEditingQueuedMessage(message: QueuedThreadMessage): (() => void) | null {
+  const record = threadOutboxManager.recordFor(message);
+  if (record === null) return null;
+  const key = threadOutboxStorageIdentity(message);
+  const release = threadOutboxManager.authority.acquireEditor(record, () => true);
+  if (release === null) return null;
+  const leases = editorLeases.get(key) ?? new Set<symbol>();
+  const token = Symbol("pending-editor");
+  leases.add(token);
+  editorLeases.set(key, leases);
+  appAtomRegistry.set(editingQueuedMessageIdsAtom, {
+    ...appAtomRegistry.get(editingQueuedMessageIdsAtom),
+    [key]: true,
+  });
+  return () => {
+    if (!leases.delete(token)) return;
+    release();
+    if (leases.size > 0) return;
+    editorLeases.delete(key);
+    const next = { ...appAtomRegistry.get(editingQueuedMessageIdsAtom) };
+    delete next[key];
+    appAtomRegistry.set(editingQueuedMessageIdsAtom, next);
+  };
 }
 
-export function releaseEditingQueuedMessage(messageId: MessageId): void {
-  const current = appAtomRegistry.get(editingQueuedMessageIdsAtom);
-  if (!current[messageId]) {
-    return;
-  }
-  const next = { ...current };
-  delete next[messageId];
-  appAtomRegistry.set(editingQueuedMessageIdsAtom, next);
-}
+export const unassignedRecordCountAtom = threadOutboxManager.unassignedRecordCountAtom;
 
 export function useThreadOutboxMessages() {
   return useAtomValue(threadOutboxManager.queuedMessagesByThreadKeyAtom);
@@ -69,7 +83,13 @@ export const queuedThreadKeysAtom = Atom.make((get): ReadonlySet<string> => {
   for (const [threadKey, queue] of Object.entries(
     get(threadOutboxManager.queuedMessagesByThreadKeyAtom),
   )) {
-    if (queue.some((message) => message.creation === undefined)) {
+    if (
+      queue.some(
+        (message) =>
+          message.creation === undefined &&
+          currentThreadOutboxPresentation(message).kind === "ready",
+      )
+    ) {
       keys.add(threadKey);
     }
   }

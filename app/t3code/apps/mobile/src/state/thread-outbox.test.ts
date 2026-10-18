@@ -20,6 +20,16 @@ import { onTestFinished, vi } from "vite-plus/test";
 
 const outboxFiles = vi.hoisted(() => new Map<string, string | Error>());
 
+vi.mock("expo-crypto", () => ({
+  CryptoDigestAlgorithm: { SHA256: "SHA-256" },
+  digestStringAsync: async (_algorithm: string, text: string) => {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join(
+      "",
+    );
+  },
+}));
+
 vi.mock("expo-file-system", () => {
   class Directory {
     create() {}
@@ -90,8 +100,10 @@ import {
   type QueuedThreadMessage,
 } from "./thread-outbox-model";
 import { createThreadOutboxManager, ThreadOutboxManagerError } from "./thread-outbox-manager";
+import { decodeThreadOutboxRecord, encodeThreadOutboxRecord } from "./thread-outbox-record";
 import {
   expoThreadOutboxStorage,
+  threadOutboxWriteState,
   ThreadOutboxStorageError,
   type ThreadOutboxLoadResult,
   type ThreadOutboxStorage,
@@ -102,6 +114,7 @@ function queuedMessage(input: {
   readonly threadId?: string;
   readonly messageId: string;
   readonly createdAt: string;
+  readonly delivery?: QueuedThreadMessage["delivery"];
 }): QueuedThreadMessage {
   return {
     environmentId: EnvironmentId.make(input.environmentId ?? "environment-1"),
@@ -111,10 +124,616 @@ function queuedMessage(input: {
     text: input.messageId,
     attachments: [],
     createdAt: input.createdAt,
+    ...(input.delivery === undefined ? {} : { delivery: input.delivery }),
   };
 }
 
 describe("thread outbox", () => {
+  it("invalidates attachment inventories across a tracked record write", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const before = threadOutboxWriteState();
+    const record = decodeThreadOutboxRecord(
+      encodeQueuedThreadMessage(
+        queuedMessage({
+          messageId: "write-epoch",
+          createdAt: "2026-10-04T00:00:00.000Z",
+        }),
+      ),
+    );
+    const writing = expoThreadOutboxStorage.writeRecord(record);
+    expect(threadOutboxWriteState().pending).toBe(true);
+    expect(threadOutboxWriteState().revision).toBeGreaterThan(before.revision);
+    await writing;
+    expect(threadOutboxWriteState().pending).toBe(false);
+    expect(threadOutboxWriteState().revision).toBeGreaterThan(before.revision);
+  });
+
+  it("does not write or remove an optimistic enqueue when the inventory is incomplete", async () => {
+    const registry = AtomRegistry.make();
+    onTestFinished(() => registry.dispose());
+    const write = vi.fn(async (_message: QueuedThreadMessage) => {});
+    const remove = vi.fn(async (_message: QueuedThreadMessage) => {});
+    let readAvailable = false;
+    const manager = createThreadOutboxManager({
+      registry,
+      storage: {
+        load: async () =>
+          readAvailable
+            ? {
+                messages: [{ ...message, delivery: { state: "attempted" as const } }],
+                errors: [],
+              }
+            : {
+                messages: [],
+                errors: [
+                  new ThreadOutboxStorageError({
+                    operation: "read-message",
+                    environmentId: null,
+                    threadId: null,
+                    messageId: null,
+                    fileName: "unreadable.json",
+                    cause: new Error("Unreadable authority"),
+                  }),
+                ],
+              },
+        write,
+        remove,
+      },
+    });
+    const message = queuedMessage({
+      messageId: "incomplete-admission",
+      createdAt: "2026-10-04T00:00:00.000Z",
+      delivery: { state: "ready" },
+    });
+    await expect(manager.enqueue(message)).rejects.toBeInstanceOf(ThreadOutboxManagerError);
+    expect(write).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    await expect(manager.confirmQueued(message)).resolves.toBe(false);
+    expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toEqual({});
+    readAvailable = true;
+    await expect(manager.load()).resolves.toBe(true);
+    expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toEqual({
+      "environment-1:thread-1": [{ ...message, delivery: { state: "attempted" } }],
+    });
+  });
+
+  it("loads and replaces a terminal record in its original durable slot", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const original = queuedMessage({
+      messageId: "record-slot",
+      createdAt: "2026-10-04T00:00:00.000Z",
+    });
+    const identity = {
+      environmentId: original.environmentId,
+      threadId: original.threadId,
+      messageId: original.messageId,
+    };
+    const record = decodeThreadOutboxRecord(
+      encodeQueuedThreadMessage({
+        ...original,
+        environmentId: EnvironmentId.make("environment-2"),
+        storageIdentity: identity,
+        delivery: { state: "attempted" },
+      }),
+    );
+    await expoThreadOutboxStorage.writeRecord(record);
+    await expect(expoThreadOutboxStorage.readRecord(identity)).resolves.toEqual(record);
+    await expect(expoThreadOutboxStorage.readRecord(record.transport)).resolves.toBeNull();
+    const terminal = decodeThreadOutboxRecord({
+      schemaVersion: 6,
+      kind: "retired",
+      reason: "discarded",
+      storageIdentity: record.storageIdentity,
+      transport: record.transport,
+      delivery: record.delivery,
+      original: record.original,
+    });
+    await expoThreadOutboxStorage.writeRecord(terminal);
+    expect(outboxFiles.size).toBe(1);
+    await expect(expoThreadOutboxStorage.loadRecords()).resolves.toEqual({
+      records: [terminal],
+      errors: [],
+    });
+  });
+
+  it("does not fall back to a legacy copy when the scoped authority is unreadable", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const message = queuedMessage({
+      messageId: "unreadable-scoped",
+      createdAt: "2026-10-04T00:00:00.000Z",
+    });
+    const record = decodeThreadOutboxRecord(encodeQueuedThreadMessage(message));
+    await expoThreadOutboxStorage.writeRecord(record);
+    const fileName = [...outboxFiles.keys()][0];
+    if (fileName === undefined) throw new Error("Expected scoped record");
+    outboxFiles.set(fileName, "{");
+    outboxFiles.set("unreadable-scoped.json", JSON.stringify(encodeQueuedThreadMessage(message)));
+    const before = new Map(outboxFiles);
+    await expect(expoThreadOutboxStorage.readRecord(record.storageIdentity)).rejects.toMatchObject({
+      operation: "read-message",
+      fileName,
+    });
+    const loaded = await expoThreadOutboxStorage.loadRecords();
+    expect(loaded.errors).toHaveLength(1);
+    expect(loaded.records).toEqual([]);
+    expect(outboxFiles).toEqual(before);
+  });
+
+  it("preserves committed record bytes when atomic replacement fails", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const message = queuedMessage({
+      messageId: "record-write-failure",
+      createdAt: "2026-10-04T00:00:00.000Z",
+    });
+    const record = decodeThreadOutboxRecord(encodeQueuedThreadMessage(message));
+    await expoThreadOutboxStorage.writeRecord(record);
+    const { File } = await import("expo-file-system");
+    const rename = vi.spyOn(File.prototype, "moveSync").mockImplementationOnce(() => {
+      throw new Error("Injected pre-rename failure");
+    });
+    onTestFinished(() => rename.mockRestore());
+    await expect(
+      expoThreadOutboxStorage.writeRecord({
+        ...record,
+        archivedFor: "account-1",
+      }),
+    ).rejects.toMatchObject({ operation: "write" });
+    await expect(expoThreadOutboxStorage.readRecord(record.storageIdentity)).resolves.toEqual(
+      record,
+    );
+    await expect(expoThreadOutboxStorage.loadRecords()).resolves.toEqual({
+      records: [record],
+      errors: [],
+    });
+  });
+
+  it.each(["write", "remove"] as const)(
+    "prevents legacy %s from erasing a version6 terminal marker",
+    async (operation) => {
+      onTestFinished(() => outboxFiles.clear());
+      const message = queuedMessage({
+        messageId: "terminal",
+        createdAt: "2026-10-04T00:00:00.000Z",
+      });
+      await expoThreadOutboxStorage.write(message);
+      const fileName = [...outboxFiles.keys()][0];
+      if (fileName === undefined) throw new Error("Expected scoped fixture file");
+      const marker = decodeThreadOutboxRecord({
+        schemaVersion: 6,
+        kind: "retired",
+        reason: "discarded",
+        delivery: { state: "unknown" },
+        storageIdentity: {
+          environmentId: message.environmentId,
+          threadId: message.threadId,
+          messageId: message.messageId,
+        },
+        transport: {
+          environmentId: message.environmentId,
+          threadId: message.threadId,
+          messageId: message.messageId,
+          commandId: message.commandId,
+        },
+      });
+      outboxFiles.set(fileName, JSON.stringify(encodeThreadOutboxRecord(marker)));
+      outboxFiles.set("terminal.json", JSON.stringify(encodeQueuedThreadMessage(message)));
+      const before = new Map(outboxFiles);
+      const legacyLoad = await expoThreadOutboxStorage.load();
+      expect(legacyLoad.messages).toEqual([]);
+      expect(legacyLoad.errors).toHaveLength(1);
+      await expect(expoThreadOutboxStorage[operation](message)).rejects.toBeInstanceOf(
+        ThreadOutboxStorageError,
+      );
+      expect(outboxFiles).toEqual(before);
+    },
+  );
+
+  it.each(["ready", "attempted", "unknown", "refused", "legacy"] as const)(
+    "preserves authoritative %s delivery metadata when saving stale editor content",
+    async (state) => {
+      onTestFinished(() => outboxFiles.clear());
+      const registry = AtomRegistry.make();
+      onTestFinished(() => registry.dispose());
+      const manager = createThreadOutboxManager({ registry, storage: expoThreadOutboxStorage });
+      const base = queuedMessage({
+        messageId: "editor-fence",
+        createdAt: "2026-10-04T00:00:00.000Z",
+      });
+      const original = decodeQueuedThreadMessage({
+        ...base,
+        schemaVersion: 5,
+        ...(state === "legacy"
+          ? {}
+          : {
+              delivery:
+                state === "refused"
+                  ? {
+                      state,
+                      sourceMessage: {
+                        id: base.messageId,
+                        role: "user",
+                        text: "Canonical source",
+                        attachments: [],
+                        turnId: null,
+                        streaming: false,
+                        createdAt: base.createdAt,
+                        updatedAt: base.createdAt,
+                      },
+                      refusal: {
+                        version: 1,
+                        source: "workspace-ownership",
+                        requestId: base.messageId,
+                        reason: "owned",
+                        originCommandId: base.commandId,
+                        originSequence: 1,
+                      },
+                    }
+                  : { state },
+            }),
+      });
+      await manager.enqueue(original);
+      const edited: QueuedThreadMessage = {
+        ...original,
+        text: "Preserve this newer edit",
+        delivery: { state: state === "ready" ? "attempted" : "ready" },
+      };
+      await expect(manager.update(edited, manager.revisionOf(original))).resolves.toBe(true);
+      const expected = { ...original, text: edited.text };
+      expect((await expoThreadOutboxStorage.load()).messages).toEqual([expected]);
+      expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toEqual({
+        "environment-1:thread-1": [expected],
+      });
+      const { delivery: _omitted, ...withoutDelivery } = expected;
+      await expect(manager.update(withoutDelivery, manager.revisionOf(expected))).resolves.toBe(
+        true,
+      );
+      expect((await expoThreadOutboxStorage.load()).messages).toEqual([expected]);
+      if (state !== "ready") {
+        await expect(
+          manager.update(
+            {
+              ...expected,
+              commandId: CommandId.make("replacement-command"),
+            },
+            manager.revisionOf(expected),
+          ),
+        ).resolves.toBe(false);
+      }
+
+      const retarget = {
+        ...expected,
+        environmentId: EnvironmentId.make("environment-2"),
+        storageIdentity: {
+          environmentId: original.environmentId,
+          threadId: original.threadId,
+          messageId: original.messageId,
+        },
+      };
+      await expect(manager.update(retarget, manager.revisionOf(expected))).resolves.toBe(
+        state === "ready",
+      );
+      expect((await expoThreadOutboxStorage.load()).messages).toEqual([
+        state === "ready" ? retarget : expected,
+      ]);
+      if (state !== "ready") {
+        const before = registry.get(manager.queuedMessagesByThreadKeyAtom);
+        const persisted = new Map(outboxFiles);
+        const revision = manager.revisionOf(expected);
+        const { File } = await import("expo-file-system");
+        const writes = vi.spyOn(File.prototype, "write");
+        onTestFinished(() => writes.mockRestore());
+        await expect(
+          manager.enqueue({
+            ...expected,
+            text: "Unsaved replacement stays with its caller",
+            delivery: { state: "ready" },
+          }),
+        ).rejects.toBeInstanceOf(ThreadOutboxManagerError);
+        expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toBe(before);
+        expect(manager.revisionOf(expected)).toBe(revision);
+        expect(outboxFiles).toEqual(persisted);
+
+        const coldRegistry = AtomRegistry.make();
+        onTestFinished(() => coldRegistry.dispose());
+        const cold = createThreadOutboxManager({
+          registry: coldRegistry,
+          storage: expoThreadOutboxStorage,
+        });
+        const firstCold = cold.enqueue({
+          ...expected,
+          delivery: { state: "ready" },
+        });
+        const secondCold = cold.enqueue({
+          ...expected,
+          text: "Concurrent unaccepted edit",
+          delivery: { state: "ready" },
+        });
+        await Promise.all([
+          expect(firstCold).rejects.toBeInstanceOf(ThreadOutboxManagerError),
+          expect(secondCold).rejects.toBeInstanceOf(ThreadOutboxManagerError),
+        ]);
+        expect(outboxFiles).toEqual(persisted);
+        expect(coldRegistry.get(cold.queuedMessagesByThreadKeyAtom)).toEqual({
+          "environment-1:thread-1": [expected],
+        });
+
+        const restartedRegistry = AtomRegistry.make();
+        onTestFinished(() => restartedRegistry.dispose());
+        const restarted = createThreadOutboxManager({
+          registry: restartedRegistry,
+          storage: expoThreadOutboxStorage,
+        });
+        await expect(restarted.load()).resolves.toBe(true);
+        await expect(
+          restarted.enqueue({
+            ...expected,
+            delivery: { state: "ready" },
+          }),
+        ).rejects.toBeInstanceOf(ThreadOutboxManagerError);
+        expect(restartedRegistry.get(restarted.queuedMessagesByThreadKeyAtom)).toEqual({
+          "environment-1:thread-1": [expected],
+        });
+        expect(outboxFiles).toEqual(persisted);
+        expect(writes).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it("keeps manager revisions, edits and environment removal scoped for equal message IDs", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const registry = AtomRegistry.make();
+    onTestFinished(() => registry.dispose());
+    const manager = createThreadOutboxManager({ registry, storage: expoThreadOutboxStorage });
+    const first = queuedMessage({ messageId: "equal-id", createdAt: "2026-10-04T00:00:00.000Z" });
+    const second = {
+      ...first,
+      environmentId: EnvironmentId.make("environment-2"),
+      text: "Keep second",
+    };
+    await manager.enqueue(first);
+    const revision = manager.revisionOf(first);
+    await manager.enqueue(second);
+    expect(manager.revisionOf(first)).toBe(revision);
+    expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toEqual({
+      "environment-1:thread-1": [first],
+      "environment-2:thread-1": [second],
+    });
+    const edited = { ...first, text: "Edit first only" };
+    await expect(manager.update(edited, revision)).resolves.toBe(true);
+    expect(manager.revisionOf(second)).toBe(1);
+    await expect(manager.clearEnvironment(first.environmentId)).resolves.toEqual([edited]);
+    expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toEqual({
+      "environment-2:thread-1": [second],
+    });
+    expect((await expoThreadOutboxStorage.load()).messages).toEqual([second]);
+  });
+
+  it("retargets one pending record atomically without resurrecting its previous scope", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const registry = AtomRegistry.make();
+    onTestFinished(() => registry.dispose());
+    const manager = createThreadOutboxManager({ registry, storage: expoThreadOutboxStorage });
+    const original = queuedMessage({
+      delivery: { state: "ready" },
+      messageId: "retarget",
+      createdAt: "2026-10-04T00:00:00.000Z",
+    });
+    await manager.enqueue(original);
+    const moved = {
+      ...original,
+      environmentId: EnvironmentId.make("environment-2"),
+      storageIdentity: {
+        environmentId: original.environmentId,
+        threadId: original.threadId,
+        messageId: original.messageId,
+      },
+    };
+    await manager.enqueue(moved);
+    expect((await expoThreadOutboxStorage.load()).messages).toEqual([moved]);
+    expect(outboxFiles.size).toBe(1);
+    expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toEqual({
+      "environment-2:thread-1": [moved],
+    });
+  });
+
+  it("rejects retargeting into another record without changing either scope", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const registry = AtomRegistry.make();
+    onTestFinished(() => registry.dispose());
+    const manager = createThreadOutboxManager({ registry, storage: expoThreadOutboxStorage });
+    const first = queuedMessage({
+      messageId: "retarget-conflict",
+      createdAt: "2026-10-04T00:00:00.000Z",
+    });
+    const second = {
+      ...first,
+      environmentId: EnvironmentId.make("environment-2"),
+      text: "Keep second",
+    };
+    await manager.enqueue(first);
+    await manager.enqueue(second);
+    const before = registry.get(manager.queuedMessagesByThreadKeyAtom);
+    const persisted = new Map(outboxFiles);
+    await expect(
+      manager.enqueue({
+        ...first,
+        environmentId: second.environmentId,
+        storageIdentity: {
+          environmentId: first.environmentId,
+          threadId: first.threadId,
+          messageId: first.messageId,
+        },
+      }),
+    ).rejects.toBeInstanceOf(ThreadOutboxManagerError);
+    expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toBe(before);
+    expect(outboxFiles).toEqual(persisted);
+  });
+
+  it("stores and removes the same message ID independently across scopes", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const first = queuedMessage({
+      environmentId: "environment:one",
+      threadId: "thread",
+      messageId: "same-message",
+      createdAt: "2026-10-04T00:00:00.000Z",
+    });
+    const second = {
+      ...first,
+      environmentId: EnvironmentId.make("environment"),
+      threadId: ThreadId.make("one:thread"),
+      text: "Other scope",
+    };
+    await expoThreadOutboxStorage.write(first);
+    await expoThreadOutboxStorage.write(second);
+    expect((await expoThreadOutboxStorage.load()).messages).toEqual(
+      expect.arrayContaining([first, second]),
+    );
+    expect(outboxFiles.size).toBe(2);
+    await expoThreadOutboxStorage.remove(first);
+    expect((await expoThreadOutboxStorage.load()).messages).toEqual([second]);
+  });
+
+  it("does not delete a foreign legacy filename while migrating a scoped message", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const first = queuedMessage({
+      messageId: "shared-legacy",
+      createdAt: "2026-10-04T00:00:00.000Z",
+    });
+    const foreign = { ...first, environmentId: EnvironmentId.make("environment-2") };
+    outboxFiles.set("shared-legacy.json", JSON.stringify(encodeQueuedThreadMessage(foreign)));
+    await expoThreadOutboxStorage.write(first);
+    expect(outboxFiles.has("shared-legacy.json")).toBe(true);
+    await expoThreadOutboxStorage.remove(first);
+    expect((await expoThreadOutboxStorage.load()).messages).toEqual([foreign]);
+  });
+
+  it("prefers a committed scoped record over a redundant legacy copy", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const message = queuedMessage({
+      messageId: "migration-copy",
+      createdAt: "2026-10-04T00:00:00.000Z",
+    });
+    const committed = {
+      ...message,
+      text: "Committed local work",
+      delivery: { state: "attempted" as const },
+    };
+    await expoThreadOutboxStorage.write(committed);
+    outboxFiles.set("migration-copy.json", JSON.stringify({ ...message, schemaVersion: 3 }));
+    expect((await expoThreadOutboxStorage.load()).messages).toEqual([committed]);
+  });
+
+  it("keeps a committed scoped write when unreadable legacy cleanup fails", async () => {
+    onTestFinished(() => outboxFiles.clear());
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    onTestFinished(() => warn.mockRestore());
+    const message = queuedMessage({
+      messageId: "unreadable-legacy",
+      createdAt: "2026-10-04T00:00:00.000Z",
+    });
+    outboxFiles.set("unreadable-legacy.json", "{");
+    await expect(expoThreadOutboxStorage.write(message)).resolves.toBeUndefined();
+    expect(outboxFiles.get("unreadable-legacy.json")).toBe("{");
+    const loaded = await expoThreadOutboxStorage.load();
+    expect(loaded.messages).toEqual([message]);
+    expect(loaded.errors).toHaveLength(1);
+    expect(
+      warn.mock.calls.some(
+        ([, error]) =>
+          error instanceof ThreadOutboxStorageError && error.operation === "legacy-cleanup",
+      ),
+    ).toBe(true);
+  });
+
+  it.each(["ready", "attempted", "unknown"] as const)(
+    "retains the durable %s delivery state across a queue round trip",
+    (state) => {
+      const message = queuedMessage({
+        messageId: "delivery-state",
+        createdAt: "2026-10-04T00:00:00.000Z",
+      });
+      const decoded = decodeQueuedThreadMessage({
+        ...message,
+        schemaVersion: 5,
+        delivery: { state },
+      });
+      expect(decoded.delivery).toEqual({ state });
+      expect(decodeQueuedThreadMessage(encodeQueuedThreadMessage(decoded))).toEqual(decoded);
+    },
+  );
+
+  it.each([1, 2, 3, 4])(
+    "never trusts delivery eligibility from legacy schema %i",
+    (schemaVersion) => {
+      const message = queuedMessage({
+        messageId: "legacy-delivery",
+        createdAt: "2026-10-04T00:00:00.000Z",
+      });
+      const decoded = decodeQueuedThreadMessage({
+        ...message,
+        schemaVersion,
+        delivery: { state: "ready" },
+        storageIdentity: {
+          environmentId: "untrusted-environment",
+          threadId: "untrusted-thread",
+          messageId: message.messageId,
+        },
+      });
+      expect(decoded.delivery).toBeUndefined();
+      expect(decoded.storageIdentity).toBeUndefined();
+      expect(decoded.text).toBe(message.text);
+    },
+  );
+
+  it("retains correlated refused source separately from edited local payload", () => {
+    const message = queuedMessage({
+      messageId: "refused-delivery",
+      createdAt: "2026-10-04T00:00:00.000Z",
+    });
+    const delivery = {
+      state: "refused",
+      sourceMessage: {
+        id: message.messageId,
+        role: "user",
+        text: "Original persisted intent",
+        attachments: [],
+        turnId: null,
+        streaming: false,
+        createdAt: message.createdAt,
+        updatedAt: message.createdAt,
+      },
+      refusal: {
+        version: 1,
+        source: "workspace-ownership",
+        requestId: message.messageId,
+        reason: "owned",
+        originCommandId: message.commandId,
+        originSequence: 1,
+      },
+    };
+    const stored = {
+      ...message,
+      schemaVersion: 5,
+      text: "Newer local edits",
+      delivery,
+    };
+    const decoded = decodeQueuedThreadMessage(stored);
+    expect(decoded.text).toBe("Newer local edits");
+    expect(decoded.delivery).toEqual(delivery);
+    expect(() =>
+      decodeQueuedThreadMessage({
+        ...stored,
+        delivery: { ...delivery, sourceMessage: { ...delivery.sourceMessage, id: "foreign" } },
+      }),
+    ).toThrow();
+    expect(() =>
+      decodeQueuedThreadMessage({
+        ...stored,
+        delivery: { ...delivery, refusal: { ...delivery.refusal, requestId: "foreign" } },
+      }),
+    ).toThrow();
+  });
+
   it("retains structured context through a persisted offline queue round trip", () => {
     const message: QueuedThreadMessage = {
       ...queuedMessage({ messageId: "context-message", createdAt: "2026-09-06T12:00:00.000Z" }),
@@ -185,6 +804,8 @@ describe("thread outbox", () => {
       await expect(manager.confirmQueued(recovered)).resolves.toBe(true);
       const edited = { ...recovered, text: "Edited after recovery" };
       await expect(manager.update(edited)).resolves.toBe(true);
+      expect((await expoThreadOutboxStorage.load()).messages).toEqual([edited]);
+      const persistedAfterEdit = new Map(outboxFiles);
       const beforeRetry = registry.get(manager.queuedMessagesByThreadKeyAtom);
       await expect(manager.load()).resolves.toBe(false);
       expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toBe(beforeRetry);
@@ -192,12 +813,12 @@ describe("thread outbox", () => {
         operation: "clear-environment-load",
       });
       expect(outboxFiles.get("message-2.json")).toBe(unreadable);
-      expect(outboxFiles.has("message-1.json")).toBe(true);
+      expect(outboxFiles).toEqual(persistedAfterEdit);
 
       // A delivered readable message can leave the queue while the failed
       // record stays intact. Its attachment cleanup has a separate guard.
       await expect(manager.remove(edited)).resolves.toBe(edited);
-      expect(outboxFiles.has("message-1.json")).toBe(false);
+      expect(outboxFiles).toEqual(new Map([["message-2.json", unreadable]]));
 
       outboxFiles.set("message-2.json", JSON.stringify(encodeQueuedThreadMessage(second)));
       await expect(manager.load()).resolves.toBe(true);
@@ -219,12 +840,14 @@ describe("thread outbox", () => {
       createdAt: "2026-06-08T10:00:01.000Z",
     });
     const stored = new Map<MessageId, QueuedThreadMessage>();
+    let readUnavailable = false;
     const manager = createThreadOutboxManager({
       registry,
       warn: () => {},
       storage: {
         load: async () => {
-          throw new Error("storage unavailable");
+          if (readUnavailable) throw new Error("storage unavailable");
+          return { messages: [...stored.values()], errors: [] };
         },
         write: async (entry) => {
           stored.set(entry.messageId, entry);
@@ -235,6 +858,7 @@ describe("thread outbox", () => {
       },
     });
     await manager.enqueue(message);
+    readUnavailable = true;
 
     await expect(manager.clearEnvironment(message.environmentId)).rejects.toMatchObject({
       operation: "clear-environment-load",
@@ -249,6 +873,7 @@ describe("thread outbox", () => {
     const registry = AtomRegistry.make();
     onTestFinished(() => registry.dispose());
     const message = queuedMessage({
+      delivery: { state: "ready" },
       messageId: "message-retried",
       createdAt: "2026-06-08T10:00:01.000Z",
     });
@@ -295,7 +920,7 @@ describe("thread outbox", () => {
     // A later repaired record can contain a stale copy of a removed message.
     await expect(manager.load()).resolves.toBe(true);
     expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toEqual({});
-    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenCalledTimes(3);
   });
 
   it("groups messages by scoped thread and preserves creation order", () => {
@@ -765,6 +1390,7 @@ describe("thread outbox", () => {
       },
     });
     const message = queuedMessage({
+      delivery: { state: "ready" },
       messageId: "message-1",
       createdAt: "2026-06-08T10:00:01.000Z",
     });
@@ -796,6 +1422,7 @@ describe("thread outbox", () => {
       },
     });
     const message = queuedMessage({
+      delivery: { state: "ready" },
       messageId: "message-1",
       createdAt: "2026-06-08T10:00:01.000Z",
     });
@@ -864,7 +1491,7 @@ describe("thread outbox", () => {
 
     await manager.enqueue(original);
     // Revision captured before slow work (an attachment upload) starts.
-    const revision = manager.revisionOf(original.messageId);
+    const revision = manager.revisionOf(original);
     await manager.update(edited);
 
     await expect(manager.update({ ...original, text: "stale upload" }, revision)).resolves.toBe(
@@ -905,6 +1532,7 @@ describe("thread outbox", () => {
       },
     });
     const original = queuedMessage({
+      delivery: { state: "ready" },
       messageId: "message-write-race",
       createdAt: "2026-06-08T10:00:01.000Z",
     });
@@ -913,7 +1541,7 @@ describe("thread outbox", () => {
     await manager.enqueue(original);
     const update = manager.update(
       { ...original, text: "stale upload" },
-      manager.revisionOf(original.messageId),
+      manager.revisionOf(original),
     );
     await writeStarted;
     const enqueue = manager.enqueue(replacement);
@@ -955,7 +1583,7 @@ describe("thread outbox", () => {
     await manager.enqueue(original);
     // Revision captured when restore-to-composer read the payload it intends
     // to remove; the edit accepted afterwards must survive the removal.
-    const revision = manager.revisionOf(original.messageId);
+    const revision = manager.revisionOf(original);
     await manager.update(edited);
 
     await expect(manager.remove(original, revision)).resolves.toBe(null);
@@ -964,9 +1592,7 @@ describe("thread outbox", () => {
     });
     expect(stored.get(original.messageId)).toEqual(edited);
 
-    await expect(manager.remove(edited, manager.revisionOf(edited.messageId))).resolves.toEqual(
-      edited,
-    );
+    await expect(manager.remove(edited, manager.revisionOf(edited))).resolves.toEqual(edited);
     expect(registry.get(manager.queuedMessagesByThreadKeyAtom)).toEqual({});
     registry.dispose();
   });
@@ -979,6 +1605,7 @@ describe("thread outbox", () => {
     const replacementWriteStarted = Promise.withResolvers<void>();
     const replacementWriteBarrier = Promise.withResolvers<void>();
     const original = queuedMessage({
+      delivery: { state: "ready" },
       messageId: "message-remove-enqueue-race",
       createdAt: "2026-06-08T10:00:01.000Z",
     });
@@ -1003,7 +1630,7 @@ describe("thread outbox", () => {
     });
 
     await manager.enqueue(original);
-    const removal = manager.remove(original, manager.revisionOf(original.messageId));
+    const removal = manager.remove(original, manager.revisionOf(original));
     let removalSettled = false;
     void removal.then(() => {
       removalSettled = true;
@@ -1054,7 +1681,7 @@ describe("thread outbox", () => {
     let canRemove = true;
 
     await manager.enqueue(message);
-    const removal = manager.remove(message, manager.revisionOf(message.messageId), () => canRemove);
+    const removal = manager.remove(message, manager.revisionOf(message), () => canRemove);
     await removeStarted.promise;
     canRemove = false;
     removeBarrier.resolve();
@@ -1089,6 +1716,7 @@ describe("thread outbox", () => {
       },
     });
     const replaced = queuedMessage({
+      delivery: { state: "ready" },
       environmentId: "environment-clear",
       messageId: "message-replaced-during-clear",
       createdAt: "2026-06-08T10:00:01.000Z",
@@ -1216,26 +1844,24 @@ describe("thread outbox", () => {
     registry.dispose();
   });
 
-  it("removes an already-created pending task before the file-capability gate runs", () => {
-    // The creation's startTurn already made the thread, so the resolver wants
-    // the queued message removed. A missing server config (or missing file
-    // support) must not turn that into a restore, which would duplicate the
-    // task as a draft.
+  it("retains an already-created pending task without treating its shell as a receipt", () => {
+    // A shell cannot prove delivery; neither missing config nor file support
+    // authorizes retirement or restoration.
     const fileAttachments = [{ name: "report.pdf", sizeBytes: 42 }];
     expect(
       resolveThreadOutboxDispatchStep({
-        deliveryAction: "remove",
+        deliveryAction: "wait",
         fileAttachments,
         serverConfig: null,
       }),
-    ).toEqual({ step: "remove" });
+    ).toEqual({ step: "wait" });
     expect(
       resolveThreadOutboxDispatchStep({
-        deliveryAction: "remove",
+        deliveryAction: "wait",
         fileAttachments,
         serverConfig: { maxFileUploadBytes: undefined },
       }),
-    ).toEqual({ step: "remove" });
+    ).toEqual({ step: "wait" });
   });
 
   it("retries instead of parking a file message while the server config loads", () => {
@@ -1289,7 +1915,7 @@ describe("thread outbox", () => {
     ).toEqual({ step: "send" });
   });
 
-  it("only removes a missing-thread message after shell synchronization is live", () => {
+  it("retains missing-thread messages even after shell synchronization", () => {
     expect(
       resolveThreadOutboxDeliveryAction({
         isCreation: false,
@@ -1307,7 +1933,7 @@ describe("thread outbox", () => {
         environmentConnected: true,
         threadBusy: false,
       }),
-    ).toBe("remove");
+    ).toBe("wait");
     expect(
       resolveThreadOutboxDeliveryAction({
         isCreation: false,
@@ -1340,7 +1966,7 @@ describe("thread outbox", () => {
     ).toBe("wait");
   });
 
-  it("sends queued creations once connected and live, removing already-created ones", () => {
+  it("sends eligible creations once connected and live, retaining already-created ones", () => {
     expect(
       resolveThreadOutboxDeliveryAction({
         isCreation: true,
@@ -1378,7 +2004,7 @@ describe("thread outbox", () => {
         environmentConnected: true,
         threadBusy: true,
       }),
-    ).toBe("remove");
+    ).toBe("wait");
   });
 
   it("round-trips queued creations and gates incomplete ones from sending", () => {

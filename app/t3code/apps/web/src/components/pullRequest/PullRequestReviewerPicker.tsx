@@ -98,22 +98,22 @@ export function PullRequestReviewerPicker({
   return (
     <PullRequestCandidatePicker
       icon={<UserPlusIcon className="size-3.5" />}
-      label="Request a review"
+      label="리뷰 요청"
       allowed={allowed}
-      disabledReason="Asking someone to review needs write access on this repository"
+      disabledReason="리뷰를 요청하려면 이 저장소의 쓰기 권한이 필요해요"
       open={open}
       onOpenChange={setOpen}
       query={query}
       onQueryChange={setQuery}
-      searchLabel="Search people with access"
+      searchLabel="권한 있는 사람 검색"
       isPending={candidatesQuery.isPending && candidatesQuery.data === null}
       error={candidatesQuery.data === null ? candidatesQuery.error : null}
       candidates={candidates}
-      emptyLabel="Nobody else has access to this repository."
-      noMatchLabel="Nobody with access matches that."
-      errorLabel="The people with access could not be read."
+      emptyLabel="이 저장소에 권한이 있는 다른 사람이 없어요."
+      noMatchLabel="일치하는 권한 있는 사람이 없어요."
+      errorLabel="권한 있는 사람 목록을 읽지 못했어요."
       truncated={candidatesQuery.data?.truncated === true}
-      truncatedLabel="This repository has more people with access than are listed here. Ask for the rest on the host."
+      truncatedLabel="이 저장소에는 여기 나온 것보다 더 많은 사람이 권한을 갖고 있어요. 나머지는 host에서 요청해 주세요."
       candidateKey={(candidate) => `${candidate.kind}:${candidate.id}`}
       disabled={pending !== null}
       onSelect={(candidate) => void toggle(candidate)}
@@ -125,7 +125,7 @@ export function PullRequestReviewerPicker({
             <span className="shrink-0 text-muted-foreground">team</span>
           ) : null}
           {candidate.isRequested ? (
-            <CheckIcon aria-label="Already asked" className="size-3.5 shrink-0" />
+            <CheckIcon aria-label="이미 요청함" className="size-3.5 shrink-0" />
           ) : null}
         </>
       )}

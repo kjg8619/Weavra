@@ -469,9 +469,8 @@ describe("#5 model intent profiles through the real adapter (faux only)", () => 
 		);
 		const cwd = project("missing-auth", aliased);
 		const auth = await execute(cwd, aliased, "Fix bug");
-		expect(auth.report.error).toBe(
-			"Worker authentication unavailable for Reviewer review -> fast; fallback disabled",
-		);
+		// The host auth gate reports its own closed, user-facing message (claude-sdk-transport.ts).
+		expect(auth.report.error).toBe("모델 API 키 인증을 확인할 수 없어요.");
 		expect(auth.run).toBeUndefined();
 		expect(auth.providerCalls).toBe(0);
 		expect((await FileStateStore.readSnapshot(cwd)).state?.runs ?? []).toEqual([]);

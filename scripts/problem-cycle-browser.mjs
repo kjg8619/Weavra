@@ -133,10 +133,41 @@ export async function openBrowser({ executable, home, profile, headless = true }
         if (!b) return false; b.click(); return true;
       })()`), true, `Missing enabled button: ${text}`);
     };
-    return { pid: child.pid, arm, evaluate, waitText, navigate, click, stop,
-      viewport: (width, height) => call("Emulation.setDeviceMetricsOverride", {
-        width, height, deviceScaleFactor: 1, mobile: width < 600,
-      }),
+    const clickAction = async (action) => {
+      assert.equal(await evaluate(`(() => {
+        const b = document.querySelector('button[data-weavra-action=' + JSON.stringify(${JSON.stringify(action)}) + ']');
+        if (!b || b.disabled) return false; b.click(); return true;
+      })()`), true, `Missing enabled action: ${action}`);
+    };
+    const press = async (name, modifiers = 0) => {
+      const keys = {
+        Enter: { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 },
+        Space: { key: " ", code: "Space", windowsVirtualKeyCode: 32 },
+        Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
+      };
+      const key = keys[name];
+      assert.ok(key, "Unsupported QA key");
+      await call("Input.dispatchKeyEvent", { type: "keyDown", ...key, modifiers,
+        ...(name === "Enter" ? { text: "\r", unmodifiedText: "\r" } : {}) });
+      await call("Input.dispatchKeyEvent", { type: "keyUp", ...key, modifiers });
+    };
+    return { pid: child.pid, arm, evaluate, waitText, navigate, click, clickAction, press, stop,
+      typeText: (text) => call("Input.insertText", { text }),
+      setFiles: async (selector, files) => {
+        const { root } = await call("DOM.getDocument");
+        const { nodeId } = await call("DOM.querySelector", { nodeId: root.nodeId, selector });
+        assert.ok(nodeId, "Owned file input must exist");
+        await call("DOM.setFileInputFiles", { nodeId, files });
+      },
+      exceptions: () => events.rows.filter((event) => event.method === "Runtime.exceptionThrown")
+        .map((event) => event.params.exceptionDetails.exception?.description?.split("\n")[0] ??
+          event.params.exceptionDetails.text),
+      viewport: async (width, height, deviceScaleFactor = 1) => {
+        await call("Emulation.setTouchEmulationEnabled", { enabled: width < 600 });
+        return call("Emulation.setDeviceMetricsOverride", {
+          width, height, deviceScaleFactor, mobile: width < 600,
+        });
+      },
       screenshot: async (path) => {
         const image = await call("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
         await writeFile(path, Buffer.from(image.data, "base64"));

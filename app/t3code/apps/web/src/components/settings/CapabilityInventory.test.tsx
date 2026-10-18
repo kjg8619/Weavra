@@ -68,7 +68,7 @@ describe("inspection-only Runtime inventory", () => {
       inventory.brokerEpoch,
       "2 / 1",
       "environment / project / workspace",
-      "Runtime checks permission per action",
+      "Runtime이 각 동작의 권한을 확인하며",
     ])
       expect(html).toContain(text);
     expect(html).not.toMatch(/<(button|input|form|select)\b/);
@@ -79,15 +79,16 @@ describe("inspection-only Runtime inventory", () => {
       render({ status: "NEEDS_REFRESH", inventory }),
       render({ status: "CURRENT", inventory }, false),
     ]) {
-      expect(html).toContain("Historical observation");
-      expect(html).toContain("NEEDS_REFRESH");
+      expect(html).toContain("과거 관찰이에요");
+      expect(html).toContain("새로고침 필요");
       expect(html).not.toContain(">AVAILABLE<");
+      expect(html).not.toContain(">제공됨<");
       expect(html).toContain("123");
     }
   });
   it("distinguishes baseline Runtime not-exposed, failed refresh, and empty current result", () => {
-    expect(render()).toContain("NOT EXPOSED / UNKNOWN");
-    expect(render()).not.toContain("No rows in this Runtime result");
+    expect(render()).toContain("기능 목록이 제공되지 않아 확인할 수 없어요");
+    expect(render()).not.toContain("이 Runtime 결과에는 항목이 없어요");
     expect(
       render({
         status: "UNKNOWN",
@@ -103,7 +104,7 @@ describe("inspection-only Runtime inventory", () => {
     ).toContain("CONFIG_UNAVAILABLE");
     expect(
       render({ status: "CURRENT", inventory: { ...inventory, entries: [], total: 0, omitted: 0 } }),
-    ).toContain("No rows in this Runtime result");
+    ).toContain("이 Runtime 결과에는 항목이 없어요");
   });
   it("does not render arbitrary metadata or infer another scope's approval and MCP hints", () => {
     const forged = {

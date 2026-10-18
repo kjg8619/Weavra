@@ -40,7 +40,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
             size={size}
             variant="ghost"
             className={size === "xs" ? "shrink-0" : "shrink-0 px-2"}
-            aria-label="More composer controls"
+            aria-label="작성기 설정 더 보기"
             data-composer-shortcut={
               props.traitsMenuContent ? "composer.mode composer.effort" : "composer.mode"
             }
@@ -58,7 +58,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
         ) : null}
         {props.showInteractionModeToggle ? (
           <>
-            <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">Mode</div>
+            <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">모드</div>
             <MenuRadioGroup
               value={props.interactionMode}
               onValueChange={(value) => {
@@ -66,13 +66,13 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
                 props.onToggleInteractionMode();
               }}
             >
-              <MenuRadioItem value="default">Chat</MenuRadioItem>
-              <MenuRadioItem value="plan">Plan</MenuRadioItem>
+              <MenuRadioItem value="default">채팅</MenuRadioItem>
+              <MenuRadioItem value="plan">계획</MenuRadioItem>
             </MenuRadioGroup>
             <MenuDivider />
           </>
         ) : null}
-        <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">Access</div>
+        <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">접근</div>
         <MenuRadioGroup
           value={props.runtimeMode}
           onValueChange={(value) => {
@@ -80,10 +80,10 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
             props.onRuntimeModeChange(value as RuntimeMode);
           }}
         >
-          <MenuRadioItem value="approval-required">Supervised</MenuRadioItem>
-          <MenuRadioItem value="auto-accept-edits">Auto-accept edits</MenuRadioItem>
-          <MenuRadioItem value="auto">Auto</MenuRadioItem>
-          <MenuRadioItem value="full-access">Full access</MenuRadioItem>
+          <MenuRadioItem value="approval-required">승인 후 실행</MenuRadioItem>
+          <MenuRadioItem value="auto-accept-edits">편집 자동 승인</MenuRadioItem>
+          <MenuRadioItem value="auto">자동</MenuRadioItem>
+          <MenuRadioItem value="full-access">전체 접근</MenuRadioItem>
         </MenuRadioGroup>
       </MenuPopup>
     </Menu>

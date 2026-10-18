@@ -148,7 +148,7 @@ export function ZoomableImage({
         ref={viewportRef}
         role="region"
         aria-label={`${name}, zoomable image`}
-        aria-description="Click to zoom in or return to fit. Scroll to zoom, drag to pan. Use Enter to toggle zoom, plus or minus to zoom, and 0 to fit."
+        aria-description="눌러서 확대하거나 화면 맞춤으로 돌아가요. 스크롤로 확대하고 끌어서 이동해요. Enter로 확대를 전환하고, +/-로 확대·축소하고, 0으로 화면에 맞춰요."
         tabIndex={0}
         className="max-w-[var(--media-width)] overflow-auto overscroll-contain rounded-lg bg-background shadow-2xl ring-1 ring-border/70 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         style={{

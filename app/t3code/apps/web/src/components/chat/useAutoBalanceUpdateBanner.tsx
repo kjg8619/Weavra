@@ -85,8 +85,8 @@ export function useAutoBalanceUpdateBanner(
   );
   const count = running || failed || machines.length;
   const status = running ? "running" : failed ? "failed" : "idle";
-  const prefix = running ? "Updating" : failed ? "Could not update" : "Build mismatch on";
-  const title = `${prefix} ${count} ${count === 1 ? "machine" : "machines"}`;
+  const suffix = running ? "업데이트 중" : failed ? "업데이트 실패" : "빌드 불일치";
+  const title = `기기 ${count}대 ${suffix}`;
   return {
     id: `auto-balance-server-updates-${dismissedNotices.size}`,
     variant: failed ? "error" : "default",
@@ -96,7 +96,7 @@ export function useAutoBalanceUpdateBanner(
       <Popover>
         <PopoverTrigger
           className="block max-w-full truncate rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`${title}. View machines`}
+          aria-label={`${title}. 기기 보기`}
         >
           {title}
         </PopoverTrigger>
@@ -109,14 +109,14 @@ export function useAutoBalanceUpdateBanner(
                   <ServerUpdateProgress state={machine.state} />
                 ) : !machine.remoteUpdate ? (
                   <>
-                    <div className="text-muted-foreground">Matching local builds required</div>
+                    <div className="text-muted-foreground">같은 로컬 빌드가 필요해요</div>
                     <ServerUpdateAction {...machine} />
                   </>
                 ) : (
                   <div className="text-muted-foreground">
                     {machine.connected
                       ? `Client build: ${machine.targetVersion}. Automatic updates are unavailable.`
-                      : "Reconnect this machine to inspect build compatibility"}
+                      : "빌드 호환성을 확인하려면 이 기기를 다시 연결해 주세요"}
                   </div>
                 )}
               </div>
@@ -126,7 +126,7 @@ export function useAutoBalanceUpdateBanner(
       </Popover>
     ),
     description:
-      manual > 0 ? "Use matching local builds. Automatic updates are unavailable." : undefined,
+      manual > 0 ? "같은 로컬 빌드를 써 주세요. 자동 업데이트는 쓸 수 없어요." : undefined,
     actions:
       running === 0 && targets.length > 0 ? (
         <ServerUpdatesAction
@@ -134,14 +134,14 @@ export function useAutoBalanceUpdateBanner(
           variant="ghost"
           label={
             failed > 0
-              ? "Retry"
+              ? "다시 시도"
               : targets.length === machines.length
-                ? "Update all"
+                ? "모두 업데이트"
                 : `Update ${targets.length} ${targets.length === 1 ? "machine" : "machines"}`
           }
         />
       ) : undefined,
-    dismissLabel: "Dismiss update notice",
+    dismissLabel: "업데이트 알림 닫기",
     ...(running
       ? {}
       : {

@@ -26,7 +26,7 @@ import { EnvironmentCacheStore } from "../platform/persistence.ts";
 import { subscribeDynamic } from "../rpc/client.ts";
 import { ThreadSnapshotLoader, type ThreadSnapshotWindow } from "./threadSnapshotHttp.ts";
 import { parseThreadKey, threadKey } from "./entities.ts";
-import { applyThreadDetailEvent } from "./threadReducer.ts";
+import { activityOrder, applyThreadDetailEvent } from "./threadReducer.ts";
 import { THREAD_SNAPSHOT_IDLE_TTL_MS } from "./threadRetention.ts";
 import { followStreamInEnvironment } from "./runtime.ts";
 import {
@@ -576,9 +576,9 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
     );
   });
 
-  // Merges an older disjoint page below the currently loaded window. All four
-  // windowed collections prepend; identity dedupe guards the (server-bug or
-  // cursor-misuse) case of overlapping pages so a row never renders twice.
+  // Message, plan and checkpoint rows prepend below the loaded window.
+  // Activities retain canonical order: an older message's refusal can be
+  // emitted later. Identity dedupe prevents overlapping pages repeating rows.
   const mergeOlderPage = Effect.fn("EnvironmentThreadState.mergeOlderPage")(function* (
     snapshot: OrchestrationThreadDetailSnapshot,
   ) {
@@ -606,7 +606,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         // windowed collections gain rows from the older page.
         ...loaded,
         messages: mergeById(older.messages, loaded.messages),
-        activities: mergeById(older.activities, loaded.activities),
+        activities: [...mergeById(older.activities, loaded.activities)].sort(activityOrder),
         proposedPlans: mergeById(older.proposedPlans, loaded.proposedPlans),
         checkpoints: [
           ...older.checkpoints.filter((row) => !seenCheckpoints.has(row.turnId)),

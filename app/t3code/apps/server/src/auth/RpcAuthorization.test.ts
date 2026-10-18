@@ -37,6 +37,7 @@ describe("RPC authorization scopes", () => {
       WS_METHODS.weavraTaskRecover,
       WS_METHODS.weavraTaskAbort,
       WS_METHODS.weavraTaskReprepare,
+      WS_METHODS.weavraTaskCommitDirtyBaseline,
       WS_METHODS.weavraTaskCancel,
       WS_METHODS.weavraTaskResolveApproval,
     ]) {

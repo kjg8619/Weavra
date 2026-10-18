@@ -10,6 +10,7 @@ import {
 import { workerResources } from "./agent-runner.ts";
 import { BudgetController } from "./budget.ts";
 import { planningChecks } from "./check-exercises.ts";
+import { ClaudeTransportError, createHostModelTransport, resolveHostModelAuth } from "./claude-sdk-transport.ts";
 import { complexPlanLimits } from "./complex-plan.ts";
 import {
 	COMPLEX_DRAFT_MAX_BYTES,
@@ -217,6 +218,8 @@ export interface PlanningContext {
 	/** The first user message: one JSON object with `role: "Planner"`. */
 	prompt: string;
 	bytes: number;
+	/** Captured from the same validated project configuration as the planning context. */
+	claudeCodeEnabled?: boolean;
 	/** Synchronous recheck of the VALID facts the prompt carries, as workers recheck before each provider use. */
 	factsCurrent(): boolean;
 }
@@ -311,7 +314,12 @@ export async function buildPlanningContext(input: {
 			"CONTEXT_TOO_LARGE",
 			`The Planning Context is ${bytes} UTF-8 bytes; the limit is ${PLANNER_CONTEXT_MAX_BYTES}`,
 		);
-	return { prompt, bytes, factsCurrent: () => JSON.stringify(valid()) === factsIdentity };
+	return {
+		prompt,
+		bytes,
+		claudeCodeEnabled: config.models.claude_code.enabled,
+		factsCurrent: () => JSON.stringify(valid()) === factsIdentity,
+	};
 }
 
 /** Byte-bounded prefix on a code point boundary, explicitly marked; never a silent cut. */
@@ -356,7 +364,8 @@ function invocationUsage(message: ObservedAssistantMessage): {
 }
 
 /** Configured route only: provider, model and credential are resolved without any fallback. */
-async function plannerModel(runtime: ModelRuntime, route: PlannerRoute, signal: AbortSignal) {
+async function plannerModel(options: PlannerSessionOptions) {
+	const { modelRuntime: runtime, route, signal } = options;
 	// Closed alias/profile names only: configured provider and model strings stay out of error text.
 	const unavailable = () =>
 		new PlannerFailure(
@@ -368,10 +377,15 @@ async function plannerModel(runtime: ModelRuntime, route: PlannerRoute, signal: 
 	const model = runtime.getModel(route.provider, route.model);
 	if (!model) throw unavailable();
 	try {
-		if (!(await runtime.checkAuth(route.provider, { signal })) || !(await runtime.getAuth(model, { signal })))
-			throw new Error("Unconfigured auth");
-	} catch {
+		await resolveHostModelAuth({
+			runtime,
+			model,
+			claudeCodeEnabled: options.context.claudeCodeEnabled === true,
+			signal,
+		});
+	} catch (error) {
 		signal.throwIfAborted();
+		if (error instanceof ClaudeTransportError) throw new PlannerFailure("MODEL_UNAVAILABLE", error.message);
 		throw unavailable();
 	}
 	signal.throwIfAborted();
@@ -419,7 +433,7 @@ type PlannerTurn =
 export async function runPlannerSession(options: PlannerSessionOptions): Promise<ComplexDraft> {
 	const { signal } = options;
 	signal.throwIfAborted();
-	const model = await plannerModel(options.modelRuntime, options.route, signal);
+	const model = await plannerModel(options);
 	const budget = new BudgetController({
 		maxWorkerInvocations: PLANNER_MAX_INVOCATIONS,
 		maxReportedTokens: options.maxReportedTokens,
@@ -521,6 +535,7 @@ export async function runPlannerSession(options: PlannerSessionOptions): Promise
 		},
 	});
 	let session: AgentSession | undefined;
+	let transport: ReturnType<typeof createHostModelTransport> | undefined;
 	let unsubscribe: (() => void) | undefined;
 	try {
 		try {
@@ -554,7 +569,14 @@ export async function runPlannerSession(options: PlannerSessionOptions): Promise
 		}
 		const agent = session.agent;
 		agent.toolExecution = "sequential";
-		const stream = agent.streamFunction;
+		transport = createHostModelTransport({
+			runtime: options.modelRuntime,
+			claudeCodeEnabled: options.context.claudeCodeEnabled === true,
+			cwd: options.cwd,
+			agentDir: options.agentDir,
+			fallback: agent.streamFunction,
+		});
+		const stream = transport.stream;
 		agent.streamFunction = async (requestModel, llmContext, streamOptions) => {
 			await gate();
 			return stream(requestModel, llmContext, {
@@ -624,8 +646,12 @@ export async function runPlannerSession(options: PlannerSessionOptions): Promise
 		} catch {
 			/* Nothing durable depends on cleanup; the session is disposed below. */
 		} finally {
-			unsubscribe?.();
-			session?.dispose();
+			try {
+				await transport?.close();
+			} finally {
+				unsubscribe?.();
+				session?.dispose();
+			}
 		}
 	}
 	signal.throwIfAborted();

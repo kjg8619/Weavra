@@ -158,6 +158,8 @@ import * as UsageService from "./usage/UsageService.ts";
 import * as WeavraRuntimeObserver from "./weavra/RuntimeObserver.ts";
 import * as WeavraRuntimeController from "./weavra/RuntimeController.ts";
 import * as WeavraTaskCoordinator from "./weavra/TaskCoordinator.ts";
+import { setupProject } from "./weavra/ProjectSetup.ts";
+import { prepareTaskProject } from "./weavra/ProjectTaskPreparation.ts";
 import * as TraceDiagnostics from "./diagnostics/TraceDiagnostics.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import { listLinkedPullRequestThreads } from "./pullRequest/linkedThreads.ts";
@@ -743,10 +745,16 @@ const makeWsRpcLayer = (
       const serverEventId = randomUUID.pipe(Effect.map(EventId.make));
       const serverCommandId = (tag: string) =>
         randomUUID.pipe(Effect.map((uuid) => CommandId.make(`server:${tag}:${uuid}`)));
-      const toTaskRpcError = (cause: unknown) =>
-        new WeavraTaskRpcError({
-          code: isTaskCoordinatorError(cause) ? cause.code : "INTERNAL_ERROR",
+      const toTaskRpcError = (cause: unknown) => {
+        if (!isTaskCoordinatorError(cause))
+          return new WeavraTaskRpcError({ code: "INTERNAL_ERROR" });
+        return new WeavraTaskRpcError({
+          code: cause.code,
+          ...(cause.code === "PREPARE_REJECTED" && cause.prepareReason !== undefined
+            ? { prepareReason: cause.prepareReason }
+            : {}),
         });
+      };
       const taskRpc = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         effect.pipe(Effect.mapError(toTaskRpcError));
 
@@ -3727,9 +3735,20 @@ const makeWsRpcLayer = (
             { "rpc.aggregate": "weavra" },
           ),
         [WS_METHODS.weavraTaskCreate]: (input) =>
-          observeRpcEffect(WS_METHODS.weavraTaskCreate, taskRpc(taskCoordinator.create(input)), {
-            "rpc.aggregate": "weavra-task",
-          }),
+          observeRpcEffect(
+            WS_METHODS.weavraTaskCreate,
+            taskRpc(
+              prepareTaskProject(input).pipe(
+                Effect.tap((cwd) => refreshGitStatus(cwd)),
+                Effect.flatMap((cwd) => taskCoordinator.create(input, cwd)),
+              ),
+            ),
+            {
+              "rpc.aggregate": "weavra-task",
+            },
+          ),
+        [WS_METHODS.weavraProjectSetup]: (input) =>
+          observeRpcEffect(WS_METHODS.weavraProjectSetup, setupProject(input)),
         [WS_METHODS.weavraTaskAnalyze]: (input) =>
           observeRpcEffect(WS_METHODS.weavraTaskAnalyze, taskRpc(taskCoordinator.analyze(input)), {
             "rpc.aggregate": "weavra-task",
@@ -3789,6 +3808,20 @@ const makeWsRpcLayer = (
                 input.commandId,
                 input.draft,
                 input.expectedRevision,
+              ),
+            ),
+            { "rpc.aggregate": "weavra-task" },
+          ),
+        [WS_METHODS.weavraTaskCommitDirtyBaseline]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.weavraTaskCommitDirtyBaseline,
+            taskRpc(
+              taskCoordinator.commitDirtyBaseline(
+                input.task,
+                input.expectedRevision,
+                input.files,
+                input.consent,
+                [config.baseDir],
               ),
             ),
             { "rpc.aggregate": "weavra-task" },
@@ -3859,12 +3892,48 @@ const makeWsRpcLayer = (
                   task: event.payload.task,
                 })),
               );
+              // Reuse the controller's existing canonical observation stream. This
+              // adds no timer and never replays confirmation or recovery commands.
+              const runtimeUpdates = runtimeController
+                .observe(input.projectId, input.threadId)
+                .pipe(
+                  Stream.filter((observation) => !observation.stale && observation.state !== null),
+                  Stream.map((observation) => {
+                    const state = observation.state;
+                    if (state === null) return null;
+                    return JSON.stringify([
+                      state.ownerId,
+                      state.projectRevision,
+                      state.stateRevision,
+                      state.busy,
+                      state.cancelling,
+                      state.snapshot.status.writerPresent,
+                      state.snapshot.status.run?.runId,
+                      state.snapshot.status.run?.status,
+                    ]);
+                  }),
+                  Stream.changes,
+                  Stream.mapEffect(() =>
+                    taskRpc(
+                      Effect.gen(function* () {
+                        const current = yield* taskCoordinator.read(input);
+                        if (
+                          current.ownership.state === "released" ||
+                          current.execution?.confirmCommandId == null
+                        )
+                          return;
+                        yield* taskCoordinator.reconcile(input);
+                      }),
+                    ),
+                  ),
+                  Stream.drain,
+                );
               return Stream.concat(
                 Stream.make(
                   { kind: "snapshot" as const, task },
                   { kind: "synchronized" as const, task },
                 ),
-                updates,
+                Stream.merge(updates, runtimeUpdates),
               );
             }),
             { "rpc.aggregate": "weavra-task" },

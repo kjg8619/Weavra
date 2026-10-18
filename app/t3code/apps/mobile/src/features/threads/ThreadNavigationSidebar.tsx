@@ -59,6 +59,7 @@ import {
 import { buildHomeProjectScopes, buildHomeThreadGroups } from "../home/homeThreadList";
 import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "../home/thread-swipe-actions";
 import { usePendingTaskListActions } from "../home/usePendingTaskListActions";
+import { RetainedInventoryNotice, RetainedWorkSheet } from "./RetainedWorkNotice";
 import { useThreadListActions } from "../home/useThreadListActions";
 import {
   getConnectionAwareBrandHeaderOptions,
@@ -179,7 +180,8 @@ function ThreadNavigationSidebarPane(
   const threadListV2Enabled = useThreadListV2Enabled();
   const pendingTasks = usePendingNewTasks();
   const queuedThreadKeys = useQueuedThreadKeys();
-  const { openPendingTask, confirmDeletePendingTask } = usePendingTaskListActions();
+  const { openPendingTask, confirmDeletePendingTask, retainedMessage, closeRetainedWork } =
+    usePendingTaskListActions();
   const environments = useMemo(
     () =>
       Object.values(savedConnectionsById)
@@ -1193,6 +1195,7 @@ function ThreadNavigationSidebarPane(
   if (props.nativeChrome) {
     return (
       <>
+        <RetainedWorkSheet message={retainedMessage} onClose={closeRetainedWork} />
         <NativeStackScreenOptions
           optionsVersion={[nativeHeaderItems, props.width]}
           options={{
@@ -1257,6 +1260,7 @@ function ThreadNavigationSidebarPane(
                 showsVerticalScrollIndicator={false}
                 style={styles.threadList}
                 ListEmptyComponent={listEmpty}
+                ListHeaderComponent={<RetainedInventoryNotice />}
               />
             </GestureDetector>
           </SwipeableScrollGateProvider>
@@ -1273,6 +1277,7 @@ function ThreadNavigationSidebarPane(
       }
       style={{ width: props.width }}
     >
+      <RetainedWorkSheet message={retainedMessage} onClose={closeRetainedWork} />
       <View
         className="flex-1"
         style={
@@ -1290,7 +1295,10 @@ function ThreadNavigationSidebarPane(
         }
       >
         {Platform.OS === "android" && listItems.length === 0 ? (
-          <View className="flex-1 items-center justify-center">{listEmpty}</View>
+          <View className="flex-1 items-center justify-center">
+            <RetainedInventoryNotice />
+            {listEmpty}
+          </View>
         ) : (
           <SwipeableScrollGateProvider enabled={swipeEnabled}>
             <GestureDetector gesture={sidebarScrollGesture}>
@@ -1322,6 +1330,7 @@ function ThreadNavigationSidebarPane(
                 showsVerticalScrollIndicator={false}
                 style={styles.threadList}
                 ListEmptyComponent={listEmpty}
+                ListHeaderComponent={<RetainedInventoryNotice />}
               />
             </GestureDetector>
           </SwipeableScrollGateProvider>

@@ -2,11 +2,121 @@ import * as NodeAssert from "node:assert/strict";
 import { WeavraTask, WeavraExecutionId, type WeavraEvidenceRecord } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
-import { appendTaskEvidence, issueVerification } from "./weavraTaskResultLogic";
-import { resultFixture as fixture } from "./weavraTaskTestFixture";
+import {
+  appendTaskEvidence,
+  issueVerification,
+  taskResultNextAction,
+} from "./weavraTaskResultLogic";
+import { preparedTask, resultFixture as fixture, runTask } from "./weavraTaskTestFixture";
 
 type Check = Extract<WeavraEvidenceRecord, { category: "checks" }>;
 const decodeTask = Schema.decodeUnknownSync(WeavraTask);
+
+describe("task next-action priority", () => {
+  const observed = { fresh: true, connected: true, recoverySupported: true };
+  const interrupted = () => {
+    const task = runTask("INTERRUPTED");
+    const execution = task.execution;
+    NodeAssert.ok(execution?.receipt?.status === "FOUND");
+    return decodeTask({
+      ...task,
+      phase: "attention-required",
+      ownership: { ...task.ownership, state: "runtime" },
+      execution: {
+        ...execution,
+        receipt: {
+          ...execution.receipt,
+          admission: { ...execution.receipt.admission, cleanup: "UNCONFIRMED" },
+        },
+      },
+    });
+  };
+
+  it.each([{ fresh: false }, { connected: false }])(
+    "synchronizes before any action when the observation is unavailable: %j",
+    (unavailable) => {
+      expect(
+        taskResultNextAction({ ...observed, ...unavailable, task: runTask("WAITING_APPROVAL") }),
+      ).toBe("synchronize");
+    },
+  );
+
+  it("reconciles unknown delivery rather than suggesting confirmation", () => {
+    const task = runTask("RUNNING");
+    NodeAssert.ok(task.execution);
+    const unknown = decodeTask({
+      ...task,
+      execution: {
+        ...task.execution,
+        receipt: { status: "UNKNOWN", executionId: task.execution.binding.executionId },
+      },
+    });
+    expect(taskResultNextAction({ ...observed, task: unknown })).toBe("reconcile");
+  });
+
+  it("selects approval inspection only from canonical approval state", () => {
+    expect(taskResultNextAction({ ...observed, task: runTask("WAITING_APPROVAL") })).toBe(
+      "inspect-approval",
+    );
+    expect(taskResultNextAction({ ...observed, task: runTask("RUNNING") })).toBe("none");
+  });
+
+  it("offers recovery for an owned interruption and inspection when recovery is unsupported", () => {
+    const task = interrupted();
+    expect(taskResultNextAction({ ...observed, task })).toBe("recover-interruption");
+    expect(taskResultNextAction({ ...observed, task, recoverySupported: false })).toBe(
+      "inspect-cleanup",
+    );
+  });
+
+  it("handles an interruption before a Run starts without inventing a Run", () => {
+    const task = interrupted();
+    NodeAssert.ok(task.execution?.receipt?.status === "FOUND");
+    const beforeStart = decodeTask({
+      ...task,
+      execution: {
+        ...task.execution,
+        receipt: {
+          ...task.execution.receipt,
+          run: null,
+          admission: {
+            ...task.execution.receipt.admission,
+            outcome: { status: "INTERRUPTED_BEFORE_START", reasonCode: "OWNER_LOST" },
+          },
+        },
+      },
+    });
+    expect(taskResultNextAction({ ...observed, task: beforeStart })).toBe("recover-interruption");
+  });
+
+  it.each(["COMPLETED", "INTERRUPTED"] as const)(
+    "does not offer recovery for released %s work",
+    (status) => {
+      expect(taskResultNextAction({ ...observed, task: runTask(status) })).toBe("none");
+    },
+  );
+
+  it("keeps unconfirmed work out of execution recovery", () => {
+    expect(taskResultNextAction({ ...observed, task: preparedTask() })).toBe("none");
+  });
+
+  it("inspects uncertain cleanup without offering a write or unlock", () => {
+    const task = interrupted();
+    NodeAssert.ok(task.execution?.receipt?.status === "FOUND");
+    NodeAssert.ok(task.execution.receipt.run);
+    const completed = decodeTask({
+      ...task,
+      execution: {
+        ...task.execution,
+        receipt: {
+          ...task.execution.receipt,
+          run: { ...task.execution.receipt.run, status: "COMPLETED" },
+        },
+      },
+    });
+    expect(taskResultNextAction({ ...observed, task: completed })).toBe("inspect-cleanup");
+  });
+});
 
 function accept(result: ReturnType<typeof appendTaskEvidence>) {
   if (!result.ok) throw new Error(result.code);

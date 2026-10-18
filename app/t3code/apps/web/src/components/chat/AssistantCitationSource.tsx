@@ -198,8 +198,8 @@ export function observeAssistantCitationSource({
             request.onComplete();
             toastManager.add({
               type: "warning",
-              title: "Could not open the cited response",
-              description: "Click the citation to try again.",
+              title: "인용한 응답을 열지 못했어요",
+              description: "인용을 눌러 다시 시도해 주세요.",
             });
           },
         );
@@ -212,8 +212,8 @@ export function observeAssistantCitationSource({
       if (!range) {
         toastManager.add({
           type: "warning",
-          title: "The quoted text has changed",
-          description: "Showing the source response. The saved quote is unchanged.",
+          title: "인용한 텍스트가 바뀌었어요",
+          description: "원래 응답을 보여 줘요. 저장한 인용은 그대로예요.",
         });
       }
     }

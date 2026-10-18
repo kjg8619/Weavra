@@ -100,7 +100,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { flushSync } from "react-dom";
+import { WeavraRunGraphPanel } from "./chat/WeavraRunGraphPanel";
+import { createPortal, flushSync } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
 import { assistantCitationFromLocation } from "../lib/assistantCitationNavigation";
@@ -300,7 +301,9 @@ import {
   type ComposerImageAttachment,
   type DraftThreadEnvMode,
   finalizePromotedDraftThreadByRef,
+  finishRecoveredDraftSend,
   markPromotedDraftThreadByRef,
+  prepareRecoveredDraftSend,
   restoreFailedBackgroundDraftThread,
   useComposerDraftStore,
   DraftId,
@@ -366,12 +369,21 @@ import { environmentShell } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { WeavraTaskCard } from "./chat/WeavraTaskCard";
 import { WeavraTaskResults } from "./chat/WeavraTaskResult";
+import { WeavraFactCandidates } from "./chat/WeavraFactCandidates";
 import { useWeavraTask } from "./chat/useWeavraTask";
+import { weavraLabel } from "./weavraLabels";
 import { createPageScrollController, type PageScrollKey } from "./chat/pageScrollController";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
+import { RejectedTurnNotice } from "./chat/RejectedTurnNotice";
+import {
+  recoverRejectedTurn,
+  recoveredTurnContextForSend,
+  type RejectedTurnSource,
+} from "../lib/recoverRejectedTurn";
+import { prepareRecoveredTurnAttachmentsForSend } from "../lib/attachmentUploadQueue";
 import type { AssistantCitationRequest } from "./chat/AssistantCitationSource";
 import { resolveTimelineIsAtEnd, worktreeSetupAgentStarted } from "./chat/MessagesTimeline.logic";
 import { resolveComposerTimelineInset, resolveScrollToEndClearance } from "./composerFooterLayout";
@@ -1443,7 +1455,7 @@ type LocalThreadErrorEntry = {
 };
 
 function chatActionErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "An error occurred.";
+  return error instanceof Error ? error.message : "오류가 발생했어요.";
 }
 
 const ENVIRONMENT_UNAVAILABLE_SEND_TOAST_TRAIL_SIZE = 3;
@@ -1669,9 +1681,8 @@ export default function ChatView(props: ChatViewProps) {
       if (!inserted) {
         toastManager.add({
           type: "warning",
-          title: "The composer is not ready",
-          description:
-            "Try citing the selection after the connection or pending input is resolved.",
+          title: "작성기가 아직 준비되지 않았어요",
+          description: "연결이나 대기 중인 입력이 정리된 뒤 다시 인용해 주세요.",
         });
       }
       return inserted;
@@ -2183,7 +2194,7 @@ export default function ChatView(props: ChatViewProps) {
           stackedThreadToast({
             type: "error",
             title,
-            description: error instanceof Error ? error.message : "An error occurred.",
+            description: error instanceof Error ? error.message : "오류가 발생했어요.",
           }),
         );
       }
@@ -2194,10 +2205,10 @@ export default function ChatView(props: ChatViewProps) {
     activeProjectClone === null
       ? null
       : activeProjectClone.phase === "running"
-        ? "Cloning repository"
+        ? "저장소를 복제하는 중"
         : activeProjectClone.phase === "done"
           ? null
-          : "Repository not cloned";
+          : "저장소를 복제하지 못했어요";
   const projectCloneBannerItem = useMemo<ComposerBannerStackItem | null>(() => {
     if (!activeProjectClone || !activeProjectRef || activeProjectClone.phase === "done") {
       return null;
@@ -2211,19 +2222,19 @@ export default function ChatView(props: ChatViewProps) {
         compact: true,
         priority: "activity",
         icon: <DownloadIcon />,
-        title: `Cloning ${name}`,
+        title: `${name} 복제 중`,
         description: projectCloneProgressSummary(activeProjectClone),
         actions: (
           <Button
             size="xs"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneAction("Failed to cancel clone", () =>
+              void runProjectCloneAction("복제를 취소하지 못했어요", () =>
                 cancelProjectClone({ environmentId, input: { projectId } }),
               )
             }
           >
-            Cancel
+            취소
           </Button>
         ),
       };
@@ -2235,7 +2246,7 @@ export default function ChatView(props: ChatViewProps) {
       compact: true,
       icon: <DownloadIcon />,
       title: cancelled ? `Cancelled cloning ${name}` : `Failed to clone ${name}`,
-      description: cancelled ? "Retry to bring in the repository." : activeProjectClone.error,
+      description: cancelled ? "다시 시도해서 저장소를 가져와 주세요." : activeProjectClone.error,
       actions: (
         <>
           <Button
@@ -2243,18 +2254,18 @@ export default function ChatView(props: ChatViewProps) {
             variant="ghost"
             onClick={() => void removeClonedProject({ environmentId, projectId })}
           >
-            Remove project
+            프로젝트 제거
           </Button>
           <Button
             size="xs"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneAction("Failed to retry clone", () =>
+              void runProjectCloneAction("복제를 다시 시도하지 못했어요", () =>
                 retryProjectClone({ environmentId, input: { projectId } }),
               )
             }
           >
-            Retry
+            다시 시도
           </Button>
         </>
       ),
@@ -2401,8 +2412,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not reconnect environment",
-            description: error instanceof Error ? error.message : "Failed to reconnect.",
+            title: "환경에 다시 연결하지 못했어요",
+            description: error instanceof Error ? error.message : "다시 연결하지 못했어요.",
           }),
         );
       }
@@ -2429,8 +2440,8 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not disconnect server",
-              description: error instanceof Error ? error.message : "Failed to disconnect.",
+              title: "서버 연결을 끊지 못했어요",
+              description: error instanceof Error ? error.message : "연결을 끊지 못했어요.",
             }),
           );
         }
@@ -2629,6 +2640,44 @@ export default function ChatView(props: ChatViewProps) {
     recoverySupported: serverConfig?.environment.capabilities.weavraTaskRecovery === 1,
     connected: activeEnvironmentConnectionPhase === "connected",
   });
+  const controlPanelRef = useRef<HTMLDivElement>(null);
+  // One portal owns the editor/results across inline↔sheet layout changes.
+  // Moving its host preserves form errors, reviewed drafts and evidence pages.
+  const [controlPortalHost] = useState(() => {
+    const host = document.createElement("div");
+    host.className = "flex h-full min-h-0 min-w-0 flex-1 flex-col";
+    return host;
+  });
+  const controlScopeKey = controlledTaskScope ? JSON.stringify(controlledTaskScope) : null;
+  const [retainedControlScope, setRetainedControlScope] = useState<string | null>(null);
+  if (
+    renderedRightPanelSurface?.kind === "control" &&
+    controlScopeKey !== null &&
+    retainedControlScope !== controlScopeKey
+  ) {
+    setRetainedControlScope(controlScopeKey);
+  }
+  const attachControlPortal = useCallback(
+    (slot: HTMLDivElement | null) => {
+      if (slot) slot.appendChild(controlPortalHost);
+    },
+    [controlPortalHost],
+  );
+  const [controlPanelFocusRequest, setControlPanelFocusRequest] = useState(0);
+  useLayoutEffect(() => {
+    if (
+      controlPanelFocusRequest > 0 &&
+      rightPanelOpen &&
+      renderedRightPanelSurface?.kind === "control" &&
+      controlledTaskScope
+    )
+      controlPanelRef.current?.focus({ preventScroll: true });
+  }, [
+    rightPanelOpen,
+    renderedRightPanelSurface?.kind,
+    controlledTaskScope,
+    controlPanelFocusRequest,
+  ]);
   const supportsPullRequests = serverConfig?.environment.capabilities.pullRequests === true;
   const attachmentEnvironmentConfig = environmentById.get(environmentId)?.serverConfig ?? null;
   const attachmentUploadsCapabilityKnown = attachmentEnvironmentConfig !== null;
@@ -2712,12 +2761,12 @@ export default function ChatView(props: ChatViewProps) {
           size="xs"
           variant="ghost"
           disabled={disconnectingEnvironment}
-          title="Hide this server's threads. Switch it on again in Connections."
+          title="이 서버의 대화를 숨겨요. 연결 설정에서 다시 켤 수 있어요."
           onClick={() =>
             void handleDisconnectActiveEnvironment(activeEnvironmentUnavailableState.environmentId)
           }
         >
-          Disconnect server
+          서버 연결 끊기
         </Button>
       ) : undefined;
     const environmentReconnecting =
@@ -2751,8 +2800,8 @@ export default function ChatView(props: ChatViewProps) {
               aria-hidden="true"
             />
           ),
-          title: `${unavailableConnection.phase === "connecting" ? "Connecting" : "Reconnecting"} to ${activeEnvironmentUnavailableState.label}`,
-          description: "Finishing an update",
+          title: `${activeEnvironmentUnavailableState.label}에 ${unavailableConnection.phase === "connecting" ? "연결하는 중" : "다시 연결하는 중"}`,
+          description: "업데이트를 마무리하는 중",
           actions: disconnectAction,
         });
       } else {
@@ -2773,7 +2822,7 @@ export default function ChatView(props: ChatViewProps) {
                     )
                   }
                 >
-                  Reconnect
+                  다시 연결
                 </Button>
               ) : null}
               {disconnectAction}
@@ -2843,14 +2892,14 @@ export default function ChatView(props: ChatViewProps) {
             desktopAppUpdate={versionMismatchDesktopAppUpdate}
             threadContinuation={versionMismatchThreadContinuation}
             targetVersion={versionMismatch.clientVersion}
-            label={updateFailed ? "Retry" : "Update"}
+            label={updateFailed ? "다시 시도" : "Update"}
             variant="ghost"
           />
         ),
         ...(updateInProgress || (!updateFailed && !versionMismatchDismissKey)
           ? {}
           : {
-              dismissLabel: "Dismiss update notice",
+              dismissLabel: "업데이트 알림 닫기",
               onDismiss: () => {
                 if (updateFailed) {
                   dismissServerUpdateFailure(serverUpdateState);
@@ -3207,7 +3256,7 @@ export default function ChatView(props: ChatViewProps) {
       return true;
     }
     setUsageLimitsPanel(null);
-    toastManager.add({ type: "info", title: "Usage limits are unavailable for this provider" });
+    toastManager.add({ type: "info", title: "이 공급자는 사용 한도를 볼 수 없어요" });
     return false;
   }, [
     activeProviderInstanceId,
@@ -3291,16 +3340,16 @@ export default function ChatView(props: ChatViewProps) {
   const isPreparingWorktree = isLocallyPreparingWorktree || awaitingBootstrapTurn;
   const controlledSendReason =
     controlledTask.route === "blocked"
-      ? "Synchronize the controlled task and verify operate access before sending."
+      ? "보내기 전에 통제 작업을 동기화하고 실행 권한을 확인해 주세요."
       : controlledTask.route === "analysis" &&
           (!controlledAnalysisSupported || controlledProvider !== "codex")
-        ? "This selected provider does not support controlled read-only analysis. No fallback is allowed."
+        ? "선택한 프로바이더는 읽기 전용 조사를 지원하지 않아요. 다른 방식으로 자동 전환하지 않아요."
         : controlledTask.route === "analysis" && isWorking
-          ? "Wait for the current read-only analysis to finish."
+          ? "현재 읽기 전용 조사가 끝날 때까지 기다려 주세요."
           : composerHasNonPromptContent
-            ? "Controlled messages are text-only. Stop the unconfirmed task to remove existing attachments or context."
+            ? "통제 작업 메시지에는 텍스트만 보낼 수 있어요. 기존 첨부 파일이나 참고 자료를 제거하려면 아직 확인하지 않은 작업을 중단해 주세요."
             : !controlledAnalysisSupported && controlledTask.route === "followup"
-              ? "This environment does not advertise the task message API."
+              ? "이 환경은 작업 메시지 API를 제공하지 않아요."
               : null;
   const activeWorkStartedAt = deriveActiveWorkStartedAt(
     activeLatestTurn,
@@ -3375,7 +3424,7 @@ export default function ChatView(props: ChatViewProps) {
     async (attachment: ChatFileAttachment) => {
       const connection = readPreparedConnection(environmentId);
       if (!connection) {
-        toastManager.add({ type: "error", title: "The environment is not connected." });
+        toastManager.add({ type: "error", title: "환경이 연결되어 있지 않아요." });
         return;
       }
 
@@ -3393,8 +3442,8 @@ export default function ChatView(props: ChatViewProps) {
       } catch (error) {
         toastManager.add({
           type: "error",
-          title: "Could not download " + attachment.name,
-          description: error instanceof Error ? error.message : "The attachment is unavailable.",
+          title: `${attachment.name}을(를) 내려받지 못했어요`,
+          description: error instanceof Error ? error.message : "첨부를 사용할 수 없어요.",
         });
       }
     },
@@ -3594,6 +3643,7 @@ export default function ChatView(props: ChatViewProps) {
     activeThreadKey,
   );
   const displayedThreadRef = parseScopedThreadKey(displayedTimelineKey);
+  const isControlledTaskDocked = controlledTaskScope !== null && !paintOnlyDisplayedTimeline;
   // Live stages of a bootstrap worktree setup. A worktree send creates the
   // server thread under the route's thread id before anything else, so the
   // stream is keyed by that id alone: no owner bookkeeping, and a remount,
@@ -3907,7 +3957,7 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add({
         type: "warning",
         id: "load-balancing-attachments",
-        title: "Keep attachments on this machine",
+        title: "첨부를 이 기기에 보관해요",
         description:
           "Remove attachments before choosing automatic routing, then attach them on the selected machine.",
       });
@@ -3932,12 +3982,12 @@ export default function ChatView(props: ChatViewProps) {
   ]);
   const autoEnvironmentLabel = automaticEnvironment
     ? draftThread?.loadBalancedEnvironmentId
-      ? "Auto balance"
+      ? "자동 분배"
       : loadBalancing.pending
-        ? "Checking machines…"
+        ? "기기를 확인하는 중…"
         : loadBalancing.failed
-          ? "Auto balance unavailable"
-          : "Auto balance"
+          ? "자동 분배를 쓸 수 없어요"
+          : "자동 분배"
     : undefined;
 
   // Handle environment change for draft threads.  When the user picks a
@@ -4028,7 +4078,7 @@ export default function ChatView(props: ChatViewProps) {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThread.id,
-        error instanceof Error ? error.message : "Failed to interrupt the current turn.",
+        error instanceof Error ? error.message : "현재 턴을 중단하지 못했어요.",
       );
     }
   }, [interruptThreadTurn]);
@@ -4054,8 +4104,8 @@ export default function ChatView(props: ChatViewProps) {
       if (prompt !== null && !composer.insertTextAtEnd(prompt, { ensureLeadingBoundary: true })) {
         toastManager.add({
           type: "error",
-          title: "Unable to add to chat",
-          description: "The composer is busy; try again once it is ready.",
+          title: "채팅에 추가하지 못했어요",
+          description: "작성기가 사용 중이에요. 준비되면 다시 시도해 주세요.",
         });
         return;
       }
@@ -4498,15 +4548,16 @@ export default function ChatView(props: ChatViewProps) {
       if (result._tag === "Success") {
         toastManager.add({
           type: "success",
-          title: `Deleted action "${deletedName ?? "Unknown"}"`,
+          title: `"${deletedName ?? "알 수 없음"}" 작업을 삭제했어요`,
         });
       } else if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not delete action",
-            description: error instanceof Error ? error.message : "An unexpected error occurred.",
+            title: "작업을 삭제하지 못했어요",
+            description:
+              error instanceof Error ? error.message : "예상하지 못한 오류가 발생했어요.",
           }),
         );
       }
@@ -4581,7 +4632,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Unable to open browser",
+              title: "브라우저를 열지 못했어요",
               description: error.message,
             }),
           );
@@ -4603,6 +4654,15 @@ export default function ChatView(props: ChatViewProps) {
   const addAgentsSurface = useCallback(() => {
     if (!activeThreadRef) return;
     useRightPanelStore.getState().open(activeThreadRef, "agents");
+  }, [activeThreadRef]);
+  const addControlSurface = useCallback(() => {
+    if (!activeThreadRef || !controlledTaskScope) return;
+    useRightPanelStore.getState().open(activeThreadRef, "control");
+    setControlPanelFocusRequest((request) => request + 1);
+  }, [activeThreadRef, controlledTaskScope]);
+  const addGraphSurface = useCallback(() => {
+    if (!activeThreadRef) return;
+    useRightPanelStore.getState().open(activeThreadRef, "graph");
   }, [activeThreadRef]);
   const supportsThreadPullRequests =
     serverConfig?.environment.capabilities.threadPullRequests === true;
@@ -5219,8 +5279,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to copy path",
-          description: "Clipboard API unavailable.",
+          title: "경로를 복사하지 못했어요",
+          description: "클립보드를 사용할 수 없어요.",
         }),
       );
       return;
@@ -5230,7 +5290,7 @@ export default function ChatView(props: ChatViewProps) {
       () => {
         toastManager.add({
           type: "success",
-          title: "Path copied",
+          title: "경로를 복사했어요",
           description: relativePath,
         });
       },
@@ -5238,8 +5298,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to copy path",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "경로를 복사하지 못했어요",
+            description: error instanceof Error ? error.message : "오류가 발생했어요.",
           }),
         );
       },
@@ -5923,7 +5983,7 @@ export default function ChatView(props: ChatViewProps) {
         '[data-chat-composer-main-surface="true"]',
       );
       const button = composerOverlayElement?.parentElement?.querySelector<HTMLElement>(
-        'button[aria-label="Scroll to end"]',
+        'button[aria-label="맨 아래로 이동"]',
       );
       const clearance =
         composerOverlayElement && mainSurface && button
@@ -5948,18 +6008,20 @@ export default function ChatView(props: ChatViewProps) {
       const nextHeight = Math.ceil(height);
       if (nextHeight <= 0) return;
       composerOverlayHeightRef.current = nextHeight;
-      const nextInset = resolveComposerTimelineInset({
-        currentInset: composerTimelineInsetRef.current,
-        overlayHeight: nextHeight,
-        isResting: composerRestingRef.current,
-      });
+      const nextInset = isControlledTaskDocked
+        ? 0
+        : resolveComposerTimelineInset({
+            currentInset: composerTimelineInsetRef.current,
+            overlayHeight: nextHeight,
+            isResting: composerRestingRef.current,
+          });
       if (composerTimelineInsetRef.current !== nextInset) {
         composerTimelineInsetRef.current = nextInset;
         setComposerTimelineInset(nextInset);
       }
-      publishScrollToEndClearance(nextHeight);
+      publishScrollToEndClearance(isControlledTaskDocked ? 0 : nextHeight);
     },
-    [publishScrollToEndClearance],
+    [isControlledTaskDocked, publishScrollToEndClearance],
   );
   // The composer reports its resting flag from a layout effect, which runs
   // before this component's own layout effects and before any resize
@@ -5975,11 +6037,20 @@ export default function ChatView(props: ChatViewProps) {
   useLayoutEffect(() => {
     if (!composerOverlayElement) return;
     composerTimelineInsetRef.current = 0;
+    if (isControlledTaskDocked) {
+      setComposerTimelineInset(0);
+      return;
+    }
     publishComposerOverlayHeight(composerOverlayElement.getBoundingClientRect().height);
-  }, [activeThreadKey, composerOverlayElement, publishComposerOverlayHeight]);
+  }, [
+    activeThreadKey,
+    composerOverlayElement,
+    isControlledTaskDocked,
+    publishComposerOverlayHeight,
+  ]);
 
   useLayoutEffect(() => {
-    if (!composerOverlayElement) return;
+    if (!composerOverlayElement || isControlledTaskDocked) return;
 
     const updateHeight = () => {
       publishComposerOverlayHeight(composerOverlayElement.getBoundingClientRect().height);
@@ -5993,7 +6064,7 @@ export default function ChatView(props: ChatViewProps) {
     return () => {
       resizeObserver.disconnect();
     };
-  }, [composerOverlayElement, publishComposerOverlayHeight]);
+  }, [composerOverlayElement, isControlledTaskDocked, publishComposerOverlayHeight]);
   // The pill mounts and unmounts in the same commits that expand or rest the
   // composer, and a fast fling lands there while the previous resting tween
   // still pins the overlay at its old height. Measuring the overlay here would
@@ -6002,8 +6073,13 @@ export default function ChatView(props: ChatViewProps) {
   // clearance, so it reuses the height the composer last published.
   useLayoutEffect(() => {
     if (!composerOverlayElement) return;
-    publishScrollToEndClearance(composerOverlayHeightRef.current);
-  }, [composerOverlayElement, publishScrollToEndClearance, showScrollToBottom]);
+    publishScrollToEndClearance(isControlledTaskDocked ? 0 : composerOverlayHeightRef.current);
+  }, [
+    composerOverlayElement,
+    isControlledTaskDocked,
+    publishScrollToEndClearance,
+    showScrollToBottom,
+  ]);
   const openPanelPullRequestUrl = useOpenPanelPullRequestUrl(activeThreadRef);
   const activeThreadReferenceCopyTarget = useMemo(
     () =>
@@ -6041,7 +6117,7 @@ export default function ChatView(props: ChatViewProps) {
           stackedThreadToast({
             type: "error",
             title: target.failureTitle,
-            description: error instanceof Error ? error.message : "An error occurred.",
+            description: error instanceof Error ? error.message : "오류가 발생했어요.",
           }),
         );
       },
@@ -6136,8 +6212,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to un-settle thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "대화 정리를 취소하지 못했어요",
+            description: error instanceof Error ? error.message : "오류가 발생했어요.",
           }),
         );
       }
@@ -6164,8 +6240,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to wake thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "대화를 다시 열지 못했어요",
+            description: error instanceof Error ? error.message : "오류가 발생했어요.",
           }),
         );
       }
@@ -6225,7 +6301,7 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to switch checkout",
+            title: "checkout을 전환하지 못했어요",
             description: chatActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
           }),
         );
@@ -6245,7 +6321,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Checkout switched, but the thread could not be updated",
+              title: "checkout은 전환했지만 대화를 업데이트하지 못했어요",
               description: chatActionErrorMessage(squashAtomCommandFailure(updateResult)),
             }),
           );
@@ -6304,7 +6380,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to stop background work.",
+          error instanceof Error ? error.message : "백그라운드 작업을 멈추지 못했어요.",
         );
       }
     }
@@ -6327,9 +6403,9 @@ export default function ChatView(props: ChatViewProps) {
       ),
       title: working
         ? liveCount > 0
-          ? `${liveCount} ${liveCount === 1 ? "agent" : "agents"} working`
-          : "Background work"
-        : "Monitoring",
+          ? `에이전트 ${liveCount}개 작업 중`
+          : "백그라운드 작업"
+        : "지켜보는 중",
       actions: (
         <Button
           size="xs"
@@ -6359,9 +6435,9 @@ export default function ChatView(props: ChatViewProps) {
       id: `thread-woke:${activeThread?.id ?? "unknown"}`,
       variant: "info",
       icon: <AlarmClockIcon />,
-      title: "Thread woke from snooze",
-      description: "Send a message to continue",
-      dismissLabel: "Dismiss Woke notification",
+      title: "미뤘던 대화가 다시 열렸어요",
+      description: "이어 가려면 메시지를 보내 주세요",
+      dismissLabel: "깨어남 알림 닫기",
       onDismiss: acknowledgeActiveThreadWoke,
     };
   }, [acknowledgeActiveThreadWoke, activeThread?.id, activeThreadWokeVisible]);
@@ -6374,8 +6450,8 @@ export default function ChatView(props: ChatViewProps) {
       id: `thread-${isSnoozed ? "snoozed" : "settled"}:${activeThread?.id ?? "unknown"}`,
       variant: "info",
       icon: isSnoozed ? <AlarmClockIcon /> : <CheckCircle2Icon />,
-      title: `This thread is ${isSnoozed ? "snoozed" : "settled"}`,
-      description: `Send a message to ${isSnoozed ? "wake" : "unsettle"}`,
+      title: `이 대화는 ${isSnoozed ? "미뤄져" : "정리되어"} 있어요`,
+      description: `메시지를 보내면 ${isSnoozed ? "다시 열려요" : "정리가 취소돼요"}`,
       actions: (
         <Button
           size="xs"
@@ -6387,11 +6463,11 @@ export default function ChatView(props: ChatViewProps) {
         >
           {isSnoozed
             ? isUnsnoozing
-              ? "Waking..."
-              : "Wake now"
+              ? "다시 여는 중..."
+              : "지금 다시 열기"
             : isUnsettling
-              ? "Un-settling..."
-              : "Un-settle"}
+              ? "정리 취소 중..."
+              : "정리 취소"}
         </Button>
       ),
     };
@@ -6435,10 +6511,10 @@ export default function ChatView(props: ChatViewProps) {
   const compactDisabled = compactThreadUnavailable;
   const compactDisabledReason = compactDisabled
     ? !activeProject
-      ? "Choose a project before compacting"
+      ? "압축하기 전에 프로젝트를 골라 주세요"
       : !manualCompactionProviderAvailable
-        ? "Compaction is unavailable for this provider"
-        : "Compacting is unavailable right now"
+        ? "이 공급자는 압축을 지원하지 않아요"
+        : "지금은 압축할 수 없어요"
     : null;
   const resumeCompactionBannerItem = useMemo<ComposerBannerStackItem | null>(() => {
     if (
@@ -6472,14 +6548,14 @@ export default function ChatView(props: ChatViewProps) {
           composerRef.current?.compactContext();
         }}
       >
-        Compact
+        압축
       </Button>
     );
     return {
       id: `resume-compaction:${resumeCompactionKey}`,
       variant: "info",
       icon: <Minimize2Icon />,
-      title: "Resume with less context",
+      title: "더 적은 컨텍스트로 이어 가기",
       description: `${formatContextWindowTokens(activeContextWindow.usedTokens)} tokens from earlier`,
       actions: compactDisabledReason ? (
         <Tooltip>
@@ -6489,7 +6565,7 @@ export default function ChatView(props: ChatViewProps) {
       ) : (
         compactAction
       ),
-      dismissLabel: "Keep full history",
+      dismissLabel: "전체 기록 유지",
       onDismiss: dismiss,
     };
   }, [
@@ -6565,7 +6641,9 @@ export default function ChatView(props: ChatViewProps) {
         icon: <GitBranchIcon />,
         title: (
           <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="shrink-0 font-normal text-muted-foreground">Branch changed — was</span>
+            <span className="shrink-0 font-normal text-muted-foreground">
+              branch가 바뀌었어요. 이전:
+            </span>
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -6588,10 +6666,10 @@ export default function ChatView(props: ChatViewProps) {
             disabled={isRestoringThreadBranch}
             onClick={handleRestoreThreadBranch}
           >
-            {isRestoringThreadBranch ? "Restoring..." : "Restore branch"}
+            {isRestoringThreadBranch ? "되돌리는 중..." : "branch 되돌리기"}
           </Button>
         ),
-        dismissLabel: "Dismiss branch change notice",
+        dismissLabel: "branch 변경 알림 닫기",
         onDismiss: () => {
           dismissBranchMismatchForSession(activeBranchMismatchKey);
           setBranchMismatchDismissTick((tick) => tick + 1);
@@ -6766,8 +6844,8 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Failed to settle thread",
-              description: error instanceof Error ? error.message : "An error occurred.",
+              title: "대화를 정리하지 못했어요",
+              description: error instanceof Error ? error.message : "오류가 발생했어요.",
             }),
           );
         });
@@ -6786,8 +6864,8 @@ export default function ChatView(props: ChatViewProps) {
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: pinned ? "Failed to unpin thread" : "Failed to pin thread",
-                description: error instanceof Error ? error.message : "An error occurred.",
+                title: pinned ? "대화 고정을 해제하지 못했어요" : "대화를 고정하지 못했어요",
+                description: error instanceof Error ? error.message : "오류가 발생했어요.",
               }),
             );
           },
@@ -7048,7 +7126,7 @@ export default function ChatView(props: ChatViewProps) {
       if (!supportsConversationRollback) {
         setThreadError(
           activeThread.id,
-          "This provider does not support reverting conversation history. Start a new thread instead.",
+          "이 공급자는 대화 기록 되돌리기를 지원하지 않아요. 대신 새 대화를 시작해 주세요.",
         );
         return;
       }
@@ -7060,7 +7138,7 @@ export default function ChatView(props: ChatViewProps) {
         return;
       }
       if (phase === "running" || isSendBusy || isConnecting) {
-        setThreadError(activeThread.id, "Interrupt the current turn before reverting checkpoints.");
+        setThreadError(activeThread.id, "체크포인트를 되돌리기 전에 현재 턴을 중단해 주세요.");
         return;
       }
       if (restoreFiles === undefined) {
@@ -7077,7 +7155,7 @@ export default function ChatView(props: ChatViewProps) {
           throw new Error("Wait for attachments to finish preparing before rewinding.");
         }
         const connection = readPreparedConnection(environmentId);
-        if (!connection) throw new Error("The environment is not connected.");
+        if (!connection) throw new Error("환경이 연결되어 있지 않아요.");
         const files = await prepareRevertedMessageAttachments({
           message,
           environmentId,
@@ -7090,9 +7168,7 @@ export default function ChatView(props: ChatViewProps) {
           (draft?.images.length ?? 0) + (draft?.files.length ?? 0) + files.length >
           PROVIDER_SEND_TURN_MAX_ATTACHMENTS
         ) {
-          throw new Error(
-            "Make room for this message's attachments in the composer before rewinding.",
-          );
+          throw new Error("되감기 전에 작성기에 이 메시지의 첨부를 넣을 자리를 만들어 주세요.");
         }
         await waitForRevertedMessage(routeThreadRef, messageId, turnCount, async () => {
           const result = await revertThreadCheckpoint({
@@ -7139,7 +7215,7 @@ export default function ChatView(props: ChatViewProps) {
       } catch (error) {
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to revert thread state.",
+          error instanceof Error ? error.message : "대화 상태를 되돌리지 못했어요.",
         );
       } finally {
         useComposerDraftStore.setState((store) => {
@@ -7230,7 +7306,7 @@ export default function ChatView(props: ChatViewProps) {
           const error = squashAtomCommandFailure(result);
           setThreadError(
             threadId,
-            error instanceof Error ? error.message : "Failed to compact context.",
+            error instanceof Error ? error.message : "컨텍스트를 압축하지 못했어요.",
           );
         }
       } else {
@@ -7242,6 +7318,66 @@ export default function ChatView(props: ChatViewProps) {
   };
 
   const queuedMessages = useQueuedMessages(activeThreadKey ?? "");
+  const rejectedTurnSource = useMemo<RejectedTurnSource>(
+    () => ({
+      scope: routeThreadRef,
+      synchronized:
+        routeKind === "server" &&
+        routeThreadState.status === "live" &&
+        routeThreadState.data._tag === "Some" &&
+        routeThreadState.data.value.id === routeThreadRef.threadId &&
+        threadSyncPhase === null &&
+        activeEnvironmentConnectionPhase === "connected",
+      messages: routeThreadState.data._tag === "Some" ? routeThreadState.data.value.messages : [],
+      activities:
+        routeThreadState.data._tag === "Some" ? routeThreadState.data.value.activities : [],
+    }),
+    [
+      routeKind,
+      routeThreadRef,
+      routeThreadState.status,
+      routeThreadState.data,
+      threadSyncPhase,
+      activeEnvironmentConnectionPhase,
+    ],
+  );
+  const rejectedTurnSourceRef = useRef(rejectedTurnSource);
+  rejectedTurnSourceRef.current = rejectedTurnSource;
+  const canRecoverRejectedTurn =
+    rejectedTurnSource.synchronized &&
+    clientSettingsHydrated &&
+    draftThread === null &&
+    controlledTask.route === "free" &&
+    phase !== "running" &&
+    !isSendBusy &&
+    !isConnecting &&
+    !isRevertingCheckpoint &&
+    activePendingApproval === null &&
+    pendingUserInputs.length === 0 &&
+    queuedMessages.length === 0;
+  const canRecoverRejectedTurnRef = useRef(canRecoverRejectedTurn);
+  canRecoverRejectedTurnRef.current = canRecoverRejectedTurn;
+  const onRecoverRejectedTurn = async (messageId: MessageId) => {
+    const connection = readPreparedConnection(environmentId);
+    if (!connection) throw new Error("환경이 연결되어 있지 않아요.");
+    await recoverRejectedTurn({
+      scope: routeThreadRef,
+      messageId,
+      readSource: () => rejectedTurnSourceRef.current,
+      isComposerReady: () =>
+        canRecoverRejectedTurnRef.current &&
+        !sendInFlightRef.current &&
+        composerRef.current !== null &&
+        !composerRef.current.hasPendingAttachments(),
+      httpBaseUrl: connection.httpBaseUrl,
+      createAssetUrl: createAttachmentAssetUrl,
+    });
+    if (currentRouteThreadKeyRef.current !== routeThreadKey) return;
+    const prompt = useComposerDraftStore.getState().getComposerDraft(routeThreadRef)?.prompt ?? "";
+    promptRef.current = prompt;
+    composerRef.current?.resetCursorState({ prompt, cursor: prompt.length });
+    composerRef.current?.focusAtEnd();
+  };
   // Puts queued messages back into the composer, e.g. after Stop or a failed
   // send. Prompts join with blank lines; attachments and contexts are added.
   const restoreQueuedMessagesToComposer = (messages: ReadonlyArray<QueuedComposerMessage>) => {
@@ -7289,7 +7425,7 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "info",
-          title: "Some attachments stayed queued",
+          title: "일부 첨부가 대기 중으로 남았어요",
           description: `A message holds at most ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} attachments. Use Send now on the queued row when you want the rest to go.`,
         }),
       );
@@ -7327,15 +7463,48 @@ export default function ChatView(props: ChatViewProps) {
     queuedMessage?: QueuedComposerMessage,
   ) => {
     e?.preventDefault();
+    let recoveredDraft = queuedMessage
+      ? null
+      : useComposerDraftStore.getState().getComposerDraft(composerDraftTarget);
+    const recoveredTurn = recoveredDraft?.rejectedTurn;
+    if (recoveredTurn?.sendAttempt) {
+      setThreadError(
+        threadId,
+        "이 복구한 초안은 이미 보내기를 시도했어요. 버리기 전에 대화를 확인해 주세요.",
+      );
+      return;
+    }
+    const recoveredDraftIsCurrent = () =>
+      rejectedTurnSourceRef.current.synchronized &&
+      rejectedTurnSourceRef.current.scope === routeThreadRef &&
+      useComposerDraftStore.persist.hasHydrated() &&
+      useComposerDraftStore.getState().getComposerDraft(composerDraftTarget) === recoveredDraft;
+    if (
+      recoveredTurn &&
+      (controlledTask.route !== "free" ||
+        !recoveredDraftIsCurrent() ||
+        phase === "running" ||
+        activePendingApproval !== null ||
+        pendingUserInputs.length > 0 ||
+        queuedMessages.length > 0 ||
+        directAnnotation !== undefined ||
+        submissionIntent !== "foreground")
+    ) {
+      setThreadError(
+        threadId,
+        "이 동기화된 대화에서 복구한 초안은 일반 채팅으로 직접 보내야 해요.",
+      );
+      return;
+    }
     if (controlledTaskScope && controlledTask.route !== "free") {
       if (queuedMessage || directAnnotation || submissionIntent !== "foreground") {
         controlledTask.setError(
-          "Controlled tasks do not dispatch queued messages, annotations or background turns. Use an explicit text-only send.",
+          "통제 작업은 대기 메시지·주석·백그라운드 요청을 보내지 않아요. 텍스트만 직접 보내 주세요.",
         );
         return;
       }
       if (controlledSendReason || controlledTask.busy || composerHasNonPromptContent) {
-        controlledTask.setError(controlledSendReason ?? "Wait for the current task request.");
+        controlledTask.setError(controlledSendReason ?? "현재 작업 요청을 기다려 주세요.");
         return;
       }
       const text = promptRef.current;
@@ -7353,6 +7522,7 @@ export default function ChatView(props: ChatViewProps) {
     // Typed out in full rather than picked from the menu. Attachments or contexts
     // mean the user is sending a prompt, so those go through as usual.
     if (
+      !recoveredTurn &&
       usageLimitsOffered &&
       usageLimitsKey !== null &&
       !directAnnotation &&
@@ -7373,8 +7543,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "info",
-          title: "Annotation attached to draft",
-          description: "Sending is unavailable right now. Finish the current action, then send.",
+          title: "주석을 초안에 첨부했어요",
+          description: "지금은 보낼 수 없어요. 현재 작업을 마친 뒤 보내 주세요.",
         }),
       );
     };
@@ -7394,12 +7564,10 @@ export default function ChatView(props: ChatViewProps) {
     if (needsLoadBalancing) {
       toastManager.add({
         type: "warning",
-        title: loadBalancing.pending
-          ? "Checking machine resources"
-          : "Choose a machine to continue",
+        title: loadBalancing.pending ? "기기 자원을 확인하는 중" : "이어 가려면 기기를 골라 주세요",
         description: loadBalancing.pending
-          ? "Resource checks are still running. You can choose a machine in the composer."
-          : "No eligible machine has available resources. Choose a machine in the composer to override.",
+          ? "자원 확인이 아직 진행 중이에요. 작성기에서 기기를 고를 수 있어요."
+          : "자원이 남은 기기가 없어요. 작성기에서 기기를 직접 골라 주세요.",
       });
       return;
     }
@@ -7410,8 +7578,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add({
         ...stackedThreadToast({
           type: "warning",
-          title: "Not connected: message not sent",
-          description: "Reconnecting to the environment. Try again once it is connected.",
+          title: "연결되지 않아 메시지를 보내지 못했어요",
+          description: "환경에 다시 연결하는 중이에요. 연결되면 다시 시도해 주세요.",
         }),
         id: `chat-send-environment-unavailable:${toastSlot}`,
       });
@@ -7433,11 +7601,15 @@ export default function ChatView(props: ChatViewProps) {
       return;
     }
     const multipleModelSelections = queuedMessage ? null : sendCtx.multipleModelSelections;
+    if (recoveredTurn && multipleModelSelections !== null) {
+      setThreadError(threadId, "복구한 초안을 보내기 전에 모델 하나를 골라 주세요.");
+      return;
+    }
     if (
       multipleModelSelections !== null &&
       serverConfig?.environment.capabilities.requiredWorktreeBootstrap !== true
     ) {
-      setThreadError(activeThread.id, "Update this server before starting multiple models.");
+      setThreadError(activeThread.id, "여러 모델을 시작하기 전에 이 서버를 업데이트해 주세요.");
       return;
     }
     if (
@@ -7450,9 +7622,9 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "Choose models and a base branch",
+          title: "모델과 base branch를 골라 주세요",
           description:
-            "Multiple models need a new thread in a Git project. Each gets its own worktree.",
+            "여러 모델은 Git 프로젝트의 새 대화가 필요해요. 모델마다 각자의 worktree를 받아요.",
         }),
       );
       return;
@@ -7521,11 +7693,16 @@ export default function ChatView(props: ChatViewProps) {
       hasSendableContent,
     } = deriveComposerSendState({
       prompt: promptForSend,
-      imageCount: composerImages.length + composerFiles.length,
+      imageCount:
+        composerImages.length + composerFiles.length + (recoveredTurn?.attachments.length ?? 0),
       terminalContexts: composerTerminalContexts,
-      elementContextCount: composerPreviewAnnotations.length + composerReviewComments.length,
+      elementContextCount:
+        composerPreviewAnnotations.length +
+        composerReviewComments.length +
+        (recoveredTurn?.context?.records.length ?? 0),
     });
     const feedbackCommand =
+      !recoveredTurn &&
       ctxSelectedProvider === "codex" &&
       composerImages.length === 0 &&
       composerFiles.length === 0 &&
@@ -7539,8 +7716,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "warning",
-            title: "Start a Codex thread first",
-            description: "Send a message before you submit feedback.",
+            title: "먼저 Codex 대화를 시작해 주세요",
+            description: "피드백을 보내기 전에 메시지를 먼저 보내 주세요.",
           }),
         );
         return;
@@ -7584,6 +7761,7 @@ export default function ChatView(props: ChatViewProps) {
       return;
     }
     if (
+      !recoveredTurn &&
       !directAnnotation &&
       !queuedMessage &&
       sendInteractionModeEnabled &&
@@ -7649,6 +7827,7 @@ export default function ChatView(props: ChatViewProps) {
     }
     // Providers without the legacy toggle receive their native commands unchanged.
     const standaloneSlashCommand =
+      !recoveredTurn &&
       sendInteractionModeEnabled &&
       composerImages.length === 0 &&
       composerFiles.length === 0 &&
@@ -7690,8 +7869,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "Choose a project first",
-          description: "This draft no longer points to an available project.",
+          title: "먼저 프로젝트를 골라 주세요",
+          description: "이 초안이 가리키는 프로젝트를 더 이상 쓸 수 없어요.",
         }),
       );
       return;
@@ -7740,48 +7919,80 @@ export default function ChatView(props: ChatViewProps) {
     const shouldCreateWorktree =
       isFirstMessage && sendEnvMode === "worktree" && !activeThread.worktreePath;
     if (shouldCreateWorktree && !activeThreadBranch) {
-      setThreadError(threadIdForSend, "Select a base branch before sending in New worktree mode.");
+      setThreadError(threadIdForSend, "새 worktree 모드로 보내기 전에 base branch를 골라 주세요.");
       return;
     }
 
     const composerImagesSnapshot = [...composerImages];
     const composerFilesSnapshot = [...composerFiles];
     const composerAttachmentsSnapshot = [...composerImagesSnapshot, ...composerFilesSnapshot];
+    const recoveredAttachmentCount = recoveredTurn?.attachments.length ?? 0;
+    if (
+      recoveredAttachmentCount + composerAttachmentsSnapshot.length >
+      PROVIDER_SEND_TURN_MAX_ATTACHMENTS
+    ) {
+      setThreadError(threadIdForSend, "이 복구한 초안을 보내기 전에 첨부를 빼 주세요.");
+      return;
+    }
     const composerTerminalContextsSnapshot = [...sendableComposerTerminalContexts];
     const composerPreviewAnnotationsSnapshot = [...composerPreviewAnnotations];
     const composerReviewCommentsSnapshot: ReviewCommentContext[] = [...composerReviewComments];
     // Expired terminal excerpts are not sent; their chips leave the text with them.
-    const messageTextForSend = composerTerminalContexts
-      .filter((context) => !composerTerminalContextsSnapshot.includes(context))
-      .reduce(
-        (text, context) =>
-          removeInlineContextReference(text, terminalContextReference(context).contextId).prompt,
-        promptForSend,
-      )
-      .trim();
+    const messageTextForSend = recoveredTurn
+      ? promptForSend
+      : composerTerminalContexts
+          .filter((context) => !composerTerminalContextsSnapshot.includes(context))
+          .reduce(
+            (text, context) =>
+              removeInlineContextReference(text, terminalContextReference(context).contextId)
+                .prompt,
+            promptForSend,
+          )
+          .trim();
     // Records bind attachments by the id each side knows: the local id for the optimistic
     // row, the upload id (or local id on the data-URL path) on the wire; the server
     // rebinds them to the persisted id.
-    const buildOutgoingMessageContext = (attachmentIds: ReadonlyArray<string>) =>
-      buildMessageContext({
+    const buildOutgoingMessageContext = (attachmentIds: ReadonlyArray<string>) => {
+      const additional = buildMessageContext({
         terminalContexts: composerTerminalContextsSnapshot,
         reviewComments: composerReviewCommentsSnapshot,
         previewAnnotations: composerPreviewAnnotationsSnapshot,
         attachments: composerAttachmentsSnapshot.map((attachment, index) => ({
           attachment,
-          attachmentId: attachmentIds[index] ?? attachment.id,
+          attachmentId: attachmentIds[index + recoveredAttachmentCount] ?? attachment.id,
         })),
       });
-    const outgoingMessageContext = buildOutgoingMessageContext(
-      composerAttachmentsSnapshot.map((attachment) => attachment.id),
-    );
-    const outgoingMessageText = formatOutgoingPrompt({
-      provider: ctxSelectedProvider,
-      model: ctxSelectedModel,
-      models: ctxSelectedProviderModels,
-      effort: ctxSelectedPromptEffort,
-      text: messageTextForSend || ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
-    });
+      return recoveredTurn
+        ? recoveredTurnContextForSend(
+            recoveredTurn,
+            attachmentIds.slice(0, recoveredAttachmentCount),
+            additional,
+          )
+        : additional;
+    };
+    let outgoingMessageContext: ReturnType<typeof buildOutgoingMessageContext>;
+    try {
+      outgoingMessageContext = buildOutgoingMessageContext([
+        ...(recoveredTurn?.attachments ?? []).map((attachment) => attachment.id),
+        ...composerAttachmentsSnapshot.map((attachment) => attachment.id),
+      ]);
+    } catch (error) {
+      if (!recoveredTurn) throw error;
+      setThreadError(
+        threadIdForSend,
+        error instanceof Error ? error.message : "복구한 컨텍스트를 준비하지 못했어요.",
+      );
+      return;
+    }
+    const outgoingMessageText = recoveredTurn
+      ? messageTextForSend
+      : formatOutgoingPrompt({
+          provider: ctxSelectedProvider,
+          model: ctxSelectedModel,
+          models: ctxSelectedProviderModels,
+          effort: ctxSelectedPromptEffort,
+          text: messageTextForSend || ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
+        });
     if (composerRef.current?.validateProviderInput(outgoingMessageText) === false) {
       // A queued message that no longer fits is held at the head for the
       // user to edit via Cancel, instead of failing on every boundary.
@@ -7913,7 +8124,7 @@ export default function ChatView(props: ChatViewProps) {
       }
       if (getUploadedAttachments({ environmentId, images: composerAttachmentsSnapshot }) === null) {
         sendInFlightRef.current = false;
-        setThreadError(threadIdForSend, "Retry or remove failed uploads before sending.");
+        setThreadError(threadIdForSend, "보내기 전에 실패한 업로드를 다시 시도하거나 빼 주세요.");
         abortQueuedReplay();
         return;
       }
@@ -7965,6 +8176,28 @@ export default function ChatView(props: ChatViewProps) {
       abortQueuedReplay();
       return;
     }
+    let recoveredTransport: Awaited<
+      ReturnType<typeof prepareRecoveredTurnAttachmentsForSend>
+    > | null = null;
+    if (recoveredTurn && recoveredTurn.attachments.length > 0) {
+      try {
+        if (!attachmentCapabilitiesBeforeDispatch.supportsAttachmentUploads) {
+          throw new Error("This environment cannot upload recovered attachments.");
+        }
+        recoveredTransport = await prepareRecoveredTurnAttachmentsForSend({
+          environmentId,
+          attachments: recoveredTurn.attachments,
+          isCurrent: recoveredDraftIsCurrent,
+        });
+      } catch (error) {
+        sendInFlightRef.current = false;
+        setThreadError(
+          threadIdForSend,
+          error instanceof Error ? error.message : "복구한 첨부를 준비하지 못했어요.",
+        );
+        return;
+      }
+    }
     beginLocalDispatch({
       preparingWorktree: multipleModelSelections !== null || Boolean(baseBranchForWorktree),
       submissionIntent: resolvedSubmissionIntent,
@@ -7982,7 +8215,7 @@ export default function ChatView(props: ChatViewProps) {
           return uploaded;
         }
         if (attachment.type !== "image") {
-          throw new Error("This server does not support file attachments.");
+          throw new Error("이 서버는 파일 첨부를 지원하지 않아요.");
         }
         return {
           type: "image" as const,
@@ -7994,7 +8227,7 @@ export default function ChatView(props: ChatViewProps) {
           ...(attachment.source ? { source: attachment.source } : {}),
         };
       }),
-    );
+    ).then((attachments) => [...(recoveredTransport?.attachments ?? []), ...attachments]);
     if (multipleModelSelections !== null) {
       const failedSelections: ModelSelection[] = [];
       let clearedDraft = false;
@@ -8015,7 +8248,7 @@ export default function ChatView(props: ChatViewProps) {
         const title = truncate(
           assistantCitationsToPlainText(stripInlineContextReferences(trimmed)).trim() ||
             composerAttachmentsSnapshot[0]?.name ||
-            "New thread",
+            "새 대화",
         );
         promptRef.current = "";
         clearComposerDraftContent(composerDraftTarget);
@@ -8045,7 +8278,7 @@ export default function ChatView(props: ChatViewProps) {
             try {
               if (uncertainThreadId) {
                 throw new Error(
-                  "The previous request may have started. Open its thread to check before sending again.",
+                  "이전 요청이 이미 시작되었을 수 있어요. 다시 보내기 전에 그 대화를 열어 확인해 주세요.",
                 );
               }
               const supportsInlineMessageContext =
@@ -8113,18 +8346,18 @@ export default function ChatView(props: ChatViewProps) {
               const failureToastId = toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: `Could not start ${target.selection.model}`,
-                  description: error instanceof Error ? error.message : "Failed to send message.",
+                  title: `${target.selection.model}을(를) 시작하지 못했어요`,
+                  description: error instanceof Error ? error.message : "메시지를 보내지 못했어요.",
                   ...(retainedThreadId
                     ? {
                         timeout: 0,
                         data: {
                           secondaryActionProps: {
-                            children: "Allow retry",
+                            children: "다시 시도 허용",
                             onClick: () => {
                               void readLocalApi()
                                 ?.dialogs.confirm(
-                                  "The previous request may already be running. Check its thread first. Allow another send that could create a duplicate thread?",
+                                  "이전 요청이 이미 실행 중일 수 있어요. 먼저 그 대화를 확인해 주세요. 중복 대화가 생길 수 있는데 다시 보낼까요?",
                                 )
                                 .then(
                                   (confirmed) => {
@@ -8143,7 +8376,7 @@ export default function ChatView(props: ChatViewProps) {
                           },
                         },
                         actionProps: {
-                          children: "Open thread",
+                          children: "대화 열기",
                           onClick: () => {
                             void navigate({
                               to: "/$environmentId/$threadId",
@@ -8170,7 +8403,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "success",
-              title: `Started ${startedCount} ${startedCount === 1 ? "thread" : "threads"} in background`,
+              title: `백그라운드에서 대화 ${startedCount}개를 시작했어요`,
             }),
           );
         }
@@ -8181,7 +8414,7 @@ export default function ChatView(props: ChatViewProps) {
         failedSelections.push(...multipleModelSelections);
         setThreadError(
           threadIdForSend,
-          error instanceof Error ? error.message : "Failed to send messages.",
+          error instanceof Error ? error.message : "메시지를 보내지 못했어요.",
         );
       } finally {
         const restoreFailedDraft = () => {
@@ -8221,10 +8454,10 @@ export default function ChatView(props: ChatViewProps) {
                 type: "error",
                 title: "A background prompt could not be sent",
                 description:
-                  "Your newer draft is unchanged. Restore the failed prompt when this composer is empty.",
+                  "새 초안은 그대로예요. 작성기가 비어 있을 때 실패한 프롬프트를 복원해 주세요.",
                 timeout: 0,
                 actionProps: {
-                  children: "Restore prompt",
+                  children: "프롬프트 복원",
                   onClick: () => {
                     if (
                       !draftId ||
@@ -8236,7 +8469,7 @@ export default function ChatView(props: ChatViewProps) {
                     ) {
                       toastManager.update(recoveryToastId, {
                         description:
-                          "Return to the original draft and send or clear its current prompt before restoring.",
+                          "복원하기 전에 원래 초안으로 돌아가 현재 프롬프트를 보내거나 지워 주세요.",
                       });
                       return;
                     }
@@ -8256,27 +8489,30 @@ export default function ChatView(props: ChatViewProps) {
       }
       return;
     }
-    const optimisticAttachments = composerAttachmentsSnapshot.map((attachment) =>
-      attachment.type === "image"
-        ? {
-            type: "image" as const,
-            id: attachment.id,
-            name: attachment.name,
-            mimeType: attachment.mimeType,
-            sizeBytes: attachment.sizeBytes,
-            previewUrl: attachment.previewUrl,
-            ...(attachment.source ? { source: attachment.source } : {}),
-          }
-        : {
-            type: "file" as const,
-            id: attachment.id,
-            name: attachment.name,
-            mimeType: attachment.mimeType,
-            sizeBytes: attachment.sizeBytes,
-            downloadable: false,
-            ...(attachment.source ? { source: attachment.source } : {}),
-          },
-    );
+    const optimisticAttachments = [
+      ...(recoveredTurn?.attachments ?? []),
+      ...composerAttachmentsSnapshot.map((attachment) =>
+        attachment.type === "image"
+          ? {
+              type: "image" as const,
+              id: attachment.id,
+              name: attachment.name,
+              mimeType: attachment.mimeType,
+              sizeBytes: attachment.sizeBytes,
+              previewUrl: attachment.previewUrl,
+              ...(attachment.source ? { source: attachment.source } : {}),
+            }
+          : {
+              type: "file" as const,
+              id: attachment.id,
+              name: attachment.name,
+              mimeType: attachment.mimeType,
+              sizeBytes: attachment.sizeBytes,
+              downloadable: false,
+              ...(attachment.source ? { source: attachment.source } : {}),
+            },
+      ),
+    ];
     const shouldAnchorFirstMessage =
       activeThread.latestTurn === null &&
       !timelineMessages.some((message) => message.role === "user");
@@ -8324,7 +8560,7 @@ export default function ChatView(props: ChatViewProps) {
         }),
       );
     }
-    if (!queuedMessage) {
+    if (!queuedMessage && !recoveredTurn) {
       promptRef.current = "";
       clearComposerDraftContent(composerDraftTarget);
       composerRef.current?.resetCursorState();
@@ -8350,7 +8586,7 @@ export default function ChatView(props: ChatViewProps) {
       } else if (composerPreviewAnnotationsSnapshot.length > 0) {
         titleSeed = previewAnnotationContextLabel(composerPreviewAnnotationsSnapshot[0]!);
       } else {
-        titleSeed = "New thread";
+        titleSeed = "새 대화";
       }
     }
     const title = truncate(titleSeed);
@@ -8393,9 +8629,19 @@ export default function ChatView(props: ChatViewProps) {
 
     const turnAttachmentsResult = await settlePromise(async () => {
       const turnAttachments = await turnAttachmentsPromise;
+      if (recoveredTurn && !recoveredDraftIsCurrent()) {
+        throw new Error("The recovered draft changed before Send.");
+      }
       const liveFileBlockReason = readLiveAttachmentCapabilities().fileBlockReason;
       if (liveFileBlockReason !== null) {
         throw new Error(liveFileBlockReason);
+      }
+      if (failure === null && recoveredTurn && recoveredDraft) {
+        recoveredDraft = await prepareRecoveredDraftSend(
+          routeThreadRef,
+          recoveredDraft,
+          messageIdForSend,
+        );
       }
       return turnAttachments;
     });
@@ -8505,7 +8751,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "warning",
-              title: "Could not open a fresh composer",
+              title: "새 작성기를 열지 못했어요",
               description: error instanceof Error ? error.message : undefined,
             }),
           );
@@ -8514,8 +8760,34 @@ export default function ChatView(props: ChatViewProps) {
       const startResult = await startPromise;
       if (startResult._tag === "Failure") {
         failure = startResult;
+        if (recoveredDraft?.rejectedTurn?.sendAttempt) {
+          try {
+            await finishRecoveredDraftSend(routeThreadRef, recoveredDraft, startResult);
+          } catch (error) {
+            setThreadError(
+              threadIdForSend,
+              error instanceof Error ? error.message : "초안을 정리하지 못했어요.",
+            );
+          }
+        }
       } else {
         turnStartSucceeded = true;
+        if (recoveredTurn && recoveredDraft) {
+          try {
+            await finishRecoveredDraftSend(routeThreadRef, recoveredDraft, startResult);
+            if (currentRouteThreadKeyRef.current === routeThreadKey) {
+              promptRef.current = "";
+              composerRef.current?.resetCursorState();
+            }
+          } catch (error) {
+            // Acceptance is final. Keep the durable attempt fence, never route a
+            // cleanup failure through the request failure/restoration branch.
+            setThreadError(
+              threadIdForSend,
+              `메시지는 접수됐지만 초안을 정리하지 못했어요. ${error instanceof Error ? error.message : "이 탭을 열어 두세요."}`,
+            );
+          }
+        }
         // The turn is under way and will spend quota, so that thread's limits
         // snapshot is stale. Uploads may have outlasted a navigation, so only
         // the sending thread's panel clears.
@@ -8534,7 +8806,7 @@ export default function ChatView(props: ChatViewProps) {
             toastManager.add(
               stackedThreadToast({
                 type: "success",
-                title: "Started in background",
+                title: "백그라운드에서 시작했어요",
                 timeout: 5_000,
                 actionProps: {
                   children: "Open",
@@ -8580,6 +8852,11 @@ export default function ChatView(props: ChatViewProps) {
             images: queuedMessage.images.map(cloneComposerImageForRetry),
           });
         }
+      } else if (recoveredTurn) {
+        // This row borrows preview URLs from the draft that survives the failure.
+        setOptimisticUserMessages((existing) =>
+          existing.filter((message) => message.id !== messageIdForSend),
+        );
       } else if (
         backgroundDraftOpened
           ? !composerDraftHasUserContent(
@@ -8642,16 +8919,16 @@ export default function ChatView(props: ChatViewProps) {
         }
         setThreadError(
           threadIdForSend,
-          error instanceof Error ? error.message : "Failed to send message.",
+          error instanceof Error ? error.message : "메시지를 보내지 못했어요.",
         );
         if (backgroundDraftOpened && draftId) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Background task failed",
-              description: error instanceof Error ? error.message : "Failed to send message.",
+              title: "백그라운드 작업에 실패했어요",
+              description: error instanceof Error ? error.message : "메시지를 보내지 못했어요.",
               actionProps: {
-                children: "Open draft",
+                children: "초안 열기",
                 onClick: () => {
                   void navigate({ to: "/draft/$draftId", params: { draftId } });
                 },
@@ -8661,6 +8938,7 @@ export default function ChatView(props: ChatViewProps) {
         }
       }
     }
+    recoveredTransport?.release();
     sendInFlightRef.current = false;
     if (!turnStartSucceeded) {
       setDockedDraftHeroThreadKey((currentThreadKey) =>
@@ -8759,7 +9037,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : "Failed to submit approval decision.",
+          error instanceof Error ? error.message : "승인 결정을 보내지 못했어요.",
         );
       }
       setRespondingRequestIds((existing) => existing.filter((id) => id !== requestId));
@@ -8820,7 +9098,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : "Failed to submit user input.",
+          error instanceof Error ? error.message : "입력을 보내지 못했어요.",
         );
       }
       userInputResponsesInFlight.current.delete(responseKey);
@@ -8854,7 +9132,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : "Failed to dismiss the question.",
+          error instanceof Error ? error.message : "질문을 닫지 못했어요.",
         );
       }
       setRespondingUserInputRequestIds((existing) => existing.filter((id) => id !== requestId));
@@ -9138,7 +9416,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(failure);
         setThreadError(
           threadIdForSend,
-          error instanceof Error ? error.message : "Failed to send plan follow-up.",
+          error instanceof Error ? error.message : "계획 후속 메시지를 보내지 못했어요.",
         );
       }
       sendInFlightRef.current = false;
@@ -9298,11 +9576,9 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not start implementation thread",
+            title: "구현 대화를 시작하지 못했어요",
             description:
-              error instanceof Error
-                ? error.message
-                : "An error occurred while creating the new thread.",
+              error instanceof Error ? error.message : "새 대화를 만드는 중 오류가 발생했어요.",
           }),
         );
       }
@@ -9655,8 +9931,97 @@ export default function ChatView(props: ChatViewProps) {
       <div className="pointer-events-auto flex h-full items-center">{panelToggleControls}</div>
     </div>
   );
+  const controlPanelContent =
+    activeThreadRef && controlledTaskScope && retainedControlScope === controlScopeKey ? (
+      <div
+        key={JSON.stringify(controlledTaskScope)}
+        ref={controlPanelRef}
+        role="region"
+        aria-label="프로젝트 통제 설정"
+        data-weavra="controlled-task-details"
+        tabIndex={-1}
+        className="min-h-0 flex-1 overflow-y-auto p-3"
+      >
+        <h2 className="text-sm font-medium">{activeProject?.title} 통제 설정</h2>
+        <p className="mt-2 text-xs text-muted-foreground">
+          통제 작업은 선택 사항이에요. 저장된 프로젝트 설정을 재사용하며, 패널을 열거나 닫는
+          것만으로 작업을 시작하거나 실행을 승인하지 않아요.
+        </p>
+        {controlledTask.task &&
+        (controlledTask.task.ownership.state === "analysis" ||
+          controlledTask.task.ownership.state === "released") ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            data-weavra-action="return-to-normal-chat"
+            disabled={!controlledTask.fresh || !controlledTask.canOperate || controlledTask.busy}
+            onClick={async () => {
+              if (controlledTask.task?.ownership.state === "released") {
+                controlledTask.chooseFreeCoding();
+                useRightPanelStore.getState().close(activeThreadRef);
+              } else if (controlledTask.ref && controlledTask.task) {
+                const released = await controlledTask.act({
+                  type: "abort",
+                  input: {
+                    task: controlledTask.ref,
+                    expectedRevision: controlledTask.task.revision,
+                  },
+                });
+                if (released?.ownership.state === "released")
+                  useRightPanelStore.getState().close(activeThreadRef);
+              }
+            }}
+          >
+            일반 채팅으로 돌아가기
+          </Button>
+        ) : null}
+        {controlledTaskScope && !paintOnlyDisplayedTimeline ? (
+          <>
+            <WeavraTaskCard
+              controller={controlledTask}
+              scope={controlledTaskScope}
+              supported={controlledTasksSupported}
+              analysisSupported={controlledAnalysisSupported}
+              connected={activeEnvironmentConnectionPhase === "connected"}
+              messages={timelineMessages}
+              provider={controlledProvider}
+              entryBlockedReason={
+                isWorking
+                  ? "현재 대화 응답이 끝난 뒤 통제 작업을 시작할 수 있어요."
+                  : queuedMessages.length > 0
+                    ? "통제 작업 전에 대기 중인 메시지를 제거해 주세요."
+                    : composerHasNonPromptContent
+                      ? "통제 작업 전에 첨부 파일과 참고 자료를 제거해 주세요."
+                      : null
+              }
+            />
+            <WeavraTaskResults
+              controller={controlledTask}
+              connected={activeEnvironmentConnectionPhase === "connected"}
+            />
+            {activeProject ? (
+              <WeavraFactCandidates
+                environmentId={activeProject.environmentId}
+                projectId={activeProject.id}
+                workspaceRoot={activeProject.workspaceRoot}
+              />
+            ) : null}
+          </>
+        ) : null}
+      </div>
+    ) : null;
   const rightPanelContent = activeThreadRef ? (
-    renderedRightPanelSurface?.kind === "preview" ? (
+    renderedRightPanelSurface?.kind === "graph" && activeProject ? (
+      <WeavraRunGraphPanel
+        environmentId={activeProject.environmentId}
+        projectId={activeProject.id}
+        workspaceRoot={activeProject.workspaceRoot}
+      />
+    ) : renderedRightPanelSurface?.kind === "control" ? (
+      <div ref={attachControlPortal} className="flex h-full min-h-0 min-w-0 flex-1 flex-col" />
+    ) : renderedRightPanelSurface?.kind === "preview" ? (
       <Suspense fallback={null}>
         <PreviewPanel
           mode="embedded"
@@ -9701,8 +10066,8 @@ export default function ChatView(props: ChatViewProps) {
       <PullRequestDetailGhost />
     ) : renderedRightPanelSurface?.kind === "pull-request" && !supportsPullRequests ? (
       <PullRequestsUnavailableState
-        title="Pull requests unavailable"
-        error="This environment's server build does not support pull requests. Use a matching Weavra server build."
+        title="PR을 쓸 수 없어요"
+        error="이 환경의 서버 빌드는 PR을 지원하지 않아요. 맞는 Weavra 서버 빌드를 써 주세요."
       />
     ) : renderedRightPanelSurface?.kind === "pull-request" ? (
       // No onClose: the surface tab's own X owns closing here, and a second X in the header
@@ -9923,7 +10288,7 @@ export default function ChatView(props: ChatViewProps) {
                   className="flex items-center gap-2 rounded-full border border-primary/25 bg-background/95 px-4 py-2.5 text-sm font-medium text-foreground shadow-lg"
                 >
                   <PaperclipIcon className="size-4 text-primary" aria-hidden="true" />
-                  Drop files to attach
+                  파일을 놓아 첨부해 주세요
                 </div>
               </div>
             ) : null}
@@ -9944,35 +10309,19 @@ export default function ChatView(props: ChatViewProps) {
               />
             </div>
             {/* Messages Wrapper */}
+            {!paintOnlyDisplayedTimeline && routeKind === "server" ? (
+              <RejectedTurnNotice
+                key={routeThreadKey}
+                scope={routeThreadRef}
+                source={rejectedTurnSource}
+                canRecover={canRecoverRejectedTurn}
+                onRecover={onRecoverRejectedTurn}
+              />
+            ) : null}
             <div className="relative flex min-h-0 flex-1 flex-col bg-background">
               {/* Messages — LegendList handles virtualization and scrolling internally */}
               <MessagesTimeline
-                controlledTaskCard={
-                  controlledTaskScope && !paintOnlyDisplayedTimeline ? (
-                    <div key={JSON.stringify(controlledTaskScope)} className="min-w-0">
-                      <WeavraTaskCard
-                        controller={controlledTask}
-                        scope={controlledTaskScope}
-                        supported={controlledTasksSupported}
-                        analysisSupported={controlledAnalysisSupported}
-                        connected={activeEnvironmentConnectionPhase === "connected"}
-                        messages={timelineMessages}
-                        provider={controlledProvider}
-                        entryBlockedReason={
-                          queuedMessages.length > 0
-                            ? "Remove queued messages before starting a controlled task."
-                            : composerHasNonPromptContent
-                              ? "Remove attachments and context before starting a controlled task."
-                              : null
-                        }
-                      />
-                      <WeavraTaskResults
-                        controller={controlledTask}
-                        connected={activeEnvironmentConnectionPhase === "connected"}
-                      />
-                    </div>
-                  ) : null
-                }
+                controlledTaskCard={null}
                 citationRequest={paintOnlyDisplayedTimeline ? null : citationRequest}
                 citationHistoryLoading={threadDetailLoading}
                 {...(!paintOnlyDisplayedTimeline
@@ -10064,7 +10413,7 @@ export default function ChatView(props: ChatViewProps) {
                   style={{ bottom: scrollToEndClearance + 4 }}
                 >
                   <Button
-                    aria-label="Scroll to end"
+                    aria-label="맨 아래로 이동"
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={() => {
                       composerRef.current?.restoreAfterTimelineReachedEnd();
@@ -10075,7 +10424,7 @@ export default function ChatView(props: ChatViewProps) {
                     variant="glass"
                   >
                     <ChevronDownIcon className="size-3.5" />
-                    Scroll to end
+                    맨 아래로 이동
                   </Button>
                 </div>
               )}
@@ -10089,12 +10438,18 @@ export default function ChatView(props: ChatViewProps) {
               className={
                 isDraftHeroState
                   ? "pointer-events-none absolute inset-0 z-20 flex items-center"
-                  : "pointer-events-none absolute inset-x-0 bottom-0 z-20 pt-1.5 sm:pt-2"
+                  : isControlledTaskDocked
+                    ? "relative z-20 shrink-0 pt-1.5 sm:pt-2"
+                    : "pointer-events-none absolute inset-x-0 bottom-0 z-20 pt-1.5 sm:pt-2"
               }
             >
               <div
                 ref={attachDraftHeroTransitionGroupRef}
-                className="w-full ps-[calc(env(safe-area-inset-left)+0.75rem)] pe-[calc(env(safe-area-inset-right)+0.75rem)] sm:ps-[calc(env(safe-area-inset-left)+1.25rem)] sm:pe-[calc(env(safe-area-inset-right)+1.25rem)]"
+                className={cn(
+                  "w-full ps-[calc(env(safe-area-inset-left)+0.75rem)] pe-[calc(env(safe-area-inset-right)+0.75rem)] sm:ps-[calc(env(safe-area-inset-left)+1.25rem)] sm:pe-[calc(env(safe-area-inset-right)+1.25rem)]",
+                  isControlledTaskDocked && "pointer-events-auto",
+                  isDraftHeroState && "pointer-events-none",
+                )}
               >
                 <div
                   data-chat-composer-stack="true"
@@ -10131,6 +10486,36 @@ export default function ChatView(props: ChatViewProps) {
                     <ComposerSurface.Shell contextStrip={showComposerContextStrip}>
                       <ComposerSurface.Host>
                         <div ref={attachDraftHeroComposerAnchorRef} className="relative z-10">
+                          {controlledTaskScope &&
+                          controlledTask.task &&
+                          !paintOnlyDisplayedTimeline ? (
+                            <div className="flex min-w-0 items-center gap-2 px-3 py-1">
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="ghost"
+                                data-weavra-action="open-controlled-task"
+                                onClick={addControlSurface}
+                              >
+                                통제 작업
+                              </Button>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {activeEnvironmentConnectionPhase !== "connected"
+                                  ? "연결 끊김"
+                                  : !controlledTasksSupported
+                                    ? "사용할 수 없음"
+                                    : !controlledTask.canOperate
+                                      ? "읽기 전용"
+                                      : !controlledTask.discovered
+                                        ? "불러오는 중"
+                                        : controlledTask.route === "free"
+                                          ? "일반 채팅"
+                                          : controlledTask.task
+                                            ? `${weavraLabel(controlledTask.task.phase)}${controlledTask.fresh ? "" : " (과거 정보)"}`
+                                            : "시작 전"}
+                              </span>
+                            </div>
+                          ) : null}
                           <ChatComposer
                             controlledTask={
                               controlledTaskScope && controlledTask.route !== "free"
@@ -10172,13 +10557,13 @@ export default function ChatView(props: ChatViewProps) {
                             isRevertingCheckpoint={isRevertingCheckpoint}
                             sendDisabledReason={
                               isRevertingCheckpoint
-                                ? "Rewinding conversation"
+                                ? "대화를 되감는 중"
                                 : feedbackUploading
-                                  ? "Sending feedback"
+                                  ? "피드백을 보내는 중"
                                   : threadDetailLoading
-                                    ? "Messages loading"
+                                    ? "메시지를 불러오는 중"
                                     : worktreeSetupBlocksSend
-                                      ? "Preparing worktree"
+                                      ? "worktree를 준비하는 중"
                                       : projectCloneSendBlockReason
                             }
                             isPreparingWorktree={isPreparingWorktree}
@@ -10361,7 +10746,7 @@ export default function ChatView(props: ChatViewProps) {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+                  <AlertDialogClose render={<Button variant="outline" />}>취소</AlertDialogClose>
                   <Button
                     variant="default"
                     onClick={() => {
@@ -10369,7 +10754,7 @@ export default function ChatView(props: ChatViewProps) {
                       void handleSwitchCheckoutToThread();
                     }}
                   >
-                    Switch branch
+                    branch 전환
                   </Button>
                 </AlertDialogFooter>
               </AlertDialogPopup>
@@ -10416,6 +10801,9 @@ export default function ChatView(props: ChatViewProps) {
         ))}
       </div>
 
+      {controlPanelContent
+        ? createPortal(controlPanelContent, controlPortalHost, controlScopeKey)
+        : null}
       {rightPanelPresent && !shouldUseRightPanelSheet && activeThreadRef ? (
         <RightPanelTabs
           mode="inline"
@@ -10448,6 +10836,8 @@ export default function ChatView(props: ChatViewProps) {
           onAddPullRequest={addPullRequestSurface}
           onAddPullRequests={addPullRequestsSurface}
           onAddAgents={addAgentsSurface}
+          {...(controlledTaskScope ? { onAddControl: addControlSurface } : {})}
+          {...(activeProject ? { onAddGraph: addGraphSurface } : {})}
           onAddDevice={addDeviceSurface}
           browserAvailable={isPreviewSupportedInRuntime()}
           terminalAvailable={activeProject !== null}
@@ -10467,6 +10857,9 @@ export default function ChatView(props: ChatViewProps) {
           animationDurationMs={panelAnimationsActive ? panelAnimationDurationMs : 0}
           open={rightPanelOpen}
           underFloatingPreview={previewMiniPlayerVisible}
+          initialFocus={() =>
+            renderedRightPanelSurface?.kind === "control" ? (controlPanelRef.current ?? true) : true
+          }
           onClose={closePreviewPanel}
         >
           <RightPanelTabs
@@ -10506,6 +10899,8 @@ export default function ChatView(props: ChatViewProps) {
             onAddPullRequest={addPullRequestSurface}
             onAddPullRequests={addPullRequestsSurface}
             onAddAgents={addAgentsSurface}
+            {...(controlledTaskScope ? { onAddControl: addControlSurface } : {})}
+            {...(activeProject ? { onAddGraph: addGraphSurface } : {})}
             onAddDevice={addDeviceSurface}
             browserAvailable={isPreviewSupportedInRuntime()}
             terminalAvailable={activeProject !== null}
@@ -10530,17 +10925,16 @@ export default function ChatView(props: ChatViewProps) {
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Edit from here?</AlertDialogTitle>
+            <AlertDialogTitle>여기부터 편집할까요?</AlertDialogTitle>
             <AlertDialogDescription>
-              Rewind chat to before this message. Your prompt and attachments return to the
-              composer.
+              이 메시지 이전으로 대화를 되감아요. 프롬프트와 첨부는 작성기로 돌아가요.
               {activeWorktreePath === null
-                ? " Files stay as they are because this thread shares the project directory."
+                ? " 이 대화는 프로젝트 폴더를 함께 쓰므로 파일은 그대로 남아요."
                 : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>취소</AlertDialogClose>
             {activeWorktreePath !== null ? (
               <Button
                 variant="destructive"
@@ -10550,7 +10944,7 @@ export default function ChatView(props: ChatViewProps) {
                   void onRevertToTurnCount(pendingRevert.turnCount, pendingRevert.messageId, true);
                 }}
               >
-                Revert files too
+                파일도 되돌리기
               </Button>
             ) : null}
             <Button
@@ -10560,7 +10954,7 @@ export default function ChatView(props: ChatViewProps) {
                 void onRevertToTurnCount(pendingRevert.turnCount, pendingRevert.messageId, false);
               }}
             >
-              Revert and keep changes
+              되돌리고 변경 사항 유지
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

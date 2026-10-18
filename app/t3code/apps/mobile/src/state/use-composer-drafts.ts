@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { pendingTaskDraftKey } from "./pending-task-identity";
 import {
   EnvironmentId as EnvironmentIdSchema,
   ModelSelection as ModelSelectionSchema,
@@ -7,6 +8,9 @@ import {
   COMPOSER_CONTEXT_MAX_RECORDS,
   ForwardCompatibleArray,
   OrchestrationMessageContext,
+  OrchestrationMessage,
+  ThreadId,
+  WorkspaceTurnStartRefusalPayload,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   ProjectId as ProjectIdSchema,
   ProviderInteractionMode as ProviderInteractionModeSchema,
@@ -21,7 +25,9 @@ import * as Schema from "effect/Schema";
 import { useEffect } from "react";
 import { Atom } from "effect/unstable/reactivity";
 
-import { writeFileAtomically } from "../lib/atomic-file";
+import { prepareAtomicFileWriter } from "../lib/atomic-file";
+import { scopedThreadKey } from "../lib/scopedEntities";
+import { mergeRejectedComposerContext } from "../lib/rejectedComposerSend";
 import { createComposerContextHistory, referencedComposerContext } from "../lib/composerContext";
 import {
   collectComposerContextReferences,
@@ -31,6 +37,7 @@ import {
 } from "@t3tools/shared/composerContextReferences";
 import { imageMimeType } from "@t3tools/shared/image";
 import { videoMimeType } from "@t3tools/shared/video";
+import { stableStringify } from "@t3tools/shared/relaySigning";
 import { DraftComposerAttachmentSchema } from "../lib/composer-image-schema";
 import {
   composerAttachmentFileReferenceKey,
@@ -49,15 +56,24 @@ import {
   decodeQueuedThreadMessage,
   encodeQueuedThreadMessage,
   QueuedThreadMessageSchema,
+  threadOutboxStorageIdentity,
   type QueuedThreadMessage,
 } from "./thread-outbox-model";
 import { flushThreadOutbox, threadOutboxManager } from "./thread-outbox";
+import { optimisticThreadOutboxOwnersAtom } from "./thread-outbox-ownership";
+import { ownedThreadOutboxPayloads } from "./thread-outbox-record";
+import {
+  expoThreadOutboxStorage,
+  flushThreadOutboxWrites,
+  threadOutboxWriteState,
+} from "./thread-outbox-storage";
 import { composerDraftEnvironmentId } from "../lib/composerAttachmentUploadQueue";
 
-const COMPOSER_DRAFTS_SCHEMA_VERSION = 1;
+const COMPOSER_DRAFTS_SCHEMA_VERSION = 2;
 const COMPOSER_DRAFTS_DIRECTORY = "composer-drafts";
 const COMPOSER_DRAFTS_FILE = "drafts.json";
 const PERSIST_DEBOUNCE_MS = 200;
+let composerMutationEpoch = 0;
 
 export const composerContextImportsAtom = Atom.make<Record<string, boolean>>({}).pipe(
   Atom.keepAlive,
@@ -67,6 +83,7 @@ export function setComposerContextImporting(draftKey: string, importing: boolean
   const next = { ...appAtomRegistry.get(composerContextImportsAtom) };
   if (importing) next[draftKey] = true;
   else delete next[draftKey];
+  composerMutationEpoch += 1;
   appAtomRegistry.set(composerContextImportsAtom, next);
 }
 
@@ -154,25 +171,41 @@ export function getComposerDraftAfterSelection(
   return draftWithoutInsertionSelection(draftKey, getComposerDraftSnapshot(draftKey), target);
 }
 
+function contextWithRejectedSource(
+  draft: ComposerDraft,
+  context: OrchestrationMessageContext | undefined,
+): OrchestrationMessageContext | undefined {
+  return draft.rejectedTurn === undefined
+    ? context
+    : mergeRejectedComposerContext(draft.rejectedTurn.message.context, context);
+}
+
 function withReferencedContextFiles(
   draft: ComposerDraft,
   text: string,
   context: OrchestrationMessageContext | undefined,
 ): ComposerDraft {
+  const nextContext = contextWithRejectedSource(draft, context);
+  const sourceIds = new Set(
+    draft.rejectedTurn?.message.attachments?.map((attachment) => attachment.id),
+  );
   const previousIds = new Set(
     draft.context?.records.flatMap((record) =>
       "attachmentId" in record ? [record.attachmentId] : [],
     ),
   );
   const retainedIds = new Set(
-    context?.records.flatMap((record) => ("attachmentId" in record ? [record.attachmentId] : [])),
+    nextContext?.records.flatMap((record) =>
+      "attachmentId" in record ? [record.attachmentId] : [],
+    ),
   );
   return {
     ...draft,
     text,
-    context,
+    context: nextContext,
     attachments: draft.attachments.filter(
       (attachment) =>
+        sourceIds.has(attachment.id) ||
         attachment.type === "image" ||
         !previousIds.has(attachment.id) ||
         retainedIds.has(attachment.id),
@@ -239,10 +272,13 @@ export function setComposerDraftContext(
   draftKey: string,
   context: OrchestrationMessageContext | undefined,
 ): void {
-  updateComposerDrafts((current) => ({
-    ...current,
-    [draftKey]: { ...normalizeDraft(current[draftKey]), context },
-  }));
+  updateComposerDrafts((current) => {
+    const draft = normalizeDraft(current[draftKey]);
+    return {
+      ...current,
+      [draftKey]: { ...draft, context: contextWithRejectedSource(draft, context) },
+    };
+  });
 }
 
 export function insertComposerDraftContext(
@@ -293,7 +329,10 @@ function draftWithInsertedContext(
   const text = before + insertion + after;
   const records = new Map(draft.context?.records.map((record) => [record.contextId, record]));
   for (const record of content.context.records) records.set(record.contextId, record);
-  const context = referencedComposerContext(text, { version: 1, records: [...records.values()] });
+  const context = contextWithRejectedSource(
+    draft,
+    referencedComposerContext(text, { version: 1, records: [...records.values()] }),
+  );
   if ((context?.records.length ?? 0) > COMPOSER_CONTEXT_MAX_RECORDS) return null;
   lastComposerSelection = {
     draftKey,
@@ -318,6 +357,20 @@ export class ComposerDraftPersistenceError extends Schema.TaggedError<ComposerDr
   }
 }
 
+const RejectedComposerDraftSourceSchema = Schema.Struct({
+  version: Schema.Literal(1),
+  environmentId: EnvironmentIdSchema,
+  threadId: ThreadId,
+  message: OrchestrationMessage,
+  refusal: WorkspaceTurnStartRefusalPayload,
+}).check(
+  Schema.makeFilter(
+    (source) => source.message.role === "user" && source.message.id === source.refusal.requestId,
+  ),
+);
+
+export type RejectedComposerDraftSource = typeof RejectedComposerDraftSourceSchema.Type;
+
 export interface ComposerDraft {
   readonly text: string;
   readonly context?: OrchestrationMessageContext;
@@ -333,6 +386,8 @@ export interface ComposerDraft {
    * retargeted to another project without changing identity.
    */
   readonly project?: ComposerDraftProject;
+  /** Immutable provenance, never permission to upload or replay. */
+  readonly rejectedTurn?: RejectedComposerDraftSource;
 }
 
 export interface ComposerDraftProject {
@@ -381,6 +436,8 @@ const PersistedComposerContextSchema = Schema.Struct({
 });
 
 const ComposerDraftSchema = Schema.Struct({
+  // Version1 never granted recovery provenance.
+  rejectedTurn: Schema.optional(Schema.Never),
   text: Schema.String,
   context: Schema.optional(PersistedComposerContextSchema),
   attachments: Schema.Array(DraftComposerAttachmentSchema),
@@ -392,8 +449,13 @@ const ComposerDraftSchema = Schema.Struct({
   project: Schema.optional(ComposerDraftProjectSchema),
 });
 
+const RecoveryComposerDraftSchema = Schema.Struct({
+  ...ComposerDraftSchema.fields,
+  rejectedTurn: Schema.optional(RejectedComposerDraftSourceSchema),
+});
+
 const PersistedComposerDraftsSchema = Schema.Struct({
-  schemaVersion: Schema.Literal(COMPOSER_DRAFTS_SCHEMA_VERSION),
+  schemaVersion: Schema.Literal(1),
   drafts: Schema.Record(Schema.String, ComposerDraftSchema),
   stickyModelSelection: Schema.optional(ModelSelectionSchema),
   cloudAccountId: Schema.optional(Schema.String),
@@ -408,9 +470,49 @@ const PersistedComposerDraftsSchema = Schema.Struct({
   ),
 });
 
-const decodePersistedComposerDraftsDocument = Schema.decodeUnknownSync(
-  PersistedComposerDraftsSchema,
+const decodeLegacyComposerDraftsDocument = Schema.decodeUnknownSync(PersistedComposerDraftsSchema);
+const decodeCurrentComposerDraftsDocument = Schema.decodeUnknownSync(
+  Schema.toType(
+    Schema.Struct({
+      ...PersistedComposerDraftsSchema.fields,
+      schemaVersion: Schema.Literal(COMPOSER_DRAFTS_SCHEMA_VERSION),
+      drafts: Schema.Record(Schema.String, RecoveryComposerDraftSchema),
+      signedOutDrafts: Schema.optional(
+        Schema.Record(
+          Schema.String,
+          Schema.Struct({
+            drafts: Schema.Record(Schema.String, RecoveryComposerDraftSchema),
+            queuedMessages: Schema.Array(QueuedThreadMessageSchema),
+          }),
+        ),
+      ),
+    }).check(
+      Schema.makeFilter((document) =>
+        [
+          document.drafts,
+          ...Object.values(document.signedOutDrafts ?? {}).map((saved) => saved.drafts),
+        ].every((drafts) =>
+          Object.entries(drafts).every(
+            ([key, draft]) =>
+              draft.rejectedTurn === undefined ||
+              (draft.project === undefined &&
+                key === `${draft.rejectedTurn.environmentId}:${draft.rejectedTurn.threadId}`),
+          ),
+        ),
+      ),
+    ),
+  ),
+  { onExcessProperty: "error" },
 );
+
+function decodePersistedComposerDraftsDocument(value: unknown) {
+  return typeof value === "object" &&
+    value !== null &&
+    "schemaVersion" in value &&
+    value.schemaVersion === 1
+    ? decodeLegacyComposerDraftsDocument(value)
+    : decodeCurrentComposerDraftsDocument(value);
+}
 
 const EMPTY_DRAFT: ComposerDraft = {
   text: "",
@@ -443,13 +545,62 @@ export const composerCloudDraftsAtom = Atom.make<ComposerCloudDraftState>({
 }).pipe(Atom.keepAlive);
 
 let loadPromise: Promise<void> | null = null;
+let draftsHydrated = false;
+const draftsChangedBeforeHydration = new Set<string>();
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let persistRetryNeeded = false;
 const persistenceQueue = new SerializedAsyncQueue();
 
+function publishComposerDrafts(next: Record<string, ComposerDraft>): void {
+  composerMutationEpoch += 1;
+  appAtomRegistry.set(composerDraftsAtom, next);
+}
+
+function publishComposerCloudDrafts(next: ComposerCloudDraftState): void {
+  composerMutationEpoch += 1;
+  appAtomRegistry.set(composerCloudDraftsAtom, next);
+}
+
+export interface ComposerRecoveryTarget {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+  readonly draftKey: string;
+  readonly epoch: number;
+}
+
+/** Capture before asset acquisition; existing marked drafts are resolved at commit. */
+export function captureComposerRecoveryTarget(scope: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+}): ComposerRecoveryTarget | null {
+  const draftKey = scopedThreadKey(scope.environmentId, scope.threadId);
+  const draft = getComposerDraftSnapshot(draftKey);
+  if (
+    !draftsHydrated ||
+    appAtomRegistry.get(composerContextImportsAtom)[draftKey] ||
+    draft.project !== undefined ||
+    (!isEmptyDraft(draft) && draft.rejectedTurn === undefined)
+  )
+    return null;
+  return {
+    environmentId: scope.environmentId,
+    threadId: scope.threadId,
+    draftKey,
+    epoch: composerMutationEpoch,
+  };
+}
+
+export function isComposerRecoveryTargetCurrent(target: ComposerRecoveryTarget): boolean {
+  const current = captureComposerRecoveryTarget(target);
+  return current !== null && current.draftKey === target.draftKey && current.epoch === target.epoch;
+}
+
 /** Resets module-level state between test runs. */
 export function resetComposerDraftsLoadState(): void {
+  composerMutationEpoch += 1;
   loadPromise = null;
+  draftsHydrated = false;
+  draftsChangedBeforeHydration.clear();
   persistRetryNeeded = false;
 }
 
@@ -538,8 +689,11 @@ export function isComposerDraftEmpty(draft: ComposerDraft): boolean {
 // else in it is still empty and gets dropped like any other.
 function isEmptyDraft(draft: ComposerDraft): boolean {
   return (
+    draft.rejectedTurn === undefined &&
     draft.text.length === 0 &&
     draft.attachments.length === 0 &&
+    (draft.context?.records.length ?? 0) === 0 &&
+    (draft.importedShareIds?.length ?? 0) === 0 &&
     draft.modelSelection === undefined &&
     draft.runtimeMode === undefined &&
     draft.interactionMode === undefined &&
@@ -613,25 +767,28 @@ export function decodePersistedComposerState(value: unknown): {
     drafts: Object.fromEntries(
       Object.entries(parsed.drafts)
         .map(([key, draft]) =>
-          migrateLegacyNewTaskDraft(
-            key,
-            // Stale new-task drafts left on disk by builds before the
-            // model-precedence fix carry a bare modelSelection with no
-            // other selector settings. Strip it so the next compose pass
-            // re-resolves project → sticky → provider defaults. Drafts
-            // with runtime/interaction/workspace settings or actual text /
-            // attachments were deliberately configured and are left alone.
-            isNewTaskDraftKey(key) &&
-              draft.modelSelection &&
-              draft.text.length === 0 &&
-              draft.attachments.length === 0 &&
-              draft.runtimeMode === undefined &&
-              draft.interactionMode === undefined &&
-              draft.workspaceSelection === undefined
-              ? { ...draft, modelSelection: undefined }
-              : draft,
-            now,
-          ),
+          parsed.schemaVersion === 2
+            ? ([key, draft] as const)
+            : migrateLegacyNewTaskDraft(
+                key,
+                // Stale new-task drafts left on disk by builds before the
+                // model-precedence fix carry a bare modelSelection with no
+                // other selector settings. Strip it so the next compose pass
+                // re-resolves project → sticky → provider defaults. Drafts
+                // with runtime/interaction/workspace settings or actual text /
+                // attachments were deliberately configured and are left alone.
+                isNewTaskDraftKey(key) &&
+                  draft.modelSelection &&
+                  draft.text.length === 0 &&
+                  draft.attachments.length === 0 &&
+                  (draft.context?.records.length ?? 0) === 0 &&
+                  draft.runtimeMode === undefined &&
+                  draft.interactionMode === undefined &&
+                  draft.workspaceSelection === undefined
+                  ? { ...draft, modelSelection: undefined }
+                  : draft,
+                now,
+              ),
         )
         // importedShareIds are share-import receipts: a contentless draft
         // carrying one is not empty, or the same native share would be
@@ -649,7 +806,9 @@ export function decodePersistedComposerState(value: unknown): {
             // without another decode, so they get the same key migration.
             drafts: Object.fromEntries(
               Object.entries(saved.drafts).map(([key, draft]) =>
-                migrateLegacyNewTaskDraft(key, draft, now),
+                parsed.schemaVersion === 2
+                  ? ([key, draft] as const)
+                  : migrateLegacyNewTaskDraft(key, draft, now),
               ),
             ),
             queuedMessages: saved.queuedMessages.map(decodeQueuedThreadMessage),
@@ -694,40 +853,42 @@ async function loadPersistedComposerState(): Promise<
   }
 }
 
-async function writePersistedComposerState(
-  drafts: Record<string, ComposerDraft>,
-  stickyModelSelection: ModelSelection | null,
-  cloudDrafts = appAtomRegistry.get(composerCloudDraftsAtom),
-): Promise<void> {
+function encodePersistedComposerState(drafts: Record<string, ComposerDraft>): string {
+  const stickyModelSelection = appAtomRegistry.get(stickyComposerModelSelectionAtom);
+  const cloudDrafts = appAtomRegistry.get(composerCloudDraftsAtom);
+  return JSON.stringify({
+    schemaVersion: COMPOSER_DRAFTS_SCHEMA_VERSION,
+    drafts: Object.fromEntries(Object.entries(drafts).filter(([, draft]) => !isEmptyDraft(draft))),
+    ...(stickyModelSelection ? { stickyModelSelection } : {}),
+    ...(cloudDrafts.accountId ? { cloudAccountId: cloudDrafts.accountId } : {}),
+    ...(Object.keys(cloudDrafts.signedOut).length > 0
+      ? {
+          signedOutDrafts: Object.fromEntries(
+            Object.entries(cloudDrafts.signedOut).map(([id, saved]) => [
+              id,
+              {
+                drafts: saved.drafts,
+                queuedMessages: saved.queuedMessages.map(encodeQueuedThreadMessage),
+              },
+            ]),
+          ),
+        }
+      : {}),
+  });
+}
+
+async function writePersistedComposerState(): Promise<void> {
   let operation: ComposerDraftPersistenceError["operation"] = "open";
   try {
     const file = await getComposerDraftsFile();
+    const write = await prepareAtomicFileWriter(file);
+    // Capture after all asynchronous preparation. An older queued snapshot must
+    // never overwrite edits, deletions or a recovery committed while it waited.
+    const drafts = appAtomRegistry.get(composerDraftsAtom);
     operation = "encode";
-    const nonEmptyDrafts = Object.fromEntries(
-      Object.entries(drafts).filter(([, draft]) => !isEmptyDraft(draft)),
-    );
-    const document = {
-      schemaVersion: COMPOSER_DRAFTS_SCHEMA_VERSION,
-      drafts: nonEmptyDrafts,
-      ...(stickyModelSelection ? { stickyModelSelection } : {}),
-      ...(cloudDrafts.accountId ? { cloudAccountId: cloudDrafts.accountId } : {}),
-      ...(Object.keys(cloudDrafts.signedOut).length > 0
-        ? {
-            signedOutDrafts: Object.fromEntries(
-              Object.entries(cloudDrafts.signedOut).map(([id, saved]) => [
-                id,
-                {
-                  drafts: saved.drafts,
-                  queuedMessages: saved.queuedMessages.map(encodeQueuedThreadMessage),
-                },
-              ]),
-            ),
-          }
-        : {}),
-    } as const;
-    const encoded = JSON.stringify(document);
+    const encoded = encodePersistedComposerState(drafts);
     operation = "write";
-    await writeFileAtomically(file, encoded);
+    write(encoded);
   } catch (cause) {
     throw new ComposerDraftPersistenceError({
       operation,
@@ -736,6 +897,151 @@ async function writePersistedComposerState(
       cause,
     });
   }
+}
+
+export class ComposerDraftRecoveryError extends Schema.TaggedError<ComposerDraftRecoveryError>()(
+  "ComposerDraftRecoveryError",
+  { reason: Schema.Literals(["source-scope", "attachments"]) },
+) {}
+
+const decodeRecoveryDraft = Schema.decodeUnknownSync(Schema.toType(RecoveryComposerDraftSchema), {
+  onExcessProperty: "error",
+});
+
+/** The caller authenticates source and owns downloaded files; this grants no delivery authority. */
+export async function commitRejectedComposerDraft(input: {
+  readonly target: ComposerRecoveryTarget;
+  readonly source: RejectedComposerDraftSource;
+  readonly attachments: ReadonlyArray<DraftComposerAttachment>;
+  readonly isCurrent: () => boolean;
+}): Promise<"recovered" | "existing" | "changed"> {
+  const target = { ...input.target };
+  // Detach source and editable content before the first await.
+  const recovered = decodeRecoveryDraft(
+    JSON.parse(
+      JSON.stringify({
+        text: input.source.message.text,
+        context: input.source.message.context,
+        attachments: input.attachments,
+        rejectedTurn: input.source,
+      }),
+    ),
+  );
+  const source = recovered.rejectedTurn;
+  if (
+    source === undefined ||
+    source.environmentId !== target.environmentId ||
+    source.threadId !== target.threadId ||
+    target.draftKey !== scopedThreadKey(target.environmentId, target.threadId)
+  )
+    throw new ComposerDraftRecoveryError({ reason: "source-scope" });
+  const originals = source.message.attachments ?? [];
+  if (
+    originals.length !== recovered.attachments.length ||
+    new Set(originals.map((attachment) => attachment.id)).size !== originals.length ||
+    !recovered.attachments.every((attachment, index) => {
+      const original = originals[index];
+      return (
+        original !== undefined &&
+        attachment.type === original.type &&
+        attachment.id === original.id &&
+        attachment.name === original.name &&
+        attachment.mimeType === original.mimeType &&
+        attachment.sizeBytes === original.sizeBytes &&
+        stableStringify({ source: attachment.source }) ===
+          stableStringify({ source: "source" in original ? original.source : undefined }) &&
+        attachment.fileUri !== undefined &&
+        attachment.uploadedAttachmentId === undefined &&
+        attachment.uploadEnvironmentId === undefined
+      );
+    })
+  )
+    throw new ComposerDraftRecoveryError({ reason: "attachments" });
+
+  return persistenceQueue.run(async () => {
+    await waitForComposerDraftsLoaded();
+    let operation: ComposerDraftPersistenceError["operation"] = "open";
+    try {
+      const write = await prepareAtomicFileWriter(await getComposerDraftsFile());
+      if (!input.isCurrent() || appAtomRegistry.get(composerContextImportsAtom)[target.draftKey]) {
+        return "changed";
+      }
+      const current = appAtomRegistry.get(composerDraftsAtom);
+      const existing = current[target.draftKey];
+      if (existing?.project !== undefined) return "changed";
+      if (existing?.rejectedTurn !== undefined) {
+        return stableStringify(existing.rejectedTurn) === stableStringify(source)
+          ? "existing"
+          : "changed";
+      }
+      if (!isComposerRecoveryTargetCurrent(target)) return "changed";
+      const next = { ...current, [target.draftKey]: recovered };
+      operation = "encode";
+      const encoded = encodePersistedComposerState(next);
+      decodeCurrentComposerDraftsDocument(JSON.parse(encoded));
+      operation = "write";
+      const result = write(
+        encoded,
+        () => input.isCurrent() && isComposerRecoveryTargetCurrent(target),
+      );
+      if (result === "cancelled") return "changed";
+      // No await may separate the successful rename from publication.
+      publishComposerDrafts(next);
+      return "recovered";
+    } catch (cause) {
+      throw new ComposerDraftPersistenceError({
+        operation,
+        directory: COMPOSER_DRAFTS_DIRECTORY,
+        fileName: COMPOSER_DRAFTS_FILE,
+        cause,
+      });
+    }
+  });
+}
+
+/** End an explicitly submitted/discarded recovery, never an ordinary edit-clear. */
+export async function completeRejectedComposerSend(input: {
+  readonly target: ComposerRecoveryTarget;
+  readonly expected: ComposerDraft;
+  readonly ownerCurrent: () => boolean;
+}): Promise<"cleared" | "changed"> {
+  const target = { ...input.target };
+  const expected = { ...input.expected };
+  const { ownerCurrent } = input;
+  if (expected.rejectedTurn === undefined) return "changed";
+  return persistenceQueue.run(async () => {
+    await waitForComposerDraftsLoaded();
+    let operation: ComposerDraftPersistenceError["operation"] = "open";
+    try {
+      const write = await prepareAtomicFileWriter(await getComposerDraftsFile());
+      const canClear = () =>
+        ownerCurrent() &&
+        isComposerRecoveryTargetCurrent(target) &&
+        sameComposerDraftState(expected, getComposerDraftSnapshot(target.draftKey));
+      if (!canClear()) return "changed";
+      const current = appAtomRegistry.get(composerDraftsAtom);
+      const { rejectedTurn: _source, ...unmarked } = expected;
+      const next = clearComposerDraftContentState(
+        { ...current, [target.draftKey]: unmarked },
+        target.draftKey,
+      );
+      operation = "encode";
+      const encoded = encodePersistedComposerState(next);
+      decodeCurrentComposerDraftsDocument(JSON.parse(encoded));
+      operation = "write";
+      if (write(encoded, canClear) === "cancelled") return "changed";
+      publishComposerDrafts(next);
+      scheduleUnusedComposerAttachmentCleanup(expected.attachments);
+      return "cleared";
+    } catch (cause) {
+      throw new ComposerDraftPersistenceError({
+        operation,
+        directory: COMPOSER_DRAFTS_DIRECTORY,
+        fileName: COMPOSER_DRAFTS_FILE,
+        cause,
+      });
+    }
+  });
 }
 
 /**
@@ -758,12 +1064,7 @@ export async function flushComposerDrafts(): Promise<void> {
       persistTimer = null;
       persistRetryNeeded = false;
       try {
-        await persistenceQueue.run(() =>
-          writePersistedComposerState(
-            appAtomRegistry.get(composerDraftsAtom),
-            appAtomRegistry.get(stickyComposerModelSelectionAtom),
-          ),
-        );
+        await persistenceQueue.run(writePersistedComposerState);
       } catch (error) {
         persistRetryNeeded = true;
         throw error;
@@ -773,6 +1074,96 @@ export async function flushComposerDrafts(): Promise<void> {
     // gated behind its own hydration await inside the queue.
     await persistenceQueue.run(() => Promise.resolve());
   } while (persistTimer !== null || persistRetryNeeded);
+}
+
+/** Transfer a failed marked submission's ownership, without merging its old text back. */
+export async function releaseRejectedComposerAdmission(input: {
+  readonly draftKey: string;
+  readonly source: RejectedComposerDraftSource;
+  readonly content: Pick<ComposerDraft, "context" | "attachments">;
+  readonly ownerCurrent: () => boolean;
+  readonly releaseAfterHandback: () => boolean;
+}): Promise<"released" | "retained"> {
+  const { draftKey, ownerCurrent, releaseAfterHandback } = input;
+  if (draftKey !== scopedThreadKey(input.source.environmentId, input.source.threadId)) {
+    return "retained";
+  }
+  const source = stableStringify(input.source);
+  const attachments = input.content.attachments.map((attachment) => stableStringify(attachment));
+  const records = (input.content.context?.records ?? []).map((record) => stableStringify(record));
+  try {
+    await flushComposerDrafts();
+    return await persistenceQueue.run(async () => {
+      const epoch = composerMutationEpoch;
+      const current = getComposerDraftSnapshot(draftKey);
+      if (!ownerCurrent() || stableStringify(current.rejectedTurn) !== source) return "retained";
+      const persisted = (await loadPersistedComposerState()).drafts[draftKey];
+      if (
+        !ownerCurrent() ||
+        epoch !== composerMutationEpoch ||
+        persisted === undefined ||
+        stableStringify(persisted) !== stableStringify(current)
+      )
+        return "retained";
+      const ownedAttachments = new Set(
+        persisted.attachments.map((attachment) => stableStringify(attachment)),
+      );
+      const ownedRecords = new Set(
+        [
+          ...(persisted.rejectedTurn?.message.context?.records ?? []),
+          ...(persisted.context?.records ?? []),
+        ].map((record) => stableStringify(record)),
+      );
+      if (
+        !attachments.every((attachment) => ownedAttachments.has(attachment)) ||
+        !records.every((record) => ownedRecords.has(record))
+      )
+        return "retained";
+      // No await between the durable/live ownership proof and this exact admission's release.
+      return releaseAfterHandback() ? "released" : "retained";
+    });
+  } catch (error) {
+    if (error instanceof ComposerDraftPersistenceError) return "retained";
+    throw error;
+  }
+}
+
+/** Read through the writer queue without restoring stale disk content into live drafts. */
+export async function persistedComposerAttachmentOwnership(
+  attachments: ReadonlyArray<DraftComposerAttachment>,
+): Promise<"referenced" | "unreferenced" | "unknown"> {
+  const keys = new Set(
+    attachments.flatMap((attachment) =>
+      attachment.fileUri === undefined
+        ? []
+        : [composerAttachmentFileReferenceKey(attachment.fileUri)],
+    ),
+  );
+  if (keys.size === 0) return "unreferenced";
+  return persistenceQueue.run(async () => {
+    try {
+      const persisted = await loadPersistedComposerState();
+      const owners = [
+        ...Object.values(persisted.drafts),
+        ...Object.values(persisted.cloudDrafts.signedOut).flatMap((saved) => [
+          ...Object.values(saved.drafts),
+          ...saved.queuedMessages,
+        ]),
+      ];
+      return owners.some((owner) =>
+        owner.attachments.some(
+          (attachment) =>
+            attachment.fileUri !== undefined &&
+            keys.has(composerAttachmentFileReferenceKey(attachment.fileUri)),
+        ),
+      )
+        ? "referenced"
+        : "unreferenced";
+    } catch (error) {
+      if (error instanceof ComposerDraftPersistenceError) return "unknown";
+      throw error;
+    }
+  });
 }
 
 function signedOutAttachmentOwners() {
@@ -801,7 +1192,10 @@ export function findLocalComposerClipboardAttachment(
     .find((attachment) => attachment.id === id);
 }
 
-function isComposerAttachmentFileReferenced(fileUri: string): boolean {
+function isComposerAttachmentFileReferenced(
+  fileUri: string,
+  recordOwners: ReadonlyArray<Pick<ComposerDraft, "attachments">>,
+): boolean {
   if (isComposerAttachmentFileRetained(fileUri)) {
     return true;
   }
@@ -810,7 +1204,14 @@ function isComposerAttachmentFileReferenced(fileUri: string): boolean {
   const queuedMessages = Object.values(
     appAtomRegistry.get(threadOutboxManager.queuedMessagesByThreadKeyAtom),
   ).flat();
-  return [...drafts, ...queuedMessages, ...signedOutAttachmentOwners()].some((owner) =>
+  const optimistic = appAtomRegistry.get(optimisticThreadOutboxOwnersAtom);
+  return [
+    ...drafts,
+    ...queuedMessages,
+    ...recordOwners,
+    ...optimistic,
+    ...signedOutAttachmentOwners(),
+  ].some((owner) =>
     owner.attachments.some(
       (attachment) =>
         attachment.fileUri !== undefined &&
@@ -822,12 +1223,20 @@ function isComposerAttachmentFileReferenced(fileUri: string): boolean {
 function isComposerAttachmentUploadReferenced(
   environmentId: EnvironmentId,
   attachmentId: string,
+  recordOwners: ReadonlyArray<Pick<ComposerDraft, "attachments">>,
 ): boolean {
   const drafts = Object.values(appAtomRegistry.get(composerDraftsAtom));
   const queuedMessages = Object.values(
     appAtomRegistry.get(threadOutboxManager.queuedMessagesByThreadKeyAtom),
   ).flat();
-  return [...drafts, ...queuedMessages, ...signedOutAttachmentOwners()].some((owner) =>
+  const optimistic = appAtomRegistry.get(optimisticThreadOutboxOwnersAtom);
+  return [
+    ...drafts,
+    ...queuedMessages,
+    ...recordOwners,
+    ...optimistic,
+    ...signedOutAttachmentOwners(),
+  ].some((owner) =>
     owner.attachments.some(
       (attachment) =>
         attachment.uploadEnvironmentId === environmentId &&
@@ -873,11 +1282,29 @@ export async function releaseUnusedComposerAttachmentFiles(
     return;
   }
   await flushThreadOutbox();
+  await flushThreadOutboxWrites();
+  const initialWriteState = threadOutboxWriteState();
+  if (initialWriteState.pending) return;
+  const inventoryUnchanged = (): boolean => {
+    const current = threadOutboxWriteState();
+    return !current.pending && current.revision === initialWriteState.revision;
+  };
+  let recordOwners: ReadonlyArray<Pick<ComposerDraft, "attachments">>;
+  try {
+    const loaded = await expoThreadOutboxStorage.loadRecords();
+    if (loaded.errors.length > 0 || !inventoryUnchanged()) return;
+    recordOwners = loaded.records.flatMap(ownedThreadOutboxPayloads);
+  } catch (error) {
+    console.warn("[composer-attachments] could not verify durable outbox ownership", error);
+    return;
+  }
 
-  const allFilesReferenced = [...candidates].every(isComposerAttachmentFileReferenced);
+  const allFilesReferenced = [...candidates].every((fileUri) =>
+    isComposerAttachmentFileReferenced(fileUri, recordOwners),
+  );
   const allUploadsReferenced = [...uploadCandidates].every(([environmentId, attachmentIds]) =>
     [...attachmentIds].every((attachmentId) =>
-      isComposerAttachmentUploadReferenced(environmentId, attachmentId),
+      isComposerAttachmentUploadReferenced(environmentId, attachmentId, recordOwners),
     ),
   );
   if (allFilesReferenced && allUploadsReferenced) {
@@ -904,10 +1331,11 @@ export async function releaseUnusedComposerAttachmentFiles(
 
   const { removePersistedComposerAttachmentFile } = await import("../lib/composerImages");
   for (const fileUri of candidates) {
+    if (!inventoryUnchanged()) return;
     // Re-check ownership immediately before each deletion: a restore or edit
     // can re-own a file after an earlier scan decided it was unused.
     if (
-      isComposerAttachmentFileReferenced(fileUri) ||
+      isComposerAttachmentFileReferenced(fileUri, recordOwners) ||
       incomingShareFileUris.has(composerAttachmentFileReferenceKey(fileUri))
     ) {
       continue;
@@ -919,10 +1347,11 @@ export async function releaseUnusedComposerAttachmentFiles(
     const { releasePendingAttachmentUploads } = await import("../lib/attachmentUpload");
     for (const [environmentId, attachmentIds] of uploadCandidates) {
       for (const attachmentId of attachmentIds) {
+        if (!inventoryUnchanged()) return;
         // A different draft or queued message can reuse the same pending
         // upload with another local URI. Re-check the server-side ownership
         // key immediately before deletion.
-        if (isComposerAttachmentUploadReferenced(environmentId, attachmentId)) {
+        if (isComposerAttachmentUploadReferenced(environmentId, attachmentId, recordOwners)) {
           continue;
         }
         try {
@@ -977,10 +1406,7 @@ function schedulePersistComposerState(): void {
     void persistenceQueue.run(async () => {
       try {
         await waitForComposerDraftsLoaded();
-        await writePersistedComposerState(
-          appAtomRegistry.get(composerDraftsAtom),
-          appAtomRegistry.get(stickyComposerModelSelectionAtom),
-        );
+        await writePersistedComposerState();
         persistRetryNeeded = false;
       } catch (error) {
         // A failed debounce has no timer left. A later final flush must retry
@@ -998,11 +1424,15 @@ export function ensureComposerDraftsLoaded(): void {
     return;
   }
   const loading = loadPersistedComposerState().then((persisted) => {
-    appAtomRegistry.set(composerCloudDraftsAtom, persisted.cloudDrafts);
+    publishComposerCloudDrafts(persisted.cloudDrafts);
     if (Object.keys(persisted.drafts).length > 0) {
       const current = appAtomRegistry.get(composerDraftsAtom);
-      appAtomRegistry.set(composerDraftsAtom, {
-        ...persisted.drafts,
+      publishComposerDrafts({
+        ...Object.fromEntries(
+          Object.entries(persisted.drafts).filter(
+            ([key]) => !draftsChangedBeforeHydration.has(key),
+          ),
+        ),
         ...current,
       });
     }
@@ -1010,8 +1440,11 @@ export function ensureComposerDraftsLoaded(): void {
       persisted.stickyModelSelection !== null &&
       appAtomRegistry.get(stickyComposerModelSelectionAtom) === null
     ) {
+      composerMutationEpoch += 1;
       appAtomRegistry.set(stickyComposerModelSelectionAtom, persisted.stickyModelSelection);
     }
+    draftsHydrated = true;
+    draftsChangedBeforeHydration.clear();
   });
   loadPromise = loading;
   // Handle fire-and-forget hook loads without swallowing failures from the
@@ -1058,11 +1491,25 @@ export async function archiveCloudComposerDrafts(
   if (owner === null) return;
   const queued = Object.values(
     appAtomRegistry.get(threadOutboxManager.queuedMessagesByThreadKeyAtom),
-  ).flat();
+  )
+    .flat()
+    .filter((message) => {
+      const record = threadOutboxManager.recordFor(message);
+      return record !== null && record.ownerAccountId === owner;
+    });
+  await threadOutboxManager.authority.parkAccount(owner, environmentIds);
   const current = appAtomRegistry.get(composerDraftsAtom);
   const remaining = { ...current };
   const savedDrafts = { ...cloud.signedOut[owner]?.drafts };
   for (const [key, draft] of Object.entries(current)) {
+    if (
+      key.startsWith("pending-task:") &&
+      !queued.some((message) => pendingTaskDraftKey(message) === key) &&
+      threadOutboxManager.authority
+        .knownRecords()
+        .filter((record) => `pending-task:${record.storageIdentity.messageId}` === key).length !== 1
+    )
+      continue;
     const environmentId = composerDraftEnvironmentId(key, queued, draft);
     if (environmentId !== null && environmentIds.has(environmentId)) {
       savedDrafts[key] = draft;
@@ -1070,13 +1517,16 @@ export async function archiveCloudComposerDrafts(
     }
   }
   const savedMessages = new Map(
-    (cloud.signedOut[owner]?.queuedMessages ?? []).map((message) => [message.messageId, message]),
+    (cloud.signedOut[owner]?.queuedMessages ?? []).map((message) => [
+      threadOutboxStorageIdentity(message),
+      message,
+    ]),
   );
   for (const message of queued) {
-    if (environmentIds.has(message.environmentId)) savedMessages.set(message.messageId, message);
+    if (environmentIds.has(message.environmentId))
+      savedMessages.set(threadOutboxStorageIdentity(message), message);
   }
-  appAtomRegistry.set(composerDraftsAtom, remaining);
-  appAtomRegistry.set(composerCloudDraftsAtom, {
+  publishComposerCloudDrafts({
     // Keep the owner through removal. A crash or failed cleanup can retry it
     // on cold start before a different account activates.
     accountId: owner,
@@ -1087,15 +1537,38 @@ export async function archiveCloudComposerDrafts(
   });
   schedulePersistComposerState();
   await flushComposerDrafts();
+  // The archive owns these exact snapshots durably before removing live copies.
+  updateComposerDrafts((latest) => {
+    const next = { ...latest };
+    for (const [key, draft] of Object.entries(current)) {
+      if (!(key in remaining) && latest[key] === draft) delete next[key];
+    }
+    return next;
+  });
+  await flushComposerDrafts();
 }
 
-function sameDraftAttachmentIds(
+function sameDraftAttachmentContent(
   left: ReadonlyArray<DraftComposerAttachment>,
   right: ReadonlyArray<DraftComposerAttachment>,
 ): boolean {
   return (
     left.length === right.length &&
-    left.every((attachment, index) => attachment.id === right[index]?.id)
+    left.every((attachment, index) => {
+      const other = right[index];
+      if (other === undefined) return false;
+      const {
+        uploadedAttachmentId: _leftUpload,
+        uploadEnvironmentId: _leftEnvironment,
+        ...leftContent
+      } = attachment;
+      const {
+        uploadedAttachmentId: _rightUpload,
+        uploadEnvironmentId: _rightEnvironment,
+        ...rightContent
+      } = other;
+      return stableStringify(leftContent) === stableStringify(rightContent);
+    })
   );
 }
 
@@ -1110,26 +1583,28 @@ export async function removeDeliveredCloudQueuedMessage(
   for (const [accountId, saved] of Object.entries(signedOut)) {
     const archived = saved.queuedMessages.find(
       (candidate) =>
-        candidate.environmentId === message.environmentId &&
-        candidate.messageId === message.messageId,
+        threadOutboxStorageIdentity(candidate) === threadOutboxStorageIdentity(message),
     );
     if (
       !archived ||
+      archived.environmentId !== message.environmentId ||
       archived.commandId !== message.commandId ||
       archived.threadId !== message.threadId ||
       archived.text !== message.text ||
-      !sameDraftAttachmentIds(archived.attachments, message.attachments)
+      !sameDraftAttachmentContent(archived.attachments, message.attachments)
     )
       continue;
     // Upload ids may change during preparation; user edits must remain recoverable.
     if (
-      JSON.stringify([
+      stableStringify([
+        archived.context,
         archived.modelSelection,
         archived.runtimeMode,
         archived.interactionMode,
         archived.creation,
       ]) !==
-      JSON.stringify([
+      stableStringify([
+        message.context,
         message.modelSelection,
         message.runtimeMode,
         message.interactionMode,
@@ -1137,12 +1612,28 @@ export async function removeDeliveredCloudQueuedMessage(
       ])
     )
       continue;
-    const editorKey = `pending-task:${message.messageId}`;
+    const scopedEditorKey = pendingTaskDraftKey(message);
+    const editorKey =
+      saved.drafts[scopedEditorKey] === undefined
+        ? `pending-task:${message.messageId}`
+        : scopedEditorKey;
     const editor = saved.drafts[editorKey];
     if (
       editor &&
+      editorKey !== scopedEditorKey &&
+      (threadOutboxManager.authority
+        .knownRecords()
+        .filter((record) => record.storageIdentity.messageId === message.messageId).length > 1 ||
+        saved.queuedMessages.some(
+          (candidate) => candidate !== archived && candidate.messageId === message.messageId,
+        ))
+    )
+      continue;
+    if (
+      editor &&
       (editor.text !== message.text ||
-        !sameDraftAttachmentIds(editor.attachments, message.attachments) ||
+        stableStringify(editor.context) !== stableStringify(message.context) ||
+        !sameDraftAttachmentContent(editor.attachments, message.attachments) ||
         (editor.modelSelection !== undefined &&
           JSON.stringify(editor.modelSelection) !== JSON.stringify(message.modelSelection)) ||
         (editor.runtimeMode !== undefined && editor.runtimeMode !== message.runtimeMode) ||
@@ -1165,7 +1656,7 @@ export async function removeDeliveredCloudQueuedMessage(
     changed = true;
   }
   if (!changed) return;
-  appAtomRegistry.set(composerCloudDraftsAtom, { ...cloud, signedOut });
+  publishComposerCloudDrafts({ ...cloud, signedOut });
   schedulePersistComposerState();
   try {
     await flushComposerDrafts();
@@ -1182,15 +1673,12 @@ export async function restoreCloudComposerDrafts(accountId: string): Promise<voi
   await waitForComposerDraftsLoaded();
   const cloud = appAtomRegistry.get(composerCloudDraftsAtom);
   const saved = cloud.signedOut[accountId];
+  const conflicts: QueuedThreadMessage[] = [];
+  if (!(await threadOutboxManager.load())) throw new Error("Could not restore queued messages.");
   if (saved) {
-    if (!(await threadOutboxManager.load())) throw new Error("Could not restore queued messages.");
     for (const message of saved.queuedMessages) {
-      const alreadyQueued = Object.values(
-        appAtomRegistry.get(threadOutboxManager.queuedMessagesByThreadKeyAtom),
-      )
-        .flat()
-        .some((current) => current.messageId === message.messageId);
-      if (!alreadyQueued) await threadOutboxManager.enqueue(message);
+      const result = await threadOutboxManager.authority.reconcileArchived(accountId, message);
+      if (result.status === "conflict") conflicts.push(message);
     }
     updateComposerDrafts((current) => {
       const restored = { ...current };
@@ -1224,9 +1712,24 @@ export async function restoreCloudComposerDrafts(accountId: string): Promise<voi
       return restored;
     });
   }
-  const signedOut = { ...cloud.signedOut };
-  delete signedOut[accountId];
-  appAtomRegistry.set(composerCloudDraftsAtom, { accountId, signedOut });
+  // Placement restoration also applies when no composer archive survived.
+  const environments = new Set(
+    threadOutboxManager.authority
+      .knownRecords()
+      .filter((record) => record.archivedFor === accountId)
+      .map((record) => record.transport.environmentId),
+  );
+  await threadOutboxManager.authority.restoreAccount(accountId, environments);
+  await flushComposerDrafts();
+  const latestCloud = appAtomRegistry.get(composerCloudDraftsAtom);
+  const signedOut = { ...latestCloud.signedOut };
+  // Only the exact, fully reconciled snapshot may be removed. Another archive
+  // write during an await is not part of this restore's deletion authority.
+  if (saved && latestCloud.signedOut[accountId] === saved) {
+    if (conflicts.length === 0) delete signedOut[accountId];
+    else signedOut[accountId] = { drafts: saved.drafts, queuedMessages: conflicts };
+  }
+  publishComposerCloudDrafts({ accountId, signedOut });
   schedulePersistComposerState();
   await flushComposerDrafts();
 }
@@ -1237,13 +1740,22 @@ function updateComposerDrafts(
   const current = appAtomRegistry.get(composerDraftsAtom);
   const next = update(current);
   if (next === current) {
+    composerMutationEpoch += 1;
     return;
   }
-  appAtomRegistry.set(composerDraftsAtom, next);
+  // An edited then cleared key is absent from `next`, but still overrides disk.
+  // Keep that intent across failed reads until hydration actually succeeds.
+  if (!draftsHydrated) {
+    for (const key of new Set([...Object.keys(current), ...Object.keys(next)])) {
+      if (current[key] !== next[key]) draftsChangedBeforeHydration.add(key);
+    }
+  }
+  publishComposerDrafts(next);
   schedulePersistComposerState();
 }
 
 export function setStickyComposerModelSelection(modelSelection: ModelSelection): void {
+  composerMutationEpoch += 1;
   appAtomRegistry.set(stickyComposerModelSelectionAtom, modelSelection);
   schedulePersistComposerState();
 }
@@ -1367,9 +1879,20 @@ export function replaceComposerDraftAttachments(
   attachments: ReadonlyArray<DraftComposerAttachment>,
 ): void {
   const previousAttachments = getComposerDraftSnapshot(draftKey).attachments;
-  const retainedIds = new Set(attachments.map((attachment) => attachment.id));
+  let retainedIds = new Set(attachments.map((attachment) => attachment.id));
   updateComposerDrafts((current) => {
     const existing = normalizeDraft(current[draftKey]);
+    const sourceIds = new Set(
+      existing.rejectedTurn?.message.attachments?.map((attachment) => attachment.id),
+    );
+    const nextAttachments =
+      existing.rejectedTurn === undefined
+        ? attachments
+        : [
+            ...existing.attachments.filter((attachment) => sourceIds.has(attachment.id)),
+            ...attachments.filter((attachment) => !sourceIds.has(attachment.id)),
+          ];
+    retainedIds = new Set(nextAttachments.map((attachment) => attachment.id));
     // An attachment that is no longer here must take its chip and context record with it, or
     // the draft keeps a reference pointing at a file it no longer holds.
     const droppedContextIds = new Set(
@@ -1383,8 +1906,11 @@ export function replaceComposerDraftAttachments(
     const draft = {
       ...existing,
       text,
-      context: referencedComposerContext(text, existing.context),
-      attachments,
+      context: contextWithRejectedSource(
+        existing,
+        referencedComposerContext(text, existing.context),
+      ),
+      attachments: nextAttachments,
     };
     return withComposerDraft(current, draftKey, draft);
   });
@@ -1397,6 +1923,11 @@ export function removeComposerDraftAttachment(draftKey: string, imageId: string)
   const previousAttachments = getComposerDraftSnapshot(draftKey).attachments;
   updateComposerDrafts((current) => {
     const existing = normalizeDraft(current[draftKey]);
+    if (
+      existing.rejectedTurn?.message.attachments?.some((attachment) => attachment.id === imageId)
+    ) {
+      return current;
+    }
     const removedIds = new Set(
       existing.context?.records
         .filter((record) => "attachmentId" in record && record.attachmentId === imageId)
@@ -1408,7 +1939,10 @@ export function removeComposerDraftAttachment(draftKey: string, imageId: string)
     const draft = {
       ...existing,
       text,
-      context: referencedComposerContext(text, existing.context),
+      context: contextWithRejectedSource(
+        existing,
+        referencedComposerContext(text, existing.context),
+      ),
       attachments: existing.attachments.filter((image) => image.id !== imageId),
     };
     return withComposerDraft(current, draftKey, draft);
@@ -1573,12 +2107,24 @@ export function mergeComposerDraftContentState(
     attachmentIds.add(attachment.id);
     return true;
   });
-  const attachments = [...existing.attachments, ...incomingAttachments].slice(
-    0,
-    PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
-  );
+  const attachments =
+    existing.rejectedTurn === undefined
+      ? [...existing.attachments, ...incomingAttachments].slice(
+          0,
+          PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
+        )
+      : [
+          ...existing.attachments,
+          ...incomingAttachments.slice(
+            0,
+            Math.max(0, PROVIDER_SEND_TURN_MAX_ATTACHMENTS - existing.attachments.length),
+          ),
+        ];
   const text = mergeComposerDraftText(existing.text, content.text);
-  const context = mergeReferencedComposerContext(text, existing.context, content.context);
+  const context = contextWithRejectedSource(
+    existing,
+    mergeReferencedComposerContext(text, existing.context, content.context),
+  );
   const importedShareIds = content.sourceShareId
     ? [...(existing.importedShareIds ?? []), content.sourceShareId]
     : existing.importedShareIds;
@@ -1634,11 +2180,9 @@ export async function mergeComposerDraftContent(
   // await. Typing during persistence then builds on the receipt-bearing state,
   // and its debounced write is serialized after this transaction.
   if (next !== current) {
-    appAtomRegistry.set(composerDraftsAtom, next);
+    publishComposerDrafts(next);
   }
-  await persistenceQueue.run(() =>
-    writePersistedComposerState(next, appAtomRegistry.get(stickyComposerModelSelectionAtom)),
-  );
+  await persistenceQueue.run(writePersistedComposerState);
   return { skippedAttachmentCount };
 }
 
@@ -1646,11 +2190,13 @@ export async function mergeComposerDraftContent(
 export async function restoreComposerDraftSnapshot(
   draftKey: string,
   snapshot: ComposerDraft,
+  canRestore: () => boolean = () => true,
 ): Promise<void> {
   ensureComposerDraftsLoaded();
   if (loadPromise !== null) {
     await loadPromise;
   }
+  if (!canRestore()) return;
   if (persistTimer !== null) {
     clearTimeout(persistTimer);
     persistTimer = null;
@@ -1660,10 +2206,8 @@ export async function restoreComposerDraftSnapshot(
     draftKey,
     snapshot,
   );
-  appAtomRegistry.set(composerDraftsAtom, next);
-  await persistenceQueue.run(() =>
-    writePersistedComposerState(next, appAtomRegistry.get(stickyComposerModelSelectionAtom)),
-  );
+  publishComposerDrafts(next);
+  await persistenceQueue.run(writePersistedComposerState);
 }
 
 export function sameComposerDraftState(a: ComposerDraft, b: ComposerDraft): boolean {
@@ -1675,7 +2219,9 @@ export function sameComposerDraftState(a: ComposerDraft, b: ComposerDraft): bool
     a.modelSelection === b.modelSelection &&
     a.runtimeMode === b.runtimeMode &&
     a.interactionMode === b.interactionMode &&
-    a.workspaceSelection === b.workspaceSelection
+    a.workspaceSelection === b.workspaceSelection &&
+    a.project === b.project &&
+    a.rejectedTurn === b.rejectedTurn
   );
 }
 
@@ -1721,7 +2267,7 @@ export function undoComposerDraftMergeState(
   const draft = {
     ...existing,
     text,
-    context: referencedComposerContext(text, existing.context),
+    context: contextWithRejectedSource(existing, referencedComposerContext(text, existing.context)),
     attachments: existing.attachments.filter(
       (attachment) => !insertedAttachmentIds.has(attachment.id),
     ),
@@ -1753,10 +2299,8 @@ export async function undoComposerDraftMerge(
     snapshot,
     merged,
   );
-  appAtomRegistry.set(composerDraftsAtom, next);
-  await persistenceQueue.run(() =>
-    writePersistedComposerState(next, appAtomRegistry.get(stickyComposerModelSelectionAtom)),
-  );
+  publishComposerDrafts(next);
+  await persistenceQueue.run(writePersistedComposerState);
 }
 
 export function clearComposerDraftContent(
@@ -1772,6 +2316,10 @@ export function clearComposerDraftContent(
     readonly deferAttachmentCleanup?: boolean;
   },
 ): void {
+  if (!draftsHydrated) {
+    draftsChangedBeforeHydration.add(draftKey);
+    schedulePersistComposerState();
+  }
   const previousAttachments = getComposerDraftSnapshot(draftKey).attachments;
   updateComposerDrafts((current) => clearComposerDraftContentState(current, draftKey, options));
   if (!options?.deferAttachmentCleanup) {
@@ -1783,6 +2331,10 @@ export function clearComposerDraft(
   draftKey: string,
   options?: { readonly deferAttachmentCleanup?: boolean },
 ): void {
+  if (!draftsHydrated) {
+    draftsChangedBeforeHydration.add(draftKey);
+    schedulePersistComposerState();
+  }
   const previousAttachments = getComposerDraftSnapshot(draftKey).attachments;
   updateComposerDrafts((current) => {
     if (!current[draftKey]) {
@@ -1912,10 +2464,8 @@ export async function clearComposerDraftsEnvironment(environmentId: EnvironmentI
     clearTimeout(persistTimer);
     persistTimer = null;
   }
-  appAtomRegistry.set(composerDraftsAtom, next);
-  await persistenceQueue.run(() =>
-    writePersistedComposerState(next, appAtomRegistry.get(stickyComposerModelSelectionAtom)),
-  );
+  publishComposerDrafts(next);
+  await persistenceQueue.run(writePersistedComposerState);
   await releaseUnusedComposerAttachmentFiles(removedAttachments);
 }
 

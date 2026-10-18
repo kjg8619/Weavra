@@ -31,7 +31,7 @@ export function ComposerServerUpdateStatus({
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const triggerId = useId();
-  const title = `${state.status === "failed" ? "Could not update" : "Updating"} ${serverLabel}`;
+  const title = `${serverLabel} ${state.status === "failed" ? "업데이트 실패" : "업데이트 중"}`;
   const detail = state.status === "failed" ? state.message : serverUpdateStageLabel(state.stage);
   return (
     <span

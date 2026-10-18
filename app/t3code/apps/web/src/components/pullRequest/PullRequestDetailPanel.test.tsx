@@ -239,10 +239,10 @@ async function click(label: string) {
 }
 
 const actions = [
-  "Resolve conflicts",
-  "Ask a question",
-  "Explain this PR",
-  "Fix findings in this thread",
+  "충돌 해결",
+  "질문하기",
+  "이 PR 설명",
+  "이 대화에서 발견 사항 수정",
   "Fix check",
   "Add to agent",
 ];
@@ -305,19 +305,19 @@ describe.each([
     await act(async () => render());
     const checkout = renderer.root
       .findAllByType("button")
-      .filter((node) => node.props["aria-label"] === "Check out");
+      .filter((node) => node.props["aria-label"] === "checkout");
     expect(checkout).toHaveLength(thread === stackThread ? 0 : 1);
   });
 
   it.each(actions)("%s writes to the correct composer", async (action) => {
     if (target) useComposerDraftStore.getState().setPrompt(target, "Keep my draft");
     await act(async () => render());
-    if (action === "Add to agent") await click("Code");
-    await click(target ? action : action.replace("in this thread", "in a thread"));
+    if (action === "Add to agent") await click("코드");
+    await click(target ? action : action.replace("이 대화에서", "대화에서"));
     const draft = useComposerDraftStore.getState().getComposerDraft(target ?? newDraftId);
-    if (action === "Resolve conflicts") expect(draft?.prompt).toContain("resolve every conflict");
+    if (action === "충돌 해결") expect(draft?.prompt).toContain("resolve every conflict");
     else if (action === "Fix check") expect(draft?.prompt).toContain("Fix the failing check");
-    else if (action.startsWith("Fix findings"))
+    else if (action.endsWith("발견 사항 수정"))
       expect(draft?.prompt).toContain("Fix the actionable findings");
     else expect(draft?.reviewComments?.length).toBeGreaterThan(0);
     if (action === "Add to agent") {

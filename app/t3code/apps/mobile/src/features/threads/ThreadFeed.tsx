@@ -172,6 +172,9 @@ import {
   WORK_GROUP_TOGGLE_HEIGHT,
 } from "./thread-work-log";
 import { appendPendingThreadMessages, type PendingThreadFeedEntry } from "./pending-thread-feed";
+import { RejectedMessageNotice, type ThreadRecoveryPresentation } from "./RejectedComposerNotice";
+import { RetainedWorkNotice } from "./RetainedWorkNotice";
+import { currentThreadOutboxPresentation } from "../../state/thread-outbox-presentation";
 import type { QueuedThreadMessage } from "../../state/thread-outbox-model";
 import { useMarkdownCodeHighlight } from "./markdownCodeHighlightState";
 import {
@@ -245,6 +248,8 @@ function isFreshTimestamp(input: string): boolean {
 }
 
 export interface ThreadFeedProps {
+  readonly recovery?: ThreadRecoveryPresentation;
+  readonly onRecoverMessage?: (id: MessageId) => void;
   readonly worktreeSetup?: WorktreeSetupCardProps | null;
   readonly setupWorkingStartedAt?: string | null;
   readonly queuedMessages: ReadonlyArray<QueuedThreadMessage>;
@@ -1359,6 +1364,8 @@ function renderFeedEntry(
     | "skills"
     | "dispatchingMessageId"
     | "onEditPendingMessage"
+    | "recovery"
+    | "onRecoverMessage"
   > & {
     readonly copiedRowId: string | null;
     readonly expandedWorkRows: Record<string, boolean>;
@@ -1391,6 +1398,9 @@ function renderFeedEntry(
   },
 ) {
   const entry = info.item;
+  if (entry.retained && entry.pendingMessage) {
+    return <RetainedWorkNotice message={entry.pendingMessage} />;
+  }
   const { markdownStyles, iconSubtleColor, userBubbleColor } = props;
 
   if (entry.type === "turn-fold") {
@@ -1552,6 +1562,13 @@ function renderFeedEntry(
       );
       return (
         <View className="mb-5 items-end">
+          {!entry.pendingMessage && props.recovery && props.onRecoverMessage ? (
+            <RejectedMessageNotice
+              messageId={message.id}
+              recovery={props.recovery}
+              onRecover={props.onRecoverMessage}
+            />
+          ) : null}
           <View
             className="min-w-0 gap-2 rounded-[20px] px-3.5 py-2.5"
             style={{
@@ -1637,10 +1654,13 @@ function renderFeedEntry(
           </View>
           <View className="mt-1 flex-row items-center justify-end gap-1 pr-0.5">
             <Text className="font-t3-medium text-xs tabular-nums text-foreground-secondary">
-              {entry.pendingMessage && !entry.acknowledged ? "Pending" : timestampLabel}
+              {entry.pendingMessage && !entry.acknowledged
+                ? currentThreadOutboxPresentation(entry.pendingMessage).label
+                : timestampLabel}
             </Text>
             {entry.pendingMessage &&
             !entry.acknowledged &&
+            currentThreadOutboxPresentation(entry.pendingMessage).kind === "ready" &&
             !entry.pendingMessage.creation &&
             entry.pendingMessage.messageId !== props.dispatchingMessageId ? (
               <Pressable
@@ -2288,6 +2308,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       worktreeSetup: props.worktreeSetup,
       setupWorkingStartedAt: props.setupWorkingStartedAt,
       dispatchingMessageId: props.dispatchingMessageId,
+      recovery: props.recovery,
       unsettledTurnId,
       copiedRowId,
       expandedWorkRows,
@@ -2304,6 +2325,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       props.worktreeSetup,
       props.setupWorkingStartedAt,
       props.dispatchingMessageId,
+      props.recovery,
       unsettledTurnId,
       copiedRowId,
       expandedWorkRows,
@@ -2460,6 +2482,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         ),
         props.feed,
         props.queuedMessages,
+        (message) => currentThreadOutboxPresentation(message).kind === "retained",
       ),
     [
       props.queuedMessages,
@@ -2754,6 +2777,8 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             environmentId: props.environmentId,
             dispatchingMessageId: props.dispatchingMessageId,
             onEditPendingMessage: props.onEditPendingMessage,
+            recovery: props.recovery,
+            onRecoverMessage: props.onRecoverMessage,
             copiedRowId,
             expandedWorkRows,
             expandedReasoningMessageIds,
@@ -2799,6 +2824,8 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       setupAnchorIndex,
       props.dispatchingMessageId,
       props.onEditPendingMessage,
+      props.recovery,
+      props.onRecoverMessage,
       copiedRowId,
       disclosureToggleSettling,
       expandedWorkRows,

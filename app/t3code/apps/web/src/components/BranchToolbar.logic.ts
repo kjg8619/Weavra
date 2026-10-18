@@ -38,7 +38,7 @@ export function resolveEnvironmentOptionLabel(input: {
       if (!label) return false;
       return !GENERIC_LOCAL_ENVIRONMENT_LABELS.has(label.toLowerCase());
     });
-    return preferredLocalLabel ?? "This device";
+    return preferredLocalLabel ?? "이 기기";
   }
 
   return runtimeLabel ?? savedLabel ?? input.environmentId;
@@ -83,15 +83,15 @@ export function resolveContextStripLabelsCompact(input: {
 }
 
 export function resolveEnvModeLabel(mode: EnvMode): string {
-  return mode === "worktree" ? "New worktree" : "Current checkout";
+  return mode === "worktree" ? "새 worktree" : "현재 checkout";
 }
 
 export function resolveCurrentWorkspaceLabel(activeWorktreePath: string | null): string {
-  return activeWorktreePath ? "Current worktree" : resolveEnvModeLabel("local");
+  return activeWorktreePath ? "현재 worktree" : resolveEnvModeLabel("local");
 }
 
 export function resolveLockedWorkspaceLabel(activeWorktreePath: string | null): string {
-  return activeWorktreePath ? "Worktree" : "Local checkout";
+  return activeWorktreePath ? "worktree" : "로컬 checkout";
 }
 
 export interface PreviousWorktreeSeed {
@@ -100,7 +100,7 @@ export interface PreviousWorktreeSeed {
 }
 
 // The most recently touched worktree in the project that the composer isn't
-// already pointing at. Backs the "Previous worktree" entry in the workspace
+// already pointing at. Backs the "이전 worktree" entry in the workspace
 // selector so a follow-up thread can hop back into the worktree you just
 // worked in without hunting for its branch. Archived threads don't compete —
 // the rest of the UI hides them, so their worktrees shouldn't resurface here.
@@ -138,7 +138,7 @@ export function resolvePreviousWorktreeSeed(input: {
 }
 
 export function resolvePreviousWorktreeLabel(seed: PreviousWorktreeSeed): string {
-  return seed.branch ? `Previous worktree (${seed.branch})` : "Previous worktree";
+  return seed.branch ? `이전 worktree (${seed.branch})` : "이전 worktree";
 }
 
 export function resolveEffectiveEnvMode(input: {
@@ -199,7 +199,7 @@ export function resolveBranchTriggerLabel(input: {
     startFromOrigin,
   } = input;
   if (!resolvedActiveBranch) {
-    return "Select ref";
+    return "ref 선택";
   }
   if (effectiveEnvMode === "worktree" && !activeWorktreePath) {
     const baseRef =

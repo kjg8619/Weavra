@@ -3,6 +3,7 @@ import { lstatSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { readAnchoredSource } from "./anchored-files.ts";
 import { parseRuntimeConfig, type RuntimeConfig } from "./config.ts";
+import { deriveMemoryCandidates } from "./memory-candidates.ts";
 import { isListablePath, type PolicyContext } from "./policy.ts";
 import { PROJECT_FACT_LIMIT, type ProjectFact, type ProjectFactSummary } from "./project-fact-types.ts";
 import { resolveProjectProtectedPaths } from "./project-protection.ts";
@@ -25,10 +26,14 @@ function digest(value: unknown): string {
 	return `sha256:${createHash("sha256").update(JSON.stringify(value)).digest("hex")}`;
 }
 // Conservative known-secret/transcript exclusion, not a classifier for arbitrary sensitive prose.
+const KNOWN_SECRET_SOURCE =
+	"-----BEGIN [A-Z ]*PRIVATE KEY-----|\\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16})\\b|(?:api[_ -]?key|password|passwd|client[_ -]?secret|access[_ -]?token|refresh[_ -]?token)\\s*[\"']?\\s*[:=]\\s*[\"']?\\S+|\\bBearer\\s+[A-Za-z0-9._~+/-]{8,}|[\"']role[\"']\\s*:\\s*[\"'](?:assistant|user|tool|system)[\"']|<\\/?(?:thinking|analysis|tool_result|tool_use)>";
 function forbiddenContent(text: string): boolean {
-	return /-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16})\b|(?:api[_ -]?key|password|passwd|client[_ -]?secret|access[_ -]?token|refresh[_ -]?token)\s*["']?\s*[:=]\s*["']?\S+|\bBearer\s+[A-Za-z0-9._~+/-]{8,}|["']role["']\s*:\s*["'](?:assistant|user|tool|system)["']|<\/?(?:thinking|analysis|tool_result|tool_use)>/i.test(
-		text,
-	);
+	return new RegExp(KNOWN_SECRET_SOURCE, "i").test(text);
+}
+/** Same known-secret patterns, masked instead of rejected; for bounded display-only excerpts. */
+export function redactKnownSecrets(text: string): string {
+	return text.replace(new RegExp(KNOWN_SECRET_SOURCE, "gi"), "[redacted]");
 }
 function assertStatement(statement: string): void {
 	if (
@@ -41,8 +46,24 @@ function assertStatement(statement: string): void {
 		throw new ProjectFactError("INVALID_FACT");
 }
 type SourcePolicy = Pick<PolicyContext, "allowedPaths" | "protectedPaths">;
-function capture(cwd: string, sourceRef: string, policy: SourcePolicy) {
+/** `run:<runId>#<candidateId>`: a memory candidate's Runtime-owned Run record, not a project file. */
+const isRunSource = (sourceRef: string) => sourceRef.startsWith("run:");
+function capture(cwd: string, sourceRef: string, statement: string, policy: SourcePolicy) {
 	try {
+		if (isRunSource(sourceRef)) {
+			const [, runId, candidateId] = /^run:(.+)#(sha256:[0-9a-f]{64})$/.exec(sourceRef) ?? [];
+			const run = runId === undefined ? undefined : FileStateStore.readRun(cwd, runId);
+			// The Run must still yield exactly this candidate, so a Run cannot back arbitrary statements.
+			if (
+				!run ||
+				!deriveMemoryCandidates([run]).some(
+					(candidate) => candidate.id === candidateId && candidate.statement === statement,
+				)
+			)
+				throw new Error("no matching candidate");
+			const sourceDigest = digest(run);
+			return { sourceDigest, sourceGeneration: digest([cwd, sourceRef, sourceDigest]) };
+		}
 		if (
 			sourceRef.length > 256 ||
 			!isListablePath(sourceRef, policy) ||
@@ -134,7 +155,7 @@ export async function prepareProjectFact(
 	if (!previous && facts.length >= PROJECT_FACT_LIMIT) throw new ProjectFactError("FACT_LIMIT");
 	if (digest(configuration(cwd)) !== digest(config)) throw new ProjectFactError("CONFIG_CHANGED");
 	return {
-		fact: { id: previous?.id ?? randomUUID(), statement, sourceRef, ...capture(cwd, sourceRef, policy) },
+		fact: { id: previous?.id ?? randomUUID(), statement, sourceRef, ...capture(cwd, sourceRef, statement, policy) },
 		projectRevision: state.state?.revision ?? 0,
 		configurationDigest: digest(config),
 	};
@@ -145,7 +166,7 @@ export async function projectFactStillCurrent(cwd: string, prepared: PreparedPro
 		if (digest(config) !== prepared.configurationDigest) return false;
 		const policy = await sourcePolicy(cwd, config);
 		if (digest(configuration(cwd)) !== prepared.configurationDigest) return false;
-		const source = capture(cwd, prepared.fact.sourceRef, policy);
+		const source = capture(cwd, prepared.fact.sourceRef, prepared.fact.statement, policy);
 		return (
 			source.sourceDigest === prepared.fact.sourceDigest &&
 			source.sourceGeneration === prepared.fact.sourceGeneration
@@ -169,7 +190,7 @@ export async function confirmProjectFact(
 		const assertFresh = () => {
 			guard();
 			if (digest(configuration(cwd)) !== prepared.configurationDigest) throw new ProjectFactError("CONFIG_CHANGED");
-			const source = capture(cwd, prepared.fact.sourceRef, policy);
+			const source = capture(cwd, prepared.fact.sourceRef, prepared.fact.statement, policy);
 			if (
 				source.sourceDigest !== prepared.fact.sourceDigest ||
 				source.sourceGeneration !== prepared.fact.sourceGeneration
@@ -209,8 +230,9 @@ export async function loadProjectFactProjection(
 			try {
 				if (!canonicalCurrent) throw new Error("canonical inputs changed");
 				assertStatement(fact.statement);
-				if (frozenPolicy && !isListablePath(fact.sourceRef, frozenPolicy)) throw new Error("outside frozen scope");
-				const source = capture(cwd, fact.sourceRef, policy);
+				if (frozenPolicy && !isRunSource(fact.sourceRef) && !isListablePath(fact.sourceRef, frozenPolicy))
+					throw new Error("outside frozen scope");
+				const source = capture(cwd, fact.sourceRef, fact.statement, policy);
 				valid = source.sourceDigest === fact.sourceDigest && source.sourceGeneration === fact.sourceGeneration;
 			} catch {
 				/* Unverifiable sources never reuse their last valid content. */

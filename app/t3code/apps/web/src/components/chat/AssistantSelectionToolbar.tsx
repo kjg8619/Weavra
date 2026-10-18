@@ -133,7 +133,9 @@ export function AssistantSelectionToolbar({
       size="xs"
       variant="glass"
       disabled={tooLong}
-      aria-label={tooLong ? "Selection is too long to cite" : "Cite selection in composer"}
+      aria-label={
+        tooLong ? "선택한 내용이 너무 길어 인용할 수 없어요" : "선택한 내용을 작성기에 인용"
+      }
       className="fixed z-50 max-w-[calc(100vw-1rem)] rounded-full px-2.5"
       style={{ left: selection.position.x, top: selection.position.y }}
       onPointerDown={(event) => event.preventDefault()}
@@ -147,7 +149,7 @@ export function AssistantSelectionToolbar({
       }}
     >
       <QuoteIcon aria-hidden="true" className="size-3.5" />
-      {tooLong ? "Shorten selection" : "Cite"}
+      {tooLong ? "선택 줄이기" : "인용"}
     </Button>,
     document.body,
   );

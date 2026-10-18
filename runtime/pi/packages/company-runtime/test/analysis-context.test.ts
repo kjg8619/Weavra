@@ -3,9 +3,15 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
-import { prepareAnalysisContext, prepareSymptomVerification } from "../src/analysis-context.ts";
+import {
+	PROJECT_RULES_MAX_BYTES,
+	prepareAnalysisContext,
+	prepareSymptomVerification,
+	projectRulesSection,
+} from "../src/analysis-context.ts";
 import { parseRuntimeConfig } from "../src/config.ts";
 import type { AnalysisContext } from "../src/contracts.ts";
+import type { ProjectFactSummary } from "../src/project-fact-types.ts";
 import { buildTaskContract } from "../src/task-contract.ts";
 
 let cwd: string;
@@ -44,6 +50,47 @@ beforeEach(async () => {
 });
 afterEach(async () => {
 	await rm(cwd, { recursive: true, force: true });
+});
+
+const fact = (
+	statement: string | null,
+	reviewedAt: number,
+	status: "VALID" | "STALE" = "VALID",
+): ProjectFactSummary => ({
+	id: `fact-${reviewedAt}`,
+	statement,
+	sourceRef: `src/${reviewedAt}.ts`,
+	sourceDigest: digest(String(reviewedAt)),
+	reviewedAt,
+	status,
+});
+
+it("renders VALID reviewed facts as an advisory project rules section and omits it without facts", () => {
+	const section = projectRulesSection([
+		fact("Use pnpm for scripts.", 1),
+		fact("Tests live under test/.", 2),
+		fact(null, 3, "STALE"),
+	]);
+	expect(section).toContain("프로젝트 규칙(자문, 정책 아님)");
+	expect(section?.split("\n").slice(1)).toEqual(["- Tests live under test/.", "- Use pnpm for scripts."]);
+	expect(projectRulesSection([])).toBeUndefined();
+	expect(projectRulesSection([fact(null, 1, "STALE")])).toBeUndefined();
+});
+
+it("truncates 5 KiB of facts to at most 4 KiB, keeping the newest reviewed facts", () => {
+	const facts = Array.from({ length: 12 }, (_, index) => fact(`${index}`.padEnd(440, "x"), index));
+	expect(Buffer.byteLength(facts.map((item) => item.statement).join(""))).toBeGreaterThan(5 * 1024);
+	const section = projectRulesSection(facts)!;
+	expect(Buffer.byteLength(JSON.stringify(section))).toBeLessThanOrEqual(PROJECT_RULES_MAX_BYTES);
+	const kept = section.split("\n").slice(1);
+	expect(kept.length).toBeGreaterThan(0);
+	expect(kept.length).toBeLessThan(facts.length);
+	expect(kept).toEqual(
+		facts
+			.slice(-kept.length)
+			.reverse()
+			.map((item) => `- ${item.statement}`),
+	);
 });
 
 it("compares the supplied digest instead of silently refreshing stale findings", async () => {

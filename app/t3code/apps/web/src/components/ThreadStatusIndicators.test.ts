@@ -87,8 +87,8 @@ describe("shared pull request state", () => {
 describe("prStatusIndicator", () => {
   it("formats PR tooltips with number, uppercase status, and title", () => {
     expect(prStatusIndicator(status().pr, undefined)).toMatchObject({
-      tooltip: "PR #42 - Open: PR branch",
-      tooltipLead: "PR #42 - Open",
+      tooltip: "PR #42 - 열림: PR branch",
+      tooltipLead: "PR #42 - 열림",
       tooltipTitle: "PR branch",
     });
   });
@@ -107,9 +107,9 @@ describe("prStatusIndicator", () => {
     if (!draftPr) throw new Error("Expected pull request fixture");
 
     expect(prStatusIndicator({ ...draftPr, isDraft: true }, undefined)).toMatchObject({
-      label: "PR draft",
+      label: "PR 초안",
       colorClass: "text-zinc-500 dark:text-zinc-400/80",
-      tooltipLead: "PR #42 - Draft",
+      tooltipLead: "PR #42 - 초안",
     });
   });
 });
@@ -128,7 +128,7 @@ describe("resolveThreadPullRequestBadgePresentation", () => {
     ).toEqual({
       Icon: PullRequestGlyph.pullRequest,
       toneClassName: "text-muted-foreground",
-      label: "PR #42, status pending",
+      label: "PR #42, 상태 확인 중",
       text: 42,
     });
   });
@@ -139,28 +139,28 @@ describe("resolveThreadPullRequestBadgePresentation", () => {
       { state: "open", isDraft: false },
       PullRequestGlyph.pullRequest,
       "text-emerald-600 dark:text-emerald-300/90",
-      "PR #42 - Open: PR branch",
+      "PR #42 - 열림: PR branch",
     ],
     [
       "draft",
       { state: "open", isDraft: true },
       PullRequestGlyph.draft,
       "text-zinc-500 dark:text-zinc-400/80",
-      "PR #42 - Draft: PR branch",
+      "PR #42 - 초안: PR branch",
     ],
     [
       "closed",
       { state: "closed", isDraft: false },
       PullRequestGlyph.closed,
       "text-red-600 dark:text-red-300/90",
-      "PR #42 - Closed: PR branch",
+      "PR #42 - 닫힘: PR branch",
     ],
     [
       "merged",
       { state: "merged", isDraft: false },
       PullRequestGlyph.merged,
       "text-violet-600 dark:text-violet-300/90",
-      "PR #42 - Merged: PR branch",
+      "PR #42 - 병합됨: PR branch",
     ],
   ] as const)(
     "keeps the %s state for one linked pull request",
@@ -187,12 +187,12 @@ describe("resolveThreadPullRequestBadgePresentation", () => {
   );
 
   it.each([
-    ["open", "text-emerald-600 dark:text-emerald-300/90"],
-    ["draft", "text-zinc-500 dark:text-zinc-400/80"],
-    ["merged", "text-violet-600 dark:text-violet-300/90"],
+    ["open", "text-emerald-600 dark:text-emerald-300/90", "열림"],
+    ["draft", "text-zinc-500 dark:text-zinc-400/80", "초안"],
+    ["merged", "text-violet-600 dark:text-violet-300/90", "병합됨"],
   ] as const)(
     "uses a layers badge with the %s stack tone without a link identity",
-    (state, expectedToneClassName) => {
+    (state, expectedToneClassName, stateLabel) => {
       expect(
         resolveThreadPullRequestBadgePresentation({
           badge: { kind: "stack", layers: 3, state },
@@ -201,19 +201,19 @@ describe("resolveThreadPullRequestBadgePresentation", () => {
       ).toEqual({
         Icon: PullRequestGlyph.stack,
         toneClassName: expectedToneClassName,
-        label: `Stack of 3 pull requests, ${state}`,
+        label: `PR 3개 스택, ${stateLabel}`,
         text: 3,
       });
     },
   );
 
   it.each([
-    ["open", PullRequestGlyph.pullRequest, "text-emerald-600 dark:text-emerald-300/90"],
-    ["draft", PullRequestGlyph.draft, "text-zinc-500 dark:text-zinc-400/80"],
-    ["merged", PullRequestGlyph.merged, "text-violet-600 dark:text-violet-300/90"],
+    ["open", PullRequestGlyph.pullRequest, "text-emerald-600 dark:text-emerald-300/90", "열림"],
+    ["draft", PullRequestGlyph.draft, "text-zinc-500 dark:text-zinc-400/80", "초안"],
+    ["merged", PullRequestGlyph.merged, "text-violet-600 dark:text-violet-300/90", "병합됨"],
   ] as const)(
     "draws the count of unrelated linked pull requests with their %s aggregate state",
-    (state, expectedIcon, expectedToneClassName) => {
+    (state, expectedIcon, expectedToneClassName, stateLabel) => {
       const fixture = status().pr;
       if (!fixture) throw new Error("Expected pull request fixture");
       const closedStatus = prStatusIndicator(
@@ -232,7 +232,7 @@ describe("resolveThreadPullRequestBadgePresentation", () => {
       ).toEqual({
         Icon: expectedIcon,
         toneClassName: expectedToneClassName,
-        label: `PR #42 - Closed: PR branch, and 2 more linked; overall ${state}`,
+        label: `PR #42 - 닫힘: PR branch, 외 2개 연결됨, 전체 ${stateLabel}`,
         text: "+3",
       });
     },

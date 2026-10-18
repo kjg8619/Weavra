@@ -1,8 +1,9 @@
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { CommandId, ProjectId, ThreadId } from "./baseSchemas.ts";
+import { CommandId, EventId, MessageId, ProjectId, ThreadId } from "./baseSchemas.ts";
 
 import {
   ProjectIconOverride,
@@ -36,8 +37,361 @@ import {
   SnapShotAccessibility,
   isProviderSendTurnSupportedImageMimeType,
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
+  WorkspaceTurnStartRefusalPayload,
+  WorkspaceTurnAdmissionAttempt,
+  WorkspaceTurnAdmissionClaimPayload,
+  WorkspaceTurnCompactionContinuationPayload,
+  decodeWorkspaceTurnStartRefusalPayload,
+  decodeWorkspaceTurnAdmissionClaimPayload,
+  decodeWorkspaceTurnCompactionContinuationPayload,
+  makeWorkspaceTurnStartRefusalIdentity,
+  makeWorkspaceTurnAdmissionClaimIdentity,
+  makeWorkspaceTurnCompactionContinuationIdentity,
 } from "./orchestration.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
+
+const workspaceRefusal = {
+  version: 1,
+  source: "workspace-ownership",
+  requestId: MessageId.make("message-1"),
+  reason: "owned",
+  originCommandId: CommandId.make("command-1"),
+  originSequence: 7,
+} as const;
+const workspaceClaim = {
+  version: 1,
+  source: "workspace-admission",
+  requestId: MessageId.make("message-1"),
+  originCommandId: CommandId.make("command-1"),
+  originSequence: 7,
+  attempt: { kind: "initial" },
+  claimantNonce: "12345678-1234-4234-8234-123456789abc",
+} as const;
+const workspaceContinuation = {
+  version: 1,
+  source: "workspace-admission",
+  requestId: MessageId.make("message-1"),
+  originCommandId: CommandId.make("command-1"),
+  originSequence: 7,
+  parentClaimId: EventId.make("claim-1"),
+  compactionRequestId: MessageId.make("compact-message-1"),
+  compactionEventId: EventId.make("compact-event-1"),
+  compactionSequence: 9,
+} as const;
+const decodeWorkspaceContinuation = Schema.decodeUnknownSync(
+  WorkspaceTurnCompactionContinuationPayload,
+);
+
+function assertWorkspacePayloadRejected(
+  schema: Schema.ConstraintDecoder<unknown>,
+  values: ReadonlyArray<unknown>,
+) {
+  const decode = Schema.decodeUnknownOption(schema);
+  for (const value of values) {
+    assert.strictEqual(Option.isNone(decode(value)), true);
+  }
+}
+
+it("decodes bounded workspace refusal payloads with the default decoder", () => {
+  const decode = Schema.decodeUnknownSync(WorkspaceTurnStartRefusalPayload);
+  for (const reason of [
+    "owned",
+    "stale",
+    "unavailable",
+    "terminal-active",
+    "provider-conflict",
+    "not-drained",
+    "cleanup-unproven",
+    "target-changed",
+  ] as const) {
+    assert.deepEqual(decode({ ...workspaceRefusal, reason }), { ...workspaceRefusal, reason });
+  }
+  assert.strictEqual(Option.isSome(decodeWorkspaceTurnStartRefusalPayload(workspaceRefusal)), true);
+});
+
+it("rejects malformed, excess and cross-kind refusal fields with the default decoder", () => {
+  assertWorkspacePayloadRejected(WorkspaceTurnStartRefusalPayload, [
+    null,
+    [],
+    "refusal",
+    { ...workspaceRefusal, version: 2 },
+    { ...workspaceRefusal, source: "workspace-admission" },
+    { ...workspaceRefusal, requestId: "" },
+    { ...workspaceRefusal, requestId: 1 },
+    { ...workspaceRefusal, originCommandId: "" },
+    { ...workspaceRefusal, reason: "unknown" },
+    { ...workspaceRefusal, originSequence: -1 },
+    { ...workspaceRefusal, originSequence: 1.5 },
+    { ...workspaceRefusal, originSequence: "7" },
+    { ...workspaceRefusal, cwd: "/private/workspace" },
+    { ...workspaceRefusal, detail: "private detail" },
+    { ...workspaceRefusal, cause: {} },
+    { ...workspaceRefusal, taskId: "foreign-task" },
+    { ...workspaceRefusal, threadId: "foreign-thread" },
+    { ...workspaceRefusal, environmentId: "foreign-environment" },
+    { ...workspaceRefusal, attempt: { kind: "initial" } },
+    { ...workspaceRefusal, parentClaimId: "claim-1" },
+    ...Object.keys(workspaceRefusal).map((missing) =>
+      Object.fromEntries(Object.entries(workspaceRefusal).filter(([key]) => key !== missing)),
+    ),
+  ]);
+  assert.strictEqual(
+    Option.isNone(decodeWorkspaceTurnStartRefusalPayload({ ...workspaceRefusal, detail: "extra" })),
+    true,
+  );
+});
+
+it("decodes initial and compaction admission claims with strict raw decoders", () => {
+  const decode = Schema.decodeUnknownSync(WorkspaceTurnAdmissionClaimPayload);
+  assert.deepEqual(decode(workspaceClaim), workspaceClaim);
+  const successor = {
+    ...workspaceClaim,
+    attempt: { kind: "compaction", permitId: EventId.make("permit-1") },
+  } as const;
+  assert.deepEqual(decode(successor), successor);
+  assert.strictEqual(Option.isSome(decodeWorkspaceTurnAdmissionClaimPayload(workspaceClaim)), true);
+  assert.strictEqual(Option.isSome(decodeWorkspaceTurnAdmissionClaimPayload(successor)), true);
+});
+
+it("rejects excess and cross-kind fields in default attempt decoders", () => {
+  const decode = Schema.decodeUnknownSync(WorkspaceTurnAdmissionAttempt);
+  assert.deepEqual(decode({ kind: "initial" }), { kind: "initial" });
+  assert.deepEqual(decode({ kind: "compaction", permitId: "permit-1" }), {
+    kind: "compaction",
+    permitId: EventId.make("permit-1"),
+  });
+  assertWorkspacePayloadRejected(WorkspaceTurnAdmissionAttempt, [
+    {},
+    { kind: "retry" },
+    { kind: "initial", permitId: "permit-1" },
+    { kind: "initial", claimantNonce: workspaceClaim.claimantNonce },
+    { kind: "compaction" },
+    { kind: "compaction", permitId: "" },
+    { kind: "compaction", permitId: 1 },
+    { kind: "compaction", permitId: "permit-1", extra: true },
+  ]);
+});
+
+it("rejects malformed claims and nested excess fields before stripping", () => {
+  assertWorkspacePayloadRejected(WorkspaceTurnAdmissionClaimPayload, [
+    null,
+    [],
+    { ...workspaceClaim, version: 2 },
+    { ...workspaceClaim, source: "workspace-ownership" },
+    { ...workspaceClaim, requestId: "" },
+    { ...workspaceClaim, originCommandId: 1 },
+    { ...workspaceClaim, originSequence: -1 },
+    { ...workspaceClaim, originSequence: 1.5 },
+    { ...workspaceClaim, originSequence: "7" },
+    { ...workspaceClaim, claimantNonce: "not-a-uuid" },
+    { ...workspaceClaim, claimantNonce: "12345678-1234-1234-8234-123456789abc" },
+    { ...workspaceClaim, claimantNonce: "12345678-1234-4234-7234-123456789abc" },
+    { ...workspaceClaim, attempt: null },
+    { ...workspaceClaim, attempt: { kind: "retry" } },
+    { ...workspaceClaim, attempt: { kind: "initial", permitId: "permit-1" } },
+    { ...workspaceClaim, attempt: { kind: "initial", extra: true } },
+    { ...workspaceClaim, attempt: { kind: "compaction" } },
+    { ...workspaceClaim, attempt: { kind: "compaction", permitId: "" } },
+    { ...workspaceClaim, attempt: { kind: "compaction", permitId: "permit-1", extra: true } },
+    { ...workspaceClaim, reason: "owned" },
+    { ...workspaceClaim, parentClaimId: "claim-1" },
+    { ...workspaceClaim, environmentId: "foreign-environment" },
+    { ...workspaceClaim, threadId: "foreign-thread" },
+    ...Object.keys(workspaceClaim).map((missing) =>
+      Object.fromEntries(Object.entries(workspaceClaim).filter(([key]) => key !== missing)),
+    ),
+  ]);
+  assert.strictEqual(
+    Option.isNone(
+      decodeWorkspaceTurnAdmissionClaimPayload({
+        ...workspaceClaim,
+        attempt: { kind: "initial", permitId: "permit-1" },
+      }),
+    ),
+    true,
+  );
+  assert.strictEqual(
+    Option.isNone(decodeWorkspaceTurnAdmissionClaimPayload({ ...workspaceClaim, reason: "owned" })),
+    true,
+  );
+});
+
+it("decodes bounded compaction continuations without inventing a turn id", () => {
+  assert.deepEqual(decodeWorkspaceContinuation(workspaceContinuation), workspaceContinuation);
+  assert.strictEqual(
+    Option.isSome(decodeWorkspaceTurnCompactionContinuationPayload(workspaceContinuation)),
+    true,
+  );
+});
+
+it("rejects malformed, excess and cross-kind continuation fields with default decoders", () => {
+  assertWorkspacePayloadRejected(WorkspaceTurnCompactionContinuationPayload, [
+    null,
+    [],
+    { ...workspaceContinuation, version: 2 },
+    { ...workspaceContinuation, source: "workspace-ownership" },
+    { ...workspaceContinuation, requestId: "" },
+    { ...workspaceContinuation, originCommandId: "" },
+    { ...workspaceContinuation, originSequence: -1 },
+    { ...workspaceContinuation, originSequence: 1.5 },
+    { ...workspaceContinuation, parentClaimId: "" },
+    { ...workspaceContinuation, parentClaimId: 1 },
+    { ...workspaceContinuation, compactionRequestId: "" },
+    { ...workspaceContinuation, compactionRequestId: 1 },
+    { ...workspaceContinuation, compactionEventId: "" },
+    { ...workspaceContinuation, compactionEventId: 1 },
+    { ...workspaceContinuation, compactionSequence: -1 },
+    { ...workspaceContinuation, compactionSequence: 1.5 },
+    { ...workspaceContinuation, compactionSequence: "9" },
+    { ...workspaceContinuation, reason: "owned" },
+    { ...workspaceContinuation, attempt: { kind: "initial" } },
+    { ...workspaceContinuation, claimantNonce: workspaceClaim.claimantNonce },
+    { ...workspaceContinuation, turnId: "invented-turn" },
+    { ...workspaceContinuation, environmentId: "foreign-environment" },
+    { ...workspaceContinuation, threadId: "foreign-thread" },
+    ...Object.keys(workspaceContinuation).map((missing) =>
+      Object.fromEntries(Object.entries(workspaceContinuation).filter(([key]) => key !== missing)),
+    ),
+  ]);
+  assert.strictEqual(
+    Option.isNone(
+      decodeWorkspaceTurnCompactionContinuationPayload({
+        ...workspaceContinuation,
+        claimantNonce: workspaceClaim.claimantNonce,
+      }),
+    ),
+    true,
+  );
+});
+
+it("uses the exact frozen tuples in both command and activity id domains", () => {
+  const threadId = ThreadId.make("thread-1");
+  const messageId = MessageId.make("message-1");
+  const parentClaimId = EventId.make("claim-1");
+  const compactionEventId = EventId.make("compact-event-1");
+  const permitId = EventId.make("permit-1");
+  const identities = [
+    [
+      makeWorkspaceTurnStartRefusalIdentity(threadId, messageId),
+      ["workspace-refusal-v1", threadId, messageId],
+    ],
+    [
+      makeWorkspaceTurnAdmissionClaimIdentity(threadId, messageId, { kind: "initial" }),
+      ["workspace-admission-v1", threadId, messageId, "initial"],
+    ],
+    [
+      makeWorkspaceTurnAdmissionClaimIdentity(threadId, messageId, {
+        kind: "compaction",
+        permitId,
+      }),
+      ["workspace-admission-v1", threadId, messageId, "compaction", permitId],
+    ],
+    [
+      makeWorkspaceTurnCompactionContinuationIdentity(
+        threadId,
+        messageId,
+        parentClaimId,
+        compactionEventId,
+      ),
+      [
+        "workspace-compaction-continuation-v1",
+        threadId,
+        messageId,
+        parentClaimId,
+        compactionEventId,
+      ],
+    ],
+  ] as const;
+  for (const [identity, tuple] of identities) {
+    assert.strictEqual(identity.commandId, `server:${JSON.stringify(tuple)}`);
+    assert.strictEqual(identity.activityId, JSON.stringify(tuple));
+    assert.deepEqual(JSON.parse(identity.activityId), tuple);
+  }
+  assert.strictEqual(new Set(identities.map(([identity]) => identity.activityId)).size, 4);
+});
+
+it("keeps delimiter-like identifiers and compaction chain links distinct", () => {
+  const pairs = [
+    [ThreadId.make("a:b"), MessageId.make("c")],
+    [ThreadId.make("a"), MessageId.make("b:c")],
+    [ThreadId.make('a","b'), MessageId.make("c\u0000d")],
+    [ThreadId.make("a"), MessageId.make('b","c\u0000d')],
+  ] as const;
+  const refusalIds = pairs.map(([threadId, messageId]) =>
+    makeWorkspaceTurnStartRefusalIdentity(threadId, messageId),
+  );
+  assert.strictEqual(new Set(refusalIds.map((identity) => identity.activityId)).size, pairs.length);
+  const initialIds = pairs.map(([threadId, messageId]) =>
+    makeWorkspaceTurnAdmissionClaimIdentity(threadId, messageId, { kind: "initial" }),
+  );
+  assert.strictEqual(new Set(initialIds.map((identity) => identity.activityId)).size, pairs.length);
+  const threadId = ThreadId.make("thread-1");
+  const messageId = MessageId.make("message-1");
+  const permit = makeWorkspaceTurnCompactionContinuationIdentity(
+    threadId,
+    messageId,
+    EventId.make("parent:claim"),
+    EventId.make("event"),
+  );
+  const changedParent = makeWorkspaceTurnCompactionContinuationIdentity(
+    threadId,
+    messageId,
+    EventId.make("parent"),
+    EventId.make("claim:event"),
+  );
+  const changedEvent = makeWorkspaceTurnCompactionContinuationIdentity(
+    threadId,
+    messageId,
+    EventId.make("parent:claim"),
+    EventId.make("event-2"),
+  );
+  assert.strictEqual(
+    new Set([permit.activityId, changedParent.activityId, changedEvent.activityId]).size,
+    3,
+  );
+  const firstClaim = makeWorkspaceTurnAdmissionClaimIdentity(threadId, messageId, {
+    kind: "compaction",
+    permitId: permit.activityId,
+  });
+  const secondClaim = makeWorkspaceTurnAdmissionClaimIdentity(threadId, messageId, {
+    kind: "compaction",
+    permitId: changedEvent.activityId,
+  });
+  assert.notStrictEqual(firstClaim.activityId, secondClaim.activityId);
+  assert.deepEqual(
+    makeWorkspaceTurnStartRefusalIdentity(threadId, messageId),
+    makeWorkspaceTurnStartRefusalIdentity(threadId, messageId),
+  );
+});
+
+it("does not admit server-only claims or permits through client commands", () => {
+  const decode = Schema.decodeUnknownOption(ClientOrchestrationCommand);
+  for (const [kind, payload] of [
+    ["provider.turn.admission.claimed", workspaceClaim],
+    ["provider.turn.compaction.continuation", workspaceContinuation],
+  ] as const) {
+    assert.strictEqual(
+      Option.isNone(
+        decode({
+          type: "thread.activity.append",
+          commandId: "server-only",
+          threadId: "thread-1",
+          activity: {
+            id: "server-only",
+            tone: "info",
+            kind,
+            summary: "Server activity",
+            payload,
+            turnId: null,
+            createdAt: "2026-10-03T00:00:00.000Z",
+          },
+          createdAt: "2026-10-03T00:00:00.000Z",
+        }),
+      ),
+      true,
+    );
+  }
+});
 
 const decodeTurnDiffInput = Schema.decodeUnknownEffect(OrchestrationGetTurnDiffInput);
 const decodeFullThreadDiffInput = Schema.decodeUnknownEffect(OrchestrationGetFullThreadDiffInput);

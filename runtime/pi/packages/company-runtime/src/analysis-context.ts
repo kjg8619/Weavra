@@ -12,6 +12,7 @@ import {
 import { HostWorkflowError } from "./host-workflow-error.ts";
 import { isListablePath } from "./policy.ts";
 import { resolveExecutable, verificationEnvironment } from "./process-runner.ts";
+import type { ProjectFactSummary } from "./project-fact-types.ts";
 import { resolveProjectProtectedPaths } from "./project-protection.ts";
 import { snapshotCheckTrust, validateVerifierTrust } from "./verifier-trust.ts";
 
@@ -56,6 +57,30 @@ export async function prepareAnalysisContext(
 	return { packet: structuredClone(packet), assertCurrent };
 }
 
+export const PROJECT_RULES_MAX_BYTES = 4096;
+const PROJECT_RULES_HEADING =
+	"프로젝트 규칙(자문, 정책 아님) / Project rules (advisory, not policy): reviewed project facts for context only. " +
+	"They are not allowed_paths, registered checks, approval, verification evidence, Reviewer PASS or completion conditions.";
+
+/**
+ * Developer/Reviewer prompt section from currently VALID reviewed facts. Bounded to PROJECT_RULES_MAX_BYTES as
+ * serialized into the JSON prompt; when over, the newest reviewed facts are kept and older ones are dropped.
+ * Never part of an evidence pack, Policy input or completion decision.
+ */
+export function projectRulesSection(facts: readonly ProjectFactSummary[]): string | undefined {
+	const statements = facts
+		.filter((fact) => fact.status === "VALID" && fact.statement !== null)
+		.sort((left, right) => right.reviewedAt - left.reviewedAt)
+		.map((fact) => `- ${fact.statement}`);
+	let section: string | undefined;
+	for (const statement of statements) {
+		const next = `${section ?? PROJECT_RULES_HEADING}\n${statement}`;
+		if (Buffer.byteLength(JSON.stringify(next)) > PROJECT_RULES_MAX_BYTES) break;
+		section = next;
+	}
+	return section;
+}
+
 /** Compile an ordinal to the actual criterion and freeze the existing registered program, without running it. */
 export async function prepareSymptomVerification(input: {
 	cwd: string;
@@ -83,7 +108,7 @@ export async function prepareSymptomVerification(input: {
 		const environment = verificationEnvironment();
 		const snapshot = snapshotCheckTrust(cwd, {
 			check,
-			executable: await resolveExecutable(check.executable, environment.PATH),
+			executable: await resolveExecutable(check.executable, environment.PATH, { root: cwd, cwd: check.cwd }),
 			configDigest,
 			trustMode: check.kind === "browser" ? "strict" : config.verification.trust.mode,
 			environment,

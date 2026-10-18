@@ -30,6 +30,7 @@ export const RuntimeConfigSchema = Type.Object(
 					},
 					strict,
 				),
+				claude_code: Type.Optional(Type.Object({ enabled: Type.Boolean() }, strict)),
 				// Model intent aliases (#5): each names a configured profile; routing is fixed per role (model-routing.ts).
 				// Absent stays absent, so existing routing and configuration digests are unchanged.
 				intents: Type.Optional(
@@ -149,13 +150,14 @@ export const RuntimeConfigSchema = Type.Object(
 					repair: Type.Optional(
 						Type.Object({ mode: Type.Optional(Type.Enum(["disabled", "self-check-once"])) }, strict),
 					),
-					// Advisory checks let a STANDARD Developer run registered process checks while implementing.
-					// Output is tool text only: never verification evidence, durable state or completion input.
-					advisory: Type.Optional(
+					// Advisory checks let a STANDARD Developer run registered process checks while implementing (default on).
+					// Output is bounded tool text only: never verification evidence, durable state or completion input.
+					advisory_checks: Type.Optional(
 						Type.Object(
 							{
-								mode: Type.Union([Type.Literal("disabled"), Type.Literal("developer")]),
-								max_runs: Type.Optional(Type.Integer({ minimum: 1, maximum: 20 })),
+								enabled: Type.Optional(Type.Boolean()),
+								max_runs_per_attempt: Type.Optional(Type.Integer({ minimum: 1, maximum: 20 })),
+								max_output_bytes: Type.Optional(Type.Integer({ minimum: 1024, maximum: 65536 })),
 							},
 							strict,
 						),
@@ -222,6 +224,9 @@ export const RuntimeConfigSchema = Type.Object(
 	},
 	strict,
 );
+
+/** Applied when `verification.advisory_checks` is absent or partial. */
+export const DEFAULT_ADVISORY_CHECKS = { enabled: true, max_runs_per_attempt: 3, max_output_bytes: 16384 };
 
 export type RuntimeConfigInput = Static<typeof RuntimeConfigSchema>;
 export type RuntimeConfig = ReturnType<typeof parseRuntimeConfig>;
@@ -316,7 +321,10 @@ export function parseRuntimeConfig(source: string) {
 	});
 	return {
 		schemaVersion: value.schemaVersion,
-		models: value.models,
+		models: {
+			...value.models,
+			claude_code: { enabled: value.models.claude_code?.enabled ?? false },
+		},
 		runtime: { workflow: value.runtime?.workflow ?? "adaptive" },
 		agents: {
 			max_parallel: value.agents?.max_parallel ?? 1,
@@ -338,14 +346,9 @@ export function parseRuntimeConfig(source: string) {
 			trust: { mode: value.verification?.trust?.mode ?? ("compatible" as const) },
 			sandbox: { mode: value.verification?.sandbox?.mode ?? ("disabled" as const) },
 			repair: { mode: value.verification?.repair?.mode ?? ("disabled" as const) },
-			// Absent stays absent so existing configuration digests are unchanged.
-			...(value.verification?.advisory
-				? {
-						advisory: {
-							mode: value.verification.advisory.mode,
-							max_runs: value.verification.advisory.max_runs ?? 5,
-						},
-					}
+			// Absent stays absent so existing configuration digests are unchanged; consumers apply DEFAULT_ADVISORY_CHECKS.
+			...(value.verification?.advisory_checks
+				? { advisory_checks: { ...DEFAULT_ADVISORY_CHECKS, ...value.verification.advisory_checks } }
 				: {}),
 		},
 		mutation: { mode: value.mutation?.mode ?? ("compatible" as const) },

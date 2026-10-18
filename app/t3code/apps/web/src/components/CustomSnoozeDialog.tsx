@@ -81,8 +81,8 @@ function CustomSnoozeDialog() {
             if (!snoozedUntil) {
               setError(
                 mode === "date"
-                  ? "Choose a valid date and time in the future."
-                  : "Enter a positive duration.",
+                  ? "미래의 올바른 날짜와 시간을 골라 주세요."
+                  : "0보다 큰 기간을 입력해 주세요.",
               );
               return;
             }
@@ -90,8 +90,8 @@ function CustomSnoozeDialog() {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Custom snooze</DialogTitle>
-            <DialogDescription>Choose when snoozed threads return to your inbox.</DialogDescription>
+            <DialogTitle>직접 미루기</DialogTitle>
+            <DialogDescription>미룬 대화가 다시 나타날 때를 골라 주세요.</DialogDescription>
           </DialogHeader>
           <DialogPanel className="flex flex-col gap-4 text-base sm:text-sm">
             <Tabs.Root
@@ -103,7 +103,7 @@ function CustomSnoozeDialog() {
               className="flex flex-col gap-4"
             >
               <Tabs.List
-                aria-label="Schedule type"
+                aria-label="예약 방식"
                 className="flex gap-0.5 rounded-lg bg-input/40 p-0.5"
               >
                 {(["date", "duration"] as const).map((value) => (
@@ -117,7 +117,7 @@ function CustomSnoozeDialog() {
                       className: "flex-1",
                     })}
                   >
-                    {value === "date" ? "Date and time" : "Duration"}
+                    {value === "date" ? "날짜와 시간" : "기간"}
                   </Tabs.Tab>
                 ))}
               </Tabs.List>
@@ -125,7 +125,7 @@ function CustomSnoozeDialog() {
                 {mode === "date" ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-1.5">
-                      <Label htmlFor={`${id}-date`}>Date</Label>
+                      <Label htmlFor={`${id}-date`}>날짜</Label>
                       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                         <PopoverTrigger
                           render={
@@ -143,7 +143,7 @@ function CustomSnoozeDialog() {
                           })}
                           <CalendarIcon className="size-4 text-muted-foreground" />
                         </PopoverTrigger>
-                        <PopoverPopup align="start" aria-label="Choose snooze date">
+                        <PopoverPopup align="start" aria-label="미룰 날짜 선택">
                           <Calendar
                             mode="single"
                             required
@@ -163,7 +163,7 @@ function CustomSnoozeDialog() {
                       className="flex min-w-0 flex-col items-stretch gap-1.5"
                       htmlFor={`${id}-time`}
                     >
-                      Time
+                      시간
                       <Input
                         nativeInput
                         id={`${id}-time`}
@@ -191,21 +191,21 @@ function CustomSnoozeDialog() {
                         setError(null);
                       }}
                     >
-                      <Label htmlFor={`${id}-amount`}>Snooze for</Label>
+                      <Label htmlFor={`${id}-amount`}>미룰 기간</Label>
                       <NumberFieldGroup>
-                        <NumberFieldDecrement aria-label="Decrease duration" />
+                        <NumberFieldDecrement aria-label="기간 줄이기" />
                         <NumberFieldInput required />
-                        <NumberFieldIncrement aria-label="Increase duration" />
+                        <NumberFieldIncrement aria-label="기간 늘리기" />
                       </NumberFieldGroup>
                     </NumberField>
                     <Label
                       className="flex min-w-0 flex-col items-stretch gap-1.5"
                       htmlFor={`${id}-unit`}
                     >
-                      Unit
+                      단위
                       <Select
                         value={unit}
-                        items={{ minutes: "Minutes", hours: "Hours", days: "Days" }}
+                        items={{ minutes: "분", hours: "시간", days: "일" }}
                         onValueChange={(value) => {
                           if (value === "minutes" || value === "hours" || value === "days")
                             setUnit(value);
@@ -216,9 +216,9 @@ function CustomSnoozeDialog() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectPopup>
-                          <SelectItem value="minutes">Minutes</SelectItem>
-                          <SelectItem value="hours">Hours</SelectItem>
-                          <SelectItem value="days">Days</SelectItem>
+                          <SelectItem value="minutes">분</SelectItem>
+                          <SelectItem value="hours">시간</SelectItem>
+                          <SelectItem value="days">일</SelectItem>
                         </SelectPopup>
                       </Select>
                     </Label>
@@ -234,9 +234,9 @@ function CustomSnoozeDialog() {
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => finish(null)}>
-              Cancel
+              취소
             </Button>
-            <Button type="submit">Snooze</Button>
+            <Button type="submit">미루기</Button>
           </DialogFooter>
         </form>
       </DialogPopup>

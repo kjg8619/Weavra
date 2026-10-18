@@ -73,7 +73,8 @@ function measuredRun(workflow: "QUICK" | "STANDARD", workerMeasurements: WorkerM
 describe("#5 model intent config and deterministic role routing", () => {
 	it("keeps today's routing and normalized config when no alias is configured", () => {
 		const plain = config();
-		expect(plain.models).toEqual({ profiles });
+		// Normalization always adds the explicit Claude opt-in, disabled by default (see test/config.test.ts).
+		expect(plain.models).toEqual({ profiles, claude_code: { enabled: false } });
 		expect("intents" in plain.models).toBe(false);
 		expect(workflowModelRoutes(plain, "QUICK")).toEqual([
 			{

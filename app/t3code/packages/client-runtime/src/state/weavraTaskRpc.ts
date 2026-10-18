@@ -14,6 +14,7 @@ import {
 } from "../rpc/client.ts";
 
 export type WeavraTaskRpcTag =
+  | typeof WS_METHODS.weavraProjectSetup
   | typeof WS_METHODS.weavraTaskCreate
   | typeof WS_METHODS.weavraTaskAnalyze
   | typeof WS_METHODS.weavraTaskFollowup
@@ -25,6 +26,7 @@ export type WeavraTaskRpcTag =
   | typeof WS_METHODS.weavraTaskRecover
   | typeof WS_METHODS.weavraTaskAbort
   | typeof WS_METHODS.weavraTaskReprepare
+  | typeof WS_METHODS.weavraTaskCommitDirtyBaseline
   | typeof WS_METHODS.weavraTaskCancel
   | typeof WS_METHODS.weavraTaskReadApproval
   | typeof WS_METHODS.weavraTaskResolveApproval

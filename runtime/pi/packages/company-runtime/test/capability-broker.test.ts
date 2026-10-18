@@ -142,6 +142,7 @@ describe("frozen Runtime capability registry", () => {
 		broker.prepare({
 			...config,
 			models: {
+				claude_code: { enabled: false },
 				profiles: {
 					coding: { provider: "SECRET", model: "SECRET" },
 					reasoning: { provider: "SECRET", model: "SECRET" },

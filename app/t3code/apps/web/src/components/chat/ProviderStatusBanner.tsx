@@ -49,13 +49,13 @@ export function getProviderStatusMessage(status: ServerProvider): string {
   if (status.auth.status === "unauthenticated") {
     if (hasProviderSetup(status)) {
       return status.driver === "antigravity"
-        ? "Open provider setup to sign in with Google."
-        : "Open provider setup to sign in.";
+        ? "공급자 설정을 열어 Google로 로그인해 주세요."
+        : "공급자 설정을 열어 로그인해 주세요.";
     }
-    return "Sign in via the CLI to authenticate again.";
+    return "CLI로 다시 로그인해 주세요.";
   }
   return status.status === "ready"
-    ? "No models are available for this provider."
+    ? "이 공급자에서 쓸 수 있는 모델이 없어요."
     : status.status === "error"
       ? `${providerName} provider is unavailable.`
       : `${providerName} provider has limited availability.`;
@@ -111,12 +111,12 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
               size="xs"
               variant="link"
             >
-              Open provider setup
+              공급자 설정 열기
             </Button>
           ) : null}
         </div>
         <Button
-          aria-label={`Dismiss ${providerName} provider ${status.status}`}
+          aria-label={`${providerName} 공급자 ${status.status === "warning" ? "경고" : "오류"} 닫기`}
           className="absolute top-2 right-2 size-6 text-muted-foreground hover:text-foreground"
           onClick={onDismiss}
           size="icon-xs"

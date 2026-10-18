@@ -32,9 +32,18 @@ const intentRules: Array<{ intent: Classification["intent"]; pattern: RegExp }> 
 		pattern:
 			/^(?:(?:delete|remove) file|파일 삭제) |typo|maintenance|dependency|dependencies|upgrade|small (?:change|setting)|simple (?:change|setting)|오타|유지보수|의존성|업데이트|작은 (?:변경|설정|수정)|한 파일/i,
 	},
-	{ intent: "implementation", pattern: /implement|add|build|구현|추가|만들/i },
-	{ intent: "analysis", pattern: /analy[sz]|inspect|분석|검토/i },
+	{
+		intent: "implementation",
+		pattern:
+			/implement|add|build|create|develop|migrate|integrate|improve|구현|추가|만들|개발|제작|작성|생성|개선|적용|도입|연동|마이그레이션/i,
+	},
+	{ intent: "analysis", pattern: /analy[sz]|inspect|분석|검토|정리|파악|확인|요약/i },
 	{ intent: "question", pattern: /what|why|how|explain|설명|무엇|왜|어떻게|알려줘|알려주세요|\?$/i },
+	{
+		intent: "bugfix",
+		pattern:
+			/^\s*(?:please\s+)?fix\s+(?!(?:it|this|that|something|anything|everything|stuff|things|nothing)\s*[.!]?\s*$)[\p{L}\p{N}][^\r\n?]*$/iu,
+	},
 ];
 const risks = ["R0", "R1", "R2", "R3"] as const;
 /**
@@ -58,8 +67,9 @@ interface Routing {
 	detectedRisk: Risk;
 }
 
-function route(goal: string, hints: ClassificationHints): Routing {
-	if (!goal.trim()) throw new Error("A non-empty goal is required");
+function route(input: string, hints: ClassificationHints): Routing {
+	if (!input.trim()) throw new Error("A non-empty goal is required");
+	const goal = input.replace(/^\s*\[(?:읽기 전용|READ_ONLY|수정|EDIT)\]\s*/, "");
 	const matched = intentRules.find((rule) => rule.pattern.test(goal));
 	const intent = hints.intent ?? matched?.intent ?? "analysis";
 	const complexity =

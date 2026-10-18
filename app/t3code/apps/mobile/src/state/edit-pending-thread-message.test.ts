@@ -1,51 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { fixture, harness } from "./testing/drain-harness";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { CommandId, EnvironmentId, MessageId, ThreadId } from "@t3tools/contracts";
 import type { QueuedThreadMessage } from "./thread-outbox-model";
-
-const state = vi.hoisted(() => ({
-  dispatching: null as string | null,
-  held: {} as Record<string, true>,
-  draft: { text: "Existing draft", attachments: [] as { id: string }[] },
-  confirm: vi.fn(async () => true),
-  remove: vi.fn(async () => true),
-  flush: vi.fn(async () => {}),
-}));
-vi.mock("./atom-registry", () => ({
-  appAtomRegistry: {
-    get: (atom: string) => (atom === "dispatching" ? state.dispatching : state.held),
-  },
-}));
-vi.mock("./use-thread-outbox", () => ({
-  dispatchingQueuedMessageIdAtom: "dispatching",
-  editingQueuedMessageIdsAtom: "editing",
-  holdEditingQueuedMessage: (id: string) => {
-    state.held[id] = true;
-  },
-  releaseEditingQueuedMessage: (id: string) => {
-    delete state.held[id];
-  },
-}));
-vi.mock("./thread-outbox", () => ({
-  confirmThreadOutboxMessageQueued: state.confirm,
-  threadOutboxRevision: () => 1,
-}));
-vi.mock("./thread-outbox-removal", () => ({ removeThreadOutboxMessage: state.remove }));
-vi.mock("./use-composer-drafts", () => ({
-  waitForComposerDraftsLoaded: async () => {},
-  getComposerDraftSnapshot: () => state.draft,
-  mergeComposerDraftContent: async (_key: string, message: QueuedThreadMessage) => {
-    state.draft = {
-      text: `${state.draft.text}\n\n${message.text}`,
-      attachments: [...state.draft.attachments, ...message.attachments],
-    };
-  },
-  updateComposerDraftSettings: () => {},
-  flushComposerDrafts: state.flush,
-  undoComposerDraftMerge: async (_key: string, snapshot: typeof state.draft) => {
-    state.draft = snapshot;
-  },
-}));
+import { threadOutboxStorageIdentity } from "./thread-outbox-model";
+import { appAtomRegistry } from "./atom-registry";
+import { dispatchingQueuedMessageIdAtom, editingQueuedMessageIdsAtom } from "./use-thread-outbox";
 import { editPendingThreadMessage } from "./edit-pending-thread-message";
+import * as drafts from "./use-composer-drafts";
 
 const message: QueuedThreadMessage = {
   environmentId: EnvironmentId.make("env"),
@@ -65,45 +26,66 @@ const message: QueuedThreadMessage = {
     },
   ],
 };
-beforeEach(() => {
-  vi.clearAllMocks();
-  state.dispatching = null;
-  state.held = {};
-  state.draft = { text: "Existing draft", attachments: [] };
-  state.confirm.mockResolvedValue(true);
-  state.remove.mockResolvedValue(true);
-  state.flush.mockResolvedValue(undefined);
+beforeEach(async () => {
+  fixture().reset();
+  drafts.resetComposerDraftsLoadState();
+  await drafts.waitForComposerDraftsLoaded();
+  drafts.setComposerDraftText("env:thread", "Existing draft");
+  await drafts.flushComposerDrafts();
+});
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await drafts.flushComposerDrafts();
+  appAtomRegistry.set(drafts.composerDraftsAtom, {});
+  appAtomRegistry.set(dispatchingQueuedMessageIdAtom, null);
+  harness.draftFile.document = JSON.stringify({ schemaVersion: 1, drafts: {} });
 });
 describe("editing a pending message", () => {
-  it("locks delivery and persists text and attachments before removing the queued copy", async () => {
-    state.confirm.mockImplementationOnce(async () => {
-      expect(state.held[message.messageId]).toBe(true);
-      return true;
+  it("locks delivery and persists text and attachments before retiring the queued copy", async () => {
+    const row = await fixture().admit(message);
+    const confirm = fixture().manager.confirmQueued;
+    vi.spyOn(fixture().manager, "confirmQueued").mockImplementationOnce(async (candidate) => {
+      expect(
+        appAtomRegistry.get(editingQueuedMessageIdsAtom)[threadOutboxStorageIdentity(row)],
+      ).toBe(true);
+      return confirm(candidate);
     });
-    state.remove.mockImplementationOnce(async () => {
-      expect(state.flush).toHaveBeenCalled();
-      expect(state.draft.text).toBe("Existing draft\n\nQueued task");
-      expect(state.draft.attachments).toEqual(message.attachments);
-      return true;
+    fixture().gates.push(async () => {
+      expect(JSON.parse(harness.draftFile.document).drafts["env:thread"]).toMatchObject({
+        text: "Existing draft\n\nQueued task",
+        attachments: message.attachments,
+      });
     });
-    expect(await editPendingThreadMessage(message)).toBe(true);
-    expect(state.held).toEqual({});
+    expect(await editPendingThreadMessage(row)).toBe(true);
+    expect(appAtomRegistry.get(editingQueuedMessageIdsAtom)).toEqual({});
   });
   it("does not reclaim a message already being dispatched", async () => {
-    state.dispatching = message.messageId;
-    expect(await editPendingThreadMessage(message)).toBe(false);
-    expect(state.confirm).not.toHaveBeenCalled();
-    expect(state.draft.text).toBe("Existing draft");
+    const row = await fixture().admit(message);
+    appAtomRegistry.set(dispatchingQueuedMessageIdAtom, threadOutboxStorageIdentity(row));
+    expect(await editPendingThreadMessage(row)).toBe(false);
+    expect(drafts.getComposerDraftSnapshot("env:thread").text).toBe("Existing draft");
   });
-  it("rolls back the draft if removing the queued message fails", async () => {
-    state.remove.mockRejectedValueOnce(new Error("disk error"));
-    await expect(editPendingThreadMessage(message)).rejects.toThrow("disk error");
-    expect(state.draft).toEqual({ text: "Existing draft", attachments: [] });
-    expect(state.held).toEqual({});
+  it("rolls back the draft if retiring the queued message fails", async () => {
+    const row = await fixture().admit(message);
+    fixture().gates.push(async () => {
+      throw new Error("disk error");
+    });
+    await expect(editPendingThreadMessage(row)).rejects.toMatchObject({ reason: "write-failed" });
+    expect(drafts.getComposerDraftSnapshot("env:thread")).toMatchObject({
+      text: "Existing draft",
+      attachments: [],
+    });
+    expect(appAtomRegistry.get(editingQueuedMessageIdsAtom)).toEqual({});
   });
-  it("rolls back when a newer queue revision wins", async () => {
-    state.remove.mockResolvedValueOnce(false);
-    expect(await editPendingThreadMessage(message)).toBe(false);
-    expect(state.draft.text).toBe("Existing draft");
+  it("rolls back when a newer queue record wins", async () => {
+    const row = await fixture().admit(message);
+    const merge = drafts.mergeComposerDraftContent;
+    vi.spyOn(drafts, "mergeComposerDraftContent").mockImplementationOnce(async (...args) => {
+      const result = await merge(...args);
+      await fixture().edit({ ...row, text: "newest" }, fixture().record(row));
+      return result;
+    });
+    expect(await editPendingThreadMessage(row)).toBe(false);
+    expect(drafts.getComposerDraftSnapshot("env:thread").text).toBe("Existing draft");
   });
 });

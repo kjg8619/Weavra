@@ -53,7 +53,7 @@ export function PullRequestCommentBody({
             setExpanded(!expanded);
           }}
         >
-          {expanded ? "Show less" : "Show full comment"}
+          {expanded ? "접기" : "전체 댓글 보기"}
         </Button>
       ) : null}
     </div>

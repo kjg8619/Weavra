@@ -79,7 +79,7 @@ export function PullRequestMarkdownEditor({
       }}
     >
       <ToggleGroup
-        aria-label="Markdown editor mode"
+        aria-label="Markdown 편집 모드"
         variant="segmented"
         value={[preview ? "preview" : "write"]}
         disabled={saving}
@@ -88,13 +88,13 @@ export function PullRequestMarkdownEditor({
           if (mode === "write" || mode === "preview") setPreview(mode === "preview");
         }}
       >
-        <Toggle value="write">Write</Toggle>
-        <Toggle value="preview">Preview</Toggle>
+        <Toggle value="write">작성</Toggle>
+        <Toggle value="preview">미리보기</Toggle>
       </ToggleGroup>
       {preview ? (
         <div className="rounded-lg border border-border/60 px-3 py-2">
           {empty ? (
-            <p className="text-xs text-muted-foreground">Nothing to preview.</p>
+            <p className="text-xs text-muted-foreground">미리볼 내용이 없어요.</p>
           ) : (
             <PullRequestMarkdown
               text={draft}
@@ -117,10 +117,10 @@ export function PullRequestMarkdownEditor({
       )}
       <div className="flex justify-end gap-2">
         <Button size="xs" variant="ghost" disabled={saving} onClick={onCancel}>
-          Cancel
+          취소
         </Button>
         <Button size="xs" variant="outline" disabled={saveDisabled} onClick={() => onSave(draft)}>
-          {saving ? "Saving..." : "Save"}
+          {saving ? "Saving..." : "저장"}
         </Button>
       </div>
     </div>
