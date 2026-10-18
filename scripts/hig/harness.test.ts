@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -12,7 +13,7 @@ import {
   validateDistinctStates,
   verifyCapture,
 } from "./assert.mjs";
-import { assertProfile } from "./seed.mjs";
+import { assertProfile, seed } from "./seed.mjs";
 
 function image(width = 1280, height = 800) {
   const png = Buffer.alloc(24);
@@ -161,5 +162,55 @@ describe("state-bound capture evidence", () => {
     expect(() => validateRecord({ ...record(), targetVisible: false }, image())).toThrow(
       "outside scrollport",
     );
+  });
+  test("seeds an existing isolated database without dispatching a turn", async () => {
+    const base = await NodeFSP.realpath(await NodeFSP.mkdtemp("/tmp/weavra-hig-"));
+    const home = NodePath.join(base, "home");
+    const workspace = NodePath.join(base, "workspace");
+    const app = NodePath.join(base, "app");
+    await NodeFSP.mkdir(home);
+    await NodeFSP.mkdir(NodePath.join(workspace, "baseline-project"), { recursive: true });
+    await NodeFSP.mkdir(NodePath.join(app, "userdata"), { recursive: true });
+    const databasePath = NodePath.join(app, "userdata/state.sqlite");
+    const db = new Database(databasePath);
+    try {
+      const tables = {
+        projection_projects: "project_id,title,workspace_root",
+        projection_threads:
+          "thread_id,project_id,title,model_selection_json,runtime_mode,interaction_mode,latest_turn_id,created_at,updated_at",
+        projection_thread_messages:
+          "message_id,thread_id,turn_id,role,text,is_streaming,created_at,updated_at",
+        projection_thread_sessions:
+          "thread_id,status,provider_name,provider_instance_id,runtime_mode,active_turn_id,last_error,updated_at",
+        projection_turns:
+          "thread_id,turn_id,pending_message_id,assistant_message_id,state,requested_at,started_at,completed_at,checkpoint_files_json",
+      };
+      for (const [name, columns] of Object.entries(tables)) {
+        db.run(
+          `CREATE TABLE ${name} (${columns
+            .split(",")
+            .map((column) => `${column} TEXT`)
+            .join(",")})`,
+        );
+      }
+      db.query("INSERT INTO projection_projects VALUES (?,?,?)").run(
+        "project-1",
+        "baseline-project",
+        NodePath.join(workspace, "baseline-project"),
+      );
+      // When the capture seed opens the existing database,
+      const receipt = seed({ base, home, workspace, app });
+      // Then only the explicitly synthetic projection is added.
+      expect(receipt.authority).toBe("SYNTHETIC_PROJECTION_ONLY");
+      expect(db.query("SELECT count(*) AS count FROM projection_threads").get()).toEqual({
+        count: 6,
+      });
+      expect(db.query("SELECT count(*) AS count FROM projection_turns").get()).toEqual({
+        count: 5,
+      });
+    } finally {
+      db.close();
+      await NodeFSP.rm(base, { recursive: true });
+    }
   });
 });

@@ -5,6 +5,7 @@ import * as NodePath from "node:path";
 import * as NodeOS from "node:os";
 import * as NodeURL from "node:url";
 import * as NodeUtil from "node:util";
+import * as NodeModule from "node:module";
 import { DESKTOP_STATES, STRESS_STATES, LABELS, CASES, SIZES, chooseAlias } from "./cases.mjs";
 import { seed, assertProfile, FIXTURE_VERSION } from "./seed.mjs";
 import { bounded, sha256, validateProvenance } from "./assert.mjs";
@@ -21,6 +22,7 @@ const { values } = NodeUtil.parseArgs({
     revision: { type: "string" },
     matrix: { type: "string", default: "ledger-plus" },
     case: { type: "string", default: "01" },
+    diagnostic: { type: "boolean", default: false },
   },
 });
 NodeAssert.ok(bundle && output && values.revision, "Explicit app, output and revision required");
@@ -31,9 +33,16 @@ const git = async (...args) => (await exec("git", ["-C", repo, ...args])).stdout
 const revision = await git("rev-parse", "HEAD");
 NodeAssert.equal(revision, values.revision, "Wrong source revision");
 const trackedDiff = await git("diff", "HEAD", "--");
-NodeAssert.equal(trackedDiff, "", "Commit source edits before capturing");
+if (!values.diagnostic) NodeAssert.equal(trackedDiff, "", "Commit source edits before capturing");
 const { _electron } = await import(
   `${repo}/app/t3code/apps/desktop/node_modules/playwright-core/index.mjs`
+);
+const desktopRequire = NodeModule.createRequire(`${repo}/app/t3code/apps/desktop/package.json`);
+const builderRequire = NodeModule.createRequire(desktopRequire.resolve("electron-builder"));
+const asarRequire = NodeModule.createRequire(builderRequire.resolve("app-builder-lib"));
+const { extractFile } = asarRequire("@electron/asar");
+const packaged = JSON.parse(
+  extractFile(NodePath.join(bundle, "Contents/Resources/app.asar"), "package.json").toString(),
 );
 const provenance = {
   revision,
@@ -49,6 +58,7 @@ const provenance = {
   bundle: await NodeFSP.realpath(bundle),
 };
 const packet = {
+  diagnostic: values.diagnostic,
   revision,
   provenance,
   manifest: [],
@@ -94,11 +104,13 @@ async function named(page, role, key, scope = page) {
   const locators = aliases.map((name) =>
     scope.getByRole(role, { name, exact: true }).filter({ visible: true }),
   );
+  await locators.reduce((all, locator) => all.or(locator)).waitFor({ state: "visible" });
   const counts = await Promise.all(locators.map((l) => l.count()));
   return locators[chooseAlias(counts)];
 }
 async function text(page, value) {
   const target = page.getByText(value, { exact: true }).filter({ visible: true });
+  await target.waitFor({ state: "visible" });
   NodeAssert.equal(await target.count(), 1, `Ambiguous text target: ${value}`);
   return target;
 }
@@ -184,7 +196,7 @@ async function runSize(width, height, includeStress = false) {
       executablePath: NodePath.join(bundle, "Contents/MacOS/weavra-desktop"),
       args: [`--user-data-dir=${isolation.home}/chromium`, "--disable-background-networking"],
       env: {
-        PATH: `${NodePath.dirname(process.execPath)}:/Users/kangjingoo/.nvm/versions/node/v24.19.0/bin:/usr/bin:/bin`,
+        PATH: process.env.PATH,
         HOME: isolation.home,
         TMPDIR: base,
         LANG: "en_US.UTF-8",
@@ -201,12 +213,10 @@ async function runSize(width, height, includeStress = false) {
     page.setDefaultTimeout(15000);
     const win = await application.browserWindow(page);
     const appInfo = await application.evaluate(({ app }) => {
-      const pkg = require(`${app.getAppPath()}/package.json`);
       return {
         userData: app.getPath("userData"),
         appPath: app.getAppPath(),
         version: app.getVersion(),
-        packagedRevision: pkg.t3codeCommitHash,
       };
     });
     NodeAssert.ok(
@@ -214,10 +224,10 @@ async function runSize(width, height, includeStress = false) {
       "Leaked Electron profile",
     );
     Object.assign(provenance, {
-      packagedRevision: appInfo.packagedRevision,
+      packagedRevision: packaged.t3codeCommitHash,
       version: appInfo.version,
     });
-    validateProvenance(provenance, revision);
+    if (!values.diagnostic) validateProvenance(provenance, revision);
     isolation.userData = appInfo.userData;
     packet.isolation ??= isolation;
     const cdp = await page.context().newCDPSession(page);
@@ -330,6 +340,32 @@ async function runSize(width, height, includeStress = false) {
               };
             },
           );
+          const overlaps = [];
+          for (let i = 0; i < controlRects.length; i++) {
+            for (let j = i + 1; j < controlRects.length; j++) {
+              const a = controlRects[i];
+              const b = controlRects[j];
+              if (!a.visible || !b.visible) continue;
+              const area =
+                Math.max(
+                  0,
+                  Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left),
+                ) *
+                Math.max(
+                  0,
+                  Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top),
+                );
+              if (area > 0.5) overlaps.push({ first: i, second: j, area });
+            }
+          }
+          const code = [...document.querySelectorAll("pre")].map((node) => {
+            const box = node.getBoundingClientRect();
+            return {
+              text: node.innerText,
+              rect: box.toJSON(),
+              visible: box.width > 0 && box.height > 0 && box.bottom > 0 && box.top < innerHeight,
+            };
+          });
           return {
             viewport,
             dpr: devicePixelRatio,
@@ -343,6 +379,8 @@ async function runSize(width, height, includeStress = false) {
             body: e.innerText,
             scrollports,
             controls: controlRects,
+            overlaps,
+            code,
             computed: {
               color: styles.color,
               backgroundColor: styles.backgroundColor,
@@ -436,19 +474,33 @@ async function runSize(width, height, includeStress = false) {
         location.hash = "/";
       });
     }
+    const threadRoutes = new Map();
     async function thread(title) {
-      await (await text(page, title)).click();
+      if (page.viewportSize().width === 390) {
+        const route = threadRoutes.get(title);
+        NodeAssert.ok(route, `No observed route for stress thread: ${title}`);
+        await page.evaluate((route) => {
+          location.hash = route;
+        }, route);
+      } else {
+        const rows = page.locator('[data-sidebar="sidebar"]').getByText(title, { exact: true });
+        await rows.click();
+      }
       await page.locator(`button[aria-label=${JSON.stringify(`${title} 대화 작업`)}]`).waitFor();
       if (title === "03 Code blocks")
         await page.locator("pre").filter({ hasText: "greeting" }).waitFor();
+      threadRoutes.set(title, await page.evaluate(() => location.hash));
     }
     async function panel(key, id) {
       await click("button", "addPanel");
       // Exact accessible names in menu include an optional shortcut description.
       const name = LABELS[key][0];
-      const item = page
-        .getByRole("menuitem")
-        .filter({ has: page.getByText(name, { exact: true }) });
+      const shortcuts = { agents: "A", graph: "G", devices: "M", browser: "B", terminal: "T" };
+      const item = page.getByRole("menuitem", {
+        name: `${name} ${shortcuts[key]}`,
+        exact: true,
+      });
+      await item.waitFor({ state: "visible" });
       NodeAssert.equal(await item.count(), 1, `Ambiguous panel: ${name}`);
       await item.click();
       await snap(id);
@@ -465,13 +517,15 @@ async function runSize(width, height, includeStress = false) {
     await click("button", "import", page.locator('[data-sidebar="sidebar"]'));
     await snap("05");
     await (await text(page, "로컬 폴더")).click();
-    const address = page.locator('[data-slot="command-dialog-popup"] input');
+    const address = page.locator(
+      '[data-slot="command-dialog-popup"] input[data-slot="autocomplete-input"]',
+    );
     await address.fill(`${isolation.workspace}/`);
     await page.getByText("baseline-project", { exact: true }).waitFor();
     await snap("06");
     await (await text(page, "baseline-project")).click();
     const add = page.locator(
-      'button[aria-label="추가 (⌘ Enter)"], button[aria-label="추가 (Ctrl Enter)"]',
+      'button[aria-label="추가 (Enter)"], button[aria-label="추가 (⌘ Enter)"], button[aria-label="추가 (Ctrl Enter)"]',
     );
     NodeAssert.equal(await add.count(), 1, "Exact folder add action");
     await add.click();
@@ -533,7 +587,7 @@ async function runSize(width, height, includeStress = false) {
     await click("button", "model");
     await snap("31");
     await page.keyboard.press("Escape");
-    await click("button", "mode");
+    await click("combobox", "mode");
     await snap("32");
     await page.keyboard.press("Escape");
     run.fixture = seed(isolation);
@@ -577,7 +631,10 @@ async function runSize(width, height, includeStress = false) {
           matches[0].click();
         };
       }, label);
-      await (await text(page, "03 Code blocks")).click({ button: "right" });
+      await page
+        .locator('[data-sidebar="sidebar"]')
+        .getByText("03 Code blocks", { exact: true })
+        .click({ button: "right" });
     }
     await nativeMenu("삭제");
     await snap("44");
@@ -604,7 +661,7 @@ async function runSize(width, height, includeStress = false) {
       "#weavra-controls",
       `matrix/${width}x${height}/light/46/prepare-end-default.png`,
     );
-    await scrollTo("#weavra-evidence");
+    await scrollTo("#weavra-evidence", "center");
     await snap("47", "#weavra-evidence");
     await scrollTo("#weavra-fitness");
     await snap("48", "#weavra-fitness");
@@ -637,6 +694,47 @@ async function runSize(width, height, includeStress = false) {
         await snap(id, selector, `matrix/${width}x${height}/${mode}/${id}/end-default.png`);
       }
     }
+    if (includeStress) {
+      for (const [matrixWidth, matrixHeight] of [
+        [840, 620],
+        [2560, 1440],
+      ]) {
+        await resize(matrixWidth, matrixHeight);
+        for (const mode of ["light", "dark"]) {
+          await page.evaluate(() => {
+            location.hash = "/";
+          });
+          await theme(mode);
+          await nativeMenu("프로젝트 설정");
+          for (const [id, selector] of [
+            ["46", "#weavra-controls"],
+            ["47", "#weavra-evidence"],
+            ["48", "#weavra-fitness"],
+          ]) {
+            await scrollTo(selector, id === "47" ? "center" : "start");
+            await snap(
+              id,
+              selector,
+              `matrix/${matrixWidth}x${matrixHeight}/${mode}/${id}/top-default.png`,
+            );
+            await page
+              .locator(selector)
+              .evaluate((e) => e.scrollIntoView({ block: "end", behavior: "instant" }));
+            await snap(
+              id,
+              selector,
+              `matrix/${matrixWidth}x${matrixHeight}/${mode}/${id}/end-default.png`,
+            );
+          }
+          await scrollTo("#project-actions", "end");
+          await snap(
+            "48",
+            "#project-actions",
+            `matrix/${matrixWidth}x${matrixHeight}/${mode}/48/actions-end-default.png`,
+          );
+        }
+      }
+    }
     await application.evaluate(({ Menu }) => {
       Menu.prototype.popup = globalThis.higOriginalPopup;
     });
@@ -648,6 +746,24 @@ async function runSize(width, height, includeStress = false) {
       "Workspace changed during capture",
     );
     await cdp.detach();
+  } catch (error) {
+    if (application) {
+      const failurePage = application.windows()[0];
+      if (failurePage) {
+        await failurePage.screenshot({
+          path: NodePath.join(output, `failure-${width}x${height}.png`),
+          scale: "css",
+        });
+        await NodeFSP.writeFile(
+          NodePath.join(output, `failure-${width}x${height}.json`),
+          JSON.stringify({
+            error: String(error),
+            ax: await failurePage.locator("body").ariaSnapshot(),
+          }),
+        );
+      }
+    }
+    throw error;
   } finally {
     if (application) {
       const child = application.process();
@@ -667,7 +783,8 @@ async function runSize(width, height, includeStress = false) {
 try {
   for (const [index, [w, h]] of SIZES.entries()) await runSize(w, h, index === 0);
   packet.cleanup.exited = packet.runs.every((run) => run.cleanup.exited);
-  NodeAssert.equal(await git("diff", "HEAD", "--"), "", "Source changed during capture");
+  if (!values.diagnostic)
+    NodeAssert.equal(await git("diff", "HEAD", "--"), "", "Source changed during capture");
   NodeAssert.equal(packet.counters.model, 0);
   NodeAssert.equal(packet.counters.runtimeMutation, 0);
   await save();

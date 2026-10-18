@@ -24,7 +24,10 @@ export function assertProfile(base, home, workspace, app) {
 }
 export function seed({ base, home, workspace, app }) {
   assertProfile(base, home, workspace, app);
-  const db = new Database(NodePath.join(app, "userdata/state.sqlite"), { create: false });
+  const db = new Database(NodePath.join(app, "userdata/state.sqlite"), {
+    readwrite: true,
+    create: false,
+  });
   try {
     const project = db
       .query(
