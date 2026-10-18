@@ -1,0 +1,51 @@
+{
+  "file": "1280x800/19_settings_appearance_dark.png",
+  "beforeSha256": "c36ade97a7f6024d60f612edfc01282bf117cdcc40be03bb10e60b863074dae7",
+  "afterSha256": "551079da801f0d2894e025e4ea70ef5d3d1f7fa1c34e337a6b96f1d383af1e4d",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 12,
+    "diffRatio": 0,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 6,
+        "gridY": 7,
+        "x": 960,
+        "y": 700,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0006
+      },
+      {
+        "gridX": 7,
+        "gridY": 7,
+        "x": 1120,
+        "y": 700,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0002
+      }
+    ],
+    "summary": "100/100 similarity; 12/1024000 pixels differ; 2 hotspot region(s)."
+  }
+}

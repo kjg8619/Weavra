@@ -1,4 +1,10 @@
-# Task 01 capture evidence
+# Task 01 corrected capture evidence
+
+The current, state-asserted set is [the complete 158-pair before/after table](fix-20261018/README.md): 316 reviewed PNGs, both desktop sizes, both stress frames, all declared matrix themes/boundaries, and native compositor cross-checks. Both capture runs and the full packet assertion exit 0.
+
+The final harness is `bb7649c97402d9a853f91b3a987f9fa48aa970eb`. Actual stored app/asar hashes and per-pair diff receipts are recorded with the new set. The old table below is historical and must not be used as current PR evidence.
+
+## Historical packet (superseded)
 
 Head: `39abbeb910a16461c67de4f98bb071561a75d511`. Parent: `bf81b300ac494455122b2166b14650671206a993`. No W is closed; G-07 capture prerequisite only.
 

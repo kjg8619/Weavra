@@ -1,0 +1,96 @@
+{
+  "file": "1280x800/37_chat_streaming_working.png",
+  "beforeSha256": "18da2f93562746e6aa86f95d5a14ef2b1e02fc9f8ba130970e5adc741deb1922",
+  "afterSha256": "84de93b70ad229b215f8fa510ffa92d2a2dbcebb0c9040a4a1889c0d399556be",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 742,
+    "diffRatio": 0.0007,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 3,
+        "gridY": 1,
+        "x": 480,
+        "y": 100,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0178
+      },
+      {
+        "gridX": 2,
+        "gridY": 2,
+        "x": 320,
+        "y": 200,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0086
+      },
+      {
+        "gridX": 1,
+        "gridY": 1,
+        "x": 160,
+        "y": 100,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0059
+      },
+      {
+        "gridX": 2,
+        "gridY": 1,
+        "x": 320,
+        "y": 100,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0047
+      },
+      {
+        "gridX": 1,
+        "gridY": 3,
+        "x": 160,
+        "y": 300,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0038
+      },
+      {
+        "gridX": 1,
+        "gridY": 4,
+        "x": 160,
+        "y": 400,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0038
+      },
+      {
+        "gridX": 1,
+        "gridY": 2,
+        "x": 160,
+        "y": 200,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0018
+      }
+    ],
+    "summary": "100/100 similarity; 742/1024000 pixels differ; 7 hotspot region(s)."
+  }
+}

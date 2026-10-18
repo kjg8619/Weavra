@@ -1,0 +1,51 @@
+{
+  "file": "1280x800/01_first_launch_onboarding_connection.png",
+  "beforeSha256": "38b10c133e8add812d27f561439585203b4e5c8a82bc116c3f5a6c7c769fbe4a",
+  "afterSha256": "5d2ae05bed2d7dd37d68e1eaef28f267078dd49532524c7f1c0dd8c193cf48b1",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 6,
+    "diffRatio": 0,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 2,
+        "gridY": 2,
+        "x": 320,
+        "y": 200,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0002
+      },
+      {
+        "gridX": 5,
+        "gridY": 2,
+        "x": 800,
+        "y": 200,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0002
+      }
+    ],
+    "summary": "100/100 similarity; 6/1024000 pixels differ; 2 hotspot region(s)."
+  }
+}
