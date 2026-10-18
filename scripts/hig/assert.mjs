@@ -143,7 +143,7 @@ export function validateVisibleState(id, observation, contract = {}) {
     24: "source-control",
     25: "storage",
     26: "connections",
-    27: "archive",
+    27: "archived",
     28: "providers",
   };
   if (settings[id])
