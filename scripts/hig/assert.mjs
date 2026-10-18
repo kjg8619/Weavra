@@ -4,11 +4,174 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 import * as NodeURL from "node:url";
-import { expectedFiles } from "./cases.mjs";
+import { expectedCaptureFiles, DESKTOP_STATES, STRESS_STATES } from "./cases.mjs";
 import { bounded } from "../problem-cycle-browser.mjs";
 
 export { bounded };
 export const sha256 = (bytes) => NodeCrypto.createHash("sha256").update(bytes).digest("hex");
+// Runs in the renderer. Text in a mounted but clipped pane is not screenshot evidence.
+export function observeVisibleState({ target, boundary }) {
+  const visible = (element, rect) => {
+    if (!element.checkVisibility()) return false;
+    let clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+    for (let p = element.parentElement; p; p = p.parentElement) {
+      const style = getComputedStyle(p);
+      if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) {
+        const box = p.getBoundingClientRect();
+        clip = {
+          left: Math.max(clip.left, box.left),
+          top: Math.max(clip.top, box.top),
+          right: Math.min(clip.right, box.right),
+          bottom: Math.min(clip.bottom, box.bottom),
+        };
+      }
+    }
+    const hit = document.elementFromPoint(
+      (rect.left + rect.right) / 2,
+      (rect.top + rect.bottom) / 2,
+    );
+    return (
+      (hit === element || element.contains(hit) || hit?.contains(element)) &&
+      rect.width > 0 &&
+      rect.height > 0 &&
+      rect.right > clip.left &&
+      rect.left < clip.right &&
+      rect.top >= clip.top - 1 &&
+      rect.bottom <= clip.bottom + 1
+    );
+  };
+  const texts = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (!node.textContent.trim()) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    if ([...range.getClientRects()].some((r) => visible(node.parentElement, r)))
+      texts.push(node.textContent);
+  }
+  const node = document.querySelector(target);
+  const rect = node.getBoundingClientRect();
+  let port = node.parentElement;
+  while (
+    port &&
+    !(
+      /(auto|scroll)/.test(getComputedStyle(port).overflowY) &&
+      port.scrollHeight > port.clientHeight
+    )
+  )
+    port = port.parentElement;
+  const clip = port?.getBoundingClientRect() ?? { top: 0, bottom: innerHeight };
+  const edge = boundary === "end" ? rect.bottom : rect.top;
+  const desired = boundary === "end" ? clip.bottom : clip.top;
+  const limit = port
+    ? boundary === "end"
+      ? port.scrollTop <= 1
+      : port.scrollTop + port.clientHeight >= port.scrollHeight - 1
+    : false;
+  return {
+    text: texts.join(" ").replace(/\s+/g, " "),
+    route: location.hash,
+    theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
+    selectedAppearance: document
+      .querySelector('[aria-label="Appearance mode"] [aria-pressed="true"]')
+      ?.getAttribute("aria-label"),
+    customModel: document.querySelector('input[id$="-custom-model"]')?.value,
+    filesPane: [...document.querySelectorAll('button[aria-label="Refresh workspace files"]')].some(
+      (e) => visible(e, e.getBoundingClientRect()),
+    ),
+    terminal: [...document.querySelectorAll("canvas")].some((e) =>
+      visible(e, e.getBoundingClientRect()),
+    ),
+    boundary: boundary
+      ? {
+          position: boundary,
+          aligned: Math.abs(edge - desired) <= 2 || limit,
+          visible: rect.bottom > clip.top && rect.top < clip.bottom,
+          edge,
+          desired,
+        }
+      : null,
+  };
+}
+/** @param {{ target?: string, boundary?: string | null, theme?: string | null }} contract */
+export function validateVisibleState(id, observation, contract = {}) {
+  const { target = "body", boundary = null, theme = null } = contract;
+  const state = [...DESKTOP_STATES, ...STRESS_STATES].find((s) => s.id === id);
+  NodeAssert.ok(state, `Unknown state: ${id}`);
+  if (!boundary || boundary !== "end")
+    NodeAssert.ok(
+      observation.text.includes(state.expected),
+      `Visible state mismatch ${id}: ${state.expected}`,
+    );
+  if (boundary) {
+    NodeAssert.equal(observation.boundary?.position, boundary, `Wrong boundary ${id}`);
+    NodeAssert.ok(
+      observation.boundary?.aligned && observation.boundary?.visible,
+      `Section boundary mismatch ${id}: ${JSON.stringify(observation.boundary)}`,
+    );
+  }
+  if (["46", "47", "48"].includes(id)) {
+    const expected = { 46: "#weavra-controls", 47: "#weavra-evidence", 48: "#weavra-fitness" }[id];
+    NodeAssert.ok(
+      target === expected || (id === "48" && target === "#project-actions"),
+      `Wrong section ${id}`,
+    );
+  }
+  if (id === "10") NodeAssert.ok(observation.filesPane, "Files pane not visible");
+  if (id === "16") NodeAssert.ok(observation.terminal, "Terminal not initialized");
+  if (id === "18" || id === "19")
+    NodeAssert.equal(
+      observation.selectedAppearance,
+      `Use ${id === "18" ? "light" : "dark"} mode`,
+      "Wrong selected appearance",
+    );
+  if (id === "28")
+    NodeAssert.equal(
+      observation.customModel,
+      "capture-fixture-unsaved",
+      "Custom model form not populated",
+    );
+  const settings = {
+    17: "general",
+    18: "appearance",
+    19: "appearance",
+    20: "keybindings",
+    21: "snap-shot",
+    22: "providers",
+    23: "integrations",
+    24: "source-control",
+    25: "storage",
+    26: "connections",
+    27: "archive",
+    28: "providers",
+  };
+  if (settings[id])
+    NodeAssert.equal(observation.route, `#/settings/${settings[id]}`, `Wrong settings page ${id}`);
+  if (theme) NodeAssert.equal(observation.theme, theme, `Wrong theme ${id}`);
+  const threads = {
+    34: "messages",
+    35: "long",
+    36: "code",
+    37: "working",
+    38: "error",
+    39: "empty",
+    41: "code",
+    42: "code",
+    43: "code",
+  };
+  if (threads[id])
+    NodeAssert.ok(
+      observation.route.includes(`baseline-${threads[id]}`),
+      `Wrong selected thread ${id}`,
+    );
+  if (id === "38")
+    NodeAssert.ok(
+      observation.text.includes("Demonstrate a recoverable provider failure."),
+      "Missing error recovery context",
+    );
+  return observation;
+}
 export function pngDimensions(bytes) {
   NodeAssert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", "PNG signature");
   NodeAssert.equal(bytes.toString("ascii", 12, 16), "IHDR");
@@ -28,10 +191,14 @@ export function validateRecord(record, bytes) {
     NodeAssert.ok(record.targetVisible, `Target outside scrollport: ${record.file}`);
   if (["36", "41", "42", "43"].includes(record.stateId))
     NodeAssert.ok(record.paint?.colors >= 16, `Unpainted code fixture: ${record.file}`);
+  validateVisibleState(record.stateId, record.visibleState, record.stateContract);
 }
 export function validateProvenance(provenance, revision) {
   NodeAssert.equal(provenance.revision, revision, "Stale source revision");
-  NodeAssert.ok(revision.startsWith(provenance.packagedRevision), "Stale packaged build");
+  NodeAssert.ok(
+    (provenance.appRevision ?? revision).startsWith(provenance.packagedRevision),
+    "Stale packaged build",
+  );
   NodeAssert.ok(provenance.packagedRevision.length >= 7, "Missing packaged revision");
   NodeAssert.equal(provenance.trackedDiff, "", "Dirty source build");
   NodeAssert.match(provenance.asarSha256, /^[a-f0-9]{64}$/);
@@ -55,7 +222,7 @@ export async function verifyCapture(directory) {
     await NodeFSP.readFile(NodePath.join(directory, "capture-manifest.json"), "utf8"),
   );
   validateProvenance(packet.provenance, packet.revision);
-  const expected = expectedFiles();
+  const expected = expectedCaptureFiles();
   NodeAssert.equal(
     new Set(packet.manifest.map((r) => r.file)).size,
     packet.manifest.length,
@@ -107,25 +274,18 @@ export async function verifyCapture(directory) {
 
 export async function verifyPacket(directory, harnessOnly) {
   const after = await verifyCapture(NodePath.join(directory, "after/capture"));
-  // Original recipe is retained unmodified. It has known duplicate/blank evidence,
-  // so only the repaired set may be subjected to the new state-bound contract.
-  const original = JSON.parse(
-    await NodeFSP.readFile(
-      NodePath.join(directory, "before/capture/capture-manifest.json"),
-      "utf8",
-    ),
-  );
+  const original = await verifyCapture(NodePath.join(directory, "before/capture"));
   NodeAssert.deepEqual(
     original.manifest.map((r) => r.file).sort(),
-    expectedFiles().sort(),
-    "Original set incomplete",
+    after.manifest.map((r) => r.file).sort(),
+    "Before/after sets differ",
   );
   for (const r of original.manifest)
     pngDimensions(await NodeFSP.readFile(NodePath.join(directory, "before/capture", r.file)));
   const diff = JSON.parse(
     await NodeFSP.readFile(NodePath.join(directory, "diff/pairs.json"), "utf8"),
   );
-  for (const file of expectedFiles()) {
+  for (const file of expectedCaptureFiles()) {
     NodeAssert.ok(
       diff.pairs.some((pair) => pair.file === file),
       `Missing pair: ${file}`,

@@ -64,6 +64,22 @@ export function expectedFiles() {
     ...STRESS_STATES.map(({ id, name }) => `390x844/${id}_${name}.png`),
   ];
 }
+export function expectedCaptureFiles() {
+  return [
+    ...expectedFiles(),
+    ...[...SIZES, [840, 620], [2560, 1440]].flatMap(([w, h]) =>
+      ["light", "dark"].flatMap((theme) => [
+        ...["46", "47", "48"].flatMap((id) =>
+          ["top", "end"].map(
+            (position) => `matrix/${w}x${h}/${theme}/${id}/${position}-default.png`,
+          ),
+        ),
+        `matrix/${w}x${h}/${theme}/48/actions-end-default.png`,
+      ]),
+    ),
+    ...SIZES.map(([w, h]) => `matrix/${w}x${h}/light/46/prepare-end-default.png`),
+  ];
+}
 
 // Exact aliases only. Translation never changes the state ID or semantic target.
 export const LABELS = {

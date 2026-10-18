@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
-import { expectedFiles, chooseAlias } from "./cases.mjs";
+import { expectedFiles, expectedCaptureFiles, chooseAlias } from "./cases.mjs";
 import {
   bounded,
   pngDimensions,
@@ -12,6 +12,7 @@ import {
   validateProvenance,
   validateDistinctStates,
   verifyCapture,
+  validateVisibleState,
 } from "./assert.mjs";
 import { assertProfile, seed } from "./seed.mjs";
 
@@ -35,6 +36,10 @@ function record() {
     targetRect: { width: 100, height: 100 },
     targetVisible: true,
     stress: false,
+    visibleState: {
+      text: "컴퓨터 연결하기 greeting",
+      route: "#/threads/baseline-code",
+    },
   };
 }
 function provenance() {
@@ -64,6 +69,15 @@ describe("state-bound capture evidence", () => {
     const bytes = image(1920, 1080);
     const row = { ...record(), sha256: sha256(bytes) };
     expect(() => validateRecord(row, bytes)).toThrow("Wrong dimensions");
+  });
+  test("requires both themes and both boundaries at every matrix size", () => {
+    const files = expectedCaptureFiles();
+    expect(new Set(files).size).toBe(152);
+    for (const size of ["1280x800", "1920x1080", "840x620", "2560x1440"])
+      for (const theme of ["light", "dark"])
+        for (const id of ["46", "47", "48"])
+          for (const boundary of ["top", "end"])
+            expect(files).toContain(`matrix/${size}/${theme}/${id}/${boundary}-default.png`);
   });
   test("rejects a changed image under an old hash", () => {
     const bytes = image();
@@ -172,6 +186,55 @@ describe("state-bound capture evidence", () => {
     expect(() => validateRecord({ ...record(), targetVisible: false }, image())).toThrow(
       "outside scrollport",
     );
+  });
+  test("rejects expected text mounted outside the visible viewport", () => {
+    // Given a mounted fixture whose visible viewport is an empty chat,
+    const observation = { text: "empty chat", route: "#/threads/baseline-messages" };
+    // When bound to the conversation state, then it cannot authorize a screenshot.
+    expect(() => validateVisibleState("34", observation)).toThrow("Visible state mismatch");
+  });
+  test("rejects a hidden Files pane even when its label remains visible", () => {
+    const observation = { text: "파일", filesPane: false };
+    expect(() => validateVisibleState("10", observation)).toThrow("Files pane not visible");
+  });
+  test("rejects System selection on the Light appearance page", () => {
+    const observation = {
+      text: "Color scheme",
+      selectedAppearance: "Follow the system appearance",
+    };
+    expect(() => validateVisibleState("18", observation)).toThrow("Wrong selected appearance");
+  });
+  test("rejects a settings label visible only in another page's navigation", () => {
+    const observation = { text: "Keybindings", route: "#/settings/general" };
+    expect(() => validateVisibleState("20", observation)).toThrow("Wrong settings page");
+  });
+  test("rejects a different selected thread with matching fixture text", () => {
+    const observation = { text: "local screenshot fixture", route: "#/threads/baseline-error" };
+    expect(() => validateVisibleState("34", observation)).toThrow("Wrong selected thread");
+  });
+  test("rejects model fitness substituted for the Evidence section", () => {
+    const observation = { text: "순위가 아닌 계약 준수 증거" };
+    expect(() => validateVisibleState("47", observation, { target: "#weavra-evidence" })).toThrow(
+      "Visible state mismatch",
+    );
+  });
+  test("rejects an end frame before the section boundary", () => {
+    const observation = {
+      text: "기록 불러오기",
+      boundary: { position: "end", aligned: false, visible: true },
+    };
+    expect(() =>
+      validateVisibleState("48", observation, { target: "#weavra-fitness", boundary: "end" }),
+    ).toThrow("Section boundary mismatch");
+  });
+  test("accepts a visible Evidence heading at the declared top boundary", () => {
+    const observation = {
+      text: "증거 요약",
+      boundary: { position: "start", aligned: true, visible: true },
+    };
+    expect(() =>
+      validateVisibleState("47", observation, { target: "#weavra-evidence", boundary: "start" }),
+    ).not.toThrow();
   });
   test("seeds an existing isolated database without dispatching a turn", async () => {
     const base = await NodeFSP.realpath(await NodeFSP.mkdtemp("/tmp/weavra-hig-"));

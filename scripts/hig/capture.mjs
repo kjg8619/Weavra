@@ -8,7 +8,13 @@ import * as NodeUtil from "node:util";
 import * as NodeModule from "node:module";
 import { DESKTOP_STATES, STRESS_STATES, LABELS, CASES, SIZES, chooseAlias } from "./cases.mjs";
 import { seed, assertProfile, FIXTURE_VERSION } from "./seed.mjs";
-import { bounded, sha256, validateProvenance } from "./assert.mjs";
+import {
+  bounded,
+  sha256,
+  validateProvenance,
+  observeVisibleState,
+  validateVisibleState,
+} from "./assert.mjs";
 
 const exec = NodeUtil.promisify(NodeChildProcess.execFile);
 const here = NodePath.dirname(NodeURL.fileURLToPath(import.meta.url));
@@ -20,6 +26,7 @@ const output = process.env.WEAVRA_CAPTURE_OUT;
 const { values } = NodeUtil.parseArgs({
   options: {
     revision: { type: "string" },
+    "app-revision": { type: "string" },
     matrix: { type: "string", default: "ledger-plus" },
     case: { type: "string", default: "01" },
     diagnostic: { type: "boolean", default: false },
@@ -34,6 +41,12 @@ const revision = await git("rev-parse", "HEAD");
 NodeAssert.equal(revision, values.revision, "Wrong source revision");
 const trackedDiff = await git("diff", "HEAD", "--");
 if (!values.diagnostic) NodeAssert.equal(trackedDiff, "", "Commit source edits before capturing");
+const appRevision = await git("rev-parse", values["app-revision"] ?? revision);
+NodeAssert.equal(
+  await git("diff", appRevision, revision, "--", "app", "runtime"),
+  "",
+  "Stored app source differs from capture revision",
+);
 const { _electron } = await import(
   `${NodePath.resolve(here, "../..")}/app/t3code/apps/desktop/node_modules/playwright-core/index.mjs`
 );
@@ -48,6 +61,10 @@ const packaged = JSON.parse(
 );
 const provenance = {
   revision,
+  appRevision,
+  executableSha256: sha256(
+    await NodeFSP.readFile(NodePath.join(bundle, "Contents/MacOS/weavra-desktop")),
+  ),
   trackedDiff,
   trackedDiffSha256: sha256(trackedDiff),
   asarSha256: sha256(await NodeFSP.readFile(NodePath.join(bundle, "Contents/Resources/app.asar"))),
@@ -285,6 +302,34 @@ async function runSize(width, height, includeStress = false) {
       const state = [...DESKTOP_STATES, ...STRESS_STATES].find((s) => s.id === id);
       NodeAssert.ok(state);
       const readiness = await ready(page, state.expected, target);
+      if (id === "35") {
+        await page
+          .getByRole("heading", { name: "Baseline review", exact: true })
+          .scrollIntoViewIfNeeded();
+        await ready(page, state.expected, target);
+      }
+      const boundary = suffix?.includes("/top-")
+        ? "start"
+        : suffix?.includes("/end-") || suffix?.includes("/actions-end-")
+          ? "end"
+          : null;
+      if (boundary) await scrollTo(target, boundary);
+      const stateContract = {
+        target,
+        boundary,
+        theme:
+          suffix?.match(/\/(light|dark)\//)?.[1] ??
+          (["18", "36", "43"].includes(id)
+            ? "light"
+            : ["19", "41", "42"].includes(id)
+              ? "dark"
+              : null),
+      };
+      const visibleState = validateVisibleState(
+        id,
+        await page.evaluate(observeVisibleState, { target, boundary }),
+        stateContract,
+      );
       let paint = null;
       if (["36", "41", "42", "43"].includes(id)) {
         const fixtureCode = page.locator("pre").filter({ hasText: "greeting" });
@@ -461,6 +506,8 @@ async function runSize(width, height, includeStress = false) {
         stress,
         authority: "SYNTHETIC_PROJECTION_ONLY; REAL PACKAGED RENDERER",
         readiness,
+        stateContract,
+        visibleState,
         paint,
         sha256: sha256(png),
         ...nativeCapture,
@@ -520,6 +567,11 @@ async function runSize(width, height, includeStress = false) {
       await page.locator(`button[aria-label=${JSON.stringify(`${title} 대화 작업`)}]`).waitFor();
       if (title === "03 Code blocks")
         await page.locator("pre").filter({ hasText: "greeting" }).waitFor();
+      const providerNotice = page.getByRole("button", {
+        name: "Codex 공급자 오류 닫기",
+        exact: true,
+      });
+      if (await providerNotice.isVisible()) await providerNotice.click();
       threadRoutes.set(title, await page.evaluate(() => location.hash));
     }
     async function panel(key, id) {
@@ -591,6 +643,7 @@ async function runSize(width, height, includeStress = false) {
     await click("button", "settings");
     await snap("17");
     await click("button", "appearance");
+    await (await text(page, "Light")).click();
     await snap("18");
     await (await text(page, "Dark")).click();
     await snap("19");
@@ -610,6 +663,7 @@ async function runSize(width, height, includeStress = false) {
     }
     await click("button", "providers");
     await click("button", "customModel");
+    await page.locator('input[id$="-custom-model"]').fill("capture-fixture-unsaved");
     await snap("28");
     await click("button", "cancel");
     await click("button", "general");
@@ -682,6 +736,7 @@ async function runSize(width, height, includeStress = false) {
     await page.keyboard.press("Escape");
     await nativeMenu("프로젝트 설정");
     async function scrollTo(selector, position = "start") {
+      await ready(page, "", selector);
       await page
         .locator(selector)
         .evaluate(
@@ -698,7 +753,7 @@ async function runSize(width, height, includeStress = false) {
       "#weavra-controls",
       `matrix/${width}x${height}/light/46/prepare-end-default.png`,
     );
-    await scrollTo("#weavra-evidence", "center");
+    await scrollTo("#weavra-evidence");
     await snap("47", "#weavra-evidence");
     await scrollTo("#weavra-fitness");
     await snap("48", "#weavra-fitness");
@@ -711,13 +766,13 @@ async function runSize(width, height, includeStress = false) {
       `matrix/${width}x${height}/light/48/actions-end-default.png`,
     );
     for (const mode of ["dark", "light"]) {
-      if (mode === "dark") {
+      {
         await page.evaluate(() => {
           location.hash = "/";
         });
-        await theme("dark");
+        await theme(mode);
         await nativeMenu("프로젝트 설정");
-      } else continue;
+      }
       for (const [id, selector] of [
         ["46", "#weavra-controls"],
         ["47", "#weavra-evidence"],
@@ -729,6 +784,14 @@ async function runSize(width, height, includeStress = false) {
           .locator(selector)
           .evaluate((e) => e.scrollIntoView({ block: "end", behavior: "instant" }));
         await snap(id, selector, `matrix/${width}x${height}/${mode}/${id}/end-default.png`);
+      }
+      if (mode === "dark") {
+        await scrollTo("#project-actions", "end");
+        await snap(
+          "48",
+          "#project-actions",
+          `matrix/${width}x${height}/${mode}/48/actions-end-default.png`,
+        );
       }
     }
     if (includeStress) {
@@ -748,7 +811,7 @@ async function runSize(width, height, includeStress = false) {
             ["47", "#weavra-evidence"],
             ["48", "#weavra-fitness"],
           ]) {
-            await scrollTo(selector, id === "47" ? "center" : "start");
+            await scrollTo(selector);
             await snap(
               id,
               selector,
