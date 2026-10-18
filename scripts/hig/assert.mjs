@@ -167,7 +167,8 @@ export function validateVisibleState(id, observation, contract = {}) {
     );
   if (id === "38")
     NodeAssert.ok(
-      observation.text.includes("Demonstrate a recoverable provider failure."),
+      observation.text.includes("Recovery context") &&
+        observation.text.includes("No model request was made."),
       "Missing error recovery context",
     );
   return observation;

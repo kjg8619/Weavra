@@ -236,6 +236,13 @@ describe("state-bound capture evidence", () => {
       validateVisibleState("47", observation, { target: "#weavra-evidence", boundary: "start" }),
     ).not.toThrow();
   });
+  test("rejects an error toast without visible conversation recovery context", () => {
+    const observation = {
+      text: "Capture fixture: provider unavailable.",
+      route: "#/threads/baseline-error",
+    };
+    expect(() => validateVisibleState("38", observation)).toThrow("Missing error recovery context");
+  });
   test("seeds an existing isolated database without dispatching a turn", async () => {
     const base = await NodeFSP.realpath(await NodeFSP.mkdtemp("/tmp/weavra-hig-"));
     const home = NodePath.join(base, "home");

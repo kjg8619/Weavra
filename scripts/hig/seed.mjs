@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
-export const FIXTURE_VERSION = "hig-offline-projection-v1";
+export const FIXTURE_VERSION = "hig-offline-projection-v2";
 export function assertProfile(base, home, workspace, app) {
   const canonical = NodeFS.realpathSync(base);
   if (
@@ -82,7 +82,7 @@ export function seed({ base, home, workspace, app }) {
         "error",
         "05 Error fixture",
         "Demonstrate a recoverable provider failure.",
-        "No model request was made. This is a seeded error-state fixture.",
+        "## Recovery context\n\nThe local provider is unavailable. Review the provider setup, then retry this isolated fixture when ready.\n\nNo model request was made. This is a seeded error-state fixture.",
       ],
       ["empty", "06 Empty thread", null, null],
     ];
