@@ -1346,7 +1346,10 @@ export async function runScenarios(context) {
     const preview = page.getByRole("button", { name: "hig-image.png 미리보기", exact: true });
     await preview.waitFor();
     await preview.click();
-    await page.getByRole("dialog", { name: "hig-image.png 크게 보기", exact: true }).waitFor();
+    await page.getByRole("dialog", { name: "image 크게 보기", exact: true }).waitFor();
+    await page
+      .getByRole("region", { name: "hig-image.png, zoomable image", exact: true })
+      .waitFor();
     await settle();
   }
   async function motionFrames(assert, mode) {
@@ -1426,7 +1429,8 @@ export async function runScenarios(context) {
       await page.keyboard.press("Escape");
       await page.evaluate(() => {
         globalThis.higMotionObserver.disconnect();
-        for (const animation of document.getAnimations()) animation.finish();
+        for (const animation of document.getAnimations())
+          if (Number.isFinite(animation.effect?.getComputedTiming().endTime)) animation.finish();
       });
       await page.locator('[data-slot="dialog-popup"]').waitFor({ state: "hidden" });
       await frame(`${mode}-interrupted`);
