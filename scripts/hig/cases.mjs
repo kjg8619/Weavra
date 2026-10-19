@@ -179,6 +179,7 @@ export const CASES = {
       "semantic-colors",
       "contrast",
       "icon-targets",
+      "frozen-network-notices",
     ],
   },
   "03": {
@@ -414,6 +415,7 @@ export function deliverScenarioEvent(sockets, method, value) {
 }
 
 export async function runScenarios(context) {
+  const { freezeCaptureServerFrame } = await import("./seed.mjs");
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
   const { executeCheck, sha256, bounded } = await import("./assert.mjs");
@@ -436,9 +438,11 @@ export async function runScenarios(context) {
   let current;
   let wire = null;
   let responseTransform = null;
+  let providerFixture = null;
   const replies = new Map();
   let requests = [];
   let liveConfig = null;
+  let onConfig;
   const streamSamples = new Map();
   await page.route("**/api/auth/session", async (route) => {
     const response = await route.fetch();
@@ -574,7 +578,16 @@ export async function runScenarios(context) {
     server.onMessage((message) => {
       const decoded = JSON.parse(String(message));
       const frames = Array.isArray(decoded) ? decoded : [decoded];
-      for (const frame of frames) {
+      for (let frame of frames) {
+        frame = freezeCaptureServerFrame(frame, methods.get(frame.requestId));
+        if (providerFixture && methods.get(frame.requestId) === "server.getConfig")
+          if (frame.exit?._tag === "Success") frame.exit.value.providers = providerFixture;
+        if (providerFixture && methods.get(frame.requestId) === "subscribeServerConfig")
+          if (frame._tag === "Chunk")
+            for (const value of frame.values) {
+              if (value.type === "snapshot") value.config.providers = providerFixture;
+              if (value.type === "providerStatuses") value.payload.providers = providerFixture;
+            }
         const config = (value) => ({
           ...value,
           environment: {
@@ -610,6 +623,7 @@ export async function runScenarios(context) {
         if (method === "subscribeServerConfig" && frame._tag === "Chunk")
           for (const value of frame.values)
             if (value.type === "snapshot") liveConfig = value.config;
+        if (liveConfig) onConfig?.();
         socket.send(JSON.stringify(frame));
       }
     });
@@ -1310,6 +1324,8 @@ export async function runScenarios(context) {
     const providers = structuredClone(liveConfig.providers);
     const codex = providers.find((provider) => provider.instanceId === "codex");
     if (!codex) throw new Error("Fixture Codex provider missing");
+    delete codex.versionAdvisory;
+    delete codex.updateState;
     Object.assign(codex, {
       status,
       installed: true,
@@ -1336,6 +1352,7 @@ export async function runScenarios(context) {
         output: null,
       };
     const event = { version: 1, type: "providerStatuses", payload: { providers } };
+    providerFixture = providers;
     emit("subscribeServerConfig", event);
     await settle();
     return event;
@@ -1704,6 +1721,30 @@ export async function runScenarios(context) {
         packet.manifest.length,
       );
       observations.push({ files: packet.manifest.map((row) => row.file) });
+    },
+    "02/frozen-network-notices": async (assert) => {
+      await home();
+      await openPanel("브라우저");
+      await settle();
+      assert(
+        "live update checks are disabled",
+        liveConfig.settings.enableProviderUpdateChecks,
+        false,
+      );
+      assert(
+        "live provider notices are absent",
+        liveConfig.providers.every(
+          (provider) => !provider.versionAdvisory && !provider.updateState,
+        ),
+        true,
+      );
+      assert(
+        "no unsolicited live update toast",
+        await page.locator('[data-slot="toast-close"]').count(),
+        0,
+      );
+      await iconTargets(assert, "frozen-browser-toolbar");
+      await frame("frozen-browser-toolbar");
     },
     "02/icon-targets": async (assert) => {
       const required = [
@@ -4028,11 +4069,17 @@ export async function runScenarios(context) {
           (async (assert) => {
             wire = null;
             responseTransform = null;
+            providerFixture = null;
+            liveConfig = null;
             replies.clear();
             requests = [];
             await context.resize(1920, 1080);
             await page.emulateMedia({ reducedMotion: "no-preference" });
+            const configReady = new Promise((resolve) => {
+              onConfig = resolve;
+            });
             await page.reload();
+            await bounded(configReady, "Scenario server configuration");
             await home();
             await execute(assert);
           }),

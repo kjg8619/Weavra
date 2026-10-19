@@ -3,7 +3,122 @@ import { Database } from "bun:sqlite";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
-export const FIXTURE_VERSION = "hig-offline-projection-v3";
+export const FIXTURE_VERSION = "hig-offline-projection-v4";
+export const CAPTURE_SETTINGS = {
+  enableProviderUpdateChecks: false,
+  usageLimitSources: {},
+};
+
+export function prepareCaptureProfile(isolation) {
+  const { base, home, workspace, app } = isolation;
+  assertProfile(base, home, workspace, app);
+  const directory = NodePath.join(app, "userdata");
+  NodeFS.mkdirSync(directory);
+  NodeFS.writeFileSync(
+    NodePath.join(directory, "settings.json"),
+    JSON.stringify(CAPTURE_SETTINGS),
+    { flag: "wx" },
+  );
+}
+
+function freezeProviders(providers) {
+  return providers.map((provider) => {
+    const frozen = { ...provider };
+    delete frozen.versionAdvisory;
+    delete frozen.updateState;
+    delete frozen.usageLimits;
+    return frozen;
+  });
+}
+
+function freezeConfig(config) {
+  return {
+    ...config,
+    providers: freezeProviders(config.providers),
+    settings: { ...config.settings, ...CAPTURE_SETTINGS },
+    remoteOpenTargets: [],
+    environmentThemes: [],
+    usageLimitSources: [],
+  };
+}
+
+// Only external observations are frozen. Scenario events injected downstream
+// of this boundary remain explicit, labelled synthetic inputs.
+export function freezeCaptureServerFrame(frame, method) {
+  if (method === "server.getConfig" && frame.exit?._tag === "Success")
+    return { ...frame, exit: { ...frame.exit, value: freezeConfig(frame.exit.value) } };
+  if (method !== "subscribeServerConfig" || frame._tag !== "Chunk") return frame;
+  return {
+    ...frame,
+    values: frame.values.map((value) => {
+      switch (value.type) {
+        case "snapshot":
+          return { ...value, config: freezeConfig(value.config) };
+        case "providerStatuses":
+          return {
+            ...value,
+            payload: { ...value.payload, providers: freezeProviders(value.payload.providers) },
+          };
+        case "settingsUpdated":
+          return {
+            ...value,
+            payload: {
+              ...value.payload,
+              settings: { ...value.payload.settings, ...CAPTURE_SETTINGS },
+            },
+          };
+        case "environmentThemesUpdated":
+          return { ...value, payload: { themes: [] } };
+        case "usageLimitSourcesUpdated":
+          return { ...value, payload: { sources: [] } };
+        default:
+          return value;
+      }
+    }),
+  };
+}
+
+export async function installCaptureNetworkFixture(page) {
+  const receipt = { settingsSnapshots: 0, unexpectedUpdateChecks: false, frozenFrames: 0 };
+  await page.routeWebSocket("**/*", (socket) => {
+    const server = socket.connectToServer();
+    const methods = new Map();
+    socket.onClose(() => server.close());
+    server.onClose(() => socket.close());
+    socket.onMessage((message) => {
+      const decoded = JSON.parse(String(message));
+      for (const frame of Array.isArray(decoded) ? decoded : [decoded])
+        if (frame._tag === "Request") methods.set(frame.id, frame.tag);
+      server.send(message);
+    });
+    server.onMessage((message) => {
+      const decoded = JSON.parse(String(message));
+      const frames = (Array.isArray(decoded) ? decoded : [decoded]).map((frame) => {
+        const method = methods.get(frame.requestId);
+        const settings =
+          method === "server.getConfig" && frame.exit?._tag === "Success"
+            ? [frame.exit.value.settings]
+            : method === "subscribeServerConfig" && frame._tag === "Chunk"
+              ? frame.values
+                  .filter((value) => value.type === "snapshot" || value.type === "settingsUpdated")
+                  .map((value) =>
+                    value.type === "snapshot" ? value.config.settings : value.payload.settings,
+                  )
+              : [];
+        for (const value of settings) {
+          receipt.settingsSnapshots++;
+          if (value.enableProviderUpdateChecks !== false) receipt.unexpectedUpdateChecks = true;
+        }
+        const frozen = freezeCaptureServerFrame(frame, method);
+        if (JSON.stringify(frozen) !== JSON.stringify(frame)) receipt.frozenFrames++;
+        return frozen;
+      });
+      socket.send(JSON.stringify(Array.isArray(decoded) ? frames : frames[0]));
+    });
+  });
+  return receipt;
+}
+
 export function assertProfile(base, home, workspace, app) {
   const canonical = NodeFS.realpathSync(base);
   if (
