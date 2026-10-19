@@ -23,6 +23,7 @@ import {
   snapShotAccessibilityDetails,
 } from "./SnapShotAttachmentDetails";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ko } from "~/i18n/ko";
 import { ZoomableImage, type ZoomableImageHandle } from "./ZoomableImage";
 import { composerFloatingLayerProps } from "./composerEventScope";
 
@@ -188,14 +189,14 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
           if (event.target === event.currentTarget) onClose();
         }}
       >
-        <DialogTitle className="sr-only">{mediaLabel} 크게 보기</DialogTitle>
+        <DialogTitle className="sr-only">{ko.chat.media.expand(mediaLabel)}</DialogTitle>
         {preview.images.length > 1 && (
           <Button
             type="button"
             size="icon"
             variant="media-navigation"
             className="left-0 top-auto -bottom-12 translate-y-0 rounded-full bg-white/10 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
-            aria-label="이전 미디어"
+            aria-label={ko.chat.media.previous}
             onClick={() => navigateImage(-1)}
           >
             <ChevronLeftIcon className="size-5" />
@@ -210,7 +211,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
               variant="media-close"
               className="absolute right-0 -top-10 z-(--layer-raised-content)"
               onClick={onClose}
-              aria-label={`${mediaLabel} 미리보기 닫기`}
+              aria-label={ko.chat.media.closePreview(mediaLabel)}
             >
               <XIcon />
             </Button>
@@ -282,7 +283,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             size="icon"
             variant="media-navigation"
             className="right-0 top-auto -bottom-12 translate-y-0 rounded-full bg-white/10 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
-            aria-label="다음 미디어"
+            aria-label={ko.chat.media.next}
             onClick={() => navigateImage(1)}
           >
             <ChevronRightIcon className="size-5" />
