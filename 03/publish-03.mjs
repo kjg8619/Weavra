@@ -131,11 +131,20 @@ if (mode === "index") {
   const checks = [];
   const list = [...urls];
   let next = 0;
-  await Promise.all(Array.from({ length: 12 }, async () => {
+  // GitHub rate-limits anonymous attachment GETs (429); honor Retry-After with a bounded retry count.
+  const get = async (u) => {
+    for (let attempt = 0; ; attempt++) {
+      const r = await fetch(u, { redirect: "follow", signal: AbortSignal.timeout(20000) });
+      if (r.status !== 429 || attempt >= 8) return r;
+      await r.arrayBuffer();
+      await Bun.sleep(1000 * Math.min(120, Number(r.headers.get("retry-after")) || 15 * 2 ** attempt));
+    }
+  };
+  await Promise.all(Array.from({ length: 2 }, async () => {
     while (next < list.length) {
       const [u, expected] = list[next++];
       try {
-        const r = await fetch(u, { redirect: "follow", signal: AbortSignal.timeout(20000) });
+        const r = await get(u);
         const bytes = new Uint8Array(await r.arrayBuffer());
         checks.push({ url: u, status: r.status, contentType: r.headers.get("content-type"), sha256: sha(bytes), expectedSha256: expected });
       } catch (error) { checks.push({ url: u, status: 0, error: String(error) }); }
