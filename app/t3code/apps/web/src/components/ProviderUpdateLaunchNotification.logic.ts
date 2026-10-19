@@ -780,3 +780,44 @@ export function resolveEnvironmentUpdateRowStatus(input: {
   }
   return { kind: "idle", text: environmentProviderNames(input.group) };
 }
+
+/**
+ * Routine update availability is shown in Providers settings, never as a launch
+ * popup over active work. Returns null when nothing in this list can be updated.
+ */
+export function getProviderUpdateAvailabilitySummary(
+  providers: ReadonlyArray<ServerProvider>,
+): string | null {
+  const candidates = collectProviderUpdateCandidates(providers);
+  if (candidates.length === 0) {
+    return null;
+  }
+  const versions = candidates.map((provider) => {
+    const providerName = PROVIDER_DISPLAY_NAMES[provider.driver] ?? provider.driver;
+    const latest = formatVersion(provider.versionAdvisory.latestVersion);
+    const current = provider.versionAdvisory.currentVersion;
+    return current
+      ? `${providerName} ${formatVersion(current)} → ${latest}`
+      : `${providerName} ${latest}`;
+  });
+  return `공급자 업데이트를 쓸 수 있어요: ${versions.join(", ")}`;
+}
+
+/**
+ * Result of a user-requested update, shown beside the provider that ran it: a
+ * command that could not start wins, otherwise the provider's live update state.
+ * An idle provider has no result to show.
+ */
+export function getProviderManualUpdateResultView(input: {
+  readonly provider: ServerProvider | undefined;
+  readonly startFailure: string | null;
+}): ProviderUpdateToastView | null {
+  if (input.startFailure !== null) {
+    return getProviderUpdateRejectedToastView(1, input.startFailure);
+  }
+  const status = input.provider?.updateState?.status;
+  if (!input.provider || status === undefined || status === "idle") {
+    return null;
+  }
+  return getProviderUpdateProgressToastView({ providers: [input.provider], providerCount: 1 });
+}
