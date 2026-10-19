@@ -68,7 +68,11 @@ function DisabledCommandPaletteResultRow(props: {
   item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
 }) {
   return (
-    <div className="flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base opacity-64 sm:min-h-7 sm:text-sm">
+    <div
+      aria-disabled="true"
+      aria-describedby={props.item.description ? props.item.descriptionId : undefined}
+      className="flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base opacity-64 sm:min-h-7 sm:text-sm"
+    >
       {props.item.icon}
       {props.item.description || props.item.threadContentMatch ? (
         <span className="flex min-w-0 flex-1 flex-col">
@@ -80,7 +84,10 @@ function DisabledCommandPaletteResultRow(props: {
             <ThreadSearchMatchExcerpt match={props.item.threadContentMatch} />
           ) : null}
           {props.item.description ? (
-            <span className="min-w-0 text-muted-foreground/70 text-xs">
+            <span
+              id={props.item.descriptionId}
+              className="min-w-0 text-muted-foreground/70 text-xs"
+            >
               {props.item.description}
             </span>
           ) : null}

@@ -6,6 +6,7 @@ import {
   buildCommandPaletteProjectMetadata,
   buildProjectImportSourceActions,
   buildProjectActionItems,
+  projectImportAvailabilityRank,
   buildThreadActionItems,
   buildLinkedThreadActionItems,
   enumerateCommandPaletteItems,
@@ -192,6 +193,7 @@ describe("buildProjectImportSourceActions", () => {
         environmentId: LOCAL_ENVIRONMENT_ID,
         source: "github",
         label: "GitHub",
+        title: "GitHub 저장소",
         description: "owner/repo 복제",
         availability: { status, reason },
         icon: null,
@@ -201,6 +203,7 @@ describe("buildProjectImportSourceActions", () => {
 
       expect(importAction.disabled).toBe(true);
       expect(importAction.description).toContain(reason);
+      expect(importAction.descriptionId).toBe(`add-project-${LOCAL_ENVIRONMENT_ID}-github-reason`);
       await importAction.run();
       expect(runImport).not.toHaveBeenCalled();
       if (canOpenSetup) {
@@ -227,6 +230,7 @@ describe("buildProjectImportSourceActions", () => {
       environmentId: LOCAL_ENVIRONMENT_ID,
       source: "gitlab",
       label: "GitLab",
+      title: "GitLab 저장소",
       description: "group/project 복제",
       availability: { status: "ready" },
       icon: null,
@@ -236,11 +240,22 @@ describe("buildProjectImportSourceActions", () => {
 
     expect(importAction.disabled).toBe(false);
     expect(importAction.description).toBe("group/project 복제");
+    expect(importAction.descriptionId).toBeUndefined();
     expect(setupAction).toBeNull();
     await importAction.run();
     expect(runImport).toHaveBeenCalledOnce();
     expect(runSetup).not.toHaveBeenCalled();
     expect(PROJECT_IMPORT_SETUP_DESTINATION).toEqual({ to: "/settings/source-control" });
+  });
+
+  it("orders ready, then fixable, then unsupported sources", () => {
+    const availabilities = [
+      { status: "unsupported", reason: "x" },
+      { status: "unauthenticated", reason: "x" },
+      { status: "ready" },
+      { status: "not-installed", reason: "x" },
+    ] as const;
+    expect(availabilities.map(projectImportAvailabilityRank)).toEqual([2, 1, 0, 1]);
   });
 });
 

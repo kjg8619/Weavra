@@ -156,6 +156,7 @@ import {
   getCommandPaletteMode,
   ITEM_ICON_CLASS,
   PROJECT_IMPORT_SETUP_DESTINATION,
+  projectImportAvailabilityRank,
   type ProjectImportAvailability,
   RECENT_THREAD_LIMIT,
   reduceCommandPaletteUiState,
@@ -385,10 +386,11 @@ function sortAddProjectProviderSources(
   readinessBySource: AddProjectRemoteSourceReadiness,
 ): ReadonlyArray<AddProjectRemoteProviderKind> {
   return REMOTE_PROJECT_PROVIDER_SOURCES.toSorted((left, right) => {
-    const leftReady = readinessBySource[left].status === "ready";
-    const rightReady = readinessBySource[right].status === "ready";
-    if (leftReady !== rightReady) {
-      return leftReady ? -1 : 1;
+    const rankDifference =
+      projectImportAvailabilityRank(readinessBySource[left]) -
+      projectImportAvailabilityRank(readinessBySource[right]);
+    if (rankDifference !== 0) {
+      return rankDifference;
     }
     return remoteProjectSourceLabel(left).localeCompare(remoteProjectSourceLabel(right));
   });
@@ -1494,13 +1496,10 @@ function OpenCommandPaletteDialog(props: {
     [pushPaletteView],
   );
 
-  const openSourceControlSettings = useCallback(
-    (_source: AddProjectRemoteProviderKind) => {
-      setOpen(false);
-      void navigate(PROJECT_IMPORT_SETUP_DESTINATION);
-    },
-    [navigate, setOpen],
-  );
+  const openSourceControlSettings = useCallback(() => {
+    setOpen(false);
+    void navigate(PROJECT_IMPORT_SETUP_DESTINATION);
+  }, [navigate, setOpen]);
 
   const buildAddProjectSourceGroups = useCallback(
     (
@@ -1538,13 +1537,12 @@ function OpenCommandPaletteDialog(props: {
           environmentId,
           source,
           label,
+          title: source === "url" ? label : `${label} 저장소`,
           description,
           availability: readiness,
           icon: remoteProjectSourceIcon(source, ITEM_ICON_CLASS),
           runImport: async () => startAddProjectClone(environmentId, source),
-          runSetup: async () => {
-            if (source !== "url") openSourceControlSettings(source);
-          },
+          runSetup: async () => openSourceControlSettings(),
         });
         if (!actions.setupAction) {
           sourceItems.push(actions.importAction);

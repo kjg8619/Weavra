@@ -137,6 +137,8 @@ export interface CommandPaletteItem {
   readonly timestamp?: string;
   readonly icon: ReactNode;
   readonly disabled?: boolean;
+  /** DOM id for the description, so a disabled row can reference its reason. */
+  readonly descriptionId?: string;
   /** Optional content rendered inline before the title text. */
   readonly titleLeadingContent?: ReactNode;
   /** Optional content rendered inline after the title text (before the timestamp). */
@@ -159,6 +161,12 @@ export type ProjectImportAvailability =
       readonly reason: string;
     };
 
+/** Ready sources first, then ones a setup step can fix, then permanently unsupported ones. */
+export function projectImportAvailabilityRank(availability: ProjectImportAvailability): number {
+  if (availability.status === "ready") return 0;
+  return availability.status === "unsupported" ? 2 : 1;
+}
+
 export const PROJECT_IMPORT_SETUP_DESTINATION = {
   to: "/settings/source-control",
 } as const;
@@ -167,6 +175,7 @@ export function buildProjectImportSourceActions(input: {
   readonly environmentId: EnvironmentId;
   readonly source: string;
   readonly label: string;
+  readonly title: string;
   readonly description: string;
   readonly availability: ProjectImportAvailability;
   readonly icon: ReactNode;
@@ -182,9 +191,12 @@ export function buildProjectImportSourceActions(input: {
     kind: "action",
     value: `action:add-project:${input.environmentId}:${input.source}${isReady ? "" : ":not-ready"}`,
     searchTerms: ["clone", "remote", "repository", "repo", "git", input.label],
-    title: `${input.label} 저장소`,
+    title: input.title,
     description: reason ?? input.description,
     disabled: !isReady,
+    ...(isReady
+      ? {}
+      : { descriptionId: `add-project-${input.environmentId}-${input.source}-reason` }),
     icon: input.icon,
     keepOpen: isReady,
     run: async () => {
