@@ -9,6 +9,7 @@ import {
   chooseAlias,
   CASES,
   deliverScenarioEvent,
+  readCompletedCopy,
   iconTargetMeetsMinimum,
   assertIconTargetHits,
 } from "./cases.mjs";
@@ -90,6 +91,47 @@ describe("capture network notice isolation", () => {
     } finally {
       await NodeFSP.rm(base, { recursive: true });
     }
+  });
+});
+
+describe("diagnostic copy synchronization", () => {
+  const path = "/tmp/hig/workspace/" + "x".repeat(200);
+  test("a write that completes after the click is read only once it lands", async () => {
+    let clipboard = "";
+    let complete!: () => void;
+    const written = new Promise<void>((resolve) => (complete = resolve));
+    const reading = readCompletedCopy(written, async () => clipboard, 1_000);
+    await Promise.resolve();
+    clipboard = `연결 주소: ws://x\n작업 공간 전체 경로: ${path}`;
+    complete();
+    expect((await reading).values).toContain(path);
+  });
+  test("a truncated or wrong write does not contain the exact path", async () => {
+    const copied = await readCompletedCopy(
+      Promise.resolve(),
+      async () => `작업 공간 전체 경로: ${path.slice(0, -1)}\n기타: ${path}/extra`,
+      1_000,
+    );
+    expect(copied.values).not.toContain(path);
+  });
+  test("a write that never completes fails instead of reading stale state", async () => {
+    let read = false;
+    await expect(
+      readCompletedCopy(
+        new Promise<void>(() => {}),
+        async () => {
+          read = true;
+          return path;
+        },
+        1,
+      ),
+    ).rejects.toThrow("Timeout: diagnostic clipboard write completion");
+    expect(read).toBe(false);
+  });
+  test("a rejected write fails", async () => {
+    await expect(
+      readCompletedCopy(Promise.reject(new Error("denied")), async () => path, 1_000),
+    ).rejects.toThrow("denied");
   });
 });
 
