@@ -1,0 +1,18 @@
+319 |     images: after.manifest.length,
+320 |     pairs: diff.pairs.length,
+321 |     revision: after.revision,
+322 |     harnessOnly,
+323 |   };
+324 |   NodeAssert.ok(
+                   ^
+AssertionError: Product acceptance requires the task-specific interactive scenario receipt; harness-only is not product PASS
+ generatedMessage: false,
+     actual: false,
+   expected: true,
+   operator: "==",
+       diff: "simple",
+       code: "ERR_ASSERTION"
+
+      at verifyPacket (/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02/scripts/hig/assert.mjs:324:14)
+
+Bun v1.4.0 (macOS arm64)

@@ -1,0 +1,1529 @@
+{
+  "revision": "bb7649c97402d9a853f91b3a987f9fa48aa970eb",
+  "bundle": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/before/app/weavra-desktop.app",
+  "asarSha256": "1f20efbecb9f649859f375defe08285e16d2ba55f108f69aa03b4d1c12ca5b7f",
+  "at": "2026-10-19T05:34:55.925Z",
+  "tokens": {
+    "light": {
+      "--layer-content": "",
+      "--layer-raised-content": "",
+      "--layer-sticky": "",
+      "--layer-selection-tools": "",
+      "--layer-passive-notice": "",
+      "--layer-modal-backdrop": "",
+      "--layer-modal": "",
+      "--layer-inspector-shade": "",
+      "--layer-inspector-outline": "",
+      "--layer-inspector-panel": "",
+      "--layer-modal-child": "",
+      "--layer-tooltip": "",
+      "--layer-blocking-system": "",
+      "--toast-stack-depth": "",
+      "--motion-feedback": "",
+      "--motion-surface": "",
+      "--overlay-shade": "",
+      "--overlay-dim": "",
+      "--inspector-shade": "",
+      "--shadow-popup": "",
+      "--shadow-modal": "",
+      "--shadow-preview": "",
+      "--shadow-preview-glow": "",
+      "--preview-separator": "",
+      "--annotation-background": "",
+      "--annotation-foreground": "",
+      "--tool-error-icon": "oklch(63.7% .237 25.331)",
+      "--app-scrollbar-thumb": "#d9d9d9",
+      "--terminal-background": "oklch(99.2% 0 0)",
+      "--terminal-foreground": "oklch(27.4% .006 286.033)"
+    },
+    "dark": {
+      "--layer-content": "",
+      "--layer-raised-content": "",
+      "--layer-sticky": "",
+      "--layer-selection-tools": "",
+      "--layer-passive-notice": "",
+      "--layer-modal-backdrop": "",
+      "--layer-modal": "",
+      "--layer-inspector-shade": "",
+      "--layer-inspector-outline": "",
+      "--layer-inspector-panel": "",
+      "--layer-modal-child": "",
+      "--layer-tooltip": "",
+      "--layer-blocking-system": "",
+      "--toast-stack-depth": "",
+      "--motion-feedback": "",
+      "--motion-surface": "",
+      "--overlay-shade": "",
+      "--overlay-dim": "",
+      "--inspector-shade": "",
+      "--shadow-popup": "",
+      "--shadow-modal": "",
+      "--shadow-preview": "",
+      "--shadow-preview-glow": "",
+      "--preview-separator": "",
+      "--annotation-background": "",
+      "--annotation-foreground": "",
+      "--tool-error-icon": "#fca5a5",
+      "--app-scrollbar-thumb": "#ffffff14",
+      "--terminal-background": "oklch(14.5% 0 none)",
+      "--terminal-foreground": "oklch(97% 0 none)"
+    }
+  },
+  "layers": [
+    {
+      "selector": "[data-slot=\"toast-viewport\"]",
+      "rect": {
+        "x": 888,
+        "y": 84,
+        "width": 360,
+        "height": 0,
+        "top": 84,
+        "right": 1248,
+        "bottom": 84,
+        "left": 888
+      },
+      "zIndex": "100",
+      "position": "fixed"
+    },
+    {
+      "selector": "[data-slot=\"command-dialog-viewport\"]",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800,
+        "top": 0,
+        "right": 1280,
+        "bottom": 800,
+        "left": 0
+      },
+      "zIndex": "50"
+    },
+    {
+      "selector": "[data-slot=\"command-dialog-backdrop\"], [data-slot=\"dialog-backdrop\"]",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800,
+        "top": 0,
+        "right": 1280,
+        "bottom": 800,
+        "left": 0
+      },
+      "zIndex": "50",
+      "backgroundColor": "color(srgb 0.989332 0.989513 0.98953 / 0.6)",
+      "transitionProperty": "all",
+      "transitionDuration": "0.2s"
+    },
+    null,
+    {
+      "selector": "[data-slot=\"toast-viewport\"]",
+      "rect": {
+        "x": 888,
+        "y": 84,
+        "width": 360,
+        "height": 0,
+        "top": 84,
+        "right": 1248,
+        "bottom": 84,
+        "left": 888
+      },
+      "zIndex": "100"
+    },
+    {
+      "selector": "[data-slot=\"toast-viewport\"] [data-slot=\"toast-root\"], [data-slot=\"toast-viewport\"] > *",
+      "rect": {
+        "x": 888,
+        "y": 84,
+        "width": 360,
+        "height": 116,
+        "top": 84,
+        "right": 1248,
+        "bottom": 200,
+        "left": 888
+      },
+      "zIndex": "9999"
+    },
+    {
+      "selector": "[data-slot=\"popover-positioner\"]",
+      "rect": {
+        "x": 391,
+        "y": 89,
+        "width": 362,
+        "height": 348,
+        "top": 89,
+        "right": 753,
+        "bottom": 437,
+        "left": 391
+      },
+      "zIndex": "130"
+    },
+    {
+      "selector": "[data-slot=\"popover-popup\"]",
+      "rect": {
+        "x": 391,
+        "y": 89,
+        "width": 362,
+        "height": 348,
+        "top": 89,
+        "right": 753,
+        "bottom": 437,
+        "left": 391
+      },
+      "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.55) 0px 16px 40px -18px",
+      "transitionProperty": "width, height, scale, opacity"
+    },
+    {
+      "selector": "[data-slot=\"tooltip-positioner\"]",
+      "rect": {
+        "x": 1110.015625,
+        "y": 44,
+        "width": 164.9765625,
+        "height": 26,
+        "top": 44,
+        "right": 1274.9921875,
+        "bottom": 70,
+        "left": 1110.015625
+      },
+      "zIndex": "140"
+    },
+    {
+      "selector": "[data-chat-composer-stack=\"true\"]",
+      "rect": {
+        "x": 384,
+        "y": 344,
+        "width": 768,
+        "height": 164,
+        "top": 344,
+        "right": 1152,
+        "bottom": 508,
+        "left": 384
+      },
+      "zIndex": "10"
+    },
+    {
+      "selector": "[data-chat-composer-overlay=\"true\"]",
+      "rect": {
+        "x": 256,
+        "y": 52,
+        "width": 1024,
+        "height": 748,
+        "top": 52,
+        "right": 1280,
+        "bottom": 800,
+        "left": 256
+      },
+      "zIndex": "20"
+    },
+    {
+      "selector": "[data-workspace-titlebar-controls]",
+      "rect": {
+        "x": 1175,
+        "y": 0,
+        "width": 92,
+        "height": 52,
+        "top": 0,
+        "right": 1267,
+        "bottom": 52,
+        "left": 1175
+      },
+      "zIndex": "50",
+      "position": "fixed"
+    },
+    {
+      "selector": "[data-slot=\"sidebar-container\"]",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 256,
+        "height": 800,
+        "top": 0,
+        "right": 256,
+        "bottom": 800,
+        "left": 0
+      },
+      "zIndex": "10"
+    },
+    {
+      "selector": "[data-slot=\"dialog-viewport\"]",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800,
+        "top": 0,
+        "right": 1280,
+        "bottom": 800,
+        "left": 0
+      },
+      "zIndex": "50"
+    },
+    {
+      "selector": "[data-slot=\"dialog-backdrop\"]",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800,
+        "top": 0,
+        "right": 1280,
+        "bottom": 800,
+        "left": 0
+      },
+      "transitionProperty": "all",
+      "transitionDuration": "0.2s",
+      "backgroundColor": "color(srgb 0.989332 0.989513 0.98953 / 0.6)",
+      "zIndex": "50"
+    },
+    {
+      "selector": "[data-slot=\"popover-positioner\"]",
+      "rect": {
+        "x": 409,
+        "y": 199.25,
+        "width": 270.65625,
+        "height": 158,
+        "top": 199.25,
+        "right": 679.65625,
+        "bottom": 357.25,
+        "left": 409
+      },
+      "zIndex": "130",
+      "note": "popover inside Add Action dialog (modal-child above modal)"
+    },
+    {
+      "selector": "[data-theme-editor-panel][role=dialog]",
+      "rect": {
+        "x": 848,
+        "y": 436,
+        "width": 416,
+        "height": 348,
+        "top": 436,
+        "right": 1264,
+        "bottom": 784,
+        "left": 848
+      },
+      "zIndex": "110",
+      "position": "fixed",
+      "boxShadow": "rgba(0, 0, 0, 0.65) 0px 24px 64px -24px"
+    },
+    {
+      "selector": "[data-slot=\"tooltip-positioner\"]",
+      "rect": {
+        "x": 1078.6875,
+        "y": 415,
+        "width": 159.6328125,
+        "height": 26,
+        "top": 415,
+        "right": 1238.3203125,
+        "bottom": 441,
+        "left": 1078.6875
+      },
+      "zIndex": "120",
+      "note": "theme editor tooltip"
+    },
+    {
+      "selector": "stylesheet rules (inspector)",
+      "declared": {
+        "#theme-inspector-spotlight": "100",
+        ".theme-inspector-spotlight-dimmer": "rgba(2, 3, 8, 0.54)",
+        "#theme-inspector-hover": ""
+      },
+      "resolved": {
+        "shade": "",
+        "outline": "",
+        "fill": ""
+      }
+    },
+    {
+      "selector": "[data-slot=\"popover-positioner\"]",
+      "rect": {
+        "x": 839.59375,
+        "y": 320.90625,
+        "width": 290,
+        "height": 312.5,
+        "top": 320.90625,
+        "right": 1129.59375,
+        "bottom": 633.40625,
+        "left": 839.59375
+      },
+      "zIndex": "120",
+      "note": "theme color picker popover above editor panel"
+    },
+    {
+      "selector": "[data-slot=\"popover-popup\"]",
+      "rect": {
+        "x": 391,
+        "y": 89,
+        "width": 362,
+        "height": 348,
+        "top": 89,
+        "right": 753,
+        "bottom": 437,
+        "left": 391
+      },
+      "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.8) 0px 18px 44px -18px",
+      "note": "popup shadow (dark)"
+    },
+    {
+      "selector": "button[aria-label=\"선택한 내용을 작성기에 인용\"]",
+      "rect": {
+        "x": 648,
+        "y": 180,
+        "width": 56.765625,
+        "height": 24,
+        "top": 180,
+        "right": 704.765625,
+        "bottom": 204,
+        "left": 648
+      },
+      "zIndex": "50",
+      "position": "fixed"
+    },
+    {
+      "selector": "[data-chat-workspace-drop-target=\"true\"] > .absolute",
+      "rect": {
+        "x": 256,
+        "y": 52,
+        "width": 1024,
+        "height": 0,
+        "top": 52,
+        "right": 1280,
+        "bottom": 52,
+        "left": 256
+      },
+      "zIndex": "20"
+    }
+  ],
+  "portalOwner": [
+    {
+      "state": "05 command palette",
+      "selector": "[data-slot=\"command-dialog-popup\"]",
+      "rect": {
+        "x": 352,
+        "y": 80,
+        "width": 576,
+        "height": 420,
+        "top": 80,
+        "right": 928,
+        "bottom": 500,
+        "left": 352
+      },
+      "zIndex": "auto",
+      "hitInside": true,
+      "hitTag": "span",
+      "activeElement": "INPUT"
+    },
+    {
+      "state": "06 autocomplete popup inside command dialog"
+    },
+    {
+      "state": "31 model selector popup",
+      "selector": "[data-slot=\"popover-positioner\"]",
+      "rect": {
+        "x": 391,
+        "y": 89,
+        "width": 362,
+        "height": 348,
+        "top": 89,
+        "right": 753,
+        "bottom": 437,
+        "left": 391
+      },
+      "zIndex": "130",
+      "hitInside": true,
+      "hitTag": "div",
+      "activeElement": "INPUT"
+    },
+    {
+      "state": "tooltip over panel toggle",
+      "selector": "[data-slot=\"tooltip-popup\"]",
+      "rect": {
+        "x": 1110.015625,
+        "y": 44,
+        "width": 164.9765625,
+        "height": 26,
+        "top": 44,
+        "right": 1274.9921875,
+        "bottom": 70,
+        "left": 1110.015625
+      },
+      "zIndex": "auto",
+      "hitInside": false,
+      "hitTag": "div",
+      "activeElement": "DIV"
+    },
+    {
+      "state": "14 device setup dialog",
+      "selector": "[data-slot=\"dialog-popup\"]",
+      "rect": {
+        "x": 352,
+        "y": 243,
+        "width": 576,
+        "height": 314,
+        "top": 243,
+        "right": 928,
+        "bottom": 557,
+        "left": 352
+      },
+      "zIndex": "auto",
+      "hitInside": true,
+      "hitTag": "h3",
+      "activeElement": "Device hub, step 1"
+    },
+    {
+      "state": "14 click outside popup hits backdrop/viewport",
+      "hitTag": "div[data-slot=dialog-viewport]",
+      "hitIsOverlay": true
+    },
+    {
+      "state": "11 popover inside dialog",
+      "selector": "[data-slot=\"popover-popup\"]",
+      "rect": {
+        "x": 409,
+        "y": 199.25,
+        "width": 270.65625,
+        "height": 158,
+        "top": 199.25,
+        "right": 679.65625,
+        "bottom": 357.25,
+        "left": 409
+      },
+      "zIndex": "auto",
+      "hitInside": true,
+      "hitTag": "div",
+      "activeElement": "BUTTON"
+    },
+    {
+      "state": "theme editor panel",
+      "selector": "[data-theme-editor-panel][role=dialog]",
+      "rect": {
+        "x": 848,
+        "y": 436,
+        "width": 416,
+        "height": 348,
+        "top": 436,
+        "right": 1264,
+        "bottom": 784,
+        "left": 848
+      },
+      "zIndex": "110",
+      "hitInside": true,
+      "hitTag": "div",
+      "activeElement": "INPUT"
+    },
+    {
+      "state": "theme color picker popover",
+      "selector": "[data-slot=\"popover-popup\"]",
+      "rect": {
+        "x": 839.59375,
+        "y": 320.90625,
+        "width": 290,
+        "height": 312.5,
+        "top": 320.90625,
+        "right": 1129.59375,
+        "bottom": 633.40625,
+        "left": 839.59375
+      },
+      "zIndex": "auto",
+      "hitInside": true,
+      "hitTag": "div",
+      "activeElement": "Background saturation"
+    },
+    {
+      "state": "selection toolbar",
+      "selector": "button[aria-label=\"선택한 내용을 작성기에 인용\"]",
+      "rect": {
+        "x": 648,
+        "y": 180,
+        "width": 56.765625,
+        "height": 24,
+        "top": 180,
+        "right": 704.765625,
+        "bottom": 204,
+        "left": 648
+      },
+      "zIndex": "50",
+      "hitInside": true,
+      "hitTag": "button[data-slot=button]",
+      "activeElement": "BODY"
+    }
+  ],
+  "escape": [
+    {
+      "state": "06 Escape with autocomplete open",
+      "popupStillOpen": false,
+      "dialogStillOpen": false,
+      "activeElement": "BODY"
+    },
+    {
+      "state": "31 Escape closes popup, focus owner",
+      "popupStillOpen": false,
+      "activeElement": ""
+    },
+    {
+      "state": "14 Escape closes dialog, focus owner",
+      "dialogStillOpen": false,
+      "activeElement": "패널 추가"
+    },
+    {
+      "state": "11 Escape with in-dialog popover open",
+      "popoverStillOpen": false,
+      "dialogStillOpen": true,
+      "activeElement": "Choose icon"
+    },
+    {
+      "state": "theme picker Escape closes popover only",
+      "popoverStillOpen": false,
+      "panelStillOpen": true
+    },
+    {
+      "state": "selection toolbar Escape dismisses",
+      "toolbarStillOpen": false
+    }
+  ],
+  "motion": [
+    {
+      "selector": "[data-chat-composer-form=\"true\"] button[type=\"submit\"]",
+      "rect": {
+        "x": 1103,
+        "y": 439,
+        "width": 32,
+        "height": 32,
+        "top": 439,
+        "right": 1135,
+        "bottom": 471,
+        "left": 1103
+      },
+      "transitionProperty": "all",
+      "transitionDuration": "0.15s",
+      "zIndex": "auto"
+    },
+    {
+      "selector": "[data-slot=\"sidebar-container\"]",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 256,
+        "height": 800,
+        "top": 0,
+        "right": 256,
+        "bottom": 800,
+        "left": 0
+      },
+      "transitionProperty": "all",
+      "transitionDuration": "0s"
+    },
+    {
+      "selector": "[data-slot=\"sidebar-gap\"]",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 256,
+        "height": 0,
+        "top": 0,
+        "right": 256,
+        "bottom": 0,
+        "left": 0
+      },
+      "transitionProperty": "all",
+      "transitionDuration": "0s"
+    },
+    {
+      "selector": "[data-slot=\"sidebar-rail\"]",
+      "rect": {
+        "x": 247,
+        "y": 0,
+        "width": 16,
+        "height": 800,
+        "top": 0,
+        "right": 263,
+        "bottom": 800,
+        "left": 247
+      },
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "zIndex": "20"
+    },
+    {
+      "selector": "input[placeholder=\"Search or enter URL\"]",
+      "rect": {
+        "x": 830,
+        "y": 52.5,
+        "width": 329,
+        "height": 26,
+        "top": 52.5,
+        "right": 1159,
+        "bottom": 78.5,
+        "left": 830
+      },
+      "transitionProperty": "background-color",
+      "transitionDuration": "5e+06s"
+    },
+    {
+      "selector": "zoom indicator",
+      "transitionProperty": "all",
+      "transitionDuration": "0.2s",
+      "zIndex": "20",
+      "opacity": "0"
+    },
+    {
+      "tag": "dialog-normal",
+      "transitions": 4,
+      "animationsSeen": [
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "translate",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 140.8541474105197
+        },
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 140.8541474105197
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 140.8541474105197
+        },
+        {
+          "type": "CSSTransition",
+          "name": "translate",
+          "duration": 140.8541474105197
+        },
+        {
+          "type": "CSSTransition",
+          "name": "box-shadow",
+          "duration": 150
+        }
+      ],
+      "frames": [
+        {
+          "label": "start",
+          "t": 0,
+          "file": "motion/dialog-normal-open-start.png"
+        },
+        {
+          "label": "mid",
+          "t": 90,
+          "file": "motion/dialog-normal-open-mid.png"
+        },
+        {
+          "label": "end",
+          "t": 180,
+          "file": "motion/dialog-normal-open-end.png"
+        },
+        {
+          "label": "interrupted-escape-at-mid",
+          "t": 90,
+          "file": "motion/dialog-normal-interrupted.png"
+        }
+      ],
+      "popupStyle": {
+        "selector": "[data-slot=\"dialog-popup\"]",
+        "rect": {
+          "x": 352.03253173828125,
+          "y": 243.1984100341797,
+          "width": 575.9349365234375,
+          "height": 313.96453857421875,
+          "top": 243.1984100341797,
+          "right": 927.9674682617188,
+          "bottom": 557.1629486083984,
+          "left": 352.03253173828125
+        },
+        "transitionProperty": "scale, opacity, translate",
+        "transitionDuration": "0.2s",
+        "boxShadow": "rgba(0, 0, 0, 0.65) 0px 24px 64px -24px",
+        "zIndex": "auto"
+      },
+      "backdropStyle": {
+        "selector": "[data-slot=\"dialog-backdrop\"]",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 800,
+          "top": 0,
+          "right": 1280,
+          "bottom": 800,
+          "left": 0
+        },
+        "transitionProperty": "all",
+        "transitionDuration": "0.2s",
+        "backgroundColor": "color(srgb 0.989332 0.989513 0.98953 / 0.6)",
+        "zIndex": "50"
+      },
+      "viewportStyle": {
+        "selector": "[data-slot=\"dialog-viewport\"]",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 800,
+          "top": 0,
+          "right": 1280,
+          "bottom": 800,
+          "left": 0
+        },
+        "zIndex": "50"
+      }
+    },
+    {
+      "tag": "sidebar-panel-animations",
+      "setting": "true",
+      "durationMs": 200,
+      "computed": [
+        {
+          "selector": "[data-slot=\"sidebar-container\"]",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 256,
+            "height": 800,
+            "top": 0,
+            "right": 256,
+            "bottom": 800,
+            "left": 0
+          },
+          "transitionProperty": "left, right, width",
+          "transitionDuration": "0.2s",
+          "translate": "none",
+          "left": "0px",
+          "width": "256px"
+        },
+        {
+          "selector": "[data-slot=\"sidebar-gap\"]",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 256,
+            "height": 0,
+            "top": 0,
+            "right": 256,
+            "bottom": 0,
+            "left": 0
+          },
+          "transitionProperty": "width",
+          "transitionDuration": "0.2s",
+          "translate": "none",
+          "left": "0px",
+          "width": "256px"
+        },
+        {
+          "selector": "[data-slot=\"sidebar-rail\"]",
+          "rect": {
+            "x": 247,
+            "y": 0,
+            "width": 16,
+            "height": 800,
+            "top": 0,
+            "right": 263,
+            "bottom": 800,
+            "left": 247
+          },
+          "transitionProperty": "all",
+          "transitionDuration": "0.2s",
+          "translate": "-50%",
+          "left": "255px",
+          "width": "16px"
+        },
+        null,
+        {
+          "selector": "[data-slot=\"sidebar-inner\"]",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 255,
+            "height": 800,
+            "top": 0,
+            "right": 255,
+            "bottom": 800,
+            "left": 0
+          },
+          "transitionProperty": "all",
+          "transitionDuration": "0s",
+          "translate": "none",
+          "left": "auto",
+          "width": "255px"
+        }
+      ],
+      "transitionsOnCollapse": [
+        {
+          "type": "CSSTransition",
+          "property": "width",
+          "target": "sidebar-gap",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "property": "left",
+          "target": "sidebar-container",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "property": "right",
+          "target": "sidebar-rail",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "property": "translate",
+          "target": "sidebar-rail",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "property": "padding-left",
+          "target": "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspa",
+          "duration": 200
+        }
+      ],
+      "transitionsOnExpand": [
+        {
+          "type": "CSSTransition",
+          "property": "width",
+          "target": "sidebar-gap",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "property": "left",
+          "target": "sidebar-container",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "property": "right",
+          "target": "sidebar-rail",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "property": "translate",
+          "target": "sidebar-rail",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "property": "padding-left",
+          "target": "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspa",
+          "duration": 200
+        }
+      ],
+      "togglePath": "button[aria-label=Toggle main sidebar]",
+      "stateBefore": "expanded",
+      "collapsedComputed": {
+        "selector": "[data-slot=\"sidebar-container\"]",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 256,
+          "height": 800,
+          "top": 0,
+          "right": 256,
+          "bottom": 800,
+          "left": 0
+        },
+        "transitionProperty": "left, right, width",
+        "translate": "none",
+        "left": "0px",
+        "width": "256px"
+      },
+      "collapsedRest": {
+        "selector": "[data-slot=\"sidebar-container\"]",
+        "rect": {
+          "x": -256,
+          "y": 0,
+          "width": 256,
+          "height": 800,
+          "top": 0,
+          "right": 0,
+          "bottom": 800,
+          "left": -256
+        },
+        "translate": "none",
+        "left": "-256px",
+        "width": "256px"
+      },
+      "gapRest": {
+        "selector": "[data-slot=\"sidebar-gap\"]",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "width": "0px"
+      },
+      "stateCollapsed": "collapsed",
+      "stateAfter": "expanded"
+    },
+    {
+      "selector": "SidebarProviderUpdatePill",
+      "result": "not mounted in isolated profile; declared classes verified by static probe"
+    }
+  ],
+  "reducedMotion": [
+    {
+      "tokens": {
+        "feedback": "",
+        "surface": ""
+      }
+    },
+    {
+      "selector": "[data-chat-composer-form=\"true\"] button[type=\"submit\"]",
+      "rect": {
+        "x": 671,
+        "y": 439,
+        "width": 32,
+        "height": 32,
+        "top": 439,
+        "right": 703,
+        "bottom": 471,
+        "left": 671
+      },
+      "transitionProperty": "all",
+      "transitionDuration": "0.15s"
+    },
+    {
+      "tag": "dialog-reduced",
+      "transitions": 4,
+      "animationsSeen": [
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "translate",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 140.8541474105197
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 140.8541474105197
+        },
+        {
+          "type": "CSSTransition",
+          "name": "translate",
+          "duration": 140.8541474105197
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 140.8541474105197
+        },
+        {
+          "type": "CSSTransition",
+          "name": "box-shadow",
+          "duration": 150
+        }
+      ],
+      "frames": [
+        {
+          "label": "start",
+          "t": 0,
+          "file": "motion/dialog-reduced-open-start.png"
+        },
+        {
+          "label": "mid",
+          "t": 90,
+          "file": "motion/dialog-reduced-open-mid.png"
+        },
+        {
+          "label": "end",
+          "t": 180,
+          "file": "motion/dialog-reduced-open-end.png"
+        },
+        {
+          "label": "interrupted-escape-at-mid",
+          "t": 90,
+          "file": "motion/dialog-reduced-interrupted.png"
+        }
+      ],
+      "popupStyle": {
+        "selector": "[data-slot=\"dialog-popup\"]",
+        "rect": {
+          "x": 352.03253173828125,
+          "y": 243.1984100341797,
+          "width": 575.9349365234375,
+          "height": 313.96453857421875,
+          "top": 243.1984100341797,
+          "right": 927.9674682617188,
+          "bottom": 557.1629486083984,
+          "left": 352.03253173828125
+        },
+        "transitionProperty": "scale, opacity, translate",
+        "transitionDuration": "0.2s",
+        "boxShadow": "rgba(0, 0, 0, 0.65) 0px 24px 64px -24px",
+        "zIndex": "auto"
+      },
+      "backdropStyle": {
+        "selector": "[data-slot=\"dialog-backdrop\"]",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 800,
+          "top": 0,
+          "right": 1280,
+          "bottom": 800,
+          "left": 0
+        },
+        "transitionProperty": "all",
+        "transitionDuration": "0.2s",
+        "backgroundColor": "color(srgb 0.989332 0.989513 0.98953 / 0.6)",
+        "zIndex": "50"
+      },
+      "viewportStyle": {
+        "selector": "[data-slot=\"dialog-viewport\"]",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 800,
+          "top": 0,
+          "right": 1280,
+          "bottom": 800,
+          "left": 0
+        },
+        "zIndex": "50"
+      }
+    }
+  ],
+  "colors": [
+    {
+      "selector": ".preview-loading-progress",
+      "rect": {
+        "x": 741,
+        "y": 90,
+        "width": 539,
+        "height": 2,
+        "top": 90,
+        "right": 1280,
+        "bottom": 92,
+        "left": 741
+      },
+      "boxShadow": "oklch(0.488 0.217 264) 0px 0px 6px 1px",
+      "zIndex": "10"
+    },
+    {
+      "label": "dialog backdrop color (light)",
+      "selector": "[data-slot=\"dialog-backdrop\"]",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800,
+        "top": 0,
+        "right": 1280,
+        "bottom": 800,
+        "left": 0
+      },
+      "transitionProperty": "all",
+      "transitionDuration": "0.2s",
+      "backgroundColor": "color(srgb 0.989332 0.989513 0.98953 / 0.6)",
+      "zIndex": "50"
+    },
+    {
+      "selector": "ThemeWireframe separator",
+      "mounted": 0,
+      "computed": null
+    },
+    {
+      "label": "dialog backdrop color (dark)",
+      "selector": "[data-slot=\"dialog-backdrop\"]",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800,
+        "top": 0,
+        "right": 1280,
+        "bottom": 800,
+        "left": 0
+      },
+      "backgroundColor": "color(srgb 0.0393766 0.039393 0.0393945 / 0.64)"
+    },
+    {
+      "label": "dialog popup shadow (dark)",
+      "selector": "[data-slot=\"dialog-popup\"]",
+      "rect": {
+        "x": 352,
+        "y": 243,
+        "width": 576,
+        "height": 314,
+        "top": 243,
+        "right": 928,
+        "bottom": 557,
+        "left": 352
+      },
+      "boxShadow": "rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0.9) 0px 24px 72px -20px"
+    }
+  ],
+  "contrast": [
+    {
+      "label": "31 popup item text (light)",
+      "theme": "light",
+      "selector": "[data-slot=\"popover-popup\"] [role=\"menuitem\"], [data-slot=\"popover-popup\"] [role=\"option\"], [data-slot=\"popover-popup\"] button",
+      "text": "",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "fg": [
+        39,
+        39,
+        42
+      ],
+      "bgSample": [
+        253,
+        253,
+        253
+      ],
+      "samplePoint": {
+        "x": 397,
+        "y": 95
+      },
+      "ratio": 14.64,
+      "pass": true
+    },
+    {
+      "label": "tooltip text (light)",
+      "theme": "light",
+      "selector": "[data-slot=\"tooltip-popup\"]",
+      "text": "오른쪽 패널 열기/닫기 (⌥⌘B)",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "fg": [
+        39,
+        39,
+        42
+      ],
+      "bgSample": [
+        253,
+        253,
+        253
+      ],
+      "samplePoint": {
+        "x": 1111,
+        "y": 45
+      },
+      "ratio": 14.64,
+      "pass": true
+    },
+    {
+      "label": "14 dialog title (light)",
+      "theme": "light",
+      "selector": "[data-slot=\"dialog-title\"]",
+      "text": "Set up devices",
+      "fontSize": "20px",
+      "fontWeight": "600",
+      "fg": [
+        39,
+        39,
+        42
+      ],
+      "bgSample": [
+        250,
+        250,
+        250
+      ],
+      "samplePoint": {
+        "x": 378,
+        "y": 269
+      },
+      "ratio": 14.27,
+      "pass": true
+    },
+    {
+      "label": "11 dialog title (light)",
+      "theme": "light",
+      "selector": "[data-slot=\"dialog-title\"]",
+      "text": "Add Action",
+      "fontSize": "20px",
+      "fontWeight": "600",
+      "fg": [
+        39,
+        39,
+        42
+      ],
+      "bgSample": [
+        253,
+        253,
+        253
+      ],
+      "samplePoint": {
+        "x": 410,
+        "y": 53
+      },
+      "ratio": 14.64,
+      "pass": true
+    },
+    {
+      "label": "31 popup item text (dark)",
+      "theme": "dark",
+      "selector": "[data-slot=\"popover-popup\"] [role=\"menuitem\"], [data-slot=\"popover-popup\"] [role=\"option\"], [data-slot=\"popover-popup\"] button",
+      "text": "",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "fg": [
+        245,
+        245,
+        245
+      ],
+      "bgSample": [
+        18,
+        18,
+        18
+      ],
+      "samplePoint": {
+        "x": 397,
+        "y": 95
+      },
+      "ratio": 17.18,
+      "pass": true
+    },
+    {
+      "label": "14 dialog title (dark)",
+      "theme": "dark",
+      "selector": "[data-slot=\"dialog-title\"]",
+      "text": "Set up devices",
+      "fontSize": "20px",
+      "fontWeight": "600",
+      "fg": [
+        245,
+        245,
+        245
+      ],
+      "bgSample": [
+        12,
+        12,
+        12
+      ],
+      "samplePoint": {
+        "x": 378,
+        "y": 269
+      },
+      "ratio": 17.94,
+      "pass": true
+    }
+  ],
+  "staticClasses": [
+    {
+      "cls": "fixed z-(--layer-blocking-system)",
+      "zIndex": "auto",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "fixed z-(--layer-modal-backdrop) transition-opacity duration-(--motion-surface)",
+      "zIndex": "auto",
+      "transitionProperty": "opacity",
+      "transitionDuration": "0.15s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "transition-[translate,opacity] duration-(--motion-surface) motion-reduce:transition-opacity",
+      "zIndex": "auto",
+      "transitionProperty": "translate, opacity",
+      "transitionDuration": "0.15s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "absolute z-[calc(var(--toast-stack-depth)-var(--toast-index))]",
+      "zIndex": "auto",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "absolute -z-(--layer-raised-content)",
+      "zIndex": "auto",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "shadow-(--shadow-popup)",
+      "zIndex": "auto",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "bg-(--overlay-dim)",
+      "zIndex": "auto",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "shadow-(--shadow-preview-glow)",
+      "zIndex": "auto",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "z-(--layer-passive-notice)",
+      "zIndex": "auto",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "z-(--layer-inspector-panel)",
+      "zIndex": "auto",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "[[data-panel-animations=true]_&]:transition-[translate] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)]",
+      "zIndex": "auto",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "transition-[opacity,translate] duration-(--motion-surface) ease-in-out motion-reduce:transition-opacity",
+      "zIndex": "auto",
+      "transitionProperty": "opacity, translate",
+      "transitionDuration": "0.15s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "transition-[scale,opacity] duration-(--motion-feedback) motion-reduce:transition-opacity",
+      "zIndex": "auto",
+      "transitionProperty": "scale, opacity",
+      "transitionDuration": "0.15s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "transition-[scale,opacity,translate] duration-(--motion-surface) ease-in-out motion-reduce:transition-opacity",
+      "zIndex": "auto",
+      "transitionProperty": "scale, opacity, translate",
+      "transitionDuration": "0.15s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "transition-[opacity,translate] duration-(--motion-surface) ease-out motion-reduce:transition-opacity",
+      "zIndex": "auto",
+      "transitionProperty": "opacity, translate",
+      "transitionDuration": "0.15s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "transition-[width,height,padding]",
+      "zIndex": "auto",
+      "transitionProperty": "width, height, padding",
+      "transitionDuration": "0.15s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "transition-all duration-150",
+      "zIndex": "auto",
+      "transitionProperty": "all",
+      "transitionDuration": "0.15s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "cls": "transition-[padding]",
+      "zIndex": "auto",
+      "transitionProperty": "padding",
+      "transitionDuration": "0.15s",
+      "boxShadow": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)"
+    }
+  ],
+  "notes": [
+    {
+      "panelAnimations": "false"
+    },
+    {
+      "dialogTooltip": "dialog close button shows no tooltip"
+    },
+    {
+      "inspectorSpotlight": "not mounted by arming the inspector in this scripted flow; declared rules recorded from the shipped stylesheet"
+    },
+    {
+      "quitOverlay": "not observed via synthetic accelerator: TimeoutError: waitFor: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[role=\"status\"]').filter({ hasTex"
+    }
+  ],
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "nativeMinimum": {
+    "minimum": [
+      840,
+      620
+    ],
+    "bounds": {
+      "x": 206,
+      "y": 37,
+      "width": 1280,
+      "height": 800
+    }
+  },
+  "closed": true
+}

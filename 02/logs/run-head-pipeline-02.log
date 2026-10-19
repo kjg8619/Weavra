@@ -1,0 +1,29 @@
+BEFORE_SHA=bb7649c97402d9a853f91b3a987f9fa48aa970eb AFTER_SHA=fdc8ffc0a2b6e459b6d2921cc061e32b77d2064a
+pnpm in app/t3code: 11.10.0
+v24.19.0
+1.4.0
+=== build after @ 2026-10-19T05:29:21Z
+after-build-exit=0
+27691a5d9986cd37f5ddf196bd2d1621cf157e6a4f30a89e64fa3705ed433a57  /Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/app/weavra-desktop.app/Contents/Resources/app.asar
+=== capture after @ 2026-10-19T05:30:13Z
+after-capture-exit=0
+DONE 152 PNGs; product findings retained
+=== diff @ 2026-10-19T05:31:10Z
+diff-exit=0
+=== accept @ 2026-10-19T05:31:25Z
+AFTER_SHA=fdc8ffc0a2b6e459b6d2921cc061e32b77d2064a AFTER_APP=/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/app/weavra-desktop.app
+assert-case-exit=1
+assert-verify-packet-exit=1
+git-diff-check-exit=0
+assert-verify-packet-harness-only-exit=0
+=== measure after @ 2026-10-19T05:31:25Z
+measure-after-exit=0
+MEASURE_DONE layers=23 owners=10 contrast=6
+=== motion after @ 2026-10-19T05:31:52Z
+motion-after-exit=0
+MOTION_DONE runs=2
+=== measure before @ 2026-10-19T05:32:00Z
+measure-before-exit=0
+MEASURE_DONE layers=23 owners=10 contrast=6
+worktree-head=fdc8ffc0
+PIPELINE_02_DONE

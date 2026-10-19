@@ -1,0 +1,31 @@
+BEFORE_SHA=bb7649c97402d9a853f91b3a987f9fa48aa970eb AFTER_SHA=d45a7a92df922335e6129dc0f565be2190f0a646
+v24.19.0
+9.15.4
+1.4.0
+=== checkout parent (detached) in task worktree @ 2026-10-19T05:19:27Z
+=== build before @ 2026-10-19T05:19:27Z
+before-build-exit=0
+    '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/before/package/builder-debug.yml'
+  ]
+1f20efbecb9f649859f375defe08285e16d2ba55f108f69aa03b4d1c12ca5b7f  /Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/before/app/weavra-desktop.app/Contents/Resources/app.asar
+=== capture before @ 2026-10-19T05:20:21Z
+before-capture-exit=0
+CAPTURE matrix/1920x1080/light/48/end-default.png
+DONE 152 PNGs; product findings retained
+=== checkout head @ 2026-10-19T05:21:18Z
+d45a7a92df922335e6129dc0f565be2190f0a646
+=== build after @ 2026-10-19T05:21:18Z
+after-build-exit=0
+    '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/package/builder-debug.yml'
+  ]
+984064df919626700c43c4cba5dca1cfc05706c39c7f8b47049456718d87b777  /Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/app/weavra-desktop.app/Contents/Resources/app.asar
+=== capture after @ 2026-10-19T05:22:10Z
+after-capture-exit=0
+CAPTURE matrix/1920x1080/light/48/end-default.png
+DONE 152 PNGs; product findings retained
+=== diff @ 2026-10-19T05:23:07Z
+diff-exit=0
+DIFF matrix/1920x1080/light/47/end-default.png
+DIFF matrix/1920x1080/light/48/top-default.png
+DIFF matrix/1920x1080/light/48/end-default.png
+CAPTURE_PR_02_DONE

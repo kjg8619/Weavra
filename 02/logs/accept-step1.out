@@ -1,0 +1,13 @@
+334 | 
+335 | if (
+336 |   process.argv[1] &&
+337 |   import.meta.url === NodeURL.pathToFileURL(NodePath.resolve(process.argv[1])).href
+338 | ) {
+339 |   const { values } = NodeUtil.parseArgs({
+                                    ^
+TypeError: Unknown option '--case'
+ code: "ERR_PARSE_ARGS_UNKNOWN_OPTION"
+
+      at /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02/scripts/hig/assert.mjs:339:31
+
+Bun v1.4.0 (macOS arm64)

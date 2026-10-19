@@ -1,0 +1,117 @@
+AFTER_SHA=fdc8ffc0a2b6e459b6d2921cc061e32b77d2064a AFTER_APP=/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/app/weavra-desktop.app
+== accept_pr 02 step 1: assert.mjs --case
+assert-case-exit=1
+334 | 
+335 | if (
+336 |   process.argv[1] &&
+337 |   import.meta.url === NodeURL.pathToFileURL(NodePath.resolve(process.argv[1])).href
+338 | ) {
+339 |   const { values } = NodeUtil.parseArgs({
+                                    ^
+TypeError: Unknown option '--case'
+ code: "ERR_PARSE_ARGS_UNKNOWN_OPTION"
+
+      at /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02/scripts/hig/assert.mjs:339:31
+
+Bun v1.4.0 (macOS arm64)
+
+== accept_pr 02 step 2: assert.mjs --verify-packet (product mode, as written)
+assert-verify-packet-exit=1
+319 |     images: after.manifest.length,
+320 |     pairs: diff.pairs.length,
+321 |     revision: after.revision,
+322 |     harnessOnly,
+323 |   };
+324 |   NodeAssert.ok(
+                   ^
+AssertionError: Product acceptance requires the task-specific interactive scenario receipt; harness-only is not product PASS
+ generatedMessage: false,
+     actual: false,
+   expected: true,
+   operator: "==",
+       diff: "simple",
+       code: "ERR_ASSERTION"
+
+      at verifyPacket (/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02/scripts/hig/assert.mjs:324:14)
+
+Bun v1.4.0 (macOS arm64)
+
+== accept_pr 02 step 3: git diff --check
+git-diff-check-exit=0
+== supplemental: assert.mjs --verify-packet --harness-only (packet structure/provenance)
+assert-verify-packet-harness-only-exit=0
+{
+  "authority": "CAPTURE_HARNESS_ONLY",
+  "harness": "PASS",
+  "product": "NOT_REMEDIATED",
+  "closes": [],
+  "prerequisite": "G-07",
+  "baselineFindings": [
+    {
+      "id": "G-07",
+      "original": "47/48 can duplicate; 46 can omit prepare",
+      "disposition": "repaired-reference; no product change"
+    },
+    {
+      "id": "W-14",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness
+== diff summary
+{"pairs":158,"failures":0,"changed":56,"identical":102,"maxDiff":0.0641,"dimensionsMismatch":0}
+1280x800/06_local_folder_picker.png 0.06410 hotspots=13
+1280x800/05_add_project_import_modal.png 0.06320 hotspots=9
+1920x1080/04_empty_projects.png 0.03230 hotspots=4
+1280x800/30_settings_licenses.png 0.02930 hotspots=6
+1920x1080/06_local_folder_picker.png 0.02840 hotspots=8
+1920x1080/05_add_project_import_modal.png 0.02790 hotspots=4
+matrix/840x620/light/46/top-default.png 0.01210 hotspots=6
+matrix/840x620/dark/46/top-default.png 0.01210 hotspots=6
+1280x800/45_rename_thread_inline.png 0.00890 hotspots=7
+1280x800/46_project_settings_control.png 0.00620 hotspots=12
+matrix/1280x800/light/46/prepare-end-default.png 0.00620 hotspots=12
+matrix/1280x800/dark/46/top-default.png 0.00620 hotspots=12
+matrix/1280x800/light/46/top-default.png 0.00620 hotspots=12
+1280x800/29_settings_diagnostics.png 0.00380 hotspots=12
+1920x1080/46_project_settings_control.png 0.00310 hotspots=5
+matrix/1920x1080/light/46/prepare-end-default.png 0.00310 hotspots=5
+matrix/1920x1080/dark/46/top-default.png 0.00310 hotspots=5
+matrix/1920x1080/dark/46/end-default.png 0.00310 hotspots=9
+matrix/1920x1080/light/46/top-default.png 0.00310 hotspots=5
+matrix/1920x1080/light/46/end-default.png 0.00310 hotspots=9
+1920x1080/29_settings_diagnostics.png 0.00190 hotspots=15
+matrix/2560x1440/light/46/top-default.png 0.00170 hotspots=3
+matrix/2560x1440/light/46/end-default.png 0.00170 hotspots=3
+matrix/2560x1440/dark/46/top-default.png 0.00170 hotspots=3
+matrix/2560x1440/dark/46/end-default.png 0.00170 hotspots=3
+1920x1080/45_rename_thread_inline.png 0.00090 hotspots=4
+1920x1080/37_chat_streaming_working.png 0.00050 hotspots=8
+1280x800/41_chat_code_blocks_dark.electron.png 0.00050 hotspots=3
+1280x800/34_chat_messages.png 0.00040 hotspots=3
+1280x800/37_chat_streaming_working.png 0.00040 hotspots=8
+1280x800/18_settings_appearance_light.png 0.00030 hotspots=12
+1280x800/19_settings_appearance_dark.png 0.00030 hotspots=14
+1920x1080/22_settings_providers.png 0.00030 hotspots=3
+1280x800/36_chat_code_blocks.electron.png 0.00030 hotspots=6
+1920x1080/41_chat_code_blocks_dark.electron.png 0.00030 hotspots=7
+1280x800/26_settings_connections.png 0.00020 hotspots=1
+1280x800/35_chat_long_messages.png 0.00020 hotspots=6
+1280x800/44_delete_thread_confirmation.png 0.00020 hotspots=1
+1920x1080/34_chat_messages.png 0.00020 hotspots=4
+1920x1080/35_chat_long_messages.png 0.00020 hotspots=7
+1280x800/01_first_launch_onboarding_connection.png 0.00010 hotspots=1
+1280x800/15_right_browser.png 0.00010 hotspots=1
+1280x800/33_project_list_with_threads.png 0.00010 hotspots=1
+1280x800/36_chat_code_blocks.png 0.00010 hotspots=5
+1280x800/38_chat_error.png 0.00010 hotspots=5
+1280x800/39_chat_empty_existing_thread.png 0.00010 hotspots=7
+1280x800/40_right_controlled_tasks.png 0.00010 hotspots=1
+1280x800/41_chat_code_blocks_dark.png 0.00010 hotspots=1
+1920x1080/01_first_launch_onboarding_connection.png 0.00010 hotspots=12
+1920x1080/18_settings_appearance_light.png 0.00010 hotspots=11
+1920x1080/19_settings_appearance_dark.png 0.00010 hotspots=11
+1920x1080/26_settings_connections.png 0.00010 hotspots=1
+1920x1080/33_project_list_with_threads.png 0.00010 hotspots=1
+1920x1080/39_chat_empty_existing_thread.png 0.00010 hotspots=7
+1920x1080/44_delete_thread_confirmation.png 0.00010 hotspots=2
+1920x1080/36_chat_code_blocks.electron.png 0.00010 hotspots=7
+ACCEPT_PR_02_DONE

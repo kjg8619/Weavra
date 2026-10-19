@@ -1,0 +1,96 @@
+{
+  "file": "1920x1080/35_chat_long_messages.png",
+  "beforeSha256": "366d00e3dcf417b5dbb5280b48da2244ee134f17be1e2b5944f0133e3a166121",
+  "afterSha256": "6aecc32d17f4b03bba9e3a1617d1eb0c9a6156a1d0da9e0fbeccd1c1d33e3e10",
+  "beforeDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "afterDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1920,
+      "height": 1080
+    },
+    "actual": {
+      "width": 1920,
+      "height": 1080
+    },
+    "totalPixels": 2073600,
+    "diffPixels": 406,
+    "diffRatio": 0.0002,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 2,
+        "x": 0,
+        "y": 270,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0081
+      },
+      {
+        "gridX": 0,
+        "gridY": 3,
+        "x": 0,
+        "y": 405,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0035
+      },
+      {
+        "gridX": 2,
+        "gridY": 6,
+        "x": 480,
+        "y": 810,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0002
+      },
+      {
+        "gridX": 6,
+        "gridY": 6,
+        "x": 1440,
+        "y": 810,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0002
+      },
+      {
+        "gridX": 2,
+        "gridY": 7,
+        "x": 480,
+        "y": 945,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0002
+      },
+      {
+        "gridX": 6,
+        "gridY": 7,
+        "x": 1440,
+        "y": 945,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0002
+      },
+      {
+        "gridX": 3,
+        "gridY": 7,
+        "x": 720,
+        "y": 945,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0
+      }
+    ],
+    "summary": "100/100 similarity; 406/2073600 pixels differ; 7 hotspot region(s)."
+  }
+}

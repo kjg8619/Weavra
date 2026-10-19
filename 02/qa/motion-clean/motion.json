@@ -1,0 +1,173 @@
+{
+  "bundle": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/app/weavra-desktop.app",
+  "asarSha256": "27691a5d9986cd37f5ddf196bd2d1621cf157e6a4f30a89e64fa3705ed433a57",
+  "at": "2026-10-19T05:31:52.661Z",
+  "runs": [
+    {
+      "tag": "dialog-normal",
+      "transitions": 6,
+      "animations": [
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 0
+        },
+        {
+          "type": "CSSTransition",
+          "name": "box-shadow",
+          "duration": 150
+        },
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 180
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 180
+        },
+        {
+          "type": "CSSTransition",
+          "name": "translate",
+          "duration": 180
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 180
+        },
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 139.60103600161108
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 139.60103600161108
+        },
+        {
+          "type": "CSSTransition",
+          "name": "translate",
+          "duration": 139.60103600161108
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 139.60103600161108
+        }
+      ],
+      "popup": {
+        "selector": "[data-slot=\"dialog-popup\"]",
+        "transitionProperty": "scale, opacity, translate",
+        "transitionDuration": "0.18s",
+        "boxShadow": "rgba(0, 0, 0, 0.65) 0px 24px 64px -24px"
+      },
+      "backdrop": {
+        "selector": "[data-slot=\"dialog-backdrop\"]",
+        "transitionProperty": "opacity",
+        "transitionDuration": "0.18s",
+        "backgroundColor": "color(srgb 0.989332 0.989513 0.98953 / 0.6)",
+        "zIndex": "40"
+      },
+      "frames": [
+        {
+          "label": "start",
+          "t": 0,
+          "file": "dialog-normal-open-start.png"
+        },
+        {
+          "label": "mid",
+          "t": 90,
+          "file": "dialog-normal-open-mid.png"
+        },
+        {
+          "label": "end",
+          "t": 180,
+          "file": "dialog-normal-open-end.png"
+        },
+        {
+          "label": "interrupted-escape-at-mid",
+          "t": 90,
+          "file": "dialog-normal-interrupted.png"
+        }
+      ]
+    },
+    {
+      "tag": "dialog-reduced",
+      "transitions": 4,
+      "animations": [
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 0
+        },
+        {
+          "type": "CSSTransition",
+          "name": "box-shadow",
+          "duration": 150
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 80
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 80
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 80
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 80
+        }
+      ],
+      "popup": {
+        "selector": "[data-slot=\"dialog-popup\"]",
+        "transitionProperty": "opacity",
+        "transitionDuration": "0.08s",
+        "boxShadow": "rgba(0, 0, 0, 0.65) 0px 24px 64px -24px"
+      },
+      "backdrop": {
+        "selector": "[data-slot=\"dialog-backdrop\"]",
+        "transitionProperty": "opacity",
+        "transitionDuration": "0.08s",
+        "backgroundColor": "color(srgb 0.989332 0.989513 0.98953 / 0.6)",
+        "zIndex": "40"
+      },
+      "frames": [
+        {
+          "label": "start",
+          "t": 0,
+          "file": "dialog-reduced-open-start.png"
+        },
+        {
+          "label": "mid",
+          "t": 90,
+          "file": "dialog-reduced-open-mid.png"
+        },
+        {
+          "label": "end",
+          "t": 180,
+          "file": "dialog-reduced-open-end.png"
+        },
+        {
+          "label": "interrupted-escape-at-mid",
+          "t": 90,
+          "file": "dialog-reduced-interrupted.png"
+        }
+      ]
+    }
+  ],
+  "reducedTokens": {
+    "feedback": "80ms",
+    "surface": "80ms"
+  }
+}

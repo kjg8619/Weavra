@@ -1,0 +1,96 @@
+{
+  "file": "1920x1080/39_chat_empty_existing_thread.png",
+  "beforeSha256": "6b4b5ad6efc9d15c51aef967c45a2e21de9641b8cb49bf0dd81cdcf1dee0ee86",
+  "afterSha256": "57364300fedfcf58af0a9f2a8517457b543254d5018920243b14471c01c0bcba",
+  "beforeDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "afterDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1920,
+      "height": 1080
+    },
+    "actual": {
+      "width": 1920,
+      "height": 1080
+    },
+    "totalPixels": 2073600,
+    "diffPixels": 153,
+    "diffRatio": 0.0001,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 1,
+        "x": 0,
+        "y": 135,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0022
+      },
+      {
+        "gridX": 0,
+        "gridY": 3,
+        "x": 0,
+        "y": 405,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0017
+      },
+      {
+        "gridX": 2,
+        "gridY": 6,
+        "x": 480,
+        "y": 810,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0002
+      },
+      {
+        "gridX": 6,
+        "gridY": 6,
+        "x": 1440,
+        "y": 810,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0002
+      },
+      {
+        "gridX": 2,
+        "gridY": 7,
+        "x": 480,
+        "y": 945,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0002
+      },
+      {
+        "gridX": 6,
+        "gridY": 7,
+        "x": 1440,
+        "y": 945,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0002
+      },
+      {
+        "gridX": 3,
+        "gridY": 7,
+        "x": 720,
+        "y": 945,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0
+      }
+    ],
+    "summary": "100/100 similarity; 153/2073600 pixels differ; 7 hotspot region(s)."
+  }
+}
