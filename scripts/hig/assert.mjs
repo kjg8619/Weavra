@@ -4,11 +4,216 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 import * as NodeURL from "node:url";
-import { expectedCaptureFiles, DESKTOP_STATES, STRESS_STATES } from "./cases.mjs";
+import * as NodeChildProcess from "node:child_process";
+import { expectedCaptureFiles, DESKTOP_STATES, STRESS_STATES, CASES } from "./cases.mjs";
 import { bounded } from "../problem-cycle-browser.mjs";
 
 export { bounded };
 export const sha256 = (bytes) => NodeCrypto.createHash("sha256").update(bytes).digest("hex");
+
+export function selectedCases(value) {
+  if (value === "all") return Object.keys(CASES).sort();
+  NodeAssert.ok(Object.hasOwn(CASES, value), `Unknown task case: ${value}`);
+  return [value];
+}
+
+// A group is a coverage obligation, not evidence that anything ran.
+export async function executeCheck(caseId, checkId, execute, observe) {
+  /** @type {{caseId: string, checkId: string, status: string, assertions: Array<{label: string, actual: unknown, expected: unknown}>, artifacts: Array<{file: string, sha256: string}>, error?: string}} */
+  const row = { caseId, checkId, status: "FAIL", assertions: [], artifacts: [] };
+  const assert = (label, actual, expected) => {
+    const assertion = { label, actual, expected };
+    row.assertions.push(assertion);
+    NodeAssert.deepEqual(actual, expected, label);
+  };
+  try {
+    NodeAssert.equal(typeof execute, "function", `Unexecuted check: ${caseId}/${checkId}`);
+    await execute(assert);
+    NodeAssert.ok(row.assertions.length > 0, `No assertions executed: ${caseId}/${checkId}`);
+    row.status = "PASS";
+  } catch (error) {
+    row.error = String(error);
+  }
+  try {
+    row.artifacts = await observe();
+    NodeAssert.ok(row.artifacts.length > 0, `No artifacts: ${caseId}/${checkId}`);
+  } catch (error) {
+    row.status = "FAIL";
+    row.error = [row.error, String(error)].filter(Boolean).join("\n");
+  }
+  return row;
+}
+
+export function validateCheckCoverage(receipt) {
+  NodeAssert.equal(receipt.schemaVersion, 1, "Unknown scenario receipt schema");
+  const cases = selectedCases(receipt.selection);
+  const expected = cases.flatMap((id) => CASES[id].checks.map((check) => `${id}/${check}`));
+  const actual = receipt.checks.map((check) => `${check.caseId}/${check.checkId}`);
+  NodeAssert.equal(new Set(actual).size, actual.length, "Duplicate scenario check");
+  NodeAssert.deepEqual([...actual].sort(), expected.sort(), "Missing or unexpected scenario check");
+  for (const check of receipt.checks) {
+    const key = `${check.caseId}/${check.checkId}`;
+    NodeAssert.equal(
+      check.status,
+      "PASS",
+      `Scenario failed: ${key}: ${check.error ?? "no result"}`,
+    );
+    NodeAssert.ok(check.assertions.length > 0, `Unexecuted check: ${key}`);
+    for (const assertion of check.assertions)
+      NodeAssert.deepEqual(assertion.actual, assertion.expected, `${key}: ${assertion.label}`);
+    NodeAssert.ok(check.artifacts.length > 0, `No source artifacts: ${key}`);
+  }
+  return cases;
+}
+
+async function boundArtifact(directory, reference) {
+  NodeAssert.equal(typeof reference.file, "string", "Missing artifact path");
+  NodeAssert.match(reference.sha256, /^[a-f0-9]{64}$/, "Missing artifact hash");
+  const root = await NodeFSP.realpath(directory);
+  const absolute = await NodeFSP.realpath(NodePath.resolve(root, reference.file));
+  NodeAssert.ok(absolute.startsWith(root + NodePath.sep), "Escaped evidence path");
+  const bytes = await NodeFSP.readFile(absolute);
+  NodeAssert.equal(sha256(bytes), reference.sha256, `Stale artifact: ${reference.file}`);
+  return bytes;
+}
+
+export async function verifyScenarioReceipt(directory, after) {
+  const receipt = JSON.parse(
+    await NodeFSP.readFile(NodePath.join(directory, "scenario-receipt.json"), "utf8"),
+  );
+  const cases = validateCheckCoverage(receipt);
+  NodeAssert.equal(
+    receipt.revision,
+    after.revision,
+    "Scenario source revision differs from capture",
+  );
+  NodeAssert.equal(
+    receipt.asarSha256,
+    after.provenance.asarSha256,
+    "Scenario package differs from capture",
+  );
+  NodeAssert.equal(receipt.cleanup.exited, true, "Scenario app leaked");
+  NodeAssert.equal(receipt.counters.model, 0, "Unexpected paid model request");
+  NodeAssert.equal(receipt.counters.blockedOutbound, 0, "Unexpected external network attempt");
+  NodeAssert.ok(receipt.startedAt && receipt.completedAt, "Incomplete scenario run");
+  NodeAssert.ok(!receipt.failure, `Failed scenario run: ${receipt.failure}`);
+  const captured = JSON.parse((await boundArtifact(directory, receipt.capture)).toString("utf8"));
+  const captureDirectory = NodePath.dirname(receipt.capture.file);
+  NodeAssert.deepEqual(
+    receipt.checks,
+    captured.checks.map((check) => ({
+      ...check,
+      artifacts: check.artifacts.map((artifact) => ({
+        ...artifact,
+        file: `${captureDirectory}/${artifact.file}`,
+      })),
+    })),
+    "Receipt assertions differ from executed capture",
+  );
+  NodeAssert.equal(captured.revision, receipt.revision, "Scenario capture source differs");
+  NodeAssert.equal(
+    captured.provenance.asarSha256,
+    receipt.asarSha256,
+    "Scenario capture package differs",
+  );
+  await verifyCapture(NodePath.join(directory, captureDirectory));
+  const here = NodePath.dirname(NodeURL.fileURLToPath(import.meta.url));
+  for (const file of ["assert.mjs", "cases.mjs", "capture.mjs", "seed.mjs"]) {
+    NodeAssert.equal(
+      receipt.sources[file],
+      sha256(await NodeFSP.readFile(NodePath.join(here, file))),
+      `Stale scenario implementation: ${file}`,
+    );
+  }
+  for (const check of receipt.checks)
+    for (const artifact of check.artifacts) await boundArtifact(directory, artifact);
+  return { receipt, cases };
+}
+
+export async function runCases(selection, evidence) {
+  selectedCases(selection);
+  const repo = process.env.WEAVRA_CAPTURE_REPO;
+  const app = process.env.WEAVRA_CAPTURE_APP;
+  NodeAssert.ok(repo && app, "Explicit WEAVRA_CAPTURE_REPO and WEAVRA_CAPTURE_APP required");
+  const exec = NodeUtil.promisify(NodeChildProcess.execFile);
+  const revision = (await exec("git", ["-C", repo, "rev-parse", "HEAD"])).stdout.trim();
+  NodeAssert.equal(
+    (await exec("git", ["-C", repo, "diff", "HEAD", "--"])).stdout,
+    "",
+    "Commit source edits before scenario acceptance",
+  );
+  const here = NodePath.dirname(NodeURL.fileURLToPath(import.meta.url));
+  const sources = Object.fromEntries(
+    await Promise.all(
+      ["assert.mjs", "cases.mjs", "capture.mjs", "seed.mjs"].map(async (file) => [
+        file,
+        sha256(await NodeFSP.readFile(NodePath.join(here, file))),
+      ]),
+    ),
+  );
+  await NodeFSP.mkdir(evidence, { recursive: true });
+  const run = `run-${NodeCrypto.randomUUID()}`;
+  const output = NodePath.join(evidence, run);
+  const receipt = {
+    schemaVersion: 1,
+    selection,
+    revision,
+    asarSha256: sha256(await NodeFSP.readFile(NodePath.join(app, "Contents/Resources/app.asar"))),
+    sources,
+    startedAt: new Date().toISOString(),
+    checks: [],
+    cleanup: { exited: false },
+    counters: { model: 0, runtimeMutation: 0, blockedOutbound: 0 },
+  };
+  // Invalidate the previous receipt before attempting another app launch.
+  const receiptPath = NodePath.join(evidence, "scenario-receipt.json");
+  await NodeFSP.writeFile(receiptPath, JSON.stringify(receipt, null, 2));
+  try {
+    await exec(
+      process.execPath,
+      [
+        NodePath.join(here, "capture.mjs"),
+        "--revision",
+        revision,
+        "--matrix",
+        "ledger-plus",
+        "--case",
+        selection,
+        "--scenarios",
+      ],
+      {
+        env: { ...process.env, WEAVRA_CAPTURE_OUT: output },
+        maxBuffer: 32 * 1024 * 1024,
+      },
+    );
+    const capture = await verifyCapture(output);
+    Object.assign(receipt, {
+      checks: capture.checks.map((check) => ({
+        ...check,
+        artifacts: check.artifacts.map((artifact) => ({
+          ...artifact,
+          file: `${run}/${artifact.file}`,
+        })),
+      })),
+      cleanup: capture.cleanup,
+      counters: capture.counters,
+      completedAt: new Date().toISOString(),
+      capture: {
+        file: `${run}/capture-manifest.json`,
+        sha256: sha256(await NodeFSP.readFile(NodePath.join(output, "capture-manifest.json"))),
+      },
+    });
+    validateCheckCoverage(receipt);
+  } catch (error) {
+    receipt.failure = String(error);
+    if (error && typeof error === "object" && "stderr" in error)
+      receipt.failure += `\n${error.stderr}`;
+    throw error;
+  } finally {
+    await NodeFSP.writeFile(receiptPath, JSON.stringify(receipt, null, 2));
+  }
+  return receipt;
+}
 // Runs in the renderer. Text in a mounted but clipped pane is not screenshot evidence.
 export function observeVisibleState({ target, boundary }) {
   const visible = (element, rect) => {
@@ -231,6 +436,8 @@ export async function verifyCapture(directory) {
   const packet = JSON.parse(
     await NodeFSP.readFile(NodePath.join(directory, "capture-manifest.json"), "utf8"),
   );
+  NodeAssert.notEqual(packet.diagnostic, true, "Diagnostic capture is not acceptance evidence");
+  NodeAssert.ok(!packet.failure, `Failed capture: ${packet.failure}`);
   validateProvenance(packet.provenance, packet.revision);
   const expected = expectedCaptureFiles();
   NodeAssert.equal(
@@ -283,6 +490,10 @@ export async function verifyCapture(directory) {
 }
 
 export async function verifyPacket(directory, harnessOnly) {
+  await NodeFSP.rm(
+    NodePath.join(directory, harnessOnly ? "harness-verdict.json" : "acceptance-verdict.json"),
+    { force: true },
+  );
   const after = await verifyCapture(NodePath.join(directory, "after/capture"));
   const original = await verifyCapture(NodePath.join(directory, "before/capture"));
   NodeAssert.deepEqual(
@@ -295,17 +506,51 @@ export async function verifyPacket(directory, harnessOnly) {
   const diff = JSON.parse(
     await NodeFSP.readFile(NodePath.join(directory, "diff/pairs.json"), "utf8"),
   );
-  for (const file of expectedCaptureFiles()) {
-    NodeAssert.ok(
-      diff.pairs.some((pair) => pair.file === file),
-      `Missing pair: ${file}`,
-    );
-  }
+  const files = after.manifest.flatMap((record) =>
+    [record.file, record.electronFile].filter(Boolean),
+  );
+  NodeAssert.equal(
+    new Set(diff.pairs.map((pair) => pair.file)).size,
+    diff.pairs.length,
+    "Duplicate diff pair",
+  );
+  NodeAssert.deepEqual(
+    diff.pairs.map((pair) => pair.file).sort(),
+    [...files].sort(),
+    "Missing or unexpected diff pair",
+  );
   NodeAssert.equal(diff.failures.length, 0);
   for (const pair of diff.pairs) {
+    for (const [side, records] of [
+      ["before", original.manifest],
+      ["after", after.manifest],
+    ]) {
+      const record = records.find(
+        (row) => row.file === pair.file || row.electronFile === pair.file,
+      );
+      NodeAssert.ok(record, `Unbound diff pair: ${pair.file}`);
+      NodeAssert.equal(
+        pair[`${side}Sha256`],
+        record.file === pair.file ? record.sha256 : record.electronSha256,
+        `Stale ${side} diff: ${pair.file}`,
+      );
+      const bytes = await boundArtifact(NodePath.join(directory, side, "capture"), {
+        file: pair.file,
+        sha256: pair[`${side}Sha256`],
+      });
+      NodeAssert.deepEqual(
+        pair[`${side}Dimensions`],
+        pngDimensions(bytes),
+        `Wrong diff dimensions: ${pair.file}`,
+      );
+    }
     NodeAssert.ok(pair.result.dimensionsMatch);
-    NodeAssert.equal(typeof pair.result.diffRatio, "number");
-    NodeAssert.equal(typeof pair.result.similarityScore, "number");
+    NodeAssert.ok(
+      Number.isFinite(pair.result.diffRatio) &&
+        pair.result.diffRatio >= 0 &&
+        pair.result.diffRatio <= 1,
+    );
+    NodeAssert.ok(Number.isFinite(pair.result.similarityScore));
     NodeAssert.ok(Array.isArray(pair.result.hotspots));
     NodeAssert.equal(typeof pair.result.alphaChannelIntact, "boolean");
   }
@@ -321,12 +566,30 @@ export async function verifyPacket(directory, harnessOnly) {
     revision: after.revision,
     harnessOnly,
   };
-  NodeAssert.ok(
-    harnessOnly,
-    "Product acceptance requires the task-specific interactive scenario receipt; harness-only is not product PASS",
-  );
+  if (NodePath.basename(NodePath.resolve(directory)) === "pr-01")
+    NodeAssert.equal(
+      harnessOnly,
+      true,
+      "Task 01 establishes harness evidence, not product remediation",
+    );
+  if (!harnessOnly) {
+    const { receipt, cases } = await verifyScenarioReceipt(NodePath.join(directory, "qa"), after);
+    const packetCase = NodePath.basename(NodePath.resolve(directory)).match(/^pr-(\d{2})$/)?.[1];
+    if (packetCase) NodeAssert.deepEqual(cases, [packetCase], "Scenario case differs from packet");
+    else NodeAssert.equal(receipt.selection, "all", "Final packet requires every case");
+    Object.assign(result, {
+      authority: "PACKAGED_SCENARIO_ACCEPTANCE",
+      product: "PASS",
+      closes: [...new Set(cases.flatMap((id) => CASES[id].closes))].sort(),
+      cases,
+      checks: receipt.checks.length,
+      receiptSha256: sha256(
+        await NodeFSP.readFile(NodePath.join(directory, "qa/scenario-receipt.json")),
+      ),
+    });
+  }
   await NodeFSP.writeFile(
-    NodePath.join(directory, "harness-verdict.json"),
+    NodePath.join(directory, harnessOnly ? "harness-verdict.json" : "acceptance-verdict.json"),
     JSON.stringify(result, null, 2),
   );
   return result;
@@ -340,15 +603,23 @@ if (
     options: {
       "verify-packet": { type: "string" },
       "harness-only": { type: "boolean", default: false },
+      case: { type: "string" },
+      evidence: { type: "string" },
     },
   });
   NodeAssert.ok(
-    values["verify-packet"],
-    "Usage: NodeAssert.mjs --verify-packet DIR --harness-only",
+    Boolean(values["verify-packet"]) !== Boolean(values.case),
+    "Usage: assert.mjs --case NN|all --evidence DIR OR --verify-packet DIR [--harness-only]",
   );
   console.log(
     JSON.stringify(
-      await verifyPacket(NodePath.resolve(values["verify-packet"]), values["harness-only"]),
+      values.case
+        ? (NodeAssert.ok(
+            values.evidence && !values["harness-only"],
+            "Case execution requires --evidence and cannot be harness-only",
+          ),
+          await runCases(values.case, NodePath.resolve(values.evidence)))
+        : await verifyPacket(NodePath.resolve(values["verify-packet"]), values["harness-only"]),
       null,
       2,
     ),

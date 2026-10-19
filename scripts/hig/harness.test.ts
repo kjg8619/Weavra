@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
-import { expectedFiles, expectedCaptureFiles, chooseAlias } from "./cases.mjs";
+import { expectedFiles, expectedCaptureFiles, chooseAlias, CASES } from "./cases.mjs";
 import {
   bounded,
   pngDimensions,
@@ -13,8 +13,87 @@ import {
   validateDistinctStates,
   verifyCapture,
   validateVisibleState,
+  executeCheck,
+  selectedCases,
+  validateCheckCoverage,
 } from "./assert.mjs";
 import { assertProfile, seed } from "./seed.mjs";
+
+describe("executed scenario coverage", () => {
+  const artifact = { file: "observed.json", sha256: "a".repeat(64) };
+  const receipt = () => ({
+    schemaVersion: 1,
+    selection: "02",
+    checks: CASES["02"].checks.map((checkId: string) => ({
+      caseId: "02",
+      checkId,
+      status: "PASS",
+      assertions: [{ label: "measured ownership", actual: true, expected: true }],
+      artifacts: [artifact],
+    })),
+  });
+  test("expands all into every declared case without dropping task one", () => {
+    expect(selectedCases("all")).toEqual(Object.keys(CASES).sort());
+  });
+  test("rejects an unknown case instead of running another case", () => {
+    expect(() => selectedCases("23")).toThrow("Unknown task case");
+  });
+  test("fails a named check when no executor is registered", async () => {
+    const result = await executeCheck("02", "portal-owner", undefined, async () => [artifact]);
+    expect(result.status).toBe("FAIL");
+    expect(result.error).toContain("Unexecuted check");
+  });
+  test("fails an executor that returns without asserting", async () => {
+    const result = await executeCheck(
+      "02",
+      "portal-owner",
+      async () => {},
+      async () => [artifact],
+    );
+    expect(result.status).toBe("FAIL");
+    expect(result.error).toContain("No assertions executed");
+  });
+  test("fails a real assertion even if an observation exists", async () => {
+    const result = await executeCheck(
+      "02",
+      "portal-owner",
+      async (assert: (label: string, actual: unknown, expected: unknown) => void) =>
+        assert("hit owner", "background", "modal"),
+      async () => [artifact],
+    );
+    expect(result.status).toBe("FAIL");
+    expect(result.assertions).toHaveLength(1);
+  });
+  test("rejects a group-only PASS without executed assertions", () => {
+    const input = receipt();
+    input.checks[0].assertions = [];
+    expect(() => validateCheckCoverage(input)).toThrow("Unexecuted check");
+  });
+  test("rejects a missing check even if all remaining checks pass", () => {
+    const input = receipt();
+    input.checks.pop();
+    expect(() => validateCheckCoverage(input)).toThrow("Missing or unexpected");
+  });
+  test("rejects duplicated checks used to fill the expected count", () => {
+    const input = receipt();
+    input.checks[1] = input.checks[0];
+    expect(() => validateCheckCoverage(input)).toThrow("Duplicate scenario check");
+  });
+  test("replays assertion values rather than trusting a PASS string", () => {
+    const input = receipt();
+    input.checks[0].assertions[0].actual = false;
+    expect(() => validateCheckCoverage(input)).toThrow("measured ownership");
+  });
+  test("rejects a successful assertion without its source artifact", () => {
+    const input = receipt();
+    input.checks[0].artifacts = [];
+    expect(() => validateCheckCoverage(input)).toThrow("No source artifacts");
+  });
+  test("cannot use a single case receipt for the final wave", () => {
+    const input = { ...receipt(), selection: "all" };
+    expect(() => validateCheckCoverage(input)).toThrow("Missing or unexpected");
+  });
+});
 
 function image(width = 1280, height = 800) {
   const png = Buffer.alloc(24);

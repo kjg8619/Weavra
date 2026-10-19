@@ -15,6 +15,7 @@ import {
   observeVisibleState,
   validateVisibleState,
   validateDistinctStates,
+  selectedCases,
 } from "./assert.mjs";
 
 const exec = NodeUtil.promisify(NodeChildProcess.execFile);
@@ -31,11 +32,12 @@ const { values } = NodeUtil.parseArgs({
     matrix: { type: "string", default: "ledger-plus" },
     case: { type: "string", default: "01" },
     diagnostic: { type: "boolean", default: false },
+    scenarios: { type: "boolean", default: false },
   },
 });
 NodeAssert.ok(bundle && output && values.revision, "Explicit app, output and revision required");
 NodeAssert.equal(values.matrix, "ledger-plus");
-NodeAssert.ok(CASES[values.case], "Unknown task case");
+const selected = selectedCases(values.case);
 await NodeFSP.mkdir(output); // Never merge a fresh run into stale evidence.
 const git = async (...args) => (await exec("git", ["-C", repo, ...args])).stdout.trim();
 const revision = await git("rev-parse", "HEAD");
@@ -78,6 +80,8 @@ const provenance = {
   bundle: await NodeFSP.realpath(bundle),
 };
 const packet = {
+  schemaVersion: 1,
+  selection: values.case,
   diagnostic: values.diagnostic,
   revision,
   provenance,
@@ -96,6 +100,7 @@ const packet = {
   counters: { model: 0, runtimeMutation: 0, blockedOutbound: 0 },
   outboundFrames: [],
   cleanup: { exited: false },
+  startedAt: new Date().toISOString(),
 };
 const save = () =>
   NodeFSP.writeFile(
@@ -853,6 +858,26 @@ async function runSize(width, height, includeStress = false) {
     await application.evaluate(({ Menu }) => {
       Menu.prototype.popup = globalThis.higOriginalPopup;
     });
+    if (values.scenarios && !includeStress) {
+      const { runScenarios } = await import("./cases.mjs");
+      packet.checks = await runScenarios({
+        selected,
+        page,
+        application,
+        cdp,
+        win,
+        click,
+        named,
+        theme,
+        thread,
+        nativeMenu,
+        resize,
+        ready,
+        isolation,
+        packet,
+        output,
+      });
+    }
     run.fileDigests = { before: beforeDigest, after: await workspaceDigest(isolation.workspace) };
     packet.fileDigests ??= run.fileDigests;
     NodeAssert.equal(
@@ -898,6 +923,7 @@ async function runSize(width, height, includeStress = false) {
 try {
   for (const [index, [w, h]] of SIZES.entries()) await runSize(w, h, index === 0);
   packet.cleanup.exited = packet.runs.every((run) => run.cleanup.exited);
+  packet.completedAt = new Date().toISOString();
   validateDistinctStates(packet.manifest);
   if (!values.diagnostic)
     NodeAssert.equal(await git("diff", "HEAD", "--"), "", "Source changed during capture");
