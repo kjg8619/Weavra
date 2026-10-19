@@ -5,6 +5,13 @@
 /* Window Controls Overlay: active when Electron exposes native titlebar control geometry. */
 @custom-variant wco (&:is(.wco, .wco *));
 
+/* Shared icon targets retain their hit box in disabled and pressed states. */
+button[data-icon-control] {
+  min-width: 36px;
+  min-height: 36px;
+  scale: 1;
+}
+
 /* On mobile, morph the expanded hero composer into the compact docked
    composer while it moves; the rest of the app remains visually stationary. */
 html[data-mobile-composer-route-transition="true"]::view-transition-old(root),
@@ -109,7 +116,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --workspace-controls-left: calc(env(safe-area-inset-left) + 0.75rem);
   --workspace-controls-right: calc(env(safe-area-inset-right) + 0.75rem);
   --workspace-native-controls-inset: 0px;
-  --workspace-titlebar-control-size: 1.75rem;
+  --workspace-titlebar-control-size: 2.25rem;
   --workspace-titlebar-control-gap: 0.75rem;
   --workspace-titlebar-scroll-fade-height: 1.5rem;
   /*

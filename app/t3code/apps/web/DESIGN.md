@@ -56,6 +56,8 @@ overlays reference.
   owner per pane; a modal alert does not scroll.
 - Desktop targets: touched icon controls are at least 36x36 CSS px, text buttons 32 px tall, and
   distinct control groups keep 8 px of separation.
+- Owned icon buttons opt into `data-icon-control`; its minimum dimensions apply to disabled
+  buttons too, and press feedback must not scale the hit box below that minimum.
 
 ## 5. Primitives and states
 

@@ -6436,6 +6436,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   className="flex size-8 shrink-0 items-center justify-center rounded-full bg-message-action text-message-action-foreground hover:bg-message-action-hover disabled:opacity-30"
                   disabled={collapsedComposerPrimaryActionDisabled}
                   aria-label={collapsedComposerPrimaryActionLabel}
+                  data-icon-control=""
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -6618,6 +6619,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                     <Button
                                       variant="ghost"
                                       size="icon-xs"
+                                      data-icon-control=""
                                       className="absolute bottom-1 left-1 bg-background/85 hover:bg-background/95"
                                       onClick={() =>
                                         retryAttachmentUpload({
@@ -7047,6 +7049,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               onPointerDown={(event) => event.preventDefault()}
                               onClick={() => attachmentInputRef.current?.click()}
                               aria-label="파일 첨부"
+                              data-icon-control=""
                             />
                           }
                         >

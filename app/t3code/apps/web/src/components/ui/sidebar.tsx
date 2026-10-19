@@ -333,6 +333,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
         onClick?.(event);
         toggleSidebar();
       }}
+      data-icon-control=""
       size="icon"
       variant="ghost"
       {...props}

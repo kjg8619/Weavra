@@ -127,6 +127,7 @@ function CopyErrorButton({ text }: { text: string }) {
       <TooltipTrigger
         render={
           <Button
+            data-icon-control=""
             size="icon-micro"
             variant="ghost-muted"
             aria-label={label}
@@ -664,6 +665,7 @@ function Toasts({ position }: { position: ToastPosition }) {
               <div className={toastCornerDismissClass}>
                 <button
                   aria-label="Dismiss notification"
+                  data-icon-control=""
                   className={toastCornerOrbClass}
                   data-slot="toast-close"
                   onClick={() =>
@@ -755,6 +757,7 @@ function AnchoredToasts() {
                       <div className={toastCornerDismissClass}>
                         <button
                           aria-label="Dismiss notification"
+                          data-icon-control=""
                           className={toastCornerOrbClass}
                           data-slot="toast-close"
                           onClick={() =>

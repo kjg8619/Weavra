@@ -115,7 +115,7 @@ export function PreviewChromeRow({
     <div className="relative">
       <form
         onSubmit={submit}
-        className="flex h-10 min-h-10 shrink-0 items-center gap-1 border-b border-border/60 bg-background px-2 in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:h-7 in-data-[preview-panel-mode=inline]:min-h-7 in-data-[preview-panel-mode=inline]:border-b-transparent"
+        className="flex h-10 min-h-10 shrink-0 items-center gap-1 border-b border-border/60 bg-background px-2 in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:border-b-transparent"
         data-surface-subheader
       >
         <div className="flex items-center gap-0.5" role="group" aria-label="Navigation">
@@ -124,6 +124,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant="ghost"
+                  data-icon-control=""
                   size="icon-xs"
                   onClick={canGoBack ? onBack : NOOP}
                   disabled={!canGoBack}
@@ -141,6 +142,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant="ghost"
+                  data-icon-control=""
                   size="icon-xs"
                   onClick={canGoForward ? onForward : NOOP}
                   disabled={!canGoForward}
@@ -158,6 +160,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant="ghost"
+                  data-icon-control=""
                   size="icon-xs"
                   onClick={refreshDisabled ? NOOP : onRefresh}
                   disabled={refreshDisabled}
@@ -174,7 +177,7 @@ export function PreviewChromeRow({
 
         {leadingActions}
 
-        <InputGroup variant="ghost" className="group/address h-7 flex-1">
+        <InputGroup variant="ghost" className="group/address h-9 min-w-0 flex-1">
           <Tooltip>
             <TooltipTrigger
               render={
@@ -183,7 +186,7 @@ export function PreviewChromeRow({
                   value={inputFocused ? draft : url}
                   className={cn(
                     "transition-none [&_[data-preview-url-input]]:[transition:none]",
-                    onOpenInBrowser && !inputFocused && "group-hover/address:pe-7",
+                    onOpenInBrowser && !inputFocused && "group-hover/address:pe-10",
                   )}
                   onChange={(event) => setDraft(event.target.value)}
                   onFocus={() => {
@@ -221,6 +224,7 @@ export function PreviewChromeRow({
                   render={
                     <Button
                       variant="ghost"
+                      data-icon-control=""
                       size="icon-xs"
                       onClick={onOpenInBrowser}
                       aria-label="Open in system browser"
@@ -242,6 +246,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant={pickActive ? "secondary" : "ghost"}
+                  data-icon-control=""
                   size="icon-xs"
                   onClick={onPickElement}
                   disabled={pickDisabled}
@@ -268,6 +273,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant={recording ? "secondary" : "ghost"}
+                  data-icon-control=""
                   size="icon-xs"
                   onClick={(event) => onCapture(event.shiftKey)}
                   aria-label={recording ? "Stop recording" : "Capture screenshot"}
@@ -293,6 +299,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant={pictureInPicture ? "secondary" : "ghost"}
+                  data-icon-control=""
                   size="icon-xs"
                   onClick={onPictureInPicture}
                   aria-label={

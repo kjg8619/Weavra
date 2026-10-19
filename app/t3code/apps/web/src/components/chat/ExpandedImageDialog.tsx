@@ -193,6 +193,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         {preview.images.length > 1 && (
           <Button
             type="button"
+            data-icon-control=""
             size="icon"
             variant="media-navigation"
             className="left-0 top-auto -bottom-12 translate-y-0 rounded-full bg-white/10 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
@@ -207,6 +208,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             <Button
               type="button"
               ref={closeButtonRef}
+              data-icon-control=""
               size="icon-xs"
               variant="media-close"
               className="absolute right-0 -top-10 z-(--layer-raised-content)"
@@ -258,6 +260,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
                         onClick={() =>
                           setAccessibilityDetailsSrc(showingAccessibilityDetails ? null : item.src)
                         }
+                        data-icon-control=""
                         size="icon-micro"
                         variant="ghost-muted"
                       />
@@ -280,6 +283,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         {preview.images.length > 1 && (
           <Button
             type="button"
+            data-icon-control=""
             size="icon"
             variant="media-navigation"
             className="right-0 top-auto -bottom-12 translate-y-0 rounded-full bg-white/10 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
