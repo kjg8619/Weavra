@@ -25,7 +25,73 @@ import {
   selectedCases,
   validateCheckCoverage,
 } from "./assert.mjs";
-import { assertProfile, seed } from "./seed.mjs";
+import { assertProfile, seed, prepareCaptureProfile, freezeCaptureServerFrame } from "./seed.mjs";
+
+describe("capture network notice isolation", () => {
+  const liveProvider = {
+    instanceId: "codex",
+    status: "ready",
+    version: "1.0.0",
+    versionAdvisory: { status: "behind_latest", latestVersion: "999.0.0" },
+    updateState: { status: "running" },
+    usageLimits: { source: "live-network" },
+  };
+  test("a live update notice cannot enter the initial capture configuration", () => {
+    const frame = {
+      _tag: "Exit",
+      requestId: 7,
+      exit: {
+        _tag: "Success",
+        value: { providers: [liveProvider], settings: {}, remoteOpenTargets: ["live-remote"] },
+      },
+    };
+    const frozen = freezeCaptureServerFrame(frame, "server.getConfig");
+    expect(frozen.exit.value.providers).toEqual([
+      { instanceId: "codex", status: "ready", version: "1.0.0" },
+    ]);
+    expect(frozen.exit.value.settings.enableProviderUpdateChecks).toBe(false);
+    expect(frozen.exit.value.remoteOpenTargets).toEqual([]);
+    expect(frame.exit.value.providers[0].versionAdvisory.status).toBe("behind_latest");
+  });
+  test("late update and remote observations are frozen on the subscription too", () => {
+    const frame = {
+      _tag: "Chunk",
+      requestId: 9,
+      values: [
+        { type: "providerStatuses", payload: { providers: [liveProvider] } },
+        { type: "environmentThemesUpdated", payload: { themes: ["live-remote"] } },
+        { type: "usageLimitSourcesUpdated", payload: { sources: ["live-quota"] } },
+      ],
+    };
+    const frozen = freezeCaptureServerFrame(frame, "subscribeServerConfig");
+    expect(frozen.values[0].payload.providers[0].versionAdvisory).toBeUndefined();
+    expect(frozen.values[0].payload.providers[0].updateState).toBeUndefined();
+    expect(frozen.values[1].payload.themes).toEqual([]);
+    expect(frozen.values[2].payload.sources).toEqual([]);
+    expect(freezeCaptureServerFrame(frame, "orchestration.subscribeShell")).toBe(frame);
+  });
+  test("disables server-side checks before the disposable app starts", async () => {
+    const base = await NodeFSP.realpath(await NodeFSP.mkdtemp("/tmp/weavra-hig-"));
+    const isolation = {
+      base,
+      home: NodePath.join(base, "home"),
+      workspace: NodePath.join(base, "workspace"),
+      app: NodePath.join(base, "app"),
+    };
+    try {
+      for (const path of [isolation.home, isolation.workspace, isolation.app])
+        await NodeFSP.mkdir(path);
+      prepareCaptureProfile(isolation);
+      expect(
+        JSON.parse(
+          await NodeFSP.readFile(NodePath.join(isolation.app, "userdata/settings.json"), "utf8"),
+        ),
+      ).toEqual({ enableProviderUpdateChecks: false, usageLimitSources: {} });
+    } finally {
+      await NodeFSP.rm(base, { recursive: true });
+    }
+  });
+});
 
 describe("touched icon targets", () => {
   test("fails the scenario when the center hits but an inset corner misses", async () => {

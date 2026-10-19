@@ -7,7 +7,13 @@ import * as NodeURL from "node:url";
 import * as NodeUtil from "node:util";
 import * as NodeModule from "node:module";
 import { DESKTOP_STATES, STRESS_STATES, LABELS, CASES, SIZES, chooseAlias } from "./cases.mjs";
-import { seed, assertProfile, FIXTURE_VERSION } from "./seed.mjs";
+import {
+  seed,
+  assertProfile,
+  FIXTURE_VERSION,
+  prepareCaptureProfile,
+  installCaptureNetworkFixture,
+} from "./seed.mjs";
 import {
   bounded,
   sha256,
@@ -229,6 +235,7 @@ async function runSize(width, height, includeStress = false) {
   for (const dir of [isolation.home, isolation.workspace, isolation.app]) await NodeFSP.mkdir(dir);
   await NodeFSP.mkdir(NodePath.join(isolation.workspace, "baseline-project"));
   assertProfile(base, isolation.home, isolation.workspace, isolation.app);
+  prepareCaptureProfile(isolation);
   const beforeDigest = await workspaceDigest(isolation.workspace);
   let application;
   const run = { width, height, isolation, cleanup: { exited: false } };
@@ -253,6 +260,8 @@ async function runSize(width, height, includeStress = false) {
     });
     const page = await application.firstWindow();
     page.setDefaultTimeout(15000);
+    const networkFixture = await installCaptureNetworkFixture(page);
+    run.networkFixture = networkFixture;
     const win = await application.browserWindow(page);
     const appInfo = await application.evaluate(({ app }) => {
       return {
@@ -300,6 +309,7 @@ async function runSize(width, height, includeStress = false) {
         await route.abort();
       } else await route.continue();
     });
+    await page.reload();
     // Record native minimum independently from renderer emulation.
     const minimum = await win.evaluate((window) => {
       const minimum = window.getMinimumSize();
@@ -326,6 +336,11 @@ async function runSize(width, height, includeStress = false) {
           .scrollIntoViewIfNeeded();
       }
       const readiness = await ready(page, id === "45" ? "" : state.expected, target);
+      NodeAssert.equal(
+        networkFixture.unexpectedUpdateChecks,
+        false,
+        "Capture server enabled live provider update checks",
+      );
       const boundary = suffix?.includes("/top-")
         ? "start"
         : suffix?.includes("/end-") || suffix?.includes("/actions-end-")
@@ -879,6 +894,12 @@ async function runSize(width, height, includeStress = false) {
         output,
       });
     }
+    NodeAssert.ok(networkFixture.settingsSnapshots > 0, "Capture settings were not observed");
+    NodeAssert.equal(
+      networkFixture.unexpectedUpdateChecks,
+      false,
+      "Capture server enabled live provider update checks",
+    );
     run.fileDigests = { before: beforeDigest, after: await workspaceDigest(isolation.workspace) };
     packet.fileDigests ??= run.fileDigests;
     NodeAssert.equal(
