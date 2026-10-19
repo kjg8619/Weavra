@@ -181,7 +181,10 @@ export function PreviewChromeRow({
                 <InputGroupInput
                   ref={inputRef}
                   value={inputFocused ? draft : url}
-                  className={cn(onOpenInBrowser && !inputFocused && "group-hover/address:pe-7")}
+                  className={cn(
+                    "transition-none [&_[data-slot=input]]:transition-none",
+                    onOpenInBrowser && !inputFocused && "group-hover/address:pe-7",
+                  )}
                   onChange={(event) => setDraft(event.target.value)}
                   onFocus={() => {
                     setDraft(url);
