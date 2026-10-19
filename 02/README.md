@@ -1,80 +1,61 @@
-# PR 02 current evidence packet
+# PR 02 current evidence - full icon hit rectangles
 
-Current product head: `d20f77e16ef4c1a26844988c27d9d27318a9b647`.
-Base / shared runner: `821328d7410425da439381687721316215765a1f` (extends the original `71710424` runner with the case-02 icon check).
-app.asar SHA-256: `67ea63a7aa86375ce18ed028deff95533df34aadba8281475b2af5cec102749e`.
+Product head: `f49c15848e37cecf12024abcd7a65617614b42ff`.
+Base/shared runner: `ef605dbd4c71c88b8229f4bce0283890cc91d9a4`.
+app.asar SHA-256: `2c5d1f06efc60074f3fb5b605d7e2607faa579027822b8c2cfbd6202ea302a23`.
 Fixture: `hig-offline-projection-v3`.
 
-This packet replaces the historical fdc8ffc0 evidence. Product source is clean. The shared runner change is test-only; the retained before package is from `bb7649c97402d9a853f91b3a987f9fa48aa970eb` with identical product sources at the new base. Both sides were freshly captured by the same runner.
+This supersedes the d20f77e1 packet's corner-hit failure. Rounded button paint and 36x36 bounds are retained; a transparent square pseudo-element supplies the actual rectangular hit target. Border compensation keeps the hit surface inside the measured box. Native icon buttons now anchor that surface, and artwork is clipped on its inner child rather than clipping the target.
 
-## Executed checks
+## Executed acceptance
 
-Build, extract, both captures, complete diff, measure-02, motion-02, accept_pr 02 and independent --verify-packet: exit 0. Seven packaged checks passed (454 assertions). Harness: 43 passing tests; existing sidebar: 1 passing test. All 18 observed touched icon identities measure 36x36 CSS px; disabled controls are included. Pairwise touched-control overlap is zero; no new overlap with other hittable controls.
+Build, extract, before/after capture, diff, measure-02, motion-02, accept_pr 02, independent --verify-packet and independent hit/overlap audit: exit 0. All seven case-02 checks passed (611 assertions). Harness: 44 passing tests; sidebar: 1 passing test. Targeted lint/fmt and web typecheck passed. No threshold was weakened.
 
-The owner-approved 2026-10-19 plan amendment reserves the exhaustive universal Q1-Q12 matrix for the Final verification wave. No threshold or assertion was weakened.
+All 157 enabled foreground capture/live observations hit the intended control at the center and all four corners inset 4 CSS px. Eligibility exactly follows QA: visible, enabled, and the center hits the control. Disabled and center-obscured/modal-inert controls remain excluded only from hit assertions, not size assertions. A harness regression test proves one missed corner yields a scenario FAIL.
 
-## Touched icon measurements
+## Previously failing states
 
-| Control | Before (CSS px) | After (CSS px) | Disabled observed |
+| State | Control | x,y,w,h | Five hits |
 |---|---|---|---|
-| Toggle main sidebar | 28x28 | 36x36 | false |
-| Dismiss notification | 24x24 | 36x36 | false |
-| 파일 첨부 | 28x28, 32x32 | 36x36 | false |
-| 메시지 보내기 | 32x32, 36x36 | 36x36 | true |
-| Close | 32x32 | 36x36 | false |
-| Back | 24x24 | 36x36 | true |
-| Forward | 24x24 | 36x36 | true |
-| Refresh | 24x24 | 36x36 | true |
-| Open in system browser | 24x24 | 36x36 | false |
-| Annotate preview | 24x24 | 36x36 | false |
-| Capture screenshot | 24x24 | 36x36 | false |
-| Float preview over chat | 24x24 | 36x36 | false |
-| 생성 중지 | 32x32 | 36x36 | false |
-| 이전 미디어 | supplemental state | 36x36 | false |
-| image 미리보기 닫기 | supplemental state | 36x36 | false |
-| 다음 미디어 | supplemental state | 36x36 | false |
-| Minimize the theme editor | supplemental state | 36x36 | false |
-| Close the theme editor | supplemental state | 36x36 | false |
+| 1280x800/04_empty_projects.png | Dismiss notification | 1217,79,36,36 | true,true,true,true,true |
+| 1280x800/37_chat_streaming_working.png | 생성 중지 | 1099,727,36,36 | true,true,true,true,true |
+| 1920x1080/04_empty_projects.png | Dismiss notification | 1857,79,36,36 | true,true,true,true,true |
+| 1920x1080/37_chat_streaming_working.png | 생성 중지 | 1419,1007,36,36 | true,true,true,true,true |
 
-`q5-controls.json` records every manifest/scenario location and raw rectangles. Text buttons, media thumbnails, resize rails and icons implemented exclusively in unmodified consumer components are not recategorized as touched icon changes. Conditional icons not reached by this packet still use the same minimum-size contract.
+The previous stored geometry produces exactly four failures with the strengthened check; see hit-baseline.json. The 1280x800 notification screen is byte-identical to the previous packet while all four corners now hit. The Stop visual remains round at the same size and location.
 
-## Before / after
+## Full observed icon inventory
 
-| State | Before | After | Diff ratio |
-|---|---|---|---|
-| `1280x800/05_add_project_import_modal.png` | ![B](before/1280x800/05_add_project_import_modal.png) | ![A](after/1280x800/05_add_project_import_modal.png) | 0.06570 |
-| `1280x800/07_chat_empty_project.png` | ![B](before/1280x800/07_chat_empty_project.png) | ![A](after/1280x800/07_chat_empty_project.png) | 0.03400 |
-| `1280x800/11_add_action_dialog.png` | ![B](before/1280x800/11_add_action_dialog.png) | ![A](after/1280x800/11_add_action_dialog.png) | 0.01830 |
-| `1280x800/15_right_browser.png` | ![B](before/1280x800/15_right_browser.png) | ![A](after/1280x800/15_right_browser.png) | 0.04130 |
-| `1280x800/16_right_terminal.png` | ![B](before/1280x800/16_right_terminal.png) | ![A](after/1280x800/16_right_terminal.png) | 0.02400 |
-| `1280x800/18_settings_appearance_light.png` | ![B](before/1280x800/18_settings_appearance_light.png) | ![A](after/1280x800/18_settings_appearance_light.png) | 0.00100 |
-| `1280x800/19_settings_appearance_dark.png` | ![B](before/1280x800/19_settings_appearance_dark.png) | ![A](after/1280x800/19_settings_appearance_dark.png) | 0.00100 |
-| `1280x800/34_chat_messages.png` | ![B](before/1280x800/34_chat_messages.png) | ![A](after/1280x800/34_chat_messages.png) | 0.01540 |
-| `1280x800/35_chat_long_messages.png` | ![B](before/1280x800/35_chat_long_messages.png) | ![A](after/1280x800/35_chat_long_messages.png) | 0.06450 |
-| `1280x800/36_chat_code_blocks.png` | ![B](before/1280x800/36_chat_code_blocks.png) | ![A](after/1280x800/36_chat_code_blocks.png) | 0.05160 |
-| `1280x800/37_chat_streaming_working.png` | ![B](before/1280x800/37_chat_streaming_working.png) | ![A](after/1280x800/37_chat_streaming_working.png) | 0.01540 |
-| `1280x800/38_chat_error.png` | ![B](before/1280x800/38_chat_error.png) | ![A](after/1280x800/38_chat_error.png) | 0.01320 |
-| `1280x800/39_chat_empty_existing_thread.png` | ![B](before/1280x800/39_chat_empty_existing_thread.png) | ![A](after/1280x800/39_chat_empty_existing_thread.png) | 0.01690 |
-| `1280x800/40_right_controlled_tasks.png` | ![B](before/1280x800/40_right_controlled_tasks.png) | ![A](after/1280x800/40_right_controlled_tasks.png) | 0.01330 |
-| `1280x800/41_chat_code_blocks_dark.png` | ![B](before/1280x800/41_chat_code_blocks_dark.png) | ![A](after/1280x800/41_chat_code_blocks_dark.png) | 0.04740 |
-| `1920x1080/05_add_project_import_modal.png` | ![B](before/1920x1080/05_add_project_import_modal.png) | ![A](after/1920x1080/05_add_project_import_modal.png) | 0.03270 |
-| `1920x1080/07_chat_empty_project.png` | ![B](before/1920x1080/07_chat_empty_project.png) | ![A](after/1920x1080/07_chat_empty_project.png) | 0.01680 |
-| `1920x1080/11_add_action_dialog.png` | ![B](before/1920x1080/11_add_action_dialog.png) | ![A](after/1920x1080/11_add_action_dialog.png) | 0.01410 |
-| `1920x1080/15_right_browser.png` | ![B](before/1920x1080/15_right_browser.png) | ![A](after/1920x1080/15_right_browser.png) | 0.02530 |
-| `1920x1080/16_right_terminal.png` | ![B](before/1920x1080/16_right_terminal.png) | ![A](after/1920x1080/16_right_terminal.png) | 0.01680 |
-| `1920x1080/18_settings_appearance_light.png` | ![B](before/1920x1080/18_settings_appearance_light.png) | ![A](after/1920x1080/18_settings_appearance_light.png) | 0.00050 |
-| `1920x1080/19_settings_appearance_dark.png` | ![B](before/1920x1080/19_settings_appearance_dark.png) | ![A](after/1920x1080/19_settings_appearance_dark.png) | 0.00050 |
-| `1920x1080/34_chat_messages.png` | ![B](before/1920x1080/34_chat_messages.png) | ![A](after/1920x1080/34_chat_messages.png) | 0.00760 |
-| `1920x1080/35_chat_long_messages.png` | ![B](before/1920x1080/35_chat_long_messages.png) | ![A](after/1920x1080/35_chat_long_messages.png) | 0.00760 |
-| `1920x1080/36_chat_code_blocks.png` | ![B](before/1920x1080/36_chat_code_blocks.png) | ![A](after/1920x1080/36_chat_code_blocks.png) | 0.00760 |
-| `1920x1080/37_chat_streaming_working.png` | ![B](before/1920x1080/37_chat_streaming_working.png) | ![A](after/1920x1080/37_chat_streaming_working.png) | 0.00760 |
-| `1920x1080/38_chat_error.png` | ![B](before/1920x1080/38_chat_error.png) | ![A](after/1920x1080/38_chat_error.png) | 0.00650 |
-| `1920x1080/39_chat_empty_existing_thread.png` | ![B](before/1920x1080/39_chat_empty_existing_thread.png) | ![A](after/1920x1080/39_chat_empty_existing_thread.png) | 0.00830 |
-| `1920x1080/40_right_controlled_tasks.png` | ![B](before/1920x1080/40_right_controlled_tasks.png) | ![A](after/1920x1080/40_right_controlled_tasks.png) | 0.00830 |
-| `1920x1080/41_chat_code_blocks_dark.png` | ![B](before/1920x1080/41_chat_code_blocks_dark.png) | ![A](after/1920x1080/41_chat_code_blocks_dark.png) | 0.00630 |
+| Control | CSS px |
+|---|---|
+| Toggle main sidebar | 36x36 |
+| Dismiss notification | 36x36 |
+| 파일 첨부 | 36x36 |
+| 메시지 보내기 | 36x36 |
+| Close | 36x36 |
+| Back | 36x36 |
+| Forward | 36x36 |
+| Refresh | 36x36 |
+| Open in system browser | 36x36 |
+| Annotate preview | 36x36 |
+| Capture screenshot | 36x36 |
+| Float preview over chat | 36x36 |
+| 생성 중지 | 36x36 |
+| 이전 미디어 | 36x36 |
+| image 미리보기 닫기 | 36x36 |
+| 다음 미디어 | 36x36 |
+| Minimize the theme editor | 36x36 |
+| Close the theme editor | 36x36 |
 
-The complete 158 primary pairs are in `diff/pairs.json`; supplemental pairs are in `supplemental-diff/pairs.json`. Every image is indexed with its source SHA-256 in `publication-index.json`. Current package provenance is in `before/capture-manifest.json` and `after/capture-manifest.json`; packaged scenarios and their hashed observations are bound by `qa/scenario-receipt.json`. The known historical evidence remains available in this branch's parent commit, not as current-head proof.
+All touched-target rectangles, including disabled boxes, have zero pairwise overlap. There are no new overlaps with other hittable controls. Raw manifest and live observation records are in hit-controls.json.
 
-## Reproduction and command receipts
+## Packet contents
 
-See `q5-pipeline.mjs`, `measure-02.mjs`, `motion-02.mjs`, `q5-audit.mjs`, and `logs/q5-*.json` / `.log` for exact commands, exit codes and timestamps. Early formatter-only attempts returned 1 and were corrected; the final formatter check returned 0. No failing product assertion was bypassed.
+- before/capture-manifest.json and after/capture-manifest.json bind current revisions, package hashes and all 152 primary records per side. The retained parent package is explicitly appRevision bb7649c97402d9a853f91b3a987f9fa48aa970eb; product-source equality at the test-only parent is checked by the runner.
+- diff/pairs.json contains all 158 primary pairs, with zero failures. supplemental-diff/pairs.json contains 26 supplemental pairs.
+- publication-index.json indexes 417 publication images (184 paired rows and 49 after-only frames).
+- qa/scenario-receipt.json binds the fresh seven-check packaged run and hashed observations.
+- hit-pipeline.mjs and hit-audit.mjs reproduce the pipeline and independent strict audit.
+- logs/hit-*.json records exact commands, timestamps and exit codes. Archived console logs normalize only extra EOF newlines for git whitespace hygiene; originals remain in the local packet's commands directory.
+
+The owner-approved October 19 amendment reserves the exhaustive universal Q1-Q12 matrix for the Final verification wave. It does not waive any executed five-point check. Earlier q5-* files are historical; this README, current capture manifests, hit-* packet and current scenario receipt are authoritative for this head.

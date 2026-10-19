@@ -1,0 +1,1515 @@
+{
+  "actions": [
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "open settings appearance",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "enable real panel animation setting",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "open Add Action",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    }
+  ],
+  "observations": [
+    {
+      "label": "sidebar-gap-motion",
+      "result": [
+        {
+          "selector": "[data-slot=\"sidebar-gap\"]",
+          "property": "none",
+          "duration": "0s",
+          "animations": []
+        }
+      ]
+    },
+    {
+      "label": "sidebar-container-motion",
+      "result": [
+        {
+          "selector": "[data-slot=\"sidebar-container\"]",
+          "property": "translate",
+          "duration": "0.15s",
+          "animations": []
+        }
+      ]
+    },
+    {
+      "label": "ComposerPrimaryActions",
+      "result": [
+        {
+          "selector": "[data-chat-composer-form=\"true\"] button[type=\"submit\"]",
+          "property": "scale, opacity",
+          "duration": "0.12s",
+          "animations": []
+        }
+      ]
+    },
+    {
+      "authority": "SYNTHETIC_SUBSCRIPTION_EVENT",
+      "method": "subscribeServerConfig",
+      "value": {
+        "version": 1,
+        "type": "providerStatuses",
+        "payload": {
+          "providers": [
+            {
+              "instanceId": "codex",
+              "driver": "codex",
+              "displayName": "Codex",
+              "continuation": {
+                "groupKey": "codex:home:/private/tmp/weavra-hig-cFMJ63/home/.codex"
+              },
+              "showInteractionModeToggle": true,
+              "reportsContextWindow": true,
+              "enabled": true,
+              "installed": true,
+              "version": "0.149.1",
+              "status": "ready",
+              "auth": {
+                "status": "authenticated"
+              },
+              "checkedAt": "2026-10-19T13:07:57.106Z",
+              "message": "HIG fixture ready",
+              "models": [],
+              "slashCommands": [
+                {
+                  "name": "compact",
+                  "description": "Summarize the conversation and reduce context usage"
+                },
+                {
+                  "name": "feedback",
+                  "description": "Send this thread and Codex logs to OpenAI",
+                  "input": {
+                    "hint": "Describe the issue (optional)"
+                  }
+                },
+                {
+                  "name": "usage-limits",
+                  "description": "Show this provider's usage limits"
+                }
+              ],
+              "skills": [],
+              "usageLimits": {
+                "checkedAt": "2026-10-19T13:07:21.501Z",
+                "windows": [],
+                "unavailable": {
+                  "reason": "probeFailed"
+                }
+              },
+              "versionAdvisory": {
+                "status": "behind_latest",
+                "currentVersion": "1.0.0",
+                "latestVersion": "2.0.0",
+                "canUpdate": true,
+                "updateCommand": "printf 'HIG update must not execute'",
+                "checkedAt": "2026-10-19T13:07:57.106Z",
+                "message": "HIG provider update available"
+              },
+              "updateState": {
+                "status": "running",
+                "startedAt": "2026-10-19T13:07:57.106Z",
+                "finishedAt": null,
+                "message": "HIG synthetic update progress; no update process was launched",
+                "output": null
+              }
+            },
+            {
+              "instanceId": "claudeAgent",
+              "driver": "claudeAgent",
+              "displayName": "Claude",
+              "continuation": {
+                "groupKey": "claude:home:/private/tmp/weavra-hig-cFMJ63/home/.claude"
+              },
+              "showInteractionModeToggle": true,
+              "reportsContextWindow": true,
+              "enabled": true,
+              "installed": true,
+              "version": "2.1.303",
+              "status": "ready",
+              "auth": {
+                "status": "authenticated"
+              },
+              "checkedAt": "2026-10-19T13:07:21.502Z",
+              "models": [
+                {
+                  "slug": "claude-fable-5-1",
+                  "name": "Claude Fable 5.1",
+                  "aliases": [
+                    "fable",
+                    "fable-5.1",
+                    "claude-fable-5.1"
+                  ],
+                  "isCustom": false,
+                  "isDefault": true,
+                  "capabilities": {
+                    "optionDescriptors": [
+                      {
+                        "id": "effort",
+                        "label": "Reasoning",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "low",
+                            "label": "Low"
+                          },
+                          {
+                            "id": "medium",
+                            "label": "Medium",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "high",
+                            "label": "High"
+                          },
+                          {
+                            "id": "xhigh",
+                            "label": "Extra High"
+                          },
+                          {
+                            "id": "max",
+                            "label": "Max"
+                          },
+                          {
+                            "id": "ultracode",
+                            "label": "Ultracode",
+                            "description": "xhigh effort plus multi-agent workflow orchestration"
+                          },
+                          {
+                            "id": "ultrathink",
+                            "label": "Ultrathink"
+                          }
+                        ],
+                        "promptInjectedValues": [
+                          "ultrathink"
+                        ]
+                      },
+                      {
+                        "id": "contextWindow",
+                        "label": "Context Window",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "200k",
+                            "label": "200k"
+                          },
+                          {
+                            "id": "1m",
+                            "label": "1M",
+                            "isDefault": true
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "slug": "claude-fable-5",
+                  "name": "Claude Fable 5",
+                  "isCustom": false,
+                  "isLegacy": true,
+                  "capabilities": {
+                    "optionDescriptors": [
+                      {
+                        "id": "effort",
+                        "label": "Reasoning",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "low",
+                            "label": "Low"
+                          },
+                          {
+                            "id": "medium",
+                            "label": "Medium",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "high",
+                            "label": "High"
+                          },
+                          {
+                            "id": "xhigh",
+                            "label": "Extra High"
+                          },
+                          {
+                            "id": "max",
+                            "label": "Max"
+                          },
+                          {
+                            "id": "ultracode",
+                            "label": "Ultracode",
+                            "description": "xhigh effort plus multi-agent workflow orchestration"
+                          },
+                          {
+                            "id": "ultrathink",
+                            "label": "Ultrathink"
+                          }
+                        ],
+                        "promptInjectedValues": [
+                          "ultrathink"
+                        ]
+                      },
+                      {
+                        "id": "contextWindow",
+                        "label": "Context Window",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "200k",
+                            "label": "200k"
+                          },
+                          {
+                            "id": "1m",
+                            "label": "1M",
+                            "isDefault": true
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "slug": "claude-opus-5",
+                  "name": "Claude Opus 5",
+                  "aliases": [
+                    "opus",
+                    "opus-5",
+                    "claude-opus-5.0",
+                    "claude-opus-5-0"
+                  ],
+                  "isCustom": false,
+                  "capabilities": {
+                    "optionDescriptors": [
+                      {
+                        "id": "effort",
+                        "label": "Reasoning",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "low",
+                            "label": "Low"
+                          },
+                          {
+                            "id": "medium",
+                            "label": "Medium"
+                          },
+                          {
+                            "id": "high",
+                            "label": "High",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "xhigh",
+                            "label": "Extra High"
+                          },
+                          {
+                            "id": "max",
+                            "label": "Max"
+                          },
+                          {
+                            "id": "ultracode",
+                            "label": "Ultracode",
+                            "description": "xhigh effort plus multi-agent workflow orchestration"
+                          },
+                          {
+                            "id": "ultrathink",
+                            "label": "Ultrathink"
+                          }
+                        ],
+                        "promptInjectedValues": [
+                          "ultrathink"
+                        ]
+                      },
+                      {
+                        "id": "fastMode",
+                        "label": "Fast Mode",
+                        "type": "boolean"
+                      },
+                      {
+                        "id": "contextWindow",
+                        "label": "Context Window",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "200k",
+                            "label": "200k"
+                          },
+                          {
+                            "id": "1m",
+                            "label": "1M",
+                            "isDefault": true
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "slug": "claude-opus-4-8",
+                  "name": "Claude Opus 4.8",
+                  "aliases": [
+                    "opus-4.8",
+                    "claude-opus-4.8"
+                  ],
+                  "isCustom": false,
+                  "isLegacy": true,
+                  "capabilities": {
+                    "optionDescriptors": [
+                      {
+                        "id": "effort",
+                        "label": "Reasoning",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "low",
+                            "label": "Low"
+                          },
+                          {
+                            "id": "medium",
+                            "label": "Medium"
+                          },
+                          {
+                            "id": "high",
+                            "label": "High",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "xhigh",
+                            "label": "Extra High"
+                          },
+                          {
+                            "id": "max",
+                            "label": "Max"
+                          },
+                          {
+                            "id": "ultracode",
+                            "label": "Ultracode",
+                            "description": "xhigh effort plus multi-agent workflow orchestration"
+                          },
+                          {
+                            "id": "ultrathink",
+                            "label": "Ultrathink"
+                          }
+                        ],
+                        "promptInjectedValues": [
+                          "ultrathink"
+                        ]
+                      },
+                      {
+                        "id": "fastMode",
+                        "label": "Fast Mode",
+                        "type": "boolean"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "slug": "claude-opus-4-7",
+                  "name": "Claude Opus 4.7",
+                  "aliases": [
+                    "opus-4.7",
+                    "claude-opus-4.7"
+                  ],
+                  "isCustom": false,
+                  "isLegacy": true,
+                  "capabilities": {
+                    "optionDescriptors": [
+                      {
+                        "id": "effort",
+                        "label": "Reasoning",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "low",
+                            "label": "Low"
+                          },
+                          {
+                            "id": "medium",
+                            "label": "Medium"
+                          },
+                          {
+                            "id": "high",
+                            "label": "High"
+                          },
+                          {
+                            "id": "xhigh",
+                            "label": "Extra High",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "max",
+                            "label": "Max"
+                          },
+                          {
+                            "id": "ultrathink",
+                            "label": "Ultrathink"
+                          }
+                        ],
+                        "promptInjectedValues": [
+                          "ultrathink"
+                        ]
+                      },
+                      {
+                        "id": "fastMode",
+                        "label": "Fast Mode",
+                        "type": "boolean"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "slug": "claude-opus-4-6",
+                  "name": "Claude Opus 4.6",
+                  "aliases": [
+                    "opus-4.6",
+                    "claude-opus-4.6",
+                    "claude-opus-4-6-20251117"
+                  ],
+                  "isCustom": false,
+                  "isLegacy": true,
+                  "capabilities": {
+                    "optionDescriptors": [
+                      {
+                        "id": "effort",
+                        "label": "Reasoning",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "low",
+                            "label": "Low"
+                          },
+                          {
+                            "id": "medium",
+                            "label": "Medium"
+                          },
+                          {
+                            "id": "high",
+                            "label": "High",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "max",
+                            "label": "Max"
+                          },
+                          {
+                            "id": "ultrathink",
+                            "label": "Ultrathink"
+                          }
+                        ],
+                        "promptInjectedValues": [
+                          "ultrathink"
+                        ]
+                      },
+                      {
+                        "id": "fastMode",
+                        "label": "Fast Mode",
+                        "type": "boolean"
+                      },
+                      {
+                        "id": "contextWindow",
+                        "label": "Context Window",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "200k",
+                            "label": "200k"
+                          },
+                          {
+                            "id": "1m",
+                            "label": "1M",
+                            "isDefault": true
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "slug": "claude-opus-4-5",
+                  "name": "Claude Opus 4.5",
+                  "isCustom": false,
+                  "isLegacy": true,
+                  "capabilities": {
+                    "optionDescriptors": [
+                      {
+                        "id": "effort",
+                        "label": "Reasoning",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "low",
+                            "label": "Low"
+                          },
+                          {
+                            "id": "medium",
+                            "label": "Medium"
+                          },
+                          {
+                            "id": "high",
+                            "label": "High",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "max",
+                            "label": "Max"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "fastMode",
+                        "label": "Fast Mode",
+                        "type": "boolean"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "slug": "claude-sonnet-5",
+                  "name": "Claude Sonnet 5",
+                  "aliases": [
+                    "sonnet",
+                    "sonnet-5",
+                    "claude-sonnet-5.0",
+                    "claude-sonnet-5-0"
+                  ],
+                  "isCustom": false,
+                  "capabilities": {
+                    "optionDescriptors": [
+                      {
+                        "id": "effort",
+                        "label": "Reasoning",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "low",
+                            "label": "Low"
+                          },
+                          {
+                            "id": "medium",
+                            "label": "Medium"
+                          },
+                          {
+                            "id": "high",
+                            "label": "High",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "xhigh",
+                            "label": "Extra High"
+                          },
+                          {
+                            "id": "max",
+                            "label": "Max"
+                          },
+                          {
+                            "id": "ultrathink",
+                            "label": "Ultrathink"
+                          }
+                        ],
+                        "promptInjectedValues": [
+                          "ultrathink"
+                        ]
+                      },
+                      {
+                        "id": "contextWindow",
+                        "label": "Context Window",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "200k",
+                            "label": "200k",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "1m",
+                            "label": "1M"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "slug": "claude-sonnet-4-6",
+                  "name": "Claude Sonnet 4.6",
+                  "aliases": [
+                    "sonnet-4.6",
+                    "claude-sonnet-4.6",
+                    "claude-sonnet-4-6-20251117"
+                  ],
+                  "isCustom": false,
+                  "isLegacy": true,
+                  "capabilities": {
+                    "optionDescriptors": [
+                      {
+                        "id": "effort",
+                        "label": "Reasoning",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "low",
+                            "label": "Low"
+                          },
+                          {
+                            "id": "medium",
+                            "label": "Medium"
+                          },
+                          {
+                            "id": "high",
+                            "label": "High",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "max",
+                            "label": "Max"
+                          },
+                          {
+                            "id": "ultrathink",
+                            "label": "Ultrathink"
+                          }
+                        ],
+                        "promptInjectedValues": [
+                          "ultrathink"
+                        ]
+                      },
+                      {
+                        "id": "contextWindow",
+                        "label": "Context Window",
+                        "type": "select",
+                        "options": [
+                          {
+                            "id": "200k",
+                            "label": "200k",
+                            "isDefault": true
+                          },
+                          {
+                            "id": "1m",
+                            "label": "1M"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "slug": "claude-haiku-4-5",
+                  "name": "Claude Haiku 4.5",
+                  "aliases": [
+                    "haiku",
+                    "haiku-4.5",
+                    "claude-haiku-4.5",
+                    "claude-haiku-4-5-20251001"
+                  ],
+                  "isCustom": false,
+                  "isLegacy": true,
+                  "capabilities": {
+                    "optionDescriptors": [
+                      {
+                        "id": "thinking",
+                        "label": "Thinking",
+                        "type": "boolean"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "slashCommands": [
+                {
+                  "name": "compact",
+                  "description": "Summarize the conversation and reduce context usage",
+                  "input": {
+                    "hint": "<optional custom summarization instructions>"
+                  }
+                },
+                {
+                  "name": "deep-research",
+                  "description": "Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. (dynamic workflow)"
+                },
+                {
+                  "name": "design",
+                  "description": "Grant or revoke Claude agent access to your Design projects",
+                  "input": {
+                    "hint": "consent | revoke"
+                  }
+                },
+                {
+                  "name": "design-sync",
+                  "description": "Push a React design system to claude.ai/design. This runs a converter that bundles the real component code (from Storybook or a bare package) and uploads it. Use when the user runs /design-sync or says \"sync my design system to Claude Design\".",
+                  "input": {
+                    "hint": "[<project hint, e.g. \"Acme DS\">]"
+                  }
+                },
+                {
+                  "name": "dataviz",
+                  "description": "Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\"."
+                },
+                {
+                  "name": "update-config",
+                  "description": "Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command."
+                },
+                {
+                  "name": "verify",
+                  "description": "Verify that a code change actually does what it's supposed to by exercising it end-to-end and observing behavior — drive the affected flow, not just tests or typecheck. Run before committing nontrivial changes; bootstraps this repo's project verify skill if none exists yet. Don't invoke it on a diff that only touches tests, docs, or other code with no runtime surface to drive (a change to product source always has one) — there's nothing to observe."
+                },
+                {
+                  "name": "debug",
+                  "description": "Enable debug logging for this session and help diagnose issues",
+                  "input": {
+                    "hint": "[issue description]"
+                  }
+                },
+                {
+                  "name": "code-review",
+                  "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's review recipe covers them) at the given effort level (low|medium|high|xhigh|max: from few high-confidence findings up to many, some of them uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
+                  "input": {
+                    "hint": "[low|medium|high|xhigh|max] [--fix] [--comment] [<pr#>|<branch>|<path>] [--max-findings <n>|all]"
+                  }
+                },
+                {
+                  "name": "simplify",
+                  "description": "Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.",
+                  "input": {
+                    "hint": "[<target>]"
+                  }
+                },
+                {
+                  "name": "batch",
+                  "description": "Research and plan a large-scale change, then execute it in parallel across 5–30 isolated worktree agents that each open a PR.",
+                  "input": {
+                    "hint": "<instruction>"
+                  }
+                },
+                {
+                  "name": "fewer-permission-prompts",
+                  "description": "Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts."
+                },
+                {
+                  "name": "doctor",
+                  "description": "Health-check the user's Claude Code setup and fix issues: diagnose installation health — what the `claude doctor` terminal diagnostics cover — from local data (duplicate or leftover installs, PATH, unparseable settings files, broken or colliding agent definitions, skills whose frontmatter fails to parse); find unused skills, MCP servers, and plugins versus their context cost and disable dead weight; deduplicate local CLAUDE.md files against checked-in ones; trim checked-in CLAUDE.md files by cutting content a session could derive from the codebase (directory layouts, tech-stack lists, architecture overviews) while keeping gotchas, rationale, and non-standard conventions; migrate always-loaded CLAUDE.md guidance into lazy skills and nested CLAUDE.md files; flag slow hooks and context-heavy extensions; check the installed version is current; make auto mode the default permission mode; and pre-approve frequently denied read-only commands. Use when the user asks for a doctor run, checkup, audit, tune-up, or cleanup of their Claude Code setup or configuration.",
+                  "input": {
+                    "hint": "[prompt-audit [<path>]]"
+                  }
+                },
+                {
+                  "name": "loop",
+                  "description": "Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.",
+                  "input": {
+                    "hint": "[interval] [prompt]"
+                  }
+                },
+                {
+                  "name": "claude-api",
+                  "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file)."
+                },
+                {
+                  "name": "workflow-authoring",
+                  "description": "Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one."
+                },
+                {
+                  "name": "run",
+                  "description": "Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library)."
+                },
+                {
+                  "name": "run-skill-generator",
+                  "description": "Author or improve the run-<unit> skill - a per-project skill that tells agents how to build, launch, and drive this project's app. Use when the user asks to set up the project, get it running, write run instructions, or verify build/run steps work from a clean environment."
+                },
+                {
+                  "name": "plugin-authoring",
+                  "description": "Make a mod: a change to Claude's own interface or behaviour, such as a live pane or panel, a band above the prompt, a status line, a toast, a slash command, or a hook on tool calls or prompts. Use to make, change or debug a mod or its hooks module."
+                },
+                {
+                  "name": "agents",
+                  "description": "(removed) Ask Claude to create/manage subagents, or edit .claude/agents/"
+                },
+                {
+                  "name": "auto-mode-setup",
+                  "description": "Teach auto mode about your environment, plus optional rule tweaks",
+                  "input": {
+                    "hint": "[--request-id <uuid>] (--wizard posture=… scope=… depth=… --propose | --expect-sha256 <64-hex> --apply-file <path>)"
+                  }
+                },
+                {
+                  "name": "autocompact",
+                  "description": "Configure the auto-compact window size",
+                  "input": {
+                    "hint": "[auto|<tokens>]"
+                  }
+                },
+                {
+                  "name": "clear",
+                  "description": "Start a new session with empty context; previous session stays on disk (resumable with /resume)",
+                  "input": {
+                    "hint": "[name]"
+                  }
+                },
+                {
+                  "name": "color",
+                  "description": "Set the prompt bar color for this session",
+                  "input": {
+                    "hint": "[red|blue|green|yellow|purple|orange|pink|cyan|default]"
+                  }
+                },
+                {
+                  "name": "config",
+                  "description": "Set a setting by key",
+                  "input": {
+                    "hint": "key=value"
+                  }
+                },
+                {
+                  "name": "output-style",
+                  "description": "List output styles or switch to one",
+                  "input": {
+                    "hint": "[style]"
+                  }
+                },
+                {
+                  "name": "context",
+                  "description": "Show current context usage"
+                },
+                {
+                  "name": "effort",
+                  "description": "Set effort level for model usage",
+                  "input": {
+                    "hint": "<low|medium|high|xhigh|max|auto|ultracode [on|off]>"
+                  }
+                },
+                {
+                  "name": "fast",
+                  "description": "Toggle fast mode (Opus 5.5)",
+                  "input": {
+                    "hint": "[on|off]"
+                  }
+                },
+                {
+                  "name": "focus",
+                  "description": "Toggle focus view: just your prompt, summary, and response",
+                  "input": {
+                    "hint": "[on|off]"
+                  }
+                },
+                {
+                  "name": "heapdump",
+                  "description": "Dump the JS heap to the Desktop; on Linux with no Desktop folder, the home directory"
+                },
+                {
+                  "name": "init",
+                  "description": "Initialize a new CLAUDE.md file with codebase documentation"
+                },
+                {
+                  "name": "mcp",
+                  "description": "Manage MCP servers",
+                  "input": {
+                    "hint": "[reconnect|enable|disable [<server>|all]]"
+                  }
+                },
+                {
+                  "name": "model",
+                  "description": "Set the AI model for Claude Code",
+                  "input": {
+                    "hint": "<model>"
+                  }
+                },
+                {
+                  "name": "__remote-workflow",
+                  "description": "Run the workflow script delivered in this session environment (server-launched sessions only)"
+                },
+                {
+                  "name": "workflow-launch-exec",
+                  "description": "Execute a server-launched workflow handoff (workflow_launch event sessions only)"
+                },
+                {
+                  "name": "reload-plugins",
+                  "description": "Activate pending plugin changes in the current session",
+                  "input": {
+                    "hint": "[--force]"
+                  }
+                },
+                {
+                  "name": "reload-skills",
+                  "description": "Pick up skills added or changed on disk during this session"
+                },
+                {
+                  "name": "rename",
+                  "description": "Rename the current conversation",
+                  "input": {
+                    "hint": "[name]"
+                  }
+                },
+                {
+                  "name": "security-review",
+                  "description": "Complete a security review of the pending changes on the current branch"
+                },
+                {
+                  "name": "usage",
+                  "description": "Show session cost, plan usage, and what's contributing to your limits"
+                },
+                {
+                  "name": "insights",
+                  "description": "Generate a report analyzing your Claude Code sessions"
+                },
+                {
+                  "name": "recap",
+                  "description": "Generate a one-line session recap now"
+                },
+                {
+                  "name": "goal",
+                  "description": "Set a goal — keep working until the condition is met"
+                },
+                {
+                  "name": "design-consent",
+                  "description": "Grant Claude agent access to your Design projects"
+                },
+                {
+                  "name": "design-revoke",
+                  "description": "Revoke Claude agent access to your Design projects"
+                },
+                {
+                  "name": "list-agents",
+                  "description": "List subagents, teammates, and other Claude sessions you can message"
+                },
+                {
+                  "name": "team-onboarding",
+                  "description": "Help teammates ramp on Claude Code with a guide from your usage"
+                },
+                {
+                  "name": "usage-limits",
+                  "description": "Show this provider's usage limits"
+                }
+              ],
+              "skills": [],
+              "workspaceSnapshots": [
+                {
+                  "cwd": "/private/tmp/weavra-hig-cFMJ63/workspace/baseline-project",
+                  "checkedAt": "2026-10-19T13:07:21.502Z",
+                  "slashCommands": [
+                    {
+                      "name": "compact",
+                      "description": "Summarize the conversation and reduce context usage",
+                      "input": {
+                        "hint": "<optional custom summarization instructions>"
+                      }
+                    },
+                    {
+                      "name": "deep-research",
+                      "description": "Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. (dynamic workflow)"
+                    },
+                    {
+                      "name": "design",
+                      "description": "Grant or revoke Claude agent access to your Design projects",
+                      "input": {
+                        "hint": "consent | revoke"
+                      }
+                    },
+                    {
+                      "name": "design-sync",
+                      "description": "Push a React design system to claude.ai/design. This runs a converter that bundles the real component code (from Storybook or a bare package) and uploads it. Use when the user runs /design-sync or says \"sync my design system to Claude Design\".",
+                      "input": {
+                        "hint": "[<project hint, e.g. \"Acme DS\">]"
+                      }
+                    },
+                    {
+                      "name": "dataviz",
+                      "description": "Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\"."
+                    },
+                    {
+                      "name": "update-config",
+                      "description": "Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command."
+                    },
+                    {
+                      "name": "verify",
+                      "description": "Verify that a code change actually does what it's supposed to by exercising it end-to-end and observing behavior — drive the affected flow, not just tests or typecheck. Run before committing nontrivial changes; bootstraps this repo's project verify skill if none exists yet. Don't invoke it on a diff that only touches tests, docs, or other code with no runtime surface to drive (a change to product source always has one) — there's nothing to observe."
+                    },
+                    {
+                      "name": "debug",
+                      "description": "Enable debug logging for this session and help diagnose issues",
+                      "input": {
+                        "hint": "[issue description]"
+                      }
+                    },
+                    {
+                      "name": "code-review",
+                      "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's review recipe covers them) at the given effort level (low|medium|high|xhigh|max: from few high-confidence findings up to many, some of them uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
+                      "input": {
+                        "hint": "[low|medium|high|xhigh|max] [--fix] [--comment] [<pr#>|<branch>|<path>] [--max-findings <n>|all]"
+                      }
+                    },
+                    {
+                      "name": "simplify",
+                      "description": "Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.",
+                      "input": {
+                        "hint": "[<target>]"
+                      }
+                    },
+                    {
+                      "name": "batch",
+                      "description": "Research and plan a large-scale change, then execute it in parallel across 5–30 isolated worktree agents that each open a PR.",
+                      "input": {
+                        "hint": "<instruction>"
+                      }
+                    },
+                    {
+                      "name": "fewer-permission-prompts",
+                      "description": "Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts."
+                    },
+                    {
+                      "name": "doctor",
+                      "description": "Health-check the user's Claude Code setup and fix issues: diagnose installation health — what the `claude doctor` terminal diagnostics cover — from local data (duplicate or leftover installs, PATH, unparseable settings files, broken or colliding agent definitions, skills whose frontmatter fails to parse); find unused skills, MCP servers, and plugins versus their context cost and disable dead weight; deduplicate local CLAUDE.md files against checked-in ones; trim checked-in CLAUDE.md files by cutting content a session could derive from the codebase (directory layouts, tech-stack lists, architecture overviews) while keeping gotchas, rationale, and non-standard conventions; migrate always-loaded CLAUDE.md guidance into lazy skills and nested CLAUDE.md files; flag slow hooks and context-heavy extensions; check the installed version is current; make auto mode the default permission mode; and pre-approve frequently denied read-only commands. Use when the user asks for a doctor run, checkup, audit, tune-up, or cleanup of their Claude Code setup or configuration.",
+                      "input": {
+                        "hint": "[prompt-audit [<path>]]"
+                      }
+                    },
+                    {
+                      "name": "loop",
+                      "description": "Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.",
+                      "input": {
+                        "hint": "[interval] [prompt]"
+                      }
+                    },
+                    {
+                      "name": "claude-api",
+                      "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file)."
+                    },
+                    {
+                      "name": "workflow-authoring",
+                      "description": "Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one."
+                    },
+                    {
+                      "name": "run",
+                      "description": "Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library)."
+                    },
+                    {
+                      "name": "run-skill-generator",
+                      "description": "Author or improve the run-<unit> skill - a per-project skill that tells agents how to build, launch, and drive this project's app. Use when the user asks to set up the project, get it running, write run instructions, or verify build/run steps work from a clean environment."
+                    },
+                    {
+                      "name": "plugin-authoring",
+                      "description": "Make a mod: a change to Claude's own interface or behaviour, such as a live pane or panel, a band above the prompt, a status line, a toast, a slash command, or a hook on tool calls or prompts. Use to make, change or debug a mod or its hooks module."
+                    },
+                    {
+                      "name": "agents",
+                      "description": "(removed) Ask Claude to create/manage subagents, or edit .claude/agents/"
+                    },
+                    {
+                      "name": "auto-mode-setup",
+                      "description": "Teach auto mode about your environment, plus optional rule tweaks",
+                      "input": {
+                        "hint": "[--request-id <uuid>] (--wizard posture=… scope=… depth=… --propose | --expect-sha256 <64-hex> --apply-file <path>)"
+                      }
+                    },
+                    {
+                      "name": "autocompact",
+                      "description": "Configure the auto-compact window size",
+                      "input": {
+                        "hint": "[auto|<tokens>]"
+                      }
+                    },
+                    {
+                      "name": "clear",
+                      "description": "Start a new session with empty context; previous session stays on disk (resumable with /resume)",
+                      "input": {
+                        "hint": "[name]"
+                      }
+                    },
+                    {
+                      "name": "color",
+                      "description": "Set the prompt bar color for this session",
+                      "input": {
+                        "hint": "[red|blue|green|yellow|purple|orange|pink|cyan|default]"
+                      }
+                    },
+                    {
+                      "name": "config",
+                      "description": "Set a setting by key",
+                      "input": {
+                        "hint": "key=value"
+                      }
+                    },
+                    {
+                      "name": "output-style",
+                      "description": "List output styles or switch to one",
+                      "input": {
+                        "hint": "[style]"
+                      }
+                    },
+                    {
+                      "name": "context",
+                      "description": "Show current context usage"
+                    },
+                    {
+                      "name": "effort",
+                      "description": "Set effort level for model usage",
+                      "input": {
+                        "hint": "<low|medium|high|xhigh|max|auto|ultracode [on|off]>"
+                      }
+                    },
+                    {
+                      "name": "fast",
+                      "description": "Toggle fast mode (Opus 5.5)",
+                      "input": {
+                        "hint": "[on|off]"
+                      }
+                    },
+                    {
+                      "name": "focus",
+                      "description": "Toggle focus view: just your prompt, summary, and response",
+                      "input": {
+                        "hint": "[on|off]"
+                      }
+                    },
+                    {
+                      "name": "heapdump",
+                      "description": "Dump the JS heap to the Desktop; on Linux with no Desktop folder, the home directory"
+                    },
+                    {
+                      "name": "init",
+                      "description": "Initialize a new CLAUDE.md file with codebase documentation"
+                    },
+                    {
+                      "name": "mcp",
+                      "description": "Manage MCP servers",
+                      "input": {
+                        "hint": "[reconnect|enable|disable [<server>|all]]"
+                      }
+                    },
+                    {
+                      "name": "model",
+                      "description": "Set the AI model for Claude Code",
+                      "input": {
+                        "hint": "<model>"
+                      }
+                    },
+                    {
+                      "name": "__remote-workflow",
+                      "description": "Run the workflow script delivered in this session environment (server-launched sessions only)"
+                    },
+                    {
+                      "name": "workflow-launch-exec",
+                      "description": "Execute a server-launched workflow handoff (workflow_launch event sessions only)"
+                    },
+                    {
+                      "name": "reload-plugins",
+                      "description": "Activate pending plugin changes in the current session",
+                      "input": {
+                        "hint": "[--force]"
+                      }
+                    },
+                    {
+                      "name": "reload-skills",
+                      "description": "Pick up skills added or changed on disk during this session"
+                    },
+                    {
+                      "name": "rename",
+                      "description": "Rename the current conversation",
+                      "input": {
+                        "hint": "[name]"
+                      }
+                    },
+                    {
+                      "name": "security-review",
+                      "description": "Complete a security review of the pending changes on the current branch"
+                    },
+                    {
+                      "name": "usage",
+                      "description": "Show session cost, plan usage, and what's contributing to your limits"
+                    },
+                    {
+                      "name": "insights",
+                      "description": "Generate a report analyzing your Claude Code sessions"
+                    },
+                    {
+                      "name": "recap",
+                      "description": "Generate a one-line session recap now"
+                    },
+                    {
+                      "name": "goal",
+                      "description": "Set a goal — keep working until the condition is met"
+                    },
+                    {
+                      "name": "design-consent",
+                      "description": "Grant Claude agent access to your Design projects"
+                    },
+                    {
+                      "name": "design-revoke",
+                      "description": "Revoke Claude agent access to your Design projects"
+                    },
+                    {
+                      "name": "list-agents",
+                      "description": "List subagents, teammates, and other Claude sessions you can message"
+                    },
+                    {
+                      "name": "team-onboarding",
+                      "description": "Help teammates ramp on Claude Code with a guide from your usage"
+                    },
+                    {
+                      "name": "usage-limits",
+                      "description": "Show this provider's usage limits"
+                    }
+                  ],
+                  "skills": []
+                }
+              ],
+              "usageLimits": {
+                "checkedAt": "2026-10-19T13:07:21.502Z",
+                "windows": [],
+                "unavailable": {
+                  "reason": "unsupported"
+                }
+              },
+              "versionAdvisory": {
+                "status": "current",
+                "currentVersion": "2.1.303",
+                "latestVersion": "2.1.303",
+                "updateCommand": "/Users/kangjingoo/.local/bin/claude update",
+                "canUpdate": true,
+                "checkedAt": "2026-10-19T13:07:21.513Z",
+                "message": null
+              }
+            },
+            {
+              "instanceId": "cursor",
+              "driver": "cursor",
+              "displayName": "Cursor",
+              "badgeLabel": "Early Access",
+              "continuation": {
+                "groupKey": "cursor:instance:cursor"
+              },
+              "showInteractionModeToggle": true,
+              "supportsConversationRollback": false,
+              "enabled": false,
+              "installed": false,
+              "version": null,
+              "status": "disabled",
+              "auth": {
+                "status": "unknown"
+              },
+              "checkedAt": "2026-10-19T13:07:21.503Z",
+              "message": "Cursor is disabled in Weavra settings.",
+              "models": [],
+              "slashCommands": [],
+              "skills": []
+            },
+            {
+              "instanceId": "grok",
+              "driver": "grok",
+              "displayName": "Grok",
+              "badgeLabel": "Early Access",
+              "continuation": {
+                "groupKey": "grok:instance:grok"
+              },
+              "showInteractionModeToggle": false,
+              "supportsConversationRollback": false,
+              "enabled": false,
+              "installed": false,
+              "version": null,
+              "status": "disabled",
+              "auth": {
+                "status": "unknown"
+              },
+              "checkedAt": "2026-10-19T13:07:21.504Z",
+              "message": "Grok is disabled in Weavra settings.",
+              "models": [
+                {
+                  "slug": "grok-build",
+                  "name": "Grok Build",
+                  "isCustom": false,
+                  "capabilities": {
+                    "optionDescriptors": []
+                  }
+                }
+              ],
+              "slashCommands": [],
+              "skills": [],
+              "versionAdvisory": {
+                "status": "unknown",
+                "currentVersion": null,
+                "latestVersion": null,
+                "updateCommand": null,
+                "canUpdate": false,
+                "checkedAt": "2026-10-19T13:07:21.504Z",
+                "message": null
+              }
+            },
+            {
+              "instanceId": "opencode",
+              "driver": "opencode",
+              "displayName": "OpenCode",
+              "continuation": {
+                "groupKey": "opencode:instance:opencode"
+              },
+              "showInteractionModeToggle": false,
+              "enabled": false,
+              "installed": false,
+              "version": null,
+              "status": "disabled",
+              "auth": {
+                "status": "unknown"
+              },
+              "checkedAt": "2026-10-19T13:07:21.504Z",
+              "message": "OpenCode is disabled in Weavra settings.",
+              "models": [],
+              "slashCommands": [],
+              "skills": [],
+              "usageLimits": {
+                "checkedAt": "2026-10-19T13:07:21.504Z",
+                "windows": [],
+                "unavailable": {
+                  "reason": "unsupported"
+                }
+              },
+              "versionAdvisory": {
+                "status": "unknown",
+                "currentVersion": null,
+                "latestVersion": null,
+                "updateCommand": null,
+                "canUpdate": false,
+                "checkedAt": "2026-10-19T13:07:21.504Z",
+                "message": null
+              }
+            },
+            {
+              "instanceId": "antigravity",
+              "driver": "antigravity",
+              "displayName": "Antigravity",
+              "continuation": {
+                "groupKey": "antigravity:instance:antigravity"
+              },
+              "showInteractionModeToggle": false,
+              "supportsConversationRollback": false,
+              "supportsTextGeneration": false,
+              "setup": {
+                "canAuthenticate": true,
+                "canInstall": true
+              },
+              "enabled": false,
+              "installed": false,
+              "version": null,
+              "status": "disabled",
+              "auth": {
+                "status": "unknown",
+                "type": "oauth-personal"
+              },
+              "checkedAt": "2026-10-19T13:07:19.673Z",
+              "message": "Antigravity is disabled in Weavra settings.",
+              "models": [],
+              "slashCommands": [],
+              "skills": [],
+              "workspaceSnapshots": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "SidebarProviderUpdatePill",
+      "result": [
+        {
+          "selector": "[class~=\"group/provider-update\"]",
+          "property": "translate, opacity",
+          "duration": "0.18s",
+          "animations": []
+        }
+      ]
+    },
+    {
+      "label": "PreviewChromeRow",
+      "result": [
+        {
+          "selector": "[data-preview-url-input]",
+          "property": "none",
+          "duration": "0s",
+          "animations": []
+        }
+      ]
+    },
+    {
+      "label": "ZoomIndicator",
+      "result": [
+        {
+          "selector": "[data-hig-motion=\"zoom-indicator\"]",
+          "property": "opacity, translate",
+          "duration": "0.18s",
+          "animations": []
+        }
+      ]
+    },
+    {
+      "label": "dialog-motion",
+      "result": [
+        {
+          "selector": "[data-slot=\"dialog-popup\"]",
+          "property": "scale, opacity, translate",
+          "duration": "0.18s",
+          "animations": []
+        }
+      ]
+    },
+    {
+      "label": "dialog-backdrop-motion",
+      "result": [
+        {
+          "selector": "[data-slot=\"dialog-backdrop\"]",
+          "property": "opacity",
+          "duration": "0.18s",
+          "animations": []
+        }
+      ]
+    },
+    {
+      "mode": "normal",
+      "animations": [
+        {
+          "duration": 180,
+          "properties": [
+            "opacity"
+          ]
+        },
+        {
+          "duration": 180,
+          "properties": [
+            "opacity"
+          ]
+        },
+        {
+          "duration": 180,
+          "properties": [
+            "scale"
+          ]
+        },
+        {
+          "duration": 180,
+          "properties": [
+            "translate"
+          ]
+        }
+      ]
+    }
+  ]
+}

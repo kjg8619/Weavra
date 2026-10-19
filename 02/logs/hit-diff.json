@@ -1,0 +1,13 @@
+{
+  "name": "hit-diff",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "source /tmp/hig02-env.sh; bun '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/diff.mjs' --before '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/before/capture' --after '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/capture' --out '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/diff'"
+  ],
+  "startedAt": "2026-10-19T13:05:59.671Z",
+  "completedAt": "2026-10-19T13:06:13.543Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/hit-diff.log",
+  "code": 0,
+  "signal": null
+}

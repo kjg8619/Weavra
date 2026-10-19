@@ -1,0 +1,28 @@
+[STARTED] Backing up original state...
+[COMPLETED] Backed up original state in git stash (56e39dfb)
+[STARTED] Running tasks for staged files...
+[STARTED] Config object — 5 files
+[STARTED] * — 5 files
+[STARTED] vp fmt --no-error-on-unmatched-pattern
+[COMPLETED] vp fmt --no-error-on-unmatched-pattern
+[COMPLETED] * — 5 files
+[COMPLETED] Config object — 5 files
+[COMPLETED] Running tasks for staged files...
+[STARTED] Applying modifications from tasks...
+[COMPLETED] Applying modifications from tasks...
+[STARTED] Cleaning up temporary files...
+[COMPLETED] Cleaning up temporary files...
+[hig/02-foundations 1271bb1a] fix(web): make full icon rectangles receive pointer hits
+ Committer: Kang Jin Goo <kangjingoo@Kangui-MacBookPro.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly:
+
+    git config --global user.name "Your Name"
+    git config --global user.email you@example.com
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 5 files changed, 28 insertions(+), 4 deletions(-)

@@ -1,0 +1,53 @@
+{
+  "revision": "d20f77e16ef4c1a26844988c27d9d27318a9b647",
+  "failures": [
+    {
+      "file": "1280x800/04_empty_projects.png",
+      "name": "Dismiss notification",
+      "hits": [
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "error": "AssertionError [ERR_ASSERTION]: 1280x800/04_empty_projects.png: Dismiss notification: five icon hit points\n+ actual - expected\n\n  [\n    true,\n+   false,\n+   false,\n+   false,\n+   false\n-   true,\n-   true,\n-   true,\n-   true\n  ]\n"
+    },
+    {
+      "file": "1280x800/37_chat_streaming_working.png",
+      "name": "생성 중지",
+      "hits": [
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "error": "AssertionError [ERR_ASSERTION]: 1280x800/37_chat_streaming_working.png: 생성 중지: five icon hit points\n+ actual - expected\n\n  [\n    true,\n+   false,\n+   false,\n+   false,\n+   false\n-   true,\n-   true,\n-   true,\n-   true\n  ]\n"
+    },
+    {
+      "file": "1920x1080/04_empty_projects.png",
+      "name": "Dismiss notification",
+      "hits": [
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "error": "AssertionError [ERR_ASSERTION]: 1920x1080/04_empty_projects.png: Dismiss notification: five icon hit points\n+ actual - expected\n\n  [\n    true,\n+   false,\n+   false,\n+   false,\n+   false\n-   true,\n-   true,\n-   true,\n-   true\n  ]\n"
+    },
+    {
+      "file": "1920x1080/37_chat_streaming_working.png",
+      "name": "생성 중지",
+      "hits": [
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "error": "AssertionError [ERR_ASSERTION]: 1920x1080/37_chat_streaming_working.png: 생성 중지: five icon hit points\n+ actual - expected\n\n  [\n    true,\n+   false,\n+   false,\n+   false,\n+   false\n-   true,\n-   true,\n-   true,\n-   true\n  ]\n"
+    }
+  ]
+}

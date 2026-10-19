@@ -1,0 +1,13 @@
+{
+  "name": "hit-after-capture",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "source /tmp/hig02-env.sh; WEAVRA_CAPTURE_REPO='/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02' WEAVRA_CAPTURE_APP='/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/app/weavra-desktop.app' WEAVRA_CAPTURE_OUT='/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/capture' bun '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/capture.mjs' --revision f49c15848e37cecf12024abcd7a65617614b42ff --app-revision f49c15848e37cecf12024abcd7a65617614b42ff --matrix ledger-plus --case 02"
+  ],
+  "startedAt": "2026-10-19T13:05:02.933Z",
+  "completedAt": "2026-10-19T13:05:59.658Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/hit-after-capture.log",
+  "code": 0,
+  "signal": null
+}

@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "selection": "02",
-  "revision": "d20f77e16ef4c1a26844988c27d9d27318a9b647",
-  "asarSha256": "67ea63a7aa86375ce18ed028deff95533df34aadba8281475b2af5cec102749e",
+  "revision": "f49c15848e37cecf12024abcd7a65617614b42ff",
+  "asarSha256": "2c5d1f06efc60074f3fb5b605d7e2607faa579027822b8c2cfbd6202ea302a23",
   "sources": {
     "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
-    "cases.mjs": "8c92b4371b80fabcfa3151a40ab00c8d69318a49c47e605793cce1fa82e682dc",
+    "cases.mjs": "12f15e942edf5c981edafeb2cec784ee4c9a4018cb0dafc6c9f48801bf7ab8aa",
     "capture.mjs": "21d7fd59ea0df149a18fc740f88a62877ff7ad1f07508fdbe2f02677a23285e5",
     "seed.mjs": "aecd32482805934ab402bf5e954f1ea0bae1fe59b73b0914af8106d7160c465f"
   },
-  "startedAt": "2026-10-19T12:19:47.529Z",
+  "startedAt": "2026-10-19T13:06:48.845Z",
   "checks": [
     {
       "caseId": "02",
@@ -89,6 +89,23 @@
           "expected": true
         },
         {
+          "label": "dialog-light: Close: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "dialog-light: unique visible owner",
           "actual": 1,
           "expected": 1
@@ -136,6 +153,23 @@
           "expected": true
         },
         {
+          "label": "modal-child-light: Close: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "modal-child-light: unique visible owner",
           "actual": 1,
           "expected": 1
@@ -168,6 +202,23 @@
           "expected": true
         },
         {
+          "label": "model-light: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "model-light: 메시지 보내기 >=36x36 (disabled=true)",
           "actual": true,
           "expected": true
@@ -176,6 +227,23 @@
           "label": "model-light: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "model-light: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "model-light: unique visible owner",
@@ -223,6 +291,23 @@
           "label": "select-in-dialog-light: Close >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "select-in-dialog-light: Close: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "select-in-dialog-light: unique visible owner",
@@ -277,14 +362,65 @@
           "expected": true
         },
         {
+          "label": "image-modal-light: 이전 미디어: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "image-modal-light: image 미리보기 닫기 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
         },
         {
+          "label": "image-modal-light: image 미리보기 닫기: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "image-modal-light: 다음 미디어 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "image-modal-light: 다음 미디어: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "image-modal-light: unique visible owner",
@@ -319,14 +455,65 @@
           "expected": true
         },
         {
+          "label": "theme-editor-light: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "theme-editor-light: Minimize the theme editor >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
         },
         {
+          "label": "theme-editor-light: Minimize the theme editor: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "theme-editor-light: Close the theme editor >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "theme-editor-light: Close the theme editor: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "theme-editor-light: unique visible owner",
@@ -371,6 +558,23 @@
           "expected": true
         },
         {
+          "label": "selection-toolbar-light: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "selection-toolbar-light: 메시지 보내기 >=36x36 (disabled=true)",
           "actual": true,
           "expected": true
@@ -379,6 +583,23 @@
           "label": "selection-toolbar-light: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "selection-toolbar-light: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "selection-toolbar-light: unique visible owner",
@@ -500,6 +721,23 @@
           "expected": true
         },
         {
+          "label": "dialog-dark: Close: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "dialog-dark: unique visible owner",
           "actual": 1,
           "expected": 1
@@ -547,6 +785,23 @@
           "expected": true
         },
         {
+          "label": "modal-child-dark: Close: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "modal-child-dark: unique visible owner",
           "actual": 1,
           "expected": 1
@@ -579,6 +834,23 @@
           "expected": true
         },
         {
+          "label": "model-dark: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "model-dark: 메시지 보내기 >=36x36 (disabled=true)",
           "actual": true,
           "expected": true
@@ -587,6 +859,23 @@
           "label": "model-dark: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "model-dark: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "model-dark: unique visible owner",
@@ -634,6 +923,23 @@
           "label": "select-in-dialog-dark: Close >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "select-in-dialog-dark: Close: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "select-in-dialog-dark: unique visible owner",
@@ -688,14 +994,65 @@
           "expected": true
         },
         {
+          "label": "image-modal-dark: 이전 미디어: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "image-modal-dark: image 미리보기 닫기 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
         },
         {
+          "label": "image-modal-dark: image 미리보기 닫기: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "image-modal-dark: 다음 미디어 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "image-modal-dark: 다음 미디어: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "image-modal-dark: unique visible owner",
@@ -730,14 +1087,65 @@
           "expected": true
         },
         {
+          "label": "theme-editor-dark: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "theme-editor-dark: Minimize the theme editor >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
         },
         {
+          "label": "theme-editor-dark: Minimize the theme editor: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "theme-editor-dark: Close the theme editor >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "theme-editor-dark: Close the theme editor: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "theme-editor-dark: unique visible owner",
@@ -782,6 +1190,23 @@
           "expected": true
         },
         {
+          "label": "selection-toolbar-dark: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "selection-toolbar-dark: 메시지 보내기 >=36x36 (disabled=true)",
           "actual": true,
           "expected": true
@@ -790,6 +1215,23 @@
           "label": "selection-toolbar-dark: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "selection-toolbar-dark: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "selection-toolbar-dark: unique visible owner",
@@ -841,192 +1283,192 @@
       ],
       "artifacts": [
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/command-light.png",
-          "sha256": "ecf6617a167426fedb1ca81d2f942ad11b719b057e33cee85326f25ca10615f8"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/command-light.png",
+          "sha256": "e038cf84c6a942346420a464d7c8d43f37e4c3123cdbf6d2d376588230912838"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/command-light.ax.json",
-          "sha256": "799668d99639edf10194b4c18b23e73750d6bd349823e7d006ef60dc56203cc7"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/command-light.ax.json",
+          "sha256": "591afabd48776c9f633553e5f6f7460d63be40ce4536cc1d12c44ce6648691b4"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/dialog-light.png",
-          "sha256": "146c767034b66aeb914ace13ed35b935d2eb208b3ff91d58887b28c06df1ddcf"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/dialog-light.png",
+          "sha256": "dc0ec62a3642c39049845cf2fede598b73c6319dfe66448e69384682e1eb849b"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/dialog-light.ax.json",
-          "sha256": "16604ddc0e6fad13a74830a26a0094459432b24b95a3e9076d352596db382380"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/dialog-light.ax.json",
+          "sha256": "10b9b25a4aa958e8dc466ef8e28b82d8a1e3b88c1ac641be6d51a9bd415841d2"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/modal-child-light.png",
-          "sha256": "58bfbaa5dda758ca35f34590629e7ec324d72116db4aef41f3187a281b5c6509"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/modal-child-light.png",
+          "sha256": "fc84ae411918d7f8777c97ee72142ac6f55ec7ad9128ee4940d333777b9f295d"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/modal-child-light.ax.json",
-          "sha256": "4d4902a2d5c67a0eaffc466e1aad60c3350849461f17d4f85bc1720c41df35ad"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/modal-child-light.ax.json",
+          "sha256": "891c50c97578aae7ea071a75864fb5c25f2443fc384032c0e6c83b8eeba65b7b"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/model-light.png",
-          "sha256": "4ed5ab60a90bfd1ee1b68a82f1ffbf7a9eff75c964c17c82c19e99694a96b09b"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/model-light.png",
+          "sha256": "4d4484213ede8d19b6a22365fce831f3ed0b9a12c5a6af3b60687b3502c66f67"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/model-light.ax.json",
-          "sha256": "839dc427aab1da0bed3cbc25c371825082b359ad3dc39777ffae93e9c7dad412"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/model-light.ax.json",
+          "sha256": "fe87cdf8f685056ac8718d6a6818e5545555efbbd3b6676f0bd413be71d7d58c"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/select-in-dialog-light.png",
-          "sha256": "d2bdbd6656fd0708218c9dd9f5834541477f82a17e5cb89fd2a4547f1eb15774"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/select-in-dialog-light.png",
+          "sha256": "7445222089c0bd38abc6f6cd4e108c120a07fd1037de33a7d98d86567cec3d37"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/select-in-dialog-light.ax.json",
-          "sha256": "56d175bdb7a225fe68797a17e4df68e4126cfc9c7340168ca8269dcc0f2a302a"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/select-in-dialog-light.ax.json",
+          "sha256": "cb8857704aa27dbaae8df0124bccd5402f6d4a2ec221a71587a3aa8a7e0c29f2"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/image-modal-light.png",
-          "sha256": "9919fbe50552469df1273eaa887789d06460744c4794552281311071817a076a"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/image-modal-light.png",
+          "sha256": "234c2248de8b46668861ac89ddae01291d48e0817f7f96039691250ac2a4b9bb"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/image-modal-light.ax.json",
-          "sha256": "2bed7d0fd9acd0ebf45576ecf939ae5cbe5fa41e37610f634be2b30bc9c3e367"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/image-modal-light.ax.json",
+          "sha256": "edbe8d2f5c8c799d927b183eddc1ddedd47110d0c6bf707a9c1ab956619476b9"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-editor-light.png",
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/theme-editor-light.png",
           "sha256": "c34001f116ec9162dc870e6d5ee7f77f35bf4c3a88213a9aeccbbe6d71a18c0d"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-editor-light.ax.json",
-          "sha256": "f5998384f3f51b46e391d9fb1bec41110f5c65bd85ea266773d6b05755c14039"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/theme-editor-light.ax.json",
+          "sha256": "e855ab5a85f68c4d2346934698638b17691539b247fcd8d04c72540aab7f8bdb"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-inspector-light.png",
-          "sha256": "2c0c299a866197bca3d221bf782ea425b94da1d465ff695e2baf77a2b0bb8dd8"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/theme-inspector-light.png",
+          "sha256": "11b9d9bc2e2da7724aaa73c59bed1989150dc5fc65ae3d6959f23aae5831019d"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-inspector-light.ax.json",
-          "sha256": "0913c4ddc30a2039a0f83e97b662a7bcc40e0f4056c234ade65d1caa004dd1c0"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/theme-inspector-light.ax.json",
+          "sha256": "a35e3045ae2e3462299666a2e9babfcadc8ef2a36ad50ab471a022efd61915c1"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/selection-toolbar-light.png",
-          "sha256": "fc98d728f868e1409adece5532db9ce2bdf04dc2cf901ffab792a7e188cdc686"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/selection-toolbar-light.png",
+          "sha256": "7cf3f62b9adee7d07f3365f7514340a6a4d6bf884b82d2ae936e00e7bbe5c621"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/selection-toolbar-light.ax.json",
-          "sha256": "f8e913f392432467afd12618ea3e16297098455e5810d1fb25685f0e7ed2747e"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/selection-toolbar-light.ax.json",
+          "sha256": "f479d4de6db7321ce2014048ae4de048fa6f93e5a8ce5458835666fe73c3c6b7"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/tooltip-light.png",
-          "sha256": "9e839ab090b6af81e204aaf44518df9b34bac5e16e81511e8ee3492d2be13580"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/tooltip-light.png",
+          "sha256": "845318f3319d3e920c1ddbc4c41827fd5af4cf052daaf1f2ef32c43b0840d514"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/tooltip-light.ax.json",
-          "sha256": "4442ffcd1bc37313e7a5e39ade91da2c1b0039d322f2e2774f5ba6c8ede78611"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/tooltip-light.ax.json",
+          "sha256": "8d156fdf80182d232239813549510da1c521ddac3aba5c14fed2179cb02c1e13"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/quit-overlay-light.png",
-          "sha256": "b1fc6d3598421db271f2645fc996e265473aa50aeccdecb47572290c4a61e235"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/quit-overlay-light.png",
+          "sha256": "b519881bcedea5627a6aa2748f03d613ba65486a9677d165f9d093d0b84f3d83"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/quit-overlay-light.ax.json",
-          "sha256": "aef04e56b2d3b31516bfda29f6cbf9dd28adde48a21a2ed9ffa00747b123b7b8"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/quit-overlay-light.ax.json",
+          "sha256": "1abf40744d9d8ce26264a78e2085f2115549db27887a373791f19bf3e5fd6bdc"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/command-dark.png",
-          "sha256": "b30c83a201b34a914aaac21604c8e0d6ee9cae7f1d983d35f07f64b0b6b08191"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/command-dark.png",
+          "sha256": "da033c11b3c1dd6a9e36cab5be10b428e8d4e92f5cabf17f1b69f1dd66802ef1"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/command-dark.ax.json",
-          "sha256": "b4dc673334556bdecb74b67ebbd35c80b6e34ad8af11c565784ff430a07756b7"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/command-dark.ax.json",
+          "sha256": "2bbff4d6fd6dbdcb206688388796ee70da1631dba092c63c12b6b864f3aee557"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/dialog-dark.png",
-          "sha256": "9a65a66c127fcbab24b16b44921922ef9f39f15d904c76c5fb087bc9dec71a71"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/dialog-dark.png",
+          "sha256": "3e10bf9802efa54ca9bf6b7feb08d6433d5beb3a0f7b50087a3aad1a82df205b"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/dialog-dark.ax.json",
-          "sha256": "119eb369a0971fdece2b280cc2bbc084ca8659a3215bc066186ea3f22440a4d7"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/dialog-dark.ax.json",
+          "sha256": "5a844a912528174b85d6702a3c30c49879ef9fa40fdc529f55843d2f16fac2ac"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/modal-child-dark.png",
-          "sha256": "3d34756270d49d7ac3520600cb1d583bc5e4764741f4bdcd80b2d9e86016a8b5"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/modal-child-dark.png",
+          "sha256": "5a2807456788e9cdb860df76bef0006946dd11c03c3216d78357065e28445c50"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/modal-child-dark.ax.json",
-          "sha256": "7f0eaca38d8308d9e47933d003ca2d487c6f608cd18cefbc475c3bae2fb0bfe1"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/modal-child-dark.ax.json",
+          "sha256": "5c90eae4ee083db40c93e688d8190e952386836e11addd0437a8d82ab2d3a927"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/model-dark.png",
-          "sha256": "e6db53b74890e69446486493e66d86a74ce62b7a1186141b4a7a816872279810"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/model-dark.png",
+          "sha256": "65ea2e3f7948c7d749c119bfb6d9202d70a5911bcd21bdea01e9b0d292b2998b"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/model-dark.ax.json",
-          "sha256": "74a93afd5c2bb520a0e76907fcc95cbf4d0729765b89ff27f25777eac613152d"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/model-dark.ax.json",
+          "sha256": "2434251684f19d2672a13e05561bd0a0380f12d4a5c40a23cd454a427c49194c"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/select-in-dialog-dark.png",
-          "sha256": "195dc100f2fb4d794cbd8b30f681b4ca4ac55819ce39284239a171b90f16de55"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/select-in-dialog-dark.png",
+          "sha256": "2162bfc2ca346589a4e65c90dff5ba73cbb449c0219f18e809aeaa2c9a0d64d9"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/select-in-dialog-dark.ax.json",
-          "sha256": "71ad14dff07f810b411f150dbb5d114d42ba988994c28336f2fd3c74926bca44"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/select-in-dialog-dark.ax.json",
+          "sha256": "83d2dfa95e22bf35f597865efb177e8cef79d900e9f3738749aa6b6349795ee6"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/image-modal-dark.png",
-          "sha256": "afcc995a491761a35c2faba924b4ea74d5f3bfb7234044183977663a990738d3"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/image-modal-dark.png",
+          "sha256": "d312acc1bbfdd4e1c2065acb0cd32ef1278617b94e4af0338ca06779c66f5064"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/image-modal-dark.ax.json",
-          "sha256": "94cadce22df0787ea3f8364a480fc2258e4779a19eab01393916f84ef8245ee7"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/image-modal-dark.ax.json",
+          "sha256": "f588bb106255839c4c93886cb7def61d350049ce1ae538de12484c240b0a0f75"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-editor-dark.png",
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/theme-editor-dark.png",
           "sha256": "b0c01fe156bcea0870ede31a586964714b7ba1fd896a1fcfdbc6143901de24a8"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-editor-dark.ax.json",
-          "sha256": "ea30cc76c4d1da9ec9e2294717754999581183c0f78a8f7581d84cbacb530b18"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/theme-editor-dark.ax.json",
+          "sha256": "8bf5a54f96d0e1ac94f3f0efaa8e9d42a8959a38dbbaca7761d4a57cf2e7d1ad"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-inspector-dark.png",
-          "sha256": "fb4aa47449cc59e14a4f3d681025393d8247ec1b37e90dfa284e87b4048069c4"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/theme-inspector-dark.png",
+          "sha256": "773533c8fec719b42cefb6e5bca584a7cbef81f338c384564fb5f678898a7c99"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-inspector-dark.ax.json",
-          "sha256": "dccf3bff5b4f6999ac91f1af2fbafe636d98d9b15c889d433024e60484a75cc6"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/theme-inspector-dark.ax.json",
+          "sha256": "33e95487db96248b2fe8397ebc2319172c6452a35c5a20e416719d40f835f6a7"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/selection-toolbar-dark.png",
-          "sha256": "fd100a592f5a389db8239d89ea183df2016c191ad66d9f3ddd277a186a6b6f87"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/selection-toolbar-dark.png",
+          "sha256": "5b71886d2afeb08f539ec33943168c0eff40a591af9e6a7943bf3ef2fbdd08df"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/selection-toolbar-dark.ax.json",
-          "sha256": "c4673e8c99303485512d5a653bed385e361ef85ede3ab488eb6e71a834e5708c"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/selection-toolbar-dark.ax.json",
+          "sha256": "5d0b9a448b090aa14d6fc5e6852526e2cfe23505a7ad99e99786491b6e1e3652"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/tooltip-dark.png",
-          "sha256": "40b1628afee510c7522c7ff767cc1a678963b6fc49752191de092baaf2cf85e0"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/tooltip-dark.png",
+          "sha256": "fb3c9f278e2ded4b94fcb79b6111071ba7e46be8c1cf9663c72928a4f3a324aa"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/tooltip-dark.ax.json",
-          "sha256": "6d385fa3a095ea1655bdeee2151d5bff094579dd56190035318725c128e15d29"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/tooltip-dark.ax.json",
+          "sha256": "e77a04bba40b3116821f2d0ba2947fbfd988a9e261b646f1aa949f16d9f8b46f"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/quit-overlay-dark.png",
-          "sha256": "dd4c99647e671cf5f409b7566018f2992c476e17b4b50edacee5d01299329565"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/quit-overlay-dark.png",
+          "sha256": "14a98b375e1f524b876ba415312e066e3f2b1a056b80ccb14bb50f780e505762"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/quit-overlay-dark.ax.json",
-          "sha256": "4da9fef4a9ec8ca0b946a1ab8d0cc6dae914c61070cd26dd09843c4bb767b7c1"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/quit-overlay-dark.ax.json",
+          "sha256": "95377ac5157100f9f084e8073edb5adb46bdca7bd7f2d35c57363b1595851849"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/result.png",
-          "sha256": "50220a5b191b2c25c3ed195c9c3eded80a6c267ca655f86897fd2b93fd250781"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/result.png",
+          "sha256": "e94273349039f589dc4b2f5a49ad1e230018bb3128953b870f1cfd592879c5df"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/result.ax.json",
-          "sha256": "c63855d75cf7d086194324b8895b5878a98935d1f31f9d6f434c5cdad94d6891"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/result.ax.json",
+          "sha256": "3e1942bb37fef38d00ed1610ca617c18138872fdc00fb1f4044ffd93397f0ddb"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/observations.json",
-          "sha256": "6ef73c44228b9c02196ccf27829c886d1ed5993e3003de0c4b3bb47cfe41df25"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/portal-owner/observations.json",
+          "sha256": "9161f70c664e8f28c52d1718ce140f1dfad4442e4facfcaa5b44b9baf6df9b3b"
         }
       ]
     },
@@ -1053,23 +1495,23 @@
       ],
       "artifacts": [
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/escape-focus-return/child-escape.png",
-          "sha256": "faf1a88571db020fa43157443506de059a91b7c310ae440fc964dee0d0aa2a33"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/escape-focus-return/child-escape.png",
+          "sha256": "4e5f9533c21142d38290789f45d4f3e92a066059d7772ad4690638b79e9b2738"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/escape-focus-return/child-escape.ax.json",
-          "sha256": "3cb7869ef9a346d7ae2c31d9987cbccd31b0b4f9dc2cfe0b13d7a5ec910178fa"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/escape-focus-return/child-escape.ax.json",
+          "sha256": "5824224e214494feaf190f88a45c524d6ddb151e32f1990a0126609ee9cf062b"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/escape-focus-return/result.png",
-          "sha256": "8178b64cd622002c2f447c34d558958dd6195b14c3180f58dbc9bb923d74dc44"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/escape-focus-return/result.png",
+          "sha256": "97f458f047f28efb971ecf6bbc235fe24f83e601981841fe5b641da67c25f6a1"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/escape-focus-return/result.ax.json",
-          "sha256": "60f1e5744c049441bd2a55d6613fabbb8037e974b179c52064c6b9ec6dd0eb67"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/escape-focus-return/result.ax.json",
+          "sha256": "d8d83f5b83ae9c73dfc7cf6919e9abe89316d9ccfb4f4456d335933a5ca6ea67"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/escape-focus-return/observations.json",
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/escape-focus-return/observations.json",
           "sha256": "1eee0c03848c00ab1f32b56220d3da4ddaffc36bca3f3fe761c48b61c802ffd6"
         }
       ]
@@ -1182,56 +1624,56 @@
       ],
       "artifacts": [
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-consumers.png",
-          "sha256": "8b4fe405b793a5cf73811cd522b746f2b991f465d86573db937968fa956c100f"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/normal-consumers.png",
+          "sha256": "cdbbeade42378421a20fc88cb6b84ae6d7fcf9e78fae429cc181266ce4c10c29"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-consumers.ax.json",
-          "sha256": "3ab4cfffc55bc822d27d21f4436dedcaddbe57befc0ae31cc0a66d163813b89d"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/normal-consumers.ax.json",
+          "sha256": "2d46ba6b41f754fdde3bec3d479bbb4f1a247f60c00675db71b18c4d68bcb9ee"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-start.png",
-          "sha256": "c329a2c93d64584ae4ce22cf76bfcf47fdb95a1be07f12eada917a87007ef0a8"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/normal-start.png",
+          "sha256": "5633b087aa4834e287d3cb92168da024f5d301525527cc3fe48a6a52b53eb002"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-start.ax.json",
-          "sha256": "b932170c184ad60b991d2b19186ab34b246910c37e1af345d0410d70c1484c52"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/normal-start.ax.json",
+          "sha256": "20fd1d4c3f5723670b983adfb49ddcdb8e6e6e6715456801bc3c48a337887f71"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-mid.png",
-          "sha256": "8b1623bdcaa5ad8c8e7f217cc9abbc36192e584c4033c5bc71125f9beef54906"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/normal-mid.png",
+          "sha256": "38fdccf0ff816ec8807d9cdaeeea6b17796abb596f80e7bfd503e52da0a096c4"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-mid.ax.json",
-          "sha256": "b932170c184ad60b991d2b19186ab34b246910c37e1af345d0410d70c1484c52"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/normal-mid.ax.json",
+          "sha256": "20fd1d4c3f5723670b983adfb49ddcdb8e6e6e6715456801bc3c48a337887f71"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-end.png",
-          "sha256": "bdb7caa09a44160a9d7329cb263e6d5d3ea0a59e3f1fd8982a036763bb63d370"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/normal-end.png",
+          "sha256": "5594bf2ddc13810e9adcff906dbcabecac0c8f557bc611556439f545aa25f1f8"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-end.ax.json",
-          "sha256": "b932170c184ad60b991d2b19186ab34b246910c37e1af345d0410d70c1484c52"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/normal-end.ax.json",
+          "sha256": "20fd1d4c3f5723670b983adfb49ddcdb8e6e6e6715456801bc3c48a337887f71"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-interrupted.png",
-          "sha256": "f4d24557bb7fa4416e97b93b19964b78921237e188d15d74d3a7457c331d4b3a"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/normal-interrupted.png",
+          "sha256": "ba2472d78fdd109d36da7339e8c338a1f262acea73d4350e7cf8aef32e14977e"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-interrupted.ax.json",
-          "sha256": "024dac5010d590a186f1d7458c54e093cb4315734f9c54d3cea30f03bd8ba6b5"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/normal-interrupted.ax.json",
+          "sha256": "420eef322726b4f9c84b51b550244fecc3e8b75f5f00c2cda4d93f183b010131"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/result.png",
-          "sha256": "018890ad739a0cbbc1f425361721aee000e825d77bba8a3b3ea7c05adb70bd79"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/result.png",
+          "sha256": "b388112d5e0675cc7d25ecfa7bd0d29ab6cc2b142e14cc5a742c9df44395b966"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/result.ax.json",
-          "sha256": "aa5c6505988be940981dd7eaa495a00b8c23a7e2a56cfd9248d3ef15c84fd50a"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/result.ax.json",
+          "sha256": "dba88a78ec8d521ebdda54c03a2b782b8a6f47f577cc9a77ed46eb8900dd98cf"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/observations.json",
-          "sha256": "96d7430fc6f2ca38bf1ba0ec696b08f94a33bd0073bd97968a07806b159f8f62"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/compositor-motion/observations.json",
+          "sha256": "05d8352c0f84361dd06e25a978f21c9091a2e608a6508beeaade40f8f0e3ad3e"
         }
       ]
     },
@@ -1403,56 +1845,56 @@
       ],
       "artifacts": [
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-consumers.png",
-          "sha256": "0e13c01b07615653c61f7e911b5a8021a010ce339041ca34c95834807792031b"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/reduced-consumers.png",
+          "sha256": "6640f76b1baa9cbdeab1cc2f7ca74c66b6886f4a13cbeb107798c0ab0e0906ef"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-consumers.ax.json",
-          "sha256": "7cada45687481973b10e7920df0ad17794b9988d83689afd7f3a2f86c6ca174c"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/reduced-consumers.ax.json",
+          "sha256": "7f0e687afc338baaac32fa56bbb238d7fdd66655245f6fc3c81ec5b8852e2b0a"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-start.png",
-          "sha256": "ef3894192df83b6c3cb9088dd15b757f14563056ac617d08fbb865b434875dea"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/reduced-start.png",
+          "sha256": "c744fadf341d6cc0581b701323eee677488cea322ee872ed18cbf266df4bc6bb"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-start.ax.json",
-          "sha256": "1d5b30f9f5d1d6af10d4fe77f370871e25f14d99966ecf1b067890721e705705"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/reduced-start.ax.json",
+          "sha256": "8a20e0e299d0c01feec4f1c5c05323cfd5affd701ca77b2b879c611cb75b4ad7"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-mid.png",
-          "sha256": "4b30a7010660e669e0b0ed8f21317526544b846214750fe852f138243017004e"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/reduced-mid.png",
+          "sha256": "78f063b0cc6ced68e17662dfae0bcd6201a2469a0024212c473a624c401537b1"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-mid.ax.json",
-          "sha256": "1d5b30f9f5d1d6af10d4fe77f370871e25f14d99966ecf1b067890721e705705"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/reduced-mid.ax.json",
+          "sha256": "8a20e0e299d0c01feec4f1c5c05323cfd5affd701ca77b2b879c611cb75b4ad7"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-end.png",
-          "sha256": "8ec45b385980fdab8422b0145ab7cb200691c4e97b7968c74878fa9171d82ab1"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/reduced-end.png",
+          "sha256": "d4c1db387e768ffc30200fd4c0c3fab38320b84e622c1be8a415a48a5d722681"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-end.ax.json",
-          "sha256": "1d5b30f9f5d1d6af10d4fe77f370871e25f14d99966ecf1b067890721e705705"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/reduced-end.ax.json",
+          "sha256": "8a20e0e299d0c01feec4f1c5c05323cfd5affd701ca77b2b879c611cb75b4ad7"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-interrupted.png",
-          "sha256": "c02defcea8b46e82f6205ac03940194a029ed47391b53d3b1520a57ca8bde44e"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/reduced-interrupted.png",
+          "sha256": "c58038f139eed23a9a795e0ebbe9e6c677c8452a1b2d4fc25ddf705d45c51100"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-interrupted.ax.json",
-          "sha256": "39877603b5228fe836fd7024b1890bea2b485cdac1a09c49600a27f67aec7a6d"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/reduced-interrupted.ax.json",
+          "sha256": "372e2818c6e574e43f5a91ee2740086e137c6f18c3414bcf0a8cecd980d82fab"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/result.png",
-          "sha256": "8bd7e151f23f7a9fe764f2fb09c7e3dd2a4c5443ae999e0ed38a3aae7e9e9682"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/result.png",
+          "sha256": "24f3133eb1a532157f4d9a534611b946be0d2992a0c0c5edd86fa25ea41efded"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/result.ax.json",
-          "sha256": "5466615fda67699584f3161d33e7d159c51d4254e3a80a2d75d7372aa30bd6b9"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/result.ax.json",
+          "sha256": "7fa447533399a840277d8594be2a616a127ebbac432d5554dfb6a340ac3d34c0"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/observations.json",
-          "sha256": "2c660726e701a3075d9b044e963ec96793c480d412c251abe394d91855f47ee9"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/reduced-motion/observations.json",
+          "sha256": "46b8943b2acc411b080fb16b78265285057dbfbca1254b5e9c4613c165bf2ff7"
         }
       ]
     },
@@ -1664,31 +2106,31 @@
       ],
       "artifacts": [
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/tokens-light.png",
-          "sha256": "18ef3350c5791904993bd51acf64c956eef37a6cda1bbbd15943d36cbbf4c9fb"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/semantic-colors/tokens-light.png",
+          "sha256": "afe1b610c74057a6881901e3cf150c9c1800b3040170f8e96cef60471ffb922a"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/tokens-light.ax.json",
-          "sha256": "6cb16e57c2dfef82bda7cd998365d448caf539c606e4e7984cd0453030c3031a"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/semantic-colors/tokens-light.ax.json",
+          "sha256": "43d1a388e8428ec4583dc877ee373bf9add6ac98ab90a16bc1bca3b9611ad83f"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/tokens-dark.png",
-          "sha256": "804a349d44fbccc2e691d5f73572ef4ebdaecaa7b3b20fd53431d196c6754f41"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/semantic-colors/tokens-dark.png",
+          "sha256": "2cd843ecaaf1bde8a4cfeba78accad7cc99a185f6022781ce07eee62de4218dc"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/tokens-dark.ax.json",
-          "sha256": "14ec7c8a32512bba3b52fd0acd54318f71dd43c9ceb59d097d084384840f0720"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/semantic-colors/tokens-dark.ax.json",
+          "sha256": "14d9318e4992e19af96d0a2f0cf15221be562a751b9e0ae861644e12416849e9"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/result.png",
-          "sha256": "804a349d44fbccc2e691d5f73572ef4ebdaecaa7b3b20fd53431d196c6754f41"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/semantic-colors/result.png",
+          "sha256": "2cd843ecaaf1bde8a4cfeba78accad7cc99a185f6022781ce07eee62de4218dc"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/result.ax.json",
-          "sha256": "14ec7c8a32512bba3b52fd0acd54318f71dd43c9ceb59d097d084384840f0720"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/semantic-colors/result.ax.json",
+          "sha256": "14d9318e4992e19af96d0a2f0cf15221be562a751b9e0ae861644e12416849e9"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/observations.json",
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/semantic-colors/observations.json",
           "sha256": "7880d59d4d461bc43135512df419032e338e9cf1edd9e0b32022b234deb79a69"
         }
       ]
@@ -1788,63 +2230,63 @@
       ],
       "artifacts": [
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tool-error-light.png",
-          "sha256": "7a34565edadf3b1b4a941fa3c998a9d13a3967f4ff7c8e9fad948b2c88a65caf"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/tool-error-light.png",
+          "sha256": "1ffd6cbcfa0f4340c83de2e8a14bd98154696c0fe3a52127c3efb75fa7153dc4"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tool-error-light.ax.json",
-          "sha256": "b3520829aa4e109be6f7371126247fb74c723cfa0de4be731e8adb0f440293e8"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/tool-error-light.ax.json",
+          "sha256": "22e9a18838ad890e9f4e80928e1d822866cc1d156a951eb02d55d002269075f2"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/dialog-title-light.png",
-          "sha256": "451175e2b8f65e290fa92f843f71b942a7cc11147a7d56b2ee3f140b1d1d16df"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/dialog-title-light.png",
+          "sha256": "c2dd54156d14833ae3d1c782cbedb6f8d181306093a323e1f76188764d695a2f"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/dialog-title-light.ax.json",
-          "sha256": "1a25ad4f853568f2ef8d67a07bf79660d87420c7d4c0ba5078522555183a55e1"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/dialog-title-light.ax.json",
+          "sha256": "ee50a42e417c35495da780d9ed8fe6a9a5b9328e57a4d5610213f3f400b02b8d"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tooltip-light.png",
-          "sha256": "8a415f120c862738a12a3ac97b61d5b97a9a54a2c014c7074fdaaca55a5eb3e1"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/tooltip-light.png",
+          "sha256": "3697fcc7179cb463d411ca35b38c5dab264a84e9f471b49e809cb47ac0f0a6cc"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tooltip-light.ax.json",
-          "sha256": "8281182ff4da5fb4767a64289cd9ac8929e4f399c645e9c610d863e46977dad7"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/tooltip-light.ax.json",
+          "sha256": "7c608f3994ae364702c7099ae6aff2607b6761ea85864edbc4780edd713163bc"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tool-error-dark.png",
-          "sha256": "9746bbe612ecc5cb14b080dffcaf44f51dbc403c30ec10324c9e3d4bff0dd37c"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/tool-error-dark.png",
+          "sha256": "fcc073ee57738bdc3aeacf3c4802b4d9a7a75817d5bade4c4a4becfb259585f8"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tool-error-dark.ax.json",
-          "sha256": "a4f6ea9608c47103fa42a532789229cda970f2db893338c5f3be9fce3f8f34a3"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/tool-error-dark.ax.json",
+          "sha256": "76d004e9e9f20c758e48ac7095bfa1c6b25a41c5b8ab79c903e545253f3760aa"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/dialog-title-dark.png",
-          "sha256": "6358388cdcd5c6e2680842d943030415c4b1e2ddafeb7b5d7e6a87ec285c0993"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/dialog-title-dark.png",
+          "sha256": "2a2a1867c2edbcabed466626f787a2676fd53418a86fcfb779f1b1df4ab0ea59"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/dialog-title-dark.ax.json",
-          "sha256": "bc82df8c1d597a9af9a2174d7decb06ccc0d09d17f953290df328dff21704caf"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/dialog-title-dark.ax.json",
+          "sha256": "3d613ffc1dc3b3f45f596b1005934c03aae2ca5e95776d454f2b629f6e0336a8"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tooltip-dark.png",
-          "sha256": "bb1801bb7ddc6c7142bd1a41f72ea2155c0257304032915a02d454094ac1dbf3"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/tooltip-dark.png",
+          "sha256": "c5ad3a6a92e25f98ea4ba0044896d1758f0cb55423c435fbb545a217744552f9"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tooltip-dark.ax.json",
-          "sha256": "becc04105895224692e176882becc92a23113ed87c46bc7d7fcd42c0ef841b6b"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/tooltip-dark.ax.json",
+          "sha256": "0f7a583730368ac7c97959594462f0ec8dc26fa29dadec8b89dcddc9870f9570"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/result.png",
-          "sha256": "2d650e3ff53e066bd4b8f90bb2456ea2dd77fca964dfd204751d6c91610ccb00"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/result.png",
+          "sha256": "6e92ab674c2e9b99f26fde240f912d5568a1e2c53325b787465d929482cab04f"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/result.ax.json",
-          "sha256": "a59697174008cf4ff8e06898e9133f1d9c9927a12d2bcb6b3e5792b1ea2e9fd8"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/result.ax.json",
+          "sha256": "1df53684702a999c7a8d36027fb9443b6ae5ea61ee43de0c11f8068f77d8006a"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/observations.json",
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/contrast/observations.json",
           "sha256": "b4441a55254a63f3348e034723bfde61b94260c1b5a43fad2048960820264f25"
         }
       ]
@@ -1875,9 +2317,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/04_empty_projects.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/04_empty_projects.png: Dismiss notification >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/04_empty_projects.png: Dismiss notification: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/05_add_project_import_modal.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -1905,6 +2381,23 @@
           "expected": true
         },
         {
+          "label": "1280x800/07_chat_empty_project.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/07_chat_empty_project.png: 메시지 보내기 >=36x36 (disabled=true)",
           "actual": true,
           "expected": true
@@ -1915,9 +2408,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/07_chat_empty_project.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/08_project_selection.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/08_project_selection.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/08_project_selection.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -1930,9 +2457,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/08_project_selection.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/09_right_panel_menu.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/09_right_panel_menu.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/09_right_panel_menu.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -1945,9 +2506,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/09_right_panel_menu.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/10_right_files.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/10_right_files.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/10_right_files.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -1958,6 +2553,23 @@
           "label": "1280x800/10_right_files.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/10_right_files.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/11_add_action_dialog.png: 파일 첨부 >=36x36 (disabled=false)",
@@ -1980,9 +2592,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/11_add_action_dialog.png: Close: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/12_right_agents.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/12_right_agents.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/12_right_agents.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -1995,9 +2641,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/12_right_agents.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/13_right_run_graph.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/13_right_run_graph.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/13_right_run_graph.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2008,6 +2688,23 @@
           "label": "1280x800/13_right_run_graph.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/13_right_run_graph.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/14_device_setup_dialog.png: 파일 첨부 >=36x36 (disabled=false)",
@@ -2030,9 +2727,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/14_device_setup_dialog.png: Close: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/15_right_browser.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/15_right_browser.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2060,9 +2791,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/15_right_browser.png: Open in system browser: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/15_right_browser.png: Annotate preview >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: Annotate preview: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/15_right_browser.png: Capture screenshot >=36x36 (disabled=false)",
@@ -2070,9 +2835,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/15_right_browser.png: Capture screenshot: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/15_right_browser.png: Float preview over chat >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: Float preview over chat: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/15_right_browser.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2080,9 +2879,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/15_right_browser.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/16_right_terminal.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/16_right_terminal.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/16_right_terminal.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2095,9 +2928,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/16_right_terminal.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/17_settings_general.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/17_settings_general.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/18_settings_appearance_light.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2105,9 +2972,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/18_settings_appearance_light.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/19_settings_appearance_dark.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/19_settings_appearance_dark.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/20_settings_keybindings.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2115,9 +3016,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/20_settings_keybindings.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/21_settings_snapshots.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/21_settings_snapshots.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/22_settings_providers.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2125,9 +3060,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/22_settings_providers.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/23_settings_integrations.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/23_settings_integrations.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/24_settings_source_control.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2135,9 +3104,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/24_settings_source_control.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/25_settings_storage.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/25_settings_storage.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/26_settings_connections.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2145,9 +3148,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/26_settings_connections.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/27_settings_archive.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/27_settings_archive.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/28_add_custom_model_form.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2155,9 +3192,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/28_add_custom_model_form.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/29_settings_diagnostics.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/29_settings_diagnostics.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/30_settings_licenses.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2165,9 +3236,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/30_settings_licenses.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/31_chat_model_selector.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/31_chat_model_selector.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/31_chat_model_selector.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2180,9 +3285,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/31_chat_model_selector.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/32_chat_permission_menu.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/32_chat_permission_menu.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/32_chat_permission_menu.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2195,9 +3334,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/32_chat_permission_menu.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/33_project_list_with_threads.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/33_project_list_with_threads.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/33_project_list_with_threads.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2210,9 +3383,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/33_project_list_with_threads.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/34_chat_messages.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/34_chat_messages.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/34_chat_messages.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2225,9 +3432,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/34_chat_messages.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/35_chat_long_messages.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/35_chat_long_messages.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/35_chat_long_messages.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2240,9 +3481,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/35_chat_long_messages.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/36_chat_code_blocks.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/36_chat_code_blocks.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/36_chat_code_blocks.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2255,9 +3530,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/36_chat_code_blocks.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/37_chat_streaming_working.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/37_chat_streaming_working.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/37_chat_streaming_working.png: 생성 중지 >=36x36 (disabled=false)",
@@ -2265,14 +3574,65 @@
           "expected": true
         },
         {
+          "label": "1280x800/37_chat_streaming_working.png: 생성 중지: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/37_chat_streaming_working.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
         },
         {
+          "label": "1280x800/37_chat_streaming_working.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/38_chat_error.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/38_chat_error.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/38_chat_error.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2285,9 +3645,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/38_chat_error.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/39_chat_empty_existing_thread.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/39_chat_empty_existing_thread.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/39_chat_empty_existing_thread.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2300,9 +3694,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/39_chat_empty_existing_thread.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/40_right_controlled_tasks.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/40_right_controlled_tasks.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/40_right_controlled_tasks.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2315,9 +3743,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/40_right_controlled_tasks.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/41_chat_code_blocks_dark.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/41_chat_code_blocks_dark.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/41_chat_code_blocks_dark.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2330,9 +3792,43 @@
           "expected": true
         },
         {
+          "label": "1280x800/41_chat_code_blocks_dark.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "390x844/42_narrow_chat_dark.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "390x844/42_narrow_chat_dark.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "390x844/42_narrow_chat_dark.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2345,6 +3841,23 @@
           "expected": true
         },
         {
+          "label": "390x844/42_narrow_chat_dark.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "390x844/43_narrow_chat_light.png: 메시지 보내기 >=36x36 (disabled=true)",
           "actual": true,
           "expected": true
@@ -2353,6 +3866,23 @@
           "label": "390x844/43_narrow_chat_light.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "390x844/43_narrow_chat_light.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1280x800/44_delete_thread_confirmation.png: 파일 첨부 >=36x36 (disabled=false)",
@@ -2375,6 +3905,23 @@
           "expected": true
         },
         {
+          "label": "1280x800/45_rename_thread_inline.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1280x800/45_rename_thread_inline.png: 메시지 보내기 >=36x36 (disabled=true)",
           "actual": true,
           "expected": true
@@ -2383,6 +3930,23 @@
           "label": "1280x800/45_rename_thread_inline.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1280x800/45_rename_thread_inline.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/01_first_launch_onboarding_connection.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2405,9 +3969,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/04_empty_projects.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/04_empty_projects.png: Dismiss notification >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/04_empty_projects.png: Dismiss notification: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/05_add_project_import_modal.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2435,6 +4033,23 @@
           "expected": true
         },
         {
+          "label": "1920x1080/07_chat_empty_project.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/07_chat_empty_project.png: 메시지 보내기 >=36x36 (disabled=true)",
           "actual": true,
           "expected": true
@@ -2445,9 +4060,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/07_chat_empty_project.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/08_project_selection.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/08_project_selection.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/08_project_selection.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2460,9 +4109,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/08_project_selection.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/09_right_panel_menu.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/09_right_panel_menu.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/09_right_panel_menu.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2475,9 +4158,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/09_right_panel_menu.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/10_right_files.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/10_right_files.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/10_right_files.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2488,6 +4205,23 @@
           "label": "1920x1080/10_right_files.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/10_right_files.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/11_add_action_dialog.png: 파일 첨부 >=36x36 (disabled=false)",
@@ -2510,9 +4244,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/11_add_action_dialog.png: Close: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/12_right_agents.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/12_right_agents.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/12_right_agents.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2525,9 +4293,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/12_right_agents.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/13_right_run_graph.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/13_right_run_graph.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/13_right_run_graph.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2538,6 +4340,23 @@
           "label": "1920x1080/13_right_run_graph.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/13_right_run_graph.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/14_device_setup_dialog.png: 파일 첨부 >=36x36 (disabled=false)",
@@ -2560,9 +4379,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/14_device_setup_dialog.png: Close: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/15_right_browser.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/15_right_browser.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2590,9 +4443,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/15_right_browser.png: Open in system browser: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/15_right_browser.png: Annotate preview >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: Annotate preview: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/15_right_browser.png: Capture screenshot >=36x36 (disabled=false)",
@@ -2600,9 +4487,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/15_right_browser.png: Capture screenshot: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/15_right_browser.png: Float preview over chat >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: Float preview over chat: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/15_right_browser.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2610,9 +4531,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/15_right_browser.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/16_right_terminal.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/16_right_terminal.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/16_right_terminal.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2625,9 +4580,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/16_right_terminal.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/17_settings_general.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/17_settings_general.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/18_settings_appearance_light.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2635,9 +4624,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/18_settings_appearance_light.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/19_settings_appearance_dark.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/19_settings_appearance_dark.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/20_settings_keybindings.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2645,9 +4668,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/20_settings_keybindings.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/21_settings_snapshots.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/21_settings_snapshots.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/22_settings_providers.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2655,9 +4712,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/22_settings_providers.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/23_settings_integrations.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/23_settings_integrations.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/24_settings_source_control.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2665,9 +4756,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/24_settings_source_control.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/25_settings_storage.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/25_settings_storage.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/26_settings_connections.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2675,9 +4800,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/26_settings_connections.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/27_settings_archive.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/27_settings_archive.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/28_add_custom_model_form.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2685,9 +4844,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/28_add_custom_model_form.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/29_settings_diagnostics.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/29_settings_diagnostics.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/30_settings_licenses.png: Toggle main sidebar >=36x36 (disabled=false)",
@@ -2695,9 +4888,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/30_settings_licenses.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/31_chat_model_selector.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/31_chat_model_selector.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/31_chat_model_selector.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2710,9 +4937,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/31_chat_model_selector.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/32_chat_permission_menu.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/32_chat_permission_menu.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/32_chat_permission_menu.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2725,9 +4986,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/32_chat_permission_menu.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/33_project_list_with_threads.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/33_project_list_with_threads.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/33_project_list_with_threads.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2740,9 +5035,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/33_project_list_with_threads.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/34_chat_messages.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/34_chat_messages.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/34_chat_messages.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2755,9 +5084,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/34_chat_messages.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/35_chat_long_messages.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/35_chat_long_messages.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/35_chat_long_messages.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2770,9 +5133,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/35_chat_long_messages.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/36_chat_code_blocks.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/36_chat_code_blocks.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/36_chat_code_blocks.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2785,9 +5182,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/36_chat_code_blocks.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/37_chat_streaming_working.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/37_chat_streaming_working.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/37_chat_streaming_working.png: 생성 중지 >=36x36 (disabled=false)",
@@ -2795,14 +5226,65 @@
           "expected": true
         },
         {
+          "label": "1920x1080/37_chat_streaming_working.png: 생성 중지: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/37_chat_streaming_working.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
         },
         {
+          "label": "1920x1080/37_chat_streaming_working.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/38_chat_error.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/38_chat_error.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/38_chat_error.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2815,9 +5297,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/38_chat_error.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/39_chat_empty_existing_thread.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/39_chat_empty_existing_thread.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/39_chat_empty_existing_thread.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2830,9 +5346,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/39_chat_empty_existing_thread.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/40_right_controlled_tasks.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/40_right_controlled_tasks.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/40_right_controlled_tasks.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2845,9 +5395,43 @@
           "expected": true
         },
         {
+          "label": "1920x1080/40_right_controlled_tasks.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/41_chat_code_blocks_dark.png: 파일 첨부 >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/41_chat_code_blocks_dark.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/41_chat_code_blocks_dark.png: 메시지 보내기 >=36x36 (disabled=true)",
@@ -2858,6 +5442,23 @@
           "label": "1920x1080/41_chat_code_blocks_dark.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/41_chat_code_blocks_dark.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "1920x1080/44_delete_thread_confirmation.png: 파일 첨부 >=36x36 (disabled=false)",
@@ -2880,6 +5481,23 @@
           "expected": true
         },
         {
+          "label": "1920x1080/45_rename_thread_inline.png: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "1920x1080/45_rename_thread_inline.png: 메시지 보내기 >=36x36 (disabled=true)",
           "actual": true,
           "expected": true
@@ -2888,6 +5506,23 @@
           "label": "1920x1080/45_rename_thread_inline.png: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "1920x1080/45_rename_thread_inline.png: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         },
         {
           "label": "required icon target measured: 메시지 보내기",
@@ -2935,6 +5570,23 @@
           "expected": true
         },
         {
+          "label": "empty composer: 파일 첨부: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
           "label": "empty composer: 메시지 보내기 >=36x36 (disabled=true)",
           "actual": true,
           "expected": true
@@ -2943,28 +5595,45 @@
           "label": "empty composer: Toggle main sidebar >=36x36 (disabled=false)",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "empty composer: Toggle main sidebar: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
         }
       ],
       "artifacts": [
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/icon-targets/icon-targets.png",
-          "sha256": "804a349d44fbccc2e691d5f73572ef4ebdaecaa7b3b20fd53431d196c6754f41"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/icon-targets/icon-targets.png",
+          "sha256": "2cd843ecaaf1bde8a4cfeba78accad7cc99a185f6022781ce07eee62de4218dc"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/icon-targets/icon-targets.ax.json",
-          "sha256": "1175f03dec42ad1d6786c4be3b8ae5b5e80b6b945a879f4280fed0c5c8f7e94f"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/icon-targets/icon-targets.ax.json",
+          "sha256": "f76b25d6ac467ad265efe2f5df230a9d23025f174314564f7c8a61b0a3a5bda0"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/icon-targets/result.png",
-          "sha256": "804a349d44fbccc2e691d5f73572ef4ebdaecaa7b3b20fd53431d196c6754f41"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/icon-targets/result.png",
+          "sha256": "2cd843ecaaf1bde8a4cfeba78accad7cc99a185f6022781ce07eee62de4218dc"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/icon-targets/result.ax.json",
-          "sha256": "1175f03dec42ad1d6786c4be3b8ae5b5e80b6b945a879f4280fed0c5c8f7e94f"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/icon-targets/result.ax.json",
+          "sha256": "f76b25d6ac467ad265efe2f5df230a9d23025f174314564f7c8a61b0a3a5bda0"
         },
         {
-          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/icon-targets/observations.json",
-          "sha256": "992b13a13024b0318fcf144050a2dd455b61ddfc01c11dadbade89d564542989"
+          "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/scenarios/02/icon-targets/observations.json",
+          "sha256": "42aba8c1da1186197c9e929e9067a247acde383f03e1bf4a3deaf355a19a6f2f"
         }
       ]
     }
@@ -2977,9 +5646,9 @@
     "runtimeMutation": 0,
     "blockedOutbound": 0
   },
-  "completedAt": "2026-10-19T12:21:12.635Z",
+  "completedAt": "2026-10-19T13:08:12.725Z",
   "capture": {
-    "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/capture-manifest.json",
-    "sha256": "df14b2c08d5b2c270a970c2d44a8c6d4f67ca594f718003eb16267a3792eeade"
+    "file": "run-f3c222cb-eb3b-43c6-bce5-3aa2c62a8db6/capture-manifest.json",
+    "sha256": "e1b8da72744ea43db0e56955be3b834cba674cb0a517e9a846dbd0521a9f9b65"
   }
 }

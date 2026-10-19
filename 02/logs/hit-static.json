@@ -1,0 +1,13 @@
+{
+  "name": "hit-static",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "source /tmp/hig02-env.sh; cd /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02/app/t3code; pnpm exec vp lint apps/web/DESIGN.md apps/web/src/index.css apps/web/src/components/chat/ChatComposer.tsx apps/web/src/components/chat/ComposerPrimaryActions.tsx apps/web/src/components/ui/toast.tsx && pnpm exec vp fmt --check apps/web/DESIGN.md apps/web/src/index.css apps/web/src/components/chat/ChatComposer.tsx apps/web/src/components/chat/ComposerPrimaryActions.tsx apps/web/src/components/ui/toast.tsx /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/cases.mjs /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/harness.test.ts && pnpm --filter @t3tools/web typecheck && bun test /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/harness.test.ts && cd apps/web && pnpm exec vp test run --project unit src/components/ui/sidebar.test.tsx"
+  ],
+  "startedAt": "2026-10-19T13:01:18.536Z",
+  "completedAt": "2026-10-19T13:01:22.537Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/hit-static.log",
+  "code": 0,
+  "signal": null
+}
