@@ -9,6 +9,7 @@ import {
   chooseAlias,
   CASES,
   deliverScenarioEvent,
+  iconTargetMeetsMinimum,
 } from "./cases.mjs";
 import {
   bounded,
@@ -24,6 +25,19 @@ import {
   validateCheckCoverage,
 } from "./assert.mjs";
 import { assertProfile, seed } from "./seed.mjs";
+
+describe("touched icon targets", () => {
+  test("rejects undersized disabled controls rather than exempting them", () => {
+    expect(iconTargetMeetsMinimum({ disabled: true, rect: { width: 32, height: 32 } })).toBe(false);
+  });
+  test("requires both dimensions to meet the minimum", () => {
+    expect(iconTargetMeetsMinimum({ rect: { width: 36, height: 32 } })).toBe(false);
+    expect(iconTargetMeetsMinimum({ rect: { width: 32, height: 36 } })).toBe(false);
+  });
+  test("accepts the exact minimum even when disabled", () => {
+    expect(iconTargetMeetsMinimum({ disabled: true, rect: { width: 36, height: 36 } })).toBe(true);
+  });
+});
 
 describe("executed scenario coverage", () => {
   const artifact = { file: "observed.json", sha256: "a".repeat(64) };

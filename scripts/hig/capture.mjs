@@ -421,6 +421,7 @@ async function runSize(width, height, includeStress = false) {
                 name: control.getAttribute("aria-label") ?? control.textContent,
                 rect: box.toJSON(),
                 disabled: control.matches(":disabled"),
+                iconControl: control.hasAttribute("data-icon-control"),
                 visible,
                 hits: visible
                   ? points.map(([x, y]) => {
