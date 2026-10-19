@@ -401,7 +401,7 @@ function buildAddProjectRemoteSourceReadiness(
 ): AddProjectRemoteSourceReadiness {
   const unknown = {
     status: "unknown",
-    reason: "Git 공급자 상태를 확인할 수 없어요. 설정 > 소스 제어에서 다시 검색하세요.",
+    reason: "Git 공급자 상태를 확인할 수 없어요.",
   } as const;
   const defaultReadiness: AddProjectRemoteSourceReadiness = {
     url: { status: "ready" },
@@ -1554,12 +1554,12 @@ function OpenCommandPaletteDialog(props: {
         sourceItems.push({
           ...actions.importAction,
           description: (
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span>{actions.importAction.description}</span>
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-foreground">
+              <span className="text-foreground">{actions.importAction.description}</span>
               <Button
                 variant="link"
                 size="sm"
-                className="h-8 px-2.5"
+                className="h-8 px-2.5 text-foreground underline"
                 onClick={(event) => {
                   event.stopPropagation();
                   void actions.setupAction?.run();

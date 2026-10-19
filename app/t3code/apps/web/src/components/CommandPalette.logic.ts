@@ -183,7 +183,7 @@ export function buildProjectImportSourceActions(input: {
     value: `action:add-project:${input.environmentId}:${input.source}${isReady ? "" : ":not-ready"}`,
     searchTerms: ["clone", "remote", "repository", "repo", "git", input.label],
     title: `${input.label} 저장소`,
-    description: reason ? `${input.description} · ${reason}` : input.description,
+    description: reason ?? input.description,
     disabled: !isReady,
     icon: input.icon,
     keepOpen: isReady,
