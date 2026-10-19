@@ -68,15 +68,16 @@ function DisabledCommandPaletteResultRow(props: {
   item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
 }) {
   return (
-    <div
-      aria-disabled="true"
-      aria-describedby={props.item.description ? props.item.descriptionId : undefined}
-      className="flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base opacity-64 sm:min-h-7 sm:text-sm"
-    >
-      {props.item.icon}
+    <div className="flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base sm:min-h-7 sm:text-sm">
+      <span className="flex shrink-0 opacity-64">{props.item.icon}</span>
       {props.item.description || props.item.threadContentMatch ? (
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
+          {/* Only the unavailable action is disabled; a linked reason and its setup action stay operable. */}
+          <span
+            aria-disabled="true"
+            aria-describedby={props.item.description ? props.item.descriptionId : undefined}
+            className="flex min-w-0 items-center gap-1.5 text-sm text-foreground opacity-64"
+          >
             {props.item.titleLeadingContent}
             <span className="truncate">{props.item.title}</span>
           </span>
@@ -86,19 +87,27 @@ function DisabledCommandPaletteResultRow(props: {
           {props.item.description ? (
             <span
               id={props.item.descriptionId}
-              className="min-w-0 text-muted-foreground/70 text-xs"
+              className={cn(
+                "min-w-0 text-muted-foreground/70 text-xs",
+                !props.item.descriptionId && "opacity-64",
+              )}
             >
               {props.item.description}
             </span>
           ) : null}
         </span>
       ) : (
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-foreground">
+        <span
+          aria-disabled="true"
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-foreground opacity-64"
+        >
           {props.item.titleLeadingContent}
           <span className="truncate">{props.item.title}</span>
         </span>
       )}
-      {props.item.titleTrailingContent}
+      {props.item.titleTrailingContent ? (
+        <span className="opacity-64">{props.item.titleTrailingContent}</span>
+      ) : null}
     </div>
   );
 }
