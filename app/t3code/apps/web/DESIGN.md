@@ -104,8 +104,9 @@ Every portal and fixed surface maps to one role. Numeric values live only in `in
 - Transitions list their properties. `transition-all` is not used. Shared surfaces animate opacity,
   scale and translate only; width, height, padding, shadow and blur snap, preserving selection and
   scroll.
-- Panel animations (`data-panel-animations`) remain a user setting with its own duration; they are
-  not covered by the surface role.
+- Panel animations (`data-panel-animations`) remain a user setting with its own duration. Under it
+  the fixed sidebar container slides with `translate`; the sidebar gap, the icon-collapse width and
+  menu-button geometry snap.
 
 ## 8. Accessibility and accepted debt
 
@@ -117,6 +118,6 @@ Every portal and fixed surface maps to one role. Numeric values live only in `in
   to its opener.
 - Accepted debt, kept deliberately: the toast stack animates height while it expands (Base UI
   stacking); popover and tooltip popups animate width/height while Base UI switches nested views;
-  the sidebar gap and the chat header animate layout under the user's panel-animation setting; the
-  provider-status and thread-error banners still overlay the timeline until their delivery policy
-  changes.
+  the chat header padding and the terminal panel's grid rows animate layout under the user's
+  panel-animation setting; the provider-status and thread-error banners still overlay the timeline
+  until their delivery policy changes.
