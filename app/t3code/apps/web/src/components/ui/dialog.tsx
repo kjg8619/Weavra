@@ -2,6 +2,7 @@
 
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
+import { useState } from "react";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
@@ -56,6 +57,19 @@ function DialogViewport({ className, ...props }: DialogPrimitive.Viewport.Props)
   );
 }
 
+function DialogSurface({ finalFocus, ...props }: DialogPrimitive.Popup.Props) {
+  // The portal mounts this before an autoFocus field can replace the opener.
+  const [opener] = useState(() =>
+    document.activeElement instanceof HTMLElement ? document.activeElement : null,
+  );
+  return (
+    <DialogPrimitive.Popup
+      {...props}
+      finalFocus={finalFocus ?? (() => (opener?.isConnected ? opener : true))}
+    />
+  );
+}
+
 function DialogPopup({
   className,
   children,
@@ -81,7 +95,7 @@ function DialogPopup({
           viewportClassName,
         )}
       >
-        <DialogPrimitive.Popup
+        <DialogSurface
           className={cn(
             variant === "media" ? DIALOG_MEDIA_POPUP_CLASS : DIALOG_POPUP_CLASS,
             "row-start-2 text-popover-foreground",
@@ -102,7 +116,7 @@ function DialogPopup({
               <XIcon />
             </DialogPrimitive.Close>
           )}
-        </DialogPrimitive.Popup>
+        </DialogSurface>
       </DialogViewport>
     </DialogPortal>
   );
