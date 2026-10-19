@@ -460,6 +460,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       ...thread,
       lastVisitedAt,
     },
+    connectionPhase: environment?.connection.phase ?? null,
   });
   const linkedPullRequestStatus = useLinkedThreadPullRequest(
     thread.environmentId,

@@ -1958,6 +1958,7 @@ describe("formatWorkingDurationLabel", () => {
 
 describe("resolveThreadStatusPill", () => {
   const baseThread = {
+    updatedAt: "2026-03-09T10:00:00.000Z",
     hasActionableProposedPlan: false,
     hasPendingApprovals: false,
     hasPendingUserInput: false,
@@ -2004,7 +2005,164 @@ describe("resolveThreadStatusPill", () => {
       resolveThreadStatusPill({
         thread: baseThread,
       }),
-    ).toMatchObject({ label: "작업 중", pulse: true });
+    ).toMatchObject({
+      label: "작업 중",
+      pulse: true,
+      activityLabel: "단계 확인 안 됨",
+    });
+  });
+
+  it("shows observed phase and progress without adding a separate status store", () => {
+    const status = resolveThreadStatusPill({
+      thread: {
+        ...baseThread,
+        planProgress: {
+          step: "검사 실행",
+          completedSteps: 2,
+          totalSteps: 5,
+        },
+        updatedAt: "2026-03-09T10:06:00.000Z",
+      },
+      connectionPhase: "connected",
+    });
+
+    expect(status).toMatchObject({
+      label: "작업 중",
+      activityLabel: "검사 실행",
+      activityProgress: "2/5",
+    });
+    expect(status?.isStale).toBeFalsy();
+  });
+
+  it("marks disconnected status as last observed without advancing its timestamp", () => {
+    expect(
+      resolveThreadStatusPill({
+        thread: {
+          ...baseThread,
+          planProgress: {
+            step: "검사 실행",
+            completedSteps: 2,
+            totalSteps: 5,
+          },
+        },
+        connectionPhase: "reconnecting",
+      }),
+    ).toMatchObject({
+      label: "작업 중",
+      activityLabel: "검사 실행",
+      activityProgress: "2/5",
+      isStale: true,
+      pulse: false,
+      lastObservedAt: "2026-03-09T10:00:00.000Z",
+    });
+  });
+
+  it("uses the latest thread observation and clears staleness after reconnection", () => {
+    const thread = {
+      ...baseThread,
+      updatedAt: "2026-03-09T10:06:00.000Z",
+      planProgress: {
+        step: "검사 실행",
+        completedSteps: 2,
+        totalSteps: 5,
+      },
+    };
+    const disconnected = resolveThreadStatusPill({
+      thread,
+      connectionPhase: "offline",
+    });
+    const reconnected = resolveThreadStatusPill({
+      thread,
+      connectionPhase: "connected",
+    });
+
+    expect(disconnected).toMatchObject({
+      isStale: true,
+      lastObservedAt: "2026-03-09T10:06:00.000Z",
+    });
+    expect(reconnected?.isStale).toBeFalsy();
+    expect(reconnected?.lastObservedAt).toBeUndefined();
+  });
+
+  it.each(["offline", "reconnecting", "error"] as const)(
+    "labels activity as last observed while the connection is %s",
+    (connectionPhase) => {
+      const status = resolveThreadStatusPill({
+        thread: {
+          ...baseThread,
+          planProgress: {
+            step: "검사 실행",
+            completedSteps: 2,
+            totalSteps: 5,
+          },
+        },
+        connectionPhase,
+      });
+
+      expect(status).toMatchObject({
+        label: "작업 중",
+        activityLabel: "검사 실행",
+        isStale: true,
+        pulse: false,
+      });
+    },
+  );
+
+  it("does not invent a last-observed timestamp when nothing was observed", () => {
+    const { updatedAt: _updatedAt, ...unobservedThread } = baseThread;
+    const status = resolveThreadStatusPill({
+      thread: {
+        ...unobservedThread,
+        session: null,
+        latestTurn: null,
+        backgroundLiveness: "working",
+      },
+      connectionPhase: "offline",
+    });
+
+    expect(status).toMatchObject({
+      label: "작업 중",
+      activityLabel: "단계 확인 안 됨",
+      isStale: true,
+      lastObservedAt: null,
+      pulse: false,
+    });
+  });
+
+  it("shows a failed session ahead of lingering background work", () => {
+    const status = resolveThreadStatusPill({
+      thread: {
+        ...baseThread,
+        session: {
+          ...baseThread.session,
+          status: "error",
+          activeTurnId: null,
+        },
+        backgroundLiveness: "working",
+      },
+      connectionPhase: "connected",
+    });
+
+    expect(status).toMatchObject({ label: "실패", pulse: false });
+    expect(status?.activityLabel).toBeUndefined();
+  });
+
+  it("keeps background monitoring distinct from active work", () => {
+    const monitoring = resolveThreadStatusPill({
+      thread: {
+        ...baseThread,
+        session: {
+          ...baseThread.session,
+          status: "ready",
+          activeTurnId: null,
+        },
+        backgroundLiveness: "monitoring",
+      },
+      connectionPhase: "connected",
+    });
+
+    expect(monitoring).toMatchObject({ label: "지켜보는 중", pulse: false });
+    expect(monitoring?.activityLabel).toBeUndefined();
   });
 
   it("shows plan ready when a settled plan turn has a proposed plan ready for follow-up", () => {

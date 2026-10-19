@@ -25,6 +25,7 @@ import {
 import type { SidebarThreadSummary, Thread } from "../types";
 import { cn } from "../lib/utils";
 import { isLatestTurnSettled } from "../session-logic";
+import type { EnvironmentPresentation } from "../state/environments";
 
 export function shouldNavigateAfterThreadPark(input: {
   readonly threadKey: string;
@@ -508,37 +509,91 @@ export function buildBulkUnpinContextMenuItem(input: {
 }
 
 export interface ThreadStatusPill {
-  label: "작업 중" | "지켜보는 중" | "연결 중" | "완료" | "승인 대기" | "입력 대기" | "계획 준비됨";
+  label:
+    | "작업 중"
+    | "지켜보는 중"
+    | "연결 중"
+    | "실패"
+    | "완료"
+    | "승인 대기"
+    | "입력 대기"
+    | "계획 준비됨";
   colorClass: string;
   dotClass: string;
   pulse: boolean;
+  activityLabel?: string;
+  activityProgress?: string;
+  isStale?: boolean;
+  lastObservedAt?: string | null;
 }
 
 // Rollup order mirrors the per-thread resolver exactly: attention states,
 // then active work, then the actionable plan prompt, then passive
 // monitoring. A Monitoring sibling must never hide a Plan Ready thread.
 const THREAD_STATUS_PRIORITY: Record<ThreadStatusPill["label"], number> = {
-  "승인 대기": 6,
-  "입력 대기": 5,
-  "작업 중": 4,
-  "연결 중": 4,
+  "승인 대기": 7,
+  "입력 대기": 6,
+  "작업 중": 5,
+  "연결 중": 5,
+  실패: 4,
   "계획 준비됨": 3,
   "지켜보는 중": 2,
   완료: 1,
 };
 
-type ThreadStatusInput = Pick<
-  SidebarThreadSummary,
-  | "hasActionableProposedPlan"
-  | "hasPendingApprovals"
-  | "hasPendingUserInput"
-  | "interactionMode"
-  | "latestTurn"
-  | "session"
-  | "backgroundLiveness"
-> & {
-  lastVisitedAt?: string | undefined;
-};
+type ThreadStatusInput = Omit<
+  Pick<
+    SidebarThreadSummary,
+    | "hasActionableProposedPlan"
+    | "hasPendingApprovals"
+    | "hasPendingUserInput"
+    | "interactionMode"
+    | "latestTurn"
+    | "planProgress"
+    | "session"
+    | "backgroundLiveness"
+    | "updatedAt"
+  >,
+  "updatedAt"
+> &
+  Partial<Pick<SidebarThreadSummary, "updatedAt">> & {
+    lastVisitedAt?: string | undefined;
+  };
+
+function withThreadObservation(
+  status: ThreadStatusPill,
+  thread: ThreadStatusInput,
+  connectionPhase: EnvironmentPresentation["connection"]["phase"] | null | undefined,
+): ThreadStatusPill {
+  const activity = status.label === "작업 중" || status.label === "연결 중";
+  const stale = connectionPhase !== undefined && connectionPhase !== "connected";
+  const planProgress = thread.planProgress;
+  return {
+    ...status,
+    ...(activity
+      ? {
+          activityLabel: planProgress?.step ?? "단계 확인 안 됨",
+          ...(planProgress
+            ? {
+                activityProgress: `${planProgress.completedSteps}/${planProgress.totalSteps}`,
+              }
+            : {}),
+        }
+      : {}),
+    ...(stale
+      ? {
+          isStale: true,
+          pulse: false,
+          lastObservedAt: firstValidTimestamp(
+            thread.updatedAt,
+            thread.session?.updatedAt,
+            thread.latestTurn?.startedAt,
+            thread.latestTurn?.requestedAt,
+          ),
+        }
+      : {}),
+  };
+}
 
 export interface ThreadJumpHintVisibilityController {
   sync: (shouldShow: boolean) => void;
@@ -1002,93 +1057,91 @@ export function formatWorkingDurationLabel(elapsedMs: number): string {
 
 export function resolveThreadStatusPill(input: {
   thread: ThreadStatusInput;
+  connectionPhase?: EnvironmentPresentation["connection"]["phase"] | null | undefined;
 }): ThreadStatusPill | null {
-  const { thread } = input;
+  const { thread, connectionPhase } = input;
+  let status: ThreadStatusPill | null = null;
 
   if (thread.hasPendingApprovals) {
-    return {
+    status = {
       label: "승인 대기",
       colorClass: "text-amber-600 dark:text-amber-300/90",
       dotClass: "bg-amber-500 dark:bg-amber-300/90",
       pulse: false,
     };
-  }
-
-  if (thread.hasPendingUserInput) {
-    return {
+  } else if (thread.hasPendingUserInput) {
+    status = {
       label: "입력 대기",
       colorClass: "text-indigo-600 dark:text-indigo-300/90",
       dotClass: "bg-indigo-500 dark:bg-indigo-300/90",
       pulse: false,
     };
-  }
-
-  if (thread.session?.status === "running") {
-    return {
+  } else if (thread.session?.status === "running") {
+    status = {
       label: "작업 중",
       colorClass: "text-sky-600 dark:text-sky-300/80",
       dotClass: "bg-sky-500 dark:bg-sky-300/80",
       pulse: true,
     };
-  }
-
-  if (thread.session?.status === "starting") {
-    return {
+  } else if (thread.session?.status === "starting") {
+    status = {
       label: "연결 중",
       colorClass: "text-sky-600 dark:text-sky-300/80",
       dotClass: "bg-sky-500 dark:bg-sky-300/80",
       pulse: true,
     };
-  }
-
-  // An actionable plan prompt outranks lingering background work: it needs
-  // the user's decision, while liveness merely reports (review finding).
-  const hasPlanReadyPrompt =
-    !thread.hasPendingUserInput &&
-    thread.interactionMode === "plan" &&
-    isLatestTurnSettled(thread.latestTurn, thread.session) &&
-    thread.hasActionableProposedPlan;
-  if (hasPlanReadyPrompt) {
-    return {
-      label: "계획 준비됨",
-      colorClass: "text-violet-600 dark:text-violet-300/90",
-      dotClass: "bg-violet-500 dark:bg-violet-300/90",
+  } else if (thread.session?.status === "error") {
+    // Same order as resolveSidebarThreadStatus: a failed session outranks
+    // lingering background liveness so both sidebars show the failure.
+    status = {
+      label: "실패",
+      colorClass: "text-red-700 dark:text-red-300",
+      dotClass: "bg-red-600 dark:bg-red-300",
       pulse: false,
     };
+  } else {
+    // An actionable plan prompt outranks lingering background work: it needs
+    // the user's decision, while liveness merely reports (review finding).
+    const hasPlanReadyPrompt =
+      !thread.hasPendingUserInput &&
+      thread.interactionMode === "plan" &&
+      isLatestTurnSettled(thread.latestTurn, thread.session) &&
+      thread.hasActionableProposedPlan;
+
+    if (hasPlanReadyPrompt) {
+      status = {
+        label: "계획 준비됨",
+        colorClass: "text-violet-600 dark:text-violet-300/90",
+        dotClass: "bg-violet-500 dark:bg-violet-300/90",
+        pulse: false,
+      };
+    } else if (thread.backgroundLiveness === "working") {
+      // The turn can settle while native background work runs on. Subagent and
+      // workflow fleets read as plain Working; monitoring is separate.
+      status = {
+        label: "작업 중",
+        colorClass: "text-sky-600 dark:text-sky-300/80",
+        dotClass: "bg-sky-500 dark:bg-sky-300/80",
+        pulse: true,
+      };
+    } else if (thread.backgroundLiveness === "monitoring") {
+      status = {
+        label: "지켜보는 중",
+        colorClass: "text-sky-600 dark:text-sky-300/80",
+        dotClass: "bg-sky-500 dark:bg-sky-300/80",
+        pulse: false,
+      };
+    } else if (hasUnseenCompletion(thread)) {
+      status = {
+        label: "완료",
+        colorClass: "text-emerald-600 dark:text-emerald-300/90",
+        dotClass: "bg-emerald-500 dark:bg-emerald-300/90",
+        pulse: false,
+      };
+    }
   }
 
-  // The turn can settle while native background work runs on. Subagent and
-  // workflow fleets read as plain Working; Monitoring is reserved for watch
-  // loops (a parent agent babysitting a PR, tailing checks) with no other
-  // live work. Same recede treatment as Working per inbox-zero.
-  if (thread.backgroundLiveness === "working") {
-    return {
-      label: "작업 중",
-      colorClass: "text-sky-600 dark:text-sky-300/80",
-      dotClass: "bg-sky-500 dark:bg-sky-300/80",
-      pulse: true,
-    };
-  }
-
-  if (thread.backgroundLiveness === "monitoring") {
-    return {
-      label: "지켜보는 중",
-      colorClass: "text-sky-600 dark:text-sky-300/80",
-      dotClass: "bg-sky-500 dark:bg-sky-300/80",
-      pulse: false,
-    };
-  }
-
-  if (hasUnseenCompletion(thread)) {
-    return {
-      label: "완료",
-      colorClass: "text-emerald-600 dark:text-emerald-300/90",
-      dotClass: "bg-emerald-500 dark:bg-emerald-300/90",
-      pulse: false,
-    };
-  }
-
-  return null;
+  return status === null ? null : withThreadObservation(status, thread, connectionPhase);
 }
 
 export function resolveProjectStatusIndicator(
