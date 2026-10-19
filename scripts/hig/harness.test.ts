@@ -10,6 +10,7 @@ import {
   CASES,
   deliverScenarioEvent,
   iconTargetMeetsMinimum,
+  assertIconTargetHits,
 } from "./cases.mjs";
 import {
   bounded,
@@ -27,6 +28,21 @@ import {
 import { assertProfile, seed } from "./seed.mjs";
 
 describe("touched icon targets", () => {
+  test("fails the scenario when the center hits but an inset corner misses", async () => {
+    const result = await executeCheck(
+      "02",
+      "icon-targets",
+      async (assert: (label: string, actual: unknown, expected: unknown) => void) =>
+        assertIconTargetHits(assert, "foreground icon", {
+          visible: true,
+          disabled: false,
+          hits: [true, false, true, true, true],
+        }),
+      async () => [{ file: "observed.json", sha256: "a".repeat(64) }],
+    );
+    expect(result.status).toBe("FAIL");
+    expect(result.error).toContain("five icon hit points");
+  });
   test("rejects undersized disabled controls rather than exempting them", () => {
     expect(iconTargetMeetsMinimum({ disabled: true, rect: { width: 32, height: 32 } })).toBe(false);
   });
