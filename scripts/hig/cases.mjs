@@ -678,6 +678,8 @@ export async function runScenarios(context) {
     return target;
   }
   async function owner(assert, label, selector) {
+    await page.locator(selector).filter({ visible: true }).waitFor({ state: "visible" });
+    await settle();
     const geometry = await sample(
       label,
       (selector) => {
@@ -1356,34 +1358,37 @@ export async function runScenarios(context) {
     await page.emulateMedia({ reducedMotion: mode === "reduced" ? "reduce" : "no-preference" });
     await home();
     await page.evaluate(() => {
-      globalThis.higMotionObserver = new MutationObserver(() => {
-        for (const animation of document.getAnimations())
-          if (
-            animation.effect?.target?.closest(
-              '[data-slot="dialog-popup"],[data-slot="dialog-backdrop"]',
-            )
-          )
-            animation.pause();
-      });
-      globalThis.higMotionObserver.observe(document, {
-        subtree: true,
-        childList: true,
-        attributes: true,
+      globalThis.higAnimationReady = new Promise((resolve) => {
+        const observe = () => {
+          const animations = document
+            .getAnimations()
+            .filter((animation) =>
+              animation.effect?.target?.matches(
+                '[data-slot="dialog-popup"],[data-slot="dialog-backdrop"]',
+              ),
+            );
+          if (!animations.length) {
+            globalThis.higAnimationFrame = requestAnimationFrame(observe);
+            return;
+          }
+          globalThis.higAnimations = animations;
+          for (const animation of animations) animation.pause();
+          resolve();
+        };
+        globalThis.higAnimationFrame = requestAnimationFrame(observe);
       });
     });
     try {
       const opener = await unique('button[aria-label="작업 추가"]');
       await opener.click();
       await page.locator('[data-slot="dialog-popup"]').waitFor({ state: "attached" });
+      await bounded(
+        page.evaluate(() => globalThis.higAnimationReady),
+        `${mode}: dialog transition creation`,
+        15000,
+      );
       const animations = await page.evaluate(() => {
-        const animations = document
-          .getAnimations()
-          .filter((a) =>
-            a.effect?.target?.closest('[data-slot="dialog-popup"],[data-slot="dialog-backdrop"]'),
-          );
-        globalThis.higAnimations = animations;
-        for (const animation of animations) animation.pause();
-        return animations.map((a) => ({
+        return globalThis.higAnimations.map((a) => ({
           duration: a.effect.getComputedTiming().duration,
           properties: [
             ...new Set(
@@ -1428,7 +1433,7 @@ export async function runScenarios(context) {
       });
       await page.keyboard.press("Escape");
       await page.evaluate(() => {
-        globalThis.higMotionObserver.disconnect();
+        cancelAnimationFrame(globalThis.higAnimationFrame);
         for (const animation of document.getAnimations())
           if (Number.isFinite(animation.effect?.getComputedTiming().endTime)) animation.finish();
       });
@@ -1441,11 +1446,138 @@ export async function runScenarios(context) {
       );
     } finally {
       await page.evaluate(() => {
-        globalThis.higMotionObserver.disconnect();
+        cancelAnimationFrame(globalThis.higAnimationFrame);
         for (const animation of document.getAnimations())
           if (animation.playState === "paused") animation.play();
       });
       await page.emulateMedia({ reducedMotion: "no-preference" });
+    }
+  }
+  async function motionConsumers(assert, reduced) {
+    await home();
+    await motionProperties(
+      assert,
+      "ComposerPrimaryActions",
+      '[data-chat-composer-form="true"] button[type="submit"]',
+      reduced,
+    );
+    await providerEvent("ready", true);
+    await motionProperties(
+      assert,
+      "SidebarProviderUpdatePill",
+      '[class~="group/provider-update"]',
+      reduced,
+    );
+    await openPanel("브라우저");
+    await motionProperties(assert, "PreviewChromeRow", "[data-preview-url-input]", reduced);
+    const count = await page.evaluate(() => {
+      const indicators = [...document.querySelectorAll("div[aria-hidden]")].filter(
+        (node) => /^\d+%$/.test(node.textContent.trim()) && node.classList.contains("top-3"),
+      );
+      for (const node of indicators) node.setAttribute("data-hig-motion", "zoom-indicator");
+      return indicators.length;
+    });
+    assert("one real ZoomIndicator consumer", count, 1);
+    await motionProperties(assert, "ZoomIndicator", '[data-hig-motion="zoom-indicator"]', reduced);
+    await frame(reduced ? "reduced-consumers" : "normal-consumers");
+  }
+  async function toolErrorContrast(assert, mode) {
+    const { Database } = await import("bun:sqlite");
+    const database = new Database(path.join(context.isolation.app, "userdata/state.sqlite"), {
+      readwrite: true,
+      create: false,
+    });
+    try {
+      database
+        .query(
+          `INSERT OR REPLACE INTO projection_thread_activities
+        (activity_id,thread_id,turn_id,tone,kind,summary,payload_json,created_at,sequence)
+        VALUES (?,?,?,?,?,?,?,?,?)`,
+        )
+        .run(
+          "hig-tool-error",
+          "baseline-error",
+          "turn-error",
+          "error",
+          "tool.completed",
+          "HIG failed tool fixture",
+          JSON.stringify({
+            toolCallId: "hig-tool",
+            itemType: "command_execution",
+            status: "failed",
+            command: "printf 'synthetic fixture; not executed'",
+            exitCode: 1,
+          }),
+          "2026-10-18T09:00:00.500Z",
+          999,
+        );
+      await page.reload();
+      await home();
+      await thread("05 Error fixture");
+      const icons = page.locator('[class*="text-tool-error-icon"]').filter({ visible: true });
+      await icons.first().waitFor({ state: "visible" });
+      await icons.first().scrollIntoViewIfNeeded();
+      const samples = await sample(`tool-error-${mode}`, () => {
+        const context = document.createElement("canvas").getContext("2d");
+        return [...document.querySelectorAll('[class*="text-tool-error-icon"]')]
+          .filter((node) => node.checkVisibility())
+          .map((node) => {
+            const style = getComputedStyle(node);
+            context.clearRect(0, 0, 1, 1);
+            context.fillStyle = style.color;
+            context.fillRect(0, 0, 1, 1);
+            return {
+              selector: node.className,
+              color: style.color,
+              rgba: [...context.getImageData(0, 0, 1, 1).data],
+              rect: node.getBoundingClientRect().toJSON(),
+            };
+          });
+      });
+      await frame(`tool-error-${mode}`);
+      assert("failed tool consumer rendered", samples.length > 0, true);
+      for (const sample of samples) {
+        const background = await context.win.evaluate(async (window, rect) => {
+          const pixel = (
+            await window.webContents.capturePage({
+              x: Math.max(0, Math.floor(rect.left - 2)),
+              y: Math.floor(rect.top + rect.height / 2),
+              width: 1,
+              height: 1,
+            })
+          ).toBitmap();
+          return [pixel[2], pixel[1], pixel[0]];
+        }, sample.rect);
+        const alpha = sample.rgba[3] / 255;
+        const foreground = background.map(
+          (channel, index) => sample.rgba[index] * alpha + channel * (1 - alpha),
+        );
+        const luminance = (rgb) =>
+          rgb
+            .map((value) => {
+              const n = value / 255;
+              return n <= 0.04045 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4;
+            })
+            .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+        const [light, dark] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+        const ratio = (light + 0.05) / (dark + 0.05);
+        observations.push({
+          role: "tool-error-icon",
+          authority: "SYNTHETIC_PROJECTION_ONLY; REAL PACKAGED RENDERER",
+          source: "app/t3code/apps/web/src/components/chat/MessagesTimeline.tsx",
+          mode,
+          ...sample,
+          background,
+          foreground,
+          ratio,
+        });
+        assert(`${mode}: tool-error icon contrast ${ratio}`, ratio >= 3, true);
+      }
+    } finally {
+      database
+        .query("DELETE FROM projection_thread_activities WHERE activity_id = ?")
+        .run("hig-tool-error");
+      database.close();
     }
   }
   const executors = {
@@ -1698,6 +1830,7 @@ export async function runScenarios(context) {
       await home();
       await motionProperties(assert, "sidebar-gap-motion", '[data-slot="sidebar-gap"]');
       await motionProperties(assert, "sidebar-container-motion", '[data-slot="sidebar-container"]');
+      await motionConsumers(assert, false);
       await openAction();
       await motionProperties(assert, "dialog-motion", '[data-slot="dialog-popup"]');
       await motionProperties(assert, "dialog-backdrop-motion", '[data-slot="dialog-backdrop"]');
@@ -1713,6 +1846,7 @@ export async function runScenarios(context) {
         await page.keyboard.press("Escape");
         await home();
         await motionProperties(assert, "sidebar-reduced", '[data-slot="sidebar-container"]', true);
+        await motionConsumers(assert, true);
       } finally {
         await page.emulateMedia({ reducedMotion: "no-preference" });
       }
@@ -1770,6 +1904,7 @@ export async function runScenarios(context) {
       for (const mode of ["light", "dark"]) {
         await home();
         await theme(mode);
+        await toolErrorContrast(assert, mode);
         await openAction();
         await contrast(assert, '[data-slot="dialog-title"]', `dialog-title-${mode}`);
         await page.keyboard.press("Escape");
