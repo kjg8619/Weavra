@@ -611,6 +611,71 @@ describe("Weavra workflow control interactions", () => {
     expect(control(render(), "확인 후 시작").props.disabled).toBe(true);
     expect(data.invoke).toHaveBeenCalledOnce();
   });
+  it.each(["unsupported", "disconnected", "stale", "missing-capability", "missing-scope", "busy"])(
+    "sends no request through forced form submission or reconnect when %s",
+    async (variant) => {
+      change("워크플로 목표", preview.goal);
+      const available = data.observation;
+      if (!available?.capabilities) throw new Error("Missing control fixture");
+      switch (variant) {
+        case "unsupported":
+          data.support = "unsupported";
+          break;
+        case "disconnected":
+          data.phase = "disconnected";
+          break;
+        case "stale":
+          data.observation = { ...available, stale: true };
+          break;
+        case "missing-capability":
+          data.observation = {
+            ...available,
+            capabilities: null,
+          };
+          break;
+        case "missing-scope":
+          data.observation = { ...available, status: "ERROR", stale: true, state: null };
+          break;
+        case "busy":
+          update({ busy: true });
+          break;
+      }
+      const tree = render();
+      expect(control(tree, "워크플로 준비").props.disabled).toBe(true);
+      const form = visitElements(tree, (node) => node.type === "form");
+      if (!form) throw new Error("Missing workflow form");
+      if (typeof form.props.onSubmit !== "function") throw new Error("Missing submit handler");
+      form.props.onSubmit({ preventDefault() {} });
+      await flush();
+      expect(data.invoke).not.toHaveBeenCalled();
+      data.observation = available;
+      data.phase = "connected";
+      data.support = "supported";
+      render();
+      await flush();
+      expect(data.invoke).not.toHaveBeenCalled();
+    },
+  );
+  it("rechecks freshness after the user accepts an outstanding workflow confirmation", async () => {
+    await prepare();
+    data.confirm.mockImplementation(async () => {
+      const observation = data.observation;
+      if (!observation) throw new Error("Missing control fixture");
+      data.observation = { ...observation, stale: true };
+      render();
+      return true;
+    });
+    await click("확인 후 시작");
+    expect(data.invoke).toHaveBeenCalledOnce();
+    expect(data.invoke.mock.calls[0]?.[0].input.request.type).toBe("workflow.prepare");
+  });
+  it("opens and closes diagnostics without issuing a Runtime request", async () => {
+    await click("연결 진단 정보");
+    expect(control(render(), "연결 진단 정보").props["aria-expanded"]).toBe(true);
+    await click("연결 진단 정보");
+    expect(control(render(), "연결 진단 정보").props["aria-expanded"]).toBe(false);
+    expect(data.invoke).not.toHaveBeenCalled();
+  });
 });
 
 const browserCandidate: WeavraBrowserCandidateSummary = {
