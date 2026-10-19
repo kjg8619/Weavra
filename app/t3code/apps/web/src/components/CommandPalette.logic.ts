@@ -152,6 +152,64 @@ export interface CommandPaletteActionItem extends CommandPaletteItem {
   readonly run: () => Promise<void>;
 }
 
+export type ProjectImportAvailability =
+  | { readonly status: "ready" }
+  | {
+      readonly status: "not-installed" | "unauthenticated" | "unknown" | "unsupported";
+      readonly reason: string;
+    };
+
+export const PROJECT_IMPORT_SETUP_DESTINATION = {
+  to: "/settings/source-control",
+} as const;
+
+export function buildProjectImportSourceActions(input: {
+  readonly environmentId: EnvironmentId;
+  readonly source: string;
+  readonly label: string;
+  readonly description: string;
+  readonly availability: ProjectImportAvailability;
+  readonly icon: ReactNode;
+  readonly runImport: () => Promise<void>;
+  readonly runSetup: () => Promise<void>;
+}): {
+  readonly importAction: CommandPaletteActionItem;
+  readonly setupAction: CommandPaletteActionItem | null;
+} {
+  const isReady = input.availability.status === "ready";
+  const reason = isReady ? null : input.availability.reason;
+  const importAction: CommandPaletteActionItem = {
+    kind: "action",
+    value: `action:add-project:${input.environmentId}:${input.source}${isReady ? "" : ":not-ready"}`,
+    searchTerms: ["clone", "remote", "repository", "repo", "git", input.label],
+    title: `${input.label} 저장소`,
+    description: reason ? `${input.description} · ${reason}` : input.description,
+    disabled: !isReady,
+    icon: input.icon,
+    keepOpen: isReady,
+    run: async () => {
+      if (isReady) await input.runImport();
+    },
+  };
+
+  if (input.availability.status === "ready" || input.availability.status === "unsupported") {
+    return { importAction, setupAction: null };
+  }
+
+  return {
+    importAction,
+    setupAction: {
+      kind: "action",
+      value: `action:add-project:${input.environmentId}:${input.source}:setup`,
+      searchTerms: ["setup", "settings", "source control", input.label],
+      title: `${input.label} 설정 열기`,
+      description: reason ?? "",
+      icon: input.icon,
+      run: input.runSetup,
+    },
+  };
+}
+
 export interface CommandPaletteSubmenuItem extends CommandPaletteItem {
   readonly kind: "submenu";
   readonly addonIcon: ReactNode;

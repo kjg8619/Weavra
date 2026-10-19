@@ -4,6 +4,7 @@ import type { Project, Thread } from "../types";
 import {
   buildBrowseGroups,
   buildCommandPaletteProjectMetadata,
+  buildProjectImportSourceActions,
   buildProjectActionItems,
   buildThreadActionItems,
   buildLinkedThreadActionItems,
@@ -11,6 +12,7 @@ import {
   filterPinnedBrowseEntries,
   filterCommandPaletteGroups,
   reduceCommandPaletteUiState,
+  PROJECT_IMPORT_SETUP_DESTINATION,
   type CommandPaletteActionItem,
   type CommandPaletteGroup,
 } from "./CommandPalette.logic";
@@ -172,6 +174,73 @@ describe("buildCommandPaletteProjectMetadata", () => {
 
     expect(metadata.searchTerms).toContain("Remote");
     expect(metadata.environmentLabels).toEqual(["Remote"]);
+  });
+});
+
+describe("buildProjectImportSourceActions", () => {
+  it.each([
+    ["not-installed", "GitHub CLI needs installation", true],
+    ["unauthenticated", "GitHub login is required", true],
+    ["unknown", "GitHub authentication state is unknown", true],
+    ["unsupported", "This provider is not supported here", false],
+  ] as const)(
+    "keeps %s imports disabled and exposes the right explanation",
+    async (status, reason, canOpenSetup) => {
+      const runImport = vi.fn(async () => {});
+      const runSetup = vi.fn(async () => {});
+      const { importAction, setupAction } = buildProjectImportSourceActions({
+        environmentId: LOCAL_ENVIRONMENT_ID,
+        source: "github",
+        label: "GitHub",
+        description: "owner/repo 복제",
+        availability: { status, reason },
+        icon: null,
+        runImport,
+        runSetup,
+      });
+
+      expect(importAction.disabled).toBe(true);
+      expect(importAction.description).toContain(reason);
+      await importAction.run();
+      expect(runImport).not.toHaveBeenCalled();
+      if (canOpenSetup) {
+        expect(setupAction).not.toBeNull();
+      } else {
+        expect(setupAction).toBeNull();
+      }
+
+      if (setupAction) {
+        expect(setupAction.title).toBe("GitHub 설정 열기");
+        expect(setupAction.description).toBe(reason);
+        await setupAction.run();
+        expect(runSetup).toHaveBeenCalledOnce();
+      } else {
+        expect(runSetup).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it("leaves ready sources available beside unrelated unavailable sources", async () => {
+    const runImport = vi.fn(async () => {});
+    const runSetup = vi.fn(async () => {});
+    const { importAction, setupAction } = buildProjectImportSourceActions({
+      environmentId: LOCAL_ENVIRONMENT_ID,
+      source: "gitlab",
+      label: "GitLab",
+      description: "group/project 복제",
+      availability: { status: "ready" },
+      icon: null,
+      runImport,
+      runSetup,
+    });
+
+    expect(importAction.disabled).toBe(false);
+    expect(importAction.description).toBe("group/project 복제");
+    expect(setupAction).toBeNull();
+    await importAction.run();
+    expect(runImport).toHaveBeenCalledOnce();
+    expect(runSetup).not.toHaveBeenCalled();
+    expect(PROJECT_IMPORT_SETUP_DESTINATION).toEqual({ to: "/settings/source-control" });
   });
 });
 
