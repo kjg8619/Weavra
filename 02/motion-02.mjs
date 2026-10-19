@@ -68,18 +68,33 @@ const cdp = await page.context().newCDPSession(page);
 await cdp.send("Animation.enable");
 const started = [];
 cdp.on("Animation.animationStarted", ({ animation }) => started.push(animation));
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const rendered = () => page.evaluate(() => new Promise((resolve) =>
+  requestAnimationFrame(() => requestAnimationFrame(resolve))));
 async function record(tag) {
   started.length = 0;
   await cdp.send("Animation.setPlaybackRate", { playbackRate: 0 });
+  const animationReady = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cdp.off("Animation.animationStarted", listener);
+      reject(new Error("Dialog animation did not start"));
+    }, 15000);
+    const listener = ({ animation }) => {
+      if (animation.type !== "CSSTransition" || animation.name !== "opacity") return;
+      clearTimeout(timeout);
+      cdp.off("Animation.animationStarted", listener);
+      resolve();
+    };
+    cdp.on("Animation.animationStarted", listener);
+  });
   await page.locator('button[aria-label="작업 추가"]').first().click();
   await page.locator('[data-slot="dialog-popup"]').waitFor();
-  await wait(150);
+  await animationReady;
+  await rendered();
   const ids = started.filter((a) => a.type === "CSSTransition").map((a) => a.id);
   const frames = [];
   for (const [label, t] of [["start", 0], ["mid", 90], ["end", 180]]) {
     if (ids.length) await cdp.send("Animation.seekAnimations", { animations: ids, currentTime: t });
-    await wait(40);
+    await rendered();
     const file = `${tag}-open-${label}.png`;
     await page.screenshot({ path: Path.join(out, file), scale: "css" });
     frames.push({ label, t, file });
@@ -88,7 +103,7 @@ async function record(tag) {
   const backdrop = await computed('[data-slot="dialog-backdrop"]', ["transitionProperty", "transitionDuration", "backgroundColor", "zIndex"]);
   if (ids.length) await cdp.send("Animation.seekAnimations", { animations: ids, currentTime: 90 });
   await page.keyboard.press("Escape");
-  await wait(100);
+  await rendered();
   const file = `${tag}-interrupted.png`;
   await page.screenshot({ path: Path.join(out, file), scale: "css" });
   frames.push({ label: "interrupted-escape-at-mid", t: 90, file });

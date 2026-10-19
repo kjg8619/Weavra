@@ -1,0 +1,13 @@
+{
+  "name": "q5-verify-packet",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "source /tmp/hig02-env.sh; bun '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/assert.mjs' --verify-packet '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02'"
+  ],
+  "startedAt": "2026-10-19T12:21:12.979Z",
+  "completedAt": "2026-10-19T12:21:13.207Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/q5-verify-packet.log",
+  "code": 0,
+  "signal": null
+}

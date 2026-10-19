@@ -1,0 +1,62 @@
+{
+  "actions": [
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    }
+  ],
+  "observations": [
+    {
+      "label": "tokens-light",
+      "result": {
+        "--layer-content": "0",
+        "--layer-sticky": "10",
+        "--layer-passive-notice": "30",
+        "--layer-modal-backdrop": "40",
+        "--layer-modal": "50",
+        "--layer-modal-child": "60",
+        "--layer-tooltip": "70",
+        "--layer-blocking-system": "80",
+        "--overlay-shade": "color-mix(in srgb, oklch(99.2% 0 0) 60%, transparent)",
+        "--shadow-popup": "0 16px 40px -18px #0000008c",
+        "--shadow-modal": "0 24px 64px -24px #000000a6",
+        "--annotation-background": "oklch(99.2% 0 0)",
+        "--annotation-foreground": "color-mix(in oklab, color-mix(in oklab, oklch(27.4% .006 286.033) 100%, oklch(99.2% 0 0)), black 0%)",
+        "--terminal-background": "oklch(99.2% 0 0)",
+        "--terminal-foreground": "oklch(27.4% .006 286.033)",
+        "--app-scrollbar-thumb": "#d9d9d9",
+        "--tool-error-icon": "oklch(63.7% .237 25.331)"
+      }
+    },
+    {
+      "label": "tokens-dark",
+      "result": {
+        "--layer-content": "0",
+        "--layer-sticky": "10",
+        "--layer-passive-notice": "30",
+        "--layer-modal-backdrop": "40",
+        "--layer-modal": "50",
+        "--layer-modal-child": "60",
+        "--layer-tooltip": "70",
+        "--layer-blocking-system": "80",
+        "--overlay-shade": "color-mix(in srgb, oklch(14.5% 0 none) 64%, transparent)",
+        "--shadow-popup": "0 18px 44px -18px #000c",
+        "--shadow-modal": "inset 0 1px #ffffff0a, 0 24px 72px -20px #000000e6",
+        "--annotation-background": "oklch(14.5% 0 none)",
+        "--annotation-foreground": "color-mix(in oklab, color-mix(in oklab, oklch(97% 0 none) 100%, oklch(14.5% 0 none)), white 0%)",
+        "--terminal-background": "oklch(14.5% 0 none)",
+        "--terminal-foreground": "oklch(97% 0 none)",
+        "--app-scrollbar-thumb": "#ffffff14",
+        "--tool-error-icon": "oklch(80.8% .114 19.571)"
+      }
+    }
+  ]
+}

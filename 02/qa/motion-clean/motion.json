@@ -1,7 +1,7 @@
 {
   "bundle": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/app/weavra-desktop.app",
-  "asarSha256": "27691a5d9986cd37f5ddf196bd2d1621cf157e6a4f30a89e64fa3705ed433a57",
-  "at": "2026-10-19T05:31:52.661Z",
+  "asarSha256": "67ea63a7aa86375ce18ed028deff95533df34aadba8281475b2af5cec102749e",
+  "at": "2026-10-19T12:19:39.775Z",
   "runs": [
     {
       "tag": "dialog-normal",
@@ -56,6 +56,11 @@
           "type": "CSSTransition",
           "name": "opacity",
           "duration": 139.60103600161108
+        },
+        {
+          "type": "CSSTransition",
+          "name": "box-shadow",
+          "duration": 150
         }
       ],
       "popup": {
@@ -96,12 +101,17 @@
     },
     {
       "tag": "dialog-reduced",
-      "transitions": 4,
+      "transitions": 5,
       "animations": [
         {
           "type": "CSSTransition",
           "name": "scale",
           "duration": 0
+        },
+        {
+          "type": "CSSTransition",
+          "name": "box-shadow",
+          "duration": 150
         },
         {
           "type": "CSSTransition",
@@ -127,6 +137,11 @@
           "type": "CSSTransition",
           "name": "opacity",
           "duration": 80
+        },
+        {
+          "type": "CSSTransition",
+          "name": "box-shadow",
+          "duration": 150
         }
       ],
       "popup": {

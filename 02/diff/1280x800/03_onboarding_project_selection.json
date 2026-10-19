@@ -1,7 +1,7 @@
 {
   "file": "1280x800/03_onboarding_project_selection.png",
   "beforeSha256": "0600ce310a938777c94a62e6ddeed25012cca16ac39e27033ac87d7e45d42999",
-  "afterSha256": "0600ce310a938777c94a62e6ddeed25012cca16ac39e27033ac87d7e45d42999",
+  "afterSha256": "67c0871f71a5b7bd3f9deeba0e67c35ce6b39adff9605d1ce36ce2f7fe0b4b4b",
   "beforeDimensions": {
     "width": 1280,
     "height": 800
@@ -22,11 +22,30 @@
       "height": 800
     },
     "totalPixels": 1024000,
-    "diffPixels": 0,
-    "diffRatio": 0,
+    "diffPixels": 2488,
+    "diffRatio": 0.0024,
     "similarityScore": 100,
     "alphaChannelIntact": true,
-    "hotspots": [],
-    "summary": "100/100 similarity; 0/1024000 pixels differ."
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 0,
+        "x": 0,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1076
+      },
+      {
+        "gridX": 1,
+        "gridY": 0,
+        "x": 160,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0479
+      }
+    ],
+    "summary": "100/100 similarity; 2488/1024000 pixels differ; 2 hotspot region(s)."
   }
 }

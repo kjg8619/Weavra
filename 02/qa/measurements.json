@@ -1,8 +1,8 @@
 {
-  "revision": "fdc8ffc0a2b6e459b6d2921cc061e32b77d2064a",
+  "revision": "d20f77e16ef4c1a26844988c27d9d27318a9b647",
   "bundle": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/app/weavra-desktop.app",
-  "asarSha256": "27691a5d9986cd37f5ddf196bd2d1621cf157e6a4f30a89e64fa3705ed433a57",
-  "at": "2026-10-19T05:34:27.875Z",
+  "asarSha256": "67ea63a7aa86375ce18ed028deff95533df34aadba8281475b2af5cec102749e",
+  "at": "2026-10-19T12:19:12.213Z",
   "tokens": {
     "light": {
       "--layer-content": "0",
@@ -192,12 +192,12 @@
       "selector": "[data-chat-composer-stack=\"true\"]",
       "rect": {
         "x": 384,
-        "y": 344,
+        "y": 342,
         "width": 768,
-        "height": 164,
-        "top": 344,
+        "height": 168,
+        "top": 342,
         "right": 1152,
-        "bottom": 508,
+        "bottom": 510,
         "left": 384
       },
       "zIndex": "1"
@@ -295,10 +295,10 @@
       "selector": "[data-theme-editor-panel][role=dialog]",
       "rect": {
         "x": 848,
-        "y": 436,
+        "y": 424,
         "width": 416,
-        "height": 348,
-        "top": 436,
+        "height": 360,
+        "top": 424,
         "right": 1264,
         "bottom": 784,
         "left": 848
@@ -310,14 +310,14 @@
     {
       "selector": "[data-slot=\"tooltip-positioner\"]",
       "rect": {
-        "x": 1078.6875,
-        "y": 415,
+        "x": 1054.6875,
+        "y": 409,
         "width": 159.6328125,
         "height": 26,
-        "top": 415,
-        "right": 1238.3203125,
-        "bottom": 441,
-        "left": 1078.6875
+        "top": 409,
+        "right": 1214.3203125,
+        "bottom": 435,
+        "left": 1054.6875
       },
       "zIndex": "70",
       "note": "theme editor tooltip"
@@ -499,10 +499,10 @@
       "selector": "[data-theme-editor-panel][role=dialog]",
       "rect": {
         "x": 848,
-        "y": 436,
+        "y": 424,
         "width": 416,
-        "height": 348,
-        "top": 436,
+        "height": 360,
+        "top": 424,
         "right": 1264,
         "bottom": 784,
         "left": 848
@@ -586,14 +586,14 @@
     {
       "selector": "[data-chat-composer-form=\"true\"] button[type=\"submit\"]",
       "rect": {
-        "x": 1103,
-        "y": 439,
-        "width": 32,
-        "height": 32,
-        "top": 439,
+        "x": 1099,
+        "y": 437,
+        "width": 36,
+        "height": 36,
+        "top": 437,
         "right": 1135,
-        "bottom": 471,
-        "left": 1103
+        "bottom": 473,
+        "left": 1099
       },
       "transitionProperty": "scale, opacity",
       "transitionDuration": "0.12s",
@@ -611,7 +611,7 @@
         "bottom": 800,
         "left": 0
       },
-      "transitionProperty": "all",
+      "transitionProperty": "none",
       "transitionDuration": "0s"
     },
     {
@@ -626,7 +626,7 @@
         "bottom": 0,
         "left": 0
       },
-      "transitionProperty": "all",
+      "transitionProperty": "none",
       "transitionDuration": "0s"
     },
     {
@@ -641,24 +641,24 @@
         "bottom": 800,
         "left": 247
       },
-      "transitionProperty": "all",
+      "transitionProperty": "none",
       "transitionDuration": "0s",
       "zIndex": "10"
     },
     {
       "selector": "input[placeholder=\"Search or enter URL\"]",
       "rect": {
-        "x": 830,
-        "y": 52.5,
-        "width": 329,
+        "x": 866,
+        "y": 58.5,
+        "width": 257,
         "height": 26,
-        "top": 52.5,
-        "right": 1159,
-        "bottom": 78.5,
-        "left": 830
+        "top": 58.5,
+        "right": 1123,
+        "bottom": 84.5,
+        "left": 866
       },
-      "transitionProperty": "background-color",
-      "transitionDuration": "5e+06s"
+      "transitionProperty": "none",
+      "transitionDuration": "0s"
     },
     {
       "selector": "zoom indicator",
@@ -673,6 +673,11 @@
       "animationsSeen": [
         {
           "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 180
+        },
+        {
+          "type": "CSSTransition",
           "name": "scale",
           "duration": 180
         },
@@ -689,27 +694,22 @@
         {
           "type": "CSSTransition",
           "name": "opacity",
-          "duration": 180
+          "duration": 139.60103600161088
         },
         {
           "type": "CSSTransition",
           "name": "scale",
-          "duration": 139.60103600161108
+          "duration": 139.60103600161088
         },
         {
           "type": "CSSTransition",
           "name": "opacity",
-          "duration": 139.60103600161108
+          "duration": 139.60103600161088
         },
         {
           "type": "CSSTransition",
           "name": "translate",
-          "duration": 139.60103600161108
-        },
-        {
-          "type": "CSSTransition",
-          "name": "opacity",
-          "duration": 139.60103600161108
+          "duration": 139.60103600161088
         },
         {
           "type": "CSSTransition",
@@ -806,7 +806,7 @@
             "left": 0
           },
           "transitionProperty": "translate",
-          "transitionDuration": "0.2s",
+          "transitionDuration": "0.15s",
           "translate": "none",
           "left": "0px",
           "width": "256px"
@@ -823,7 +823,7 @@
             "bottom": 0,
             "left": 0
           },
-          "transitionProperty": "all",
+          "transitionProperty": "none",
           "transitionDuration": "0s",
           "translate": "none",
           "left": "0px",
@@ -842,7 +842,7 @@
             "left": 247
           },
           "transitionProperty": "translate",
-          "transitionDuration": "0.2s",
+          "transitionDuration": "0.15s",
           "translate": "-50%",
           "left": "255px",
           "width": "16px"
@@ -872,13 +872,13 @@
           "type": "CSSTransition",
           "property": "translate",
           "target": "sidebar-container",
-          "duration": 200
+          "duration": 150
         },
         {
           "type": "CSSTransition",
           "property": "translate",
           "target": "sidebar-rail",
-          "duration": 200
+          "duration": 150
         },
         {
           "type": "CSSTransition",
@@ -892,13 +892,13 @@
           "type": "CSSTransition",
           "property": "translate",
           "target": "sidebar-container",
-          "duration": 200
+          "duration": 150
         },
         {
           "type": "CSSTransition",
           "property": "translate",
           "target": "sidebar-rail",
-          "duration": 200
+          "duration": 150
         },
         {
           "type": "CSSTransition",
@@ -974,14 +974,14 @@
     {
       "selector": "[data-chat-composer-form=\"true\"] button[type=\"submit\"]",
       "rect": {
-        "x": 671,
-        "y": 439,
-        "width": 32,
-        "height": 32,
-        "top": 439,
+        "x": 667,
+        "y": 437,
+        "width": 36,
+        "height": 36,
+        "top": 437,
         "right": 703,
-        "bottom": 471,
-        "left": 671
+        "bottom": 473,
+        "left": 667
       },
       "transitionProperty": "opacity",
       "transitionDuration": "0.08s"
@@ -1093,12 +1093,12 @@
       "selector": ".preview-loading-progress",
       "rect": {
         "x": 741,
-        "y": 90,
+        "y": 102,
         "width": 539,
         "height": 2,
-        "top": 90,
+        "top": 102,
         "right": 1280,
-        "bottom": 92,
+        "bottom": 104,
         "left": 741
       },
       "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklch(0.488 0.217 264) 0px 0px 6px 1px",

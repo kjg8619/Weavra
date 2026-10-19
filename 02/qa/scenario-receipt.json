@@ -1,0 +1,2985 @@
+{
+  "schemaVersion": 1,
+  "selection": "02",
+  "revision": "d20f77e16ef4c1a26844988c27d9d27318a9b647",
+  "asarSha256": "67ea63a7aa86375ce18ed028deff95533df34aadba8281475b2af5cec102749e",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "8c92b4371b80fabcfa3151a40ab00c8d69318a49c47e605793cce1fa82e682dc",
+    "capture.mjs": "21d7fd59ea0df149a18fc740f88a62877ff7ad1f07508fdbe2f02677a23285e5",
+    "seed.mjs": "aecd32482805934ab402bf5e954f1ea0bae1fe59b73b0914af8106d7160c465f"
+  },
+  "startedAt": "2026-10-19T12:19:47.529Z",
+  "checks": [
+    {
+      "caseId": "02",
+      "checkId": "portal-owner",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "command-light: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "command-light: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "command-light: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "command-light: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "command-light: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "command-light: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "command owns keyboard focus",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "background controls cannot overtake modal",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-light: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-light: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-light: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-light: Close >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-light: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "dialog-light: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-light: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "modal-child-light: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal-child-light: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal-child-light: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal-child-light: Close >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal-child-light: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "modal-child-light: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal-child-light: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "model-light: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "model-light: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "model-light: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "model-light: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "model-light: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "model-light: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "select-in-dialog-light: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "select-in-dialog-light: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "select-in-dialog-light: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "select-in-dialog-light: Close >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "select-in-dialog-light: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "select-in-dialog-light: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "select-in-dialog-light: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "Escape select leaves containing dialog",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-light: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-light: 메시지 보내기 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-light: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-light: 이전 미디어 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-light: image 미리보기 닫기 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-light: 다음 미디어 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-light: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "image-modal-light: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-light: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "theme-editor-light: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "theme-editor-light: Minimize the theme editor >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "theme-editor-light: Close the theme editor >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "theme-editor-light: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "theme-editor-light: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "theme-editor-light: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "theme inspector is armed",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "assistant selection paragraph has geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selection-toolbar-light: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selection-toolbar-light: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selection-toolbar-light: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selection-toolbar-light: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "selection-toolbar-light: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selection-toolbar-light: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "tooltip remains a passive surface",
+          "actual": "none",
+          "expected": "none"
+        },
+        {
+          "label": "tooltip does not steal keyboard focus",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "quit hint owns blocking-system layer",
+          "actual": 80,
+          "expected": 80
+        },
+        {
+          "label": "quit hint is not a pointer trap",
+          "actual": "none",
+          "expected": "none"
+        },
+        {
+          "label": "command-dark: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "command-dark: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "command-dark: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "command-dark: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "command-dark: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "command-dark: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "command owns keyboard focus",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "background controls cannot overtake modal",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-dark: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-dark: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-dark: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-dark: Close >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-dark: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "dialog-dark: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-dark: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "modal-child-dark: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal-child-dark: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal-child-dark: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal-child-dark: Close >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal-child-dark: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "modal-child-dark: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal-child-dark: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "model-dark: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "model-dark: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "model-dark: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "model-dark: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "model-dark: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "model-dark: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "select-in-dialog-dark: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "select-in-dialog-dark: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "select-in-dialog-dark: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "select-in-dialog-dark: Close >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "select-in-dialog-dark: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "select-in-dialog-dark: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "select-in-dialog-dark: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "Escape select leaves containing dialog",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-dark: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-dark: 메시지 보내기 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-dark: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-dark: 이전 미디어 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-dark: image 미리보기 닫기 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-dark: 다음 미디어 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-dark: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "image-modal-dark: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "image-modal-dark: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "theme-editor-dark: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "theme-editor-dark: Minimize the theme editor >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "theme-editor-dark: Close the theme editor >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "theme-editor-dark: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "theme-editor-dark: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "theme-editor-dark: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "theme inspector is armed",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "assistant selection paragraph has geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selection-toolbar-dark: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selection-toolbar-dark: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selection-toolbar-dark: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selection-toolbar-dark: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "selection-toolbar-dark: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selection-toolbar-dark: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "tooltip remains a passive surface",
+          "actual": "none",
+          "expected": "none"
+        },
+        {
+          "label": "tooltip does not steal keyboard focus",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "quit hint owns blocking-system layer",
+          "actual": 80,
+          "expected": 80
+        },
+        {
+          "label": "quit hint is not a pointer trap",
+          "actual": "none",
+          "expected": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/command-light.png",
+          "sha256": "ecf6617a167426fedb1ca81d2f942ad11b719b057e33cee85326f25ca10615f8"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/command-light.ax.json",
+          "sha256": "799668d99639edf10194b4c18b23e73750d6bd349823e7d006ef60dc56203cc7"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/dialog-light.png",
+          "sha256": "146c767034b66aeb914ace13ed35b935d2eb208b3ff91d58887b28c06df1ddcf"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/dialog-light.ax.json",
+          "sha256": "16604ddc0e6fad13a74830a26a0094459432b24b95a3e9076d352596db382380"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/modal-child-light.png",
+          "sha256": "58bfbaa5dda758ca35f34590629e7ec324d72116db4aef41f3187a281b5c6509"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/modal-child-light.ax.json",
+          "sha256": "4d4902a2d5c67a0eaffc466e1aad60c3350849461f17d4f85bc1720c41df35ad"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/model-light.png",
+          "sha256": "4ed5ab60a90bfd1ee1b68a82f1ffbf7a9eff75c964c17c82c19e99694a96b09b"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/model-light.ax.json",
+          "sha256": "839dc427aab1da0bed3cbc25c371825082b359ad3dc39777ffae93e9c7dad412"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/select-in-dialog-light.png",
+          "sha256": "d2bdbd6656fd0708218c9dd9f5834541477f82a17e5cb89fd2a4547f1eb15774"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/select-in-dialog-light.ax.json",
+          "sha256": "56d175bdb7a225fe68797a17e4df68e4126cfc9c7340168ca8269dcc0f2a302a"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/image-modal-light.png",
+          "sha256": "9919fbe50552469df1273eaa887789d06460744c4794552281311071817a076a"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/image-modal-light.ax.json",
+          "sha256": "2bed7d0fd9acd0ebf45576ecf939ae5cbe5fa41e37610f634be2b30bc9c3e367"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-editor-light.png",
+          "sha256": "c34001f116ec9162dc870e6d5ee7f77f35bf4c3a88213a9aeccbbe6d71a18c0d"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-editor-light.ax.json",
+          "sha256": "f5998384f3f51b46e391d9fb1bec41110f5c65bd85ea266773d6b05755c14039"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-inspector-light.png",
+          "sha256": "2c0c299a866197bca3d221bf782ea425b94da1d465ff695e2baf77a2b0bb8dd8"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-inspector-light.ax.json",
+          "sha256": "0913c4ddc30a2039a0f83e97b662a7bcc40e0f4056c234ade65d1caa004dd1c0"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/selection-toolbar-light.png",
+          "sha256": "fc98d728f868e1409adece5532db9ce2bdf04dc2cf901ffab792a7e188cdc686"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/selection-toolbar-light.ax.json",
+          "sha256": "f8e913f392432467afd12618ea3e16297098455e5810d1fb25685f0e7ed2747e"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/tooltip-light.png",
+          "sha256": "9e839ab090b6af81e204aaf44518df9b34bac5e16e81511e8ee3492d2be13580"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/tooltip-light.ax.json",
+          "sha256": "4442ffcd1bc37313e7a5e39ade91da2c1b0039d322f2e2774f5ba6c8ede78611"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/quit-overlay-light.png",
+          "sha256": "b1fc6d3598421db271f2645fc996e265473aa50aeccdecb47572290c4a61e235"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/quit-overlay-light.ax.json",
+          "sha256": "aef04e56b2d3b31516bfda29f6cbf9dd28adde48a21a2ed9ffa00747b123b7b8"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/command-dark.png",
+          "sha256": "b30c83a201b34a914aaac21604c8e0d6ee9cae7f1d983d35f07f64b0b6b08191"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/command-dark.ax.json",
+          "sha256": "b4dc673334556bdecb74b67ebbd35c80b6e34ad8af11c565784ff430a07756b7"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/dialog-dark.png",
+          "sha256": "9a65a66c127fcbab24b16b44921922ef9f39f15d904c76c5fb087bc9dec71a71"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/dialog-dark.ax.json",
+          "sha256": "119eb369a0971fdece2b280cc2bbc084ca8659a3215bc066186ea3f22440a4d7"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/modal-child-dark.png",
+          "sha256": "3d34756270d49d7ac3520600cb1d583bc5e4764741f4bdcd80b2d9e86016a8b5"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/modal-child-dark.ax.json",
+          "sha256": "7f0eaca38d8308d9e47933d003ca2d487c6f608cd18cefbc475c3bae2fb0bfe1"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/model-dark.png",
+          "sha256": "e6db53b74890e69446486493e66d86a74ce62b7a1186141b4a7a816872279810"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/model-dark.ax.json",
+          "sha256": "74a93afd5c2bb520a0e76907fcc95cbf4d0729765b89ff27f25777eac613152d"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/select-in-dialog-dark.png",
+          "sha256": "195dc100f2fb4d794cbd8b30f681b4ca4ac55819ce39284239a171b90f16de55"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/select-in-dialog-dark.ax.json",
+          "sha256": "71ad14dff07f810b411f150dbb5d114d42ba988994c28336f2fd3c74926bca44"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/image-modal-dark.png",
+          "sha256": "afcc995a491761a35c2faba924b4ea74d5f3bfb7234044183977663a990738d3"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/image-modal-dark.ax.json",
+          "sha256": "94cadce22df0787ea3f8364a480fc2258e4779a19eab01393916f84ef8245ee7"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-editor-dark.png",
+          "sha256": "b0c01fe156bcea0870ede31a586964714b7ba1fd896a1fcfdbc6143901de24a8"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-editor-dark.ax.json",
+          "sha256": "ea30cc76c4d1da9ec9e2294717754999581183c0f78a8f7581d84cbacb530b18"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-inspector-dark.png",
+          "sha256": "fb4aa47449cc59e14a4f3d681025393d8247ec1b37e90dfa284e87b4048069c4"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/theme-inspector-dark.ax.json",
+          "sha256": "dccf3bff5b4f6999ac91f1af2fbafe636d98d9b15c889d433024e60484a75cc6"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/selection-toolbar-dark.png",
+          "sha256": "fd100a592f5a389db8239d89ea183df2016c191ad66d9f3ddd277a186a6b6f87"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/selection-toolbar-dark.ax.json",
+          "sha256": "c4673e8c99303485512d5a653bed385e361ef85ede3ab488eb6e71a834e5708c"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/tooltip-dark.png",
+          "sha256": "40b1628afee510c7522c7ff767cc1a678963b6fc49752191de092baaf2cf85e0"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/tooltip-dark.ax.json",
+          "sha256": "6d385fa3a095ea1655bdeee2151d5bff094579dd56190035318725c128e15d29"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/quit-overlay-dark.png",
+          "sha256": "dd4c99647e671cf5f409b7566018f2992c476e17b4b50edacee5d01299329565"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/quit-overlay-dark.ax.json",
+          "sha256": "4da9fef4a9ec8ca0b946a1ab8d0cc6dae914c61070cd26dd09843c4bb767b7c1"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/result.png",
+          "sha256": "50220a5b191b2c25c3ed195c9c3eded80a6c267ca655f86897fd2b93fd250781"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/result.ax.json",
+          "sha256": "c63855d75cf7d086194324b8895b5878a98935d1f31f9d6f434c5cdad94d6891"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/portal-owner/observations.json",
+          "sha256": "6ef73c44228b9c02196ccf27829c886d1ed5993e3003de0c4b3bb47cfe41df25"
+        }
+      ]
+    },
+    {
+      "caseId": "02",
+      "checkId": "escape-focus-return",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "parent dialog remains visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "focus returns to child opener",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "focus returns to action opener",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/escape-focus-return/child-escape.png",
+          "sha256": "faf1a88571db020fa43157443506de059a91b7c310ae440fc964dee0d0aa2a33"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/escape-focus-return/child-escape.ax.json",
+          "sha256": "3cb7869ef9a346d7ae2c31d9987cbccd31b0b4f9dc2cfe0b13d7a5ec910178fa"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/escape-focus-return/result.png",
+          "sha256": "8178b64cd622002c2f447c34d558958dd6195b14c3180f58dbc9bb923d74dc44"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/escape-focus-return/result.ax.json",
+          "sha256": "60f1e5744c049441bd2a55d6613fabbb8037e974b179c52064c6b9ec6dd0eb67"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/escape-focus-return/observations.json",
+          "sha256": "1eee0c03848c00ab1f32b56220d3da4ddaffc36bca3f3fe761c48b61c802ffd6"
+        }
+      ]
+    },
+    {
+      "caseId": "02",
+      "checkId": "compositor-motion",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "sidebar-gap-motion: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "sidebar-gap-motion: compositor transition (none)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "sidebar-container-motion: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "sidebar-container-motion: compositor transition (translate)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "ComposerPrimaryActions: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "ComposerPrimaryActions: compositor transition (scale, opacity)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "SidebarProviderUpdatePill: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "SidebarProviderUpdatePill: compositor transition (translate, opacity)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "PreviewChromeRow: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "PreviewChromeRow: compositor transition (none)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "one real ZoomIndicator consumer",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "ZoomIndicator: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "ZoomIndicator: compositor transition (opacity, translate)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-motion: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-motion: compositor transition (scale, opacity, translate)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-backdrop-motion: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-backdrop-motion: compositor transition (opacity)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "normal: actual transitions captured",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "normal: animations change only compositor properties",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "normal: interruption dismisses top owner",
+          "actual": false,
+          "expected": false
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-consumers.png",
+          "sha256": "8b4fe405b793a5cf73811cd522b746f2b991f465d86573db937968fa956c100f"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-consumers.ax.json",
+          "sha256": "3ab4cfffc55bc822d27d21f4436dedcaddbe57befc0ae31cc0a66d163813b89d"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-start.png",
+          "sha256": "c329a2c93d64584ae4ce22cf76bfcf47fdb95a1be07f12eada917a87007ef0a8"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-start.ax.json",
+          "sha256": "b932170c184ad60b991d2b19186ab34b246910c37e1af345d0410d70c1484c52"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-mid.png",
+          "sha256": "8b1623bdcaa5ad8c8e7f217cc9abbc36192e584c4033c5bc71125f9beef54906"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-mid.ax.json",
+          "sha256": "b932170c184ad60b991d2b19186ab34b246910c37e1af345d0410d70c1484c52"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-end.png",
+          "sha256": "bdb7caa09a44160a9d7329cb263e6d5d3ea0a59e3f1fd8982a036763bb63d370"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-end.ax.json",
+          "sha256": "b932170c184ad60b991d2b19186ab34b246910c37e1af345d0410d70c1484c52"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-interrupted.png",
+          "sha256": "f4d24557bb7fa4416e97b93b19964b78921237e188d15d74d3a7457c331d4b3a"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/normal-interrupted.ax.json",
+          "sha256": "024dac5010d590a186f1d7458c54e093cb4315734f9c54d3cea30f03bd8ba6b5"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/result.png",
+          "sha256": "018890ad739a0cbbc1f425361721aee000e825d77bba8a3b3ea7c05adb70bd79"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/result.ax.json",
+          "sha256": "aa5c6505988be940981dd7eaa495a00b8c23a7e2a56cfd9248d3ef15c84fd50a"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/compositor-motion/observations.json",
+          "sha256": "96d7430fc6f2ca38bf1ba0ec696b08f94a33bd0073bd97968a07806b159f8f62"
+        }
+      ]
+    },
+    {
+      "caseId": "02",
+      "checkId": "reduced-motion",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "dialog-reduced: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-reduced: compositor transition (opacity)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-reduced: reduced opacity-only cue",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-reduced: reduced duration",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "backdrop-reduced: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "backdrop-reduced: compositor transition (opacity)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "backdrop-reduced: reduced opacity-only cue",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "backdrop-reduced: reduced duration",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "sidebar-reduced: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "sidebar-reduced: compositor transition (none)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "sidebar-reduced: reduced opacity-only cue",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "sidebar-reduced: reduced duration",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "ComposerPrimaryActions: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "ComposerPrimaryActions: compositor transition (opacity)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "ComposerPrimaryActions: reduced opacity-only cue",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "ComposerPrimaryActions: reduced duration",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "SidebarProviderUpdatePill: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "SidebarProviderUpdatePill: compositor transition (opacity)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "SidebarProviderUpdatePill: reduced opacity-only cue",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "SidebarProviderUpdatePill: reduced duration",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "PreviewChromeRow: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "PreviewChromeRow: compositor transition (none)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "PreviewChromeRow: reduced opacity-only cue",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "PreviewChromeRow: reduced duration",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "one real ZoomIndicator consumer",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "ZoomIndicator: observed controls",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "ZoomIndicator: compositor transition (opacity)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "ZoomIndicator: reduced opacity-only cue",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "ZoomIndicator: reduced duration",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reduced: actual transitions captured",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reduced: animations change only compositor properties",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reduced: interruption dismisses top owner",
+          "actual": false,
+          "expected": false
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-consumers.png",
+          "sha256": "0e13c01b07615653c61f7e911b5a8021a010ce339041ca34c95834807792031b"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-consumers.ax.json",
+          "sha256": "7cada45687481973b10e7920df0ad17794b9988d83689afd7f3a2f86c6ca174c"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-start.png",
+          "sha256": "ef3894192df83b6c3cb9088dd15b757f14563056ac617d08fbb865b434875dea"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-start.ax.json",
+          "sha256": "1d5b30f9f5d1d6af10d4fe77f370871e25f14d99966ecf1b067890721e705705"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-mid.png",
+          "sha256": "4b30a7010660e669e0b0ed8f21317526544b846214750fe852f138243017004e"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-mid.ax.json",
+          "sha256": "1d5b30f9f5d1d6af10d4fe77f370871e25f14d99966ecf1b067890721e705705"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-end.png",
+          "sha256": "8ec45b385980fdab8422b0145ab7cb200691c4e97b7968c74878fa9171d82ab1"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-end.ax.json",
+          "sha256": "1d5b30f9f5d1d6af10d4fe77f370871e25f14d99966ecf1b067890721e705705"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-interrupted.png",
+          "sha256": "c02defcea8b46e82f6205ac03940194a029ed47391b53d3b1520a57ca8bde44e"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/reduced-interrupted.ax.json",
+          "sha256": "39877603b5228fe836fd7024b1890bea2b485cdac1a09c49600a27f67aec7a6d"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/result.png",
+          "sha256": "8bd7e151f23f7a9fe764f2fb09c7e3dd2a4c5443ae999e0ed38a3aae7e9e9682"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/result.ax.json",
+          "sha256": "5466615fda67699584f3161d33e7d159c51d4254e3a80a2d75d7372aa30bd6b9"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/reduced-motion/observations.json",
+          "sha256": "2c660726e701a3075d9b044e963ec96793c480d412c251abe394d91855f47ee9"
+        }
+      ]
+    },
+    {
+      "caseId": "02",
+      "checkId": "semantic-colors",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "light: --layer-content resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --layer-sticky resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --layer-passive-notice resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --layer-modal-backdrop resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --layer-modal resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --layer-modal-child resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --layer-tooltip resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --layer-blocking-system resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --overlay-shade resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --shadow-popup resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --shadow-modal resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --annotation-background resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --annotation-foreground resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --terminal-background resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --terminal-foreground resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --app-scrollbar-thumb resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: --tool-error-icon resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "passive notification below modal backdrop",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal above backdrop",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal child above modal",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --layer-content resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --layer-sticky resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --layer-passive-notice resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --layer-modal-backdrop resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --layer-modal resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --layer-modal-child resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --layer-tooltip resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --layer-blocking-system resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --overlay-shade resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --shadow-popup resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --shadow-modal resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --annotation-background resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --annotation-foreground resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --terminal-background resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --terminal-foreground resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --app-scrollbar-thumb resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: --tool-error-icon resolves",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "passive notification below modal backdrop",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal above backdrop",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "modal child above modal",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/tokens-light.png",
+          "sha256": "18ef3350c5791904993bd51acf64c956eef37a6cda1bbbd15943d36cbbf4c9fb"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/tokens-light.ax.json",
+          "sha256": "6cb16e57c2dfef82bda7cd998365d448caf539c606e4e7984cd0453030c3031a"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/tokens-dark.png",
+          "sha256": "804a349d44fbccc2e691d5f73572ef4ebdaecaa7b3b20fd53431d196c6754f41"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/tokens-dark.ax.json",
+          "sha256": "14ec7c8a32512bba3b52fd0acd54318f71dd43c9ceb59d097d084384840f0720"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/result.png",
+          "sha256": "804a349d44fbccc2e691d5f73572ef4ebdaecaa7b3b20fd53431d196c6754f41"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/result.ax.json",
+          "sha256": "14ec7c8a32512bba3b52fd0acd54318f71dd43c9ceb59d097d084384840f0720"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/semantic-colors/observations.json",
+          "sha256": "7880d59d4d461bc43135512df419032e338e9cf1edd9e0b32022b234deb79a69"
+        }
+      ]
+    },
+    {
+      "caseId": "02",
+      "checkId": "contrast",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "failed tool belongs to the seeded error turn",
+          "actual": {
+            "thread_id": "baseline-error",
+            "turn_id": "turn-error"
+          },
+          "expected": {
+            "thread_id": "baseline-error",
+            "turn_id": "turn-error"
+          }
+        },
+        {
+          "label": "one work disclosure belongs to the error fixture",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "failed tool consumer rendered",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "light: tool-error icon contrast 3.7431662566121258",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-title-light: sampled composited background",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-title-light: worst sampled text contrast 14.642806812370022",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "tooltip-light: sampled composited background",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "tooltip-light: worst sampled text contrast 11.73839782761943",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "failed tool belongs to the seeded error turn",
+          "actual": {
+            "thread_id": "baseline-error",
+            "turn_id": "turn-error"
+          },
+          "expected": {
+            "thread_id": "baseline-error",
+            "turn_id": "turn-error"
+          }
+        },
+        {
+          "label": "failed tool consumer rendered",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dark: tool-error icon contrast 10.315643912033986",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-title-dark: sampled composited background",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dialog-title-dark: worst sampled text contrast 18.159588039824865",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "tooltip-dark: sampled composited background",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "tooltip-dark: worst sampled text contrast 12.809401224717904",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tool-error-light.png",
+          "sha256": "7a34565edadf3b1b4a941fa3c998a9d13a3967f4ff7c8e9fad948b2c88a65caf"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tool-error-light.ax.json",
+          "sha256": "b3520829aa4e109be6f7371126247fb74c723cfa0de4be731e8adb0f440293e8"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/dialog-title-light.png",
+          "sha256": "451175e2b8f65e290fa92f843f71b942a7cc11147a7d56b2ee3f140b1d1d16df"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/dialog-title-light.ax.json",
+          "sha256": "1a25ad4f853568f2ef8d67a07bf79660d87420c7d4c0ba5078522555183a55e1"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tooltip-light.png",
+          "sha256": "8a415f120c862738a12a3ac97b61d5b97a9a54a2c014c7074fdaaca55a5eb3e1"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tooltip-light.ax.json",
+          "sha256": "8281182ff4da5fb4767a64289cd9ac8929e4f399c645e9c610d863e46977dad7"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tool-error-dark.png",
+          "sha256": "9746bbe612ecc5cb14b080dffcaf44f51dbc403c30ec10324c9e3d4bff0dd37c"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tool-error-dark.ax.json",
+          "sha256": "a4f6ea9608c47103fa42a532789229cda970f2db893338c5f3be9fce3f8f34a3"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/dialog-title-dark.png",
+          "sha256": "6358388cdcd5c6e2680842d943030415c4b1e2ddafeb7b5d7e6a87ec285c0993"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/dialog-title-dark.ax.json",
+          "sha256": "bc82df8c1d597a9af9a2174d7decb06ccc0d09d17f953290df328dff21704caf"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tooltip-dark.png",
+          "sha256": "bb1801bb7ddc6c7142bd1a41f72ea2155c0257304032915a02d454094ac1dbf3"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/tooltip-dark.ax.json",
+          "sha256": "becc04105895224692e176882becc92a23113ed87c46bc7d7fcd42c0ef841b6b"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/result.png",
+          "sha256": "2d650e3ff53e066bd4b8f90bb2456ea2dd77fca964dfd204751d6c91610ccb00"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/result.ax.json",
+          "sha256": "a59697174008cf4ff8e06898e9133f1d9c9927a12d2bcb6b3e5792b1ea2e9fd8"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/contrast/observations.json",
+          "sha256": "b4441a55254a63f3348e034723bfde61b94260c1b5a43fad2048960820264f25"
+        }
+      ]
+    },
+    {
+      "caseId": "02",
+      "checkId": "icon-targets",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "1280x800/01_first_launch_onboarding_connection.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/02_onboarding_agents.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/03_onboarding_project_selection.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/04_empty_projects.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/04_empty_projects.png: Dismiss notification >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/05_add_project_import_modal.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/05_add_project_import_modal.png: Dismiss notification >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/06_local_folder_picker.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/06_local_folder_picker.png: Dismiss notification >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/07_chat_empty_project.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/07_chat_empty_project.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/07_chat_empty_project.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/08_project_selection.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/08_project_selection.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/08_project_selection.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/09_right_panel_menu.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/09_right_panel_menu.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/09_right_panel_menu.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/10_right_files.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/10_right_files.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/10_right_files.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/11_add_action_dialog.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/11_add_action_dialog.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/11_add_action_dialog.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/11_add_action_dialog.png: Close >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/12_right_agents.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/12_right_agents.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/12_right_agents.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/13_right_run_graph.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/13_right_run_graph.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/13_right_run_graph.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/14_device_setup_dialog.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/14_device_setup_dialog.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/14_device_setup_dialog.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/14_device_setup_dialog.png: Close >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: Back >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: Forward >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: Refresh >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: Open in system browser >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: Annotate preview >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: Capture screenshot >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: Float preview over chat >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/15_right_browser.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/16_right_terminal.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/16_right_terminal.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/16_right_terminal.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/17_settings_general.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/18_settings_appearance_light.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/19_settings_appearance_dark.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/20_settings_keybindings.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/21_settings_snapshots.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/22_settings_providers.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/23_settings_integrations.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/24_settings_source_control.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/25_settings_storage.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/26_settings_connections.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/27_settings_archive.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/28_add_custom_model_form.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/29_settings_diagnostics.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/30_settings_licenses.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/31_chat_model_selector.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/31_chat_model_selector.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/31_chat_model_selector.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/32_chat_permission_menu.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/32_chat_permission_menu.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/32_chat_permission_menu.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/33_project_list_with_threads.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/33_project_list_with_threads.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/33_project_list_with_threads.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/34_chat_messages.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/34_chat_messages.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/34_chat_messages.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/35_chat_long_messages.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/35_chat_long_messages.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/35_chat_long_messages.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/36_chat_code_blocks.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/36_chat_code_blocks.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/36_chat_code_blocks.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/37_chat_streaming_working.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/37_chat_streaming_working.png: 생성 중지 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/37_chat_streaming_working.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/38_chat_error.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/38_chat_error.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/38_chat_error.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/39_chat_empty_existing_thread.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/39_chat_empty_existing_thread.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/39_chat_empty_existing_thread.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/40_right_controlled_tasks.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/40_right_controlled_tasks.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/40_right_controlled_tasks.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/41_chat_code_blocks_dark.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/41_chat_code_blocks_dark.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/41_chat_code_blocks_dark.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "390x844/42_narrow_chat_dark.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "390x844/42_narrow_chat_dark.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "390x844/42_narrow_chat_dark.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "390x844/43_narrow_chat_light.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "390x844/43_narrow_chat_light.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/44_delete_thread_confirmation.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/44_delete_thread_confirmation.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/44_delete_thread_confirmation.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/45_rename_thread_inline.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/45_rename_thread_inline.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1280x800/45_rename_thread_inline.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/01_first_launch_onboarding_connection.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/02_onboarding_agents.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/03_onboarding_project_selection.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/04_empty_projects.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/04_empty_projects.png: Dismiss notification >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/05_add_project_import_modal.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/05_add_project_import_modal.png: Dismiss notification >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/06_local_folder_picker.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/06_local_folder_picker.png: Dismiss notification >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/07_chat_empty_project.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/07_chat_empty_project.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/07_chat_empty_project.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/08_project_selection.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/08_project_selection.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/08_project_selection.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/09_right_panel_menu.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/09_right_panel_menu.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/09_right_panel_menu.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/10_right_files.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/10_right_files.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/10_right_files.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/11_add_action_dialog.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/11_add_action_dialog.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/11_add_action_dialog.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/11_add_action_dialog.png: Close >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/12_right_agents.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/12_right_agents.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/12_right_agents.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/13_right_run_graph.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/13_right_run_graph.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/13_right_run_graph.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/14_device_setup_dialog.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/14_device_setup_dialog.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/14_device_setup_dialog.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/14_device_setup_dialog.png: Close >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: Back >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: Forward >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: Refresh >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: Open in system browser >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: Annotate preview >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: Capture screenshot >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: Float preview over chat >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/15_right_browser.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/16_right_terminal.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/16_right_terminal.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/16_right_terminal.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/17_settings_general.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/18_settings_appearance_light.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/19_settings_appearance_dark.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/20_settings_keybindings.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/21_settings_snapshots.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/22_settings_providers.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/23_settings_integrations.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/24_settings_source_control.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/25_settings_storage.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/26_settings_connections.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/27_settings_archive.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/28_add_custom_model_form.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/29_settings_diagnostics.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/30_settings_licenses.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/31_chat_model_selector.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/31_chat_model_selector.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/31_chat_model_selector.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/32_chat_permission_menu.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/32_chat_permission_menu.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/32_chat_permission_menu.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/33_project_list_with_threads.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/33_project_list_with_threads.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/33_project_list_with_threads.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/34_chat_messages.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/34_chat_messages.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/34_chat_messages.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/35_chat_long_messages.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/35_chat_long_messages.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/35_chat_long_messages.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/36_chat_code_blocks.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/36_chat_code_blocks.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/36_chat_code_blocks.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/37_chat_streaming_working.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/37_chat_streaming_working.png: 생성 중지 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/37_chat_streaming_working.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/38_chat_error.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/38_chat_error.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/38_chat_error.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/39_chat_empty_existing_thread.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/39_chat_empty_existing_thread.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/39_chat_empty_existing_thread.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/40_right_controlled_tasks.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/40_right_controlled_tasks.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/40_right_controlled_tasks.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/41_chat_code_blocks_dark.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/41_chat_code_blocks_dark.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/41_chat_code_blocks_dark.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/44_delete_thread_confirmation.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/44_delete_thread_confirmation.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/44_delete_thread_confirmation.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/45_rename_thread_inline.png: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/45_rename_thread_inline.png: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "1920x1080/45_rename_thread_inline.png: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "required icon target measured: 메시지 보내기",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "required icon target measured: 생성 중지",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "required icon target measured: 파일 첨부",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "required icon target measured: Close",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "required icon target measured: Back",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "required icon target measured: Forward",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "required icon target measured: Refresh",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disabled icon targets measured",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "empty composer: 파일 첨부 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "empty composer: 메시지 보내기 >=36x36 (disabled=true)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "empty composer: Toggle main sidebar >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/icon-targets/icon-targets.png",
+          "sha256": "804a349d44fbccc2e691d5f73572ef4ebdaecaa7b3b20fd53431d196c6754f41"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/icon-targets/icon-targets.ax.json",
+          "sha256": "1175f03dec42ad1d6786c4be3b8ae5b5e80b6b945a879f4280fed0c5c8f7e94f"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/icon-targets/result.png",
+          "sha256": "804a349d44fbccc2e691d5f73572ef4ebdaecaa7b3b20fd53431d196c6754f41"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/icon-targets/result.ax.json",
+          "sha256": "1175f03dec42ad1d6786c4be3b8ae5b5e80b6b945a879f4280fed0c5c8f7e94f"
+        },
+        {
+          "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/scenarios/02/icon-targets/observations.json",
+          "sha256": "992b13a13024b0318fcf144050a2dd455b61ddfc01c11dadbade89d564542989"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-19T12:21:12.635Z",
+  "capture": {
+    "file": "run-302f17d4-51e8-4d76-9ff6-cc89da7b2aff/capture-manifest.json",
+    "sha256": "df14b2c08d5b2c270a970c2d44a8c6d4f67ca594f718003eb16267a3792eeade"
+  }
+}

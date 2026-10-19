@@ -1,0 +1,13 @@
+{
+  "name": "q5-static",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "source /tmp/hig02-env.sh; cd /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02/app/t3code; FILES=\"$(git -C /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02 diff --name-only HEAD -- app/t3code | cut -d/ -f3-)\"; pnpm exec vp lint $FILES && pnpm exec vp fmt --check $FILES && pnpm --filter @t3tools/web typecheck && bun test /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/harness.test.ts"
+  ],
+  "startedAt": "2026-10-19T12:11:01.569Z",
+  "completedAt": "2026-10-19T12:11:04.715Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/q5-static.log",
+  "code": 0,
+  "signal": null
+}

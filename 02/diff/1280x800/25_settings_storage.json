@@ -1,7 +1,7 @@
 {
   "file": "1280x800/25_settings_storage.png",
   "beforeSha256": "420640f17ae05856fe73b92aae5b0b8b1d968b64df9b04e3635af16d9a1f8943",
-  "afterSha256": "420640f17ae05856fe73b92aae5b0b8b1d968b64df9b04e3635af16d9a1f8943",
+  "afterSha256": "3d29d12b585beae06aa60bc35985be72d8dc5b9e87224ce15a74b7e6a745c815",
   "beforeDimensions": {
     "width": 1280,
     "height": 800
@@ -22,11 +22,30 @@
       "height": 800
     },
     "totalPixels": 1024000,
-    "diffPixels": 0,
-    "diffRatio": 0,
+    "diffPixels": 700,
+    "diffRatio": 0.0007,
     "similarityScore": 100,
     "alphaChannelIntact": true,
-    "hotspots": [],
-    "summary": "100/100 similarity; 0/1024000 pixels differ."
+    "hotspots": [
+      {
+        "gridX": 1,
+        "gridY": 0,
+        "x": 160,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0219
+      },
+      {
+        "gridX": 0,
+        "gridY": 0,
+        "x": 0,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0218
+      }
+    ],
+    "summary": "100/100 similarity; 700/1024000 pixels differ; 2 hotspot region(s)."
   }
 }

@@ -1,7 +1,7 @@
 {
   "file": "1280x800/48_project_settings_model_fitness.png",
-  "beforeSha256": "95aa79db1de705530fa756c310f6e4be6b01049235364f7e9b128437f3e33608",
-  "afterSha256": "95aa79db1de705530fa756c310f6e4be6b01049235364f7e9b128437f3e33608",
+  "beforeSha256": "bddf8d7fcf60d77827bd9963f4fbe301c671d31a1b4912a881047f33e40a419f",
+  "afterSha256": "4273f770d634f19477a43a44542ca6cdcdaa0378ed633a1da8a207dbb33382a6",
   "beforeDimensions": {
     "width": 1280,
     "height": 800
@@ -22,11 +22,30 @@
       "height": 800
     },
     "totalPixels": 1024000,
-    "diffPixels": 0,
-    "diffRatio": 0,
+    "diffPixels": 700,
+    "diffRatio": 0.0007,
     "similarityScore": 100,
     "alphaChannelIntact": true,
-    "hotspots": [],
-    "summary": "100/100 similarity; 0/1024000 pixels differ."
+    "hotspots": [
+      {
+        "gridX": 1,
+        "gridY": 0,
+        "x": 160,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0219
+      },
+      {
+        "gridX": 0,
+        "gridY": 0,
+        "x": 0,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0218
+      }
+    ],
+    "summary": "100/100 similarity; 700/1024000 pixels differ; 2 hotspot region(s)."
   }
 }

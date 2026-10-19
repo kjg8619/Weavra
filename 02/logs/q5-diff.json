@@ -1,0 +1,13 @@
+{
+  "name": "q5-diff",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "source /tmp/hig02-env.sh; bun '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/diff.mjs' --before '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/before/capture' --after '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/capture' --out '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/diff'"
+  ],
+  "startedAt": "2026-10-19T12:18:57.906Z",
+  "completedAt": "2026-10-19T12:19:12.072Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/q5-diff.log",
+  "code": 0,
+  "signal": null
+}
