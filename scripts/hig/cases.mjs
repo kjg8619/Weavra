@@ -400,6 +400,19 @@ export const CASES = {
 // Scenario code runs only inside the disposable packaged-app capture session.
 // Every check owns its assertion rows and hashed raw observations. A missing
 // executor is an explicit FAIL; it cannot inherit a case/group verdict.
+// Reads the clipboard only after the observed write settles; a write that never
+// completes times out, and each copied `label: value` line yields its exact value.
+export async function readCompletedCopy(written, readText, timeoutMs = 10_000) {
+  const { bounded } = await import("./assert.mjs");
+  await bounded(written, "diagnostic clipboard write completion", timeoutMs);
+  const text = await readText();
+  const values = text.split(/\r?\n/).map((line) => {
+    const at = line.indexOf(": ");
+    return at < 0 ? line : line.slice(at + 2);
+  });
+  return { text, values };
+}
+
 export function deliverScenarioEvent(sockets, method, value) {
   let delivered = 0;
   for (const entry of sockets) {
@@ -2160,14 +2173,33 @@ export async function runScenarios(context) {
       );
       const copy = page.locator("#weavra-controls").getByRole("button", { name: /복사/ });
       assert("diagnostic copy action", (await copy.count()) > 0, true);
+      // Subscribe to the renderer's own clipboard write before clicking; the product writes asynchronously.
+      await page.evaluate(() => {
+        const clipboard = navigator.clipboard;
+        const write = clipboard.writeText.bind(clipboard);
+        globalThis.__higClipboardWrite = new Promise((resolve, reject) => {
+          clipboard.writeText = async (value) => {
+            clipboard.writeText = write;
+            try {
+              await write(value);
+              resolve();
+            } catch (error) {
+              reject(error);
+              throw error;
+            }
+          };
+        });
+      });
+      const written = page.evaluate(() => globalThis.__higClipboardWrite);
       await copy.first().click();
-      const clipboard = await context.application.evaluate(({ clipboard }) => clipboard.readText());
-      assert(
-        "copy preserves exact fixture path",
-        clipboard.includes(context.isolation.workspace),
-        true,
+      const copied = await readCompletedCopy(written, () =>
+        context.application.evaluate(({ clipboard }) => clipboard.readText()),
       );
-      observations.push({ copiedFixturePath: clipboard });
+      const fixturePath = await fs.realpath(
+        path.join(context.isolation.workspace, "baseline-project"),
+      );
+      assert("copy preserves exact fixture path", copied.values.includes(fixturePath), true);
+      observations.push({ copiedFixturePath: copied.text });
     },
     "03/unknown-disclosure": async (assert) => {
       await openProjectSettings();
