@@ -1,0 +1,13 @@
+{
+  "name": "hit-final-state",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "source /tmp/hig02-env.sh; set -e; for entry in '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02|hig/02-foundations' '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/../..|hig/01-capture-contract' '/private/tmp/weavra-hig-evidence-02-20261019|hig-evidence/02'; do dir=\"${entry%|*}\"; branch=\"${entry#*|}\"; test -z \"$(git -C \"$dir\" status --porcelain)\"; local_sha=\"$(git -C \"$dir\" rev-parse HEAD)\"; remote_sha=\"$(git -C \"$dir\" ls-remote origin \"refs/heads/$branch\" | cut -f1)\"; test \"$local_sha\" = \"$remote_sha\"; printf '%s %s clean pushed\\n' \"$branch\" \"$local_sha\"; done; git -C '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02' diff --check 'ef605dbd4c71c88b8229f4bce0283890cc91d9a4' 'f49c15848e37cecf12024abcd7a65617614b42ff'; gh pr view 74 --repo kjg8619/Weavra --json headRefOid,baseRefOid"
+  ],
+  "startedAt": "2026-10-19T13:14:18.709Z",
+  "completedAt": "2026-10-19T13:14:22.487Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/hit-final-state.log",
+  "code": 0,
+  "signal": null
+}

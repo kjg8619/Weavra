@@ -59,3 +59,7 @@ All touched-target rectangles, including disabled boxes, have zero pairwise over
 - logs/hit-*.json records exact commands, timestamps and exit codes. Archived console logs normalize only extra EOF newlines for git whitespace hygiene; originals remain in the local packet's commands directory.
 
 The owner-approved October 19 amendment reserves the exhaustive universal Q1-Q12 matrix for the Final verification wave. It does not waive any executed five-point check. Earlier q5-* files are historical; this README, current capture manifests, hit-* packet and current scenario receipt are authoritative for this head.
+
+## Verified PR publication
+
+PR #74 now contains the refreshed 184-pair / 49-scenario table. All 417 real image URLs returned HTTP 200 with matching SHA-256; the unchanged strict publication verifier exited 0. Its initial run found 209 HTTP 404 responses and exited 1; those assets were re-uploaded while retaining the complete body reference set, then all 417 were rechecked. The original failure receipt is retained, not relabelled. attachment-map.json, publication-body.md and publication-verification.json bind the published URLs and body to the current packet.

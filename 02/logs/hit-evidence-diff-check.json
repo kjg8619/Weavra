@@ -1,0 +1,13 @@
+{
+  "name": "hit-evidence-diff-check",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "set -e; git -C /private/tmp/weavra-hig-evidence-02-20261019 add -- 02; git -C /private/tmp/weavra-hig-evidence-02-20261019 diff --cached --check; git -C /private/tmp/weavra-hig-evidence-02-20261019 diff --cached --shortstat"
+  ],
+  "startedAt": "2026-10-19T13:11:36.702Z",
+  "completedAt": "2026-10-19T13:11:41.868Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/hit-evidence-diff-check.log",
+  "code": 0,
+  "signal": null
+}
