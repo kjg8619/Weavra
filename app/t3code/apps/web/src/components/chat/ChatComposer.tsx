@@ -914,7 +914,7 @@ function ComposerCommandMenuLayer(props: { anchor: HTMLElement | null; children:
 
   return createPortal(
     <div
-      className="pointer-events-auto fixed z-40 flex flex-col"
+      className="pointer-events-auto fixed z-(--layer-modal-child) flex flex-col"
       data-composer-drawer-layer="true"
       style={{
         bottom: position.bottom,
@@ -6081,7 +6081,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       <form
         ref={composerFormRef}
         onSubmit={send}
-        className="relative z-10 space-y-3 rounded-[22px] p-4"
+        className="relative z-(--layer-raised-content) space-y-3 rounded-[22px] p-4"
       >
         <label htmlFor={controlledMessageId} className="block text-sm font-medium">
           {controlledTask.mode === "analysis"
@@ -6215,7 +6215,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         <ComposerBanner.Column>
           <ComposerBannerStack
             key={activeThreadId}
-            className="relative z-0"
+            className="relative z-(--layer-content)"
             items={bannerStackItems}
           />
           {!activityStackItem && (props.threadSyncPhase || inlineTasksBadge) ? (
@@ -6704,7 +6704,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                 <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/10" />
                               </>
                             )}
-                            <PlayIcon className="relative z-10 size-4 fill-current drop-shadow-md" />
+                            <PlayIcon className="relative z-(--layer-raised-content) size-4 fill-current drop-shadow-md" />
                           </button>
                           {upload?.status === "uploading" && (
                             <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-background/85 px-1 text-center text-[10px] text-foreground">
@@ -6995,7 +6995,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   isComposerFooterCompact ? "gap-1.5" : "gap-2 sm:gap-0",
                   showMobilePendingAnswerActions && "hidden sm:flex",
                   isComposerResting &&
-                    "absolute bottom-px right-px z-10 h-12 w-auto gap-0 py-0 sm:gap-0 sm:py-0",
+                    "absolute bottom-px right-px z-(--layer-raised-content) h-12 w-auto gap-0 py-0 sm:gap-0 sm:py-0",
                 )}
               >
                 <div

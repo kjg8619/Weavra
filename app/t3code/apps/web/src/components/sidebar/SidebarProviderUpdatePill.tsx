@@ -1,4 +1,5 @@
 import { Spinner } from "~/components/ui/spinner";
+import { ko } from "~/i18n/ko";
 import { useNavigate } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import type { ServerProvider } from "@t3tools/contracts";
@@ -126,11 +127,11 @@ export function SidebarProviderUpdatePill() {
 
   return (
     <div
-      className={`group/provider-update relative flex min-h-7 w-full shrink-0 items-center overflow-hidden rounded-lg text-[11px] leading-4 font-medium transform-gpu transition-all duration-180 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
+      className={`group/provider-update relative flex min-h-7 w-full shrink-0 items-center overflow-hidden rounded-lg text-[11px] leading-4 font-medium transform-gpu transition-[translate,opacity] duration-(--motion-surface) ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-opacity ${
         PROVIDER_UPDATE_PILL_STYLES[displayedView.tone]
       } ${
         exitingKey === displayedView.key
-          ? "pointer-events-none translate-y-1.5 opacity-0"
+          ? "pointer-events-none translate-y-1.5 opacity-0 motion-reduce:translate-y-0"
           : "translate-y-0 opacity-100"
       }`}
       onTransitionEnd={(event) => {
@@ -170,7 +171,7 @@ export function SidebarProviderUpdatePill() {
             <button
               type="button"
               aria-label={displayedView.description}
-              className="provider-update-main relative z-[1] flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
+              className="provider-update-main relative z-(--layer-raised-content) flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
               onClick={openProviderSettings}
             >
               {displayedView.tone === "loading" ? (
@@ -195,8 +196,8 @@ export function SidebarProviderUpdatePill() {
               <Button
                 size="icon-micro"
                 variant="ghost"
-                aria-label="제공자 업데이트 알림 닫기"
-                className="relative z-[1] mr-1 [--control-icon-color:currentColor] rounded-md text-inherit opacity-70 hover:bg-transparent hover:opacity-100"
+                aria-label={ko.providers.dismissUpdateNotice}
+                className="relative z-(--layer-raised-content) mr-1 [--control-icon-color:currentColor] rounded-md text-inherit opacity-70 hover:bg-transparent hover:opacity-100"
                 onClick={() => startExit(displayedView.key, null, displayedView.key)}
               >
                 <XIcon className="size-3.5 shrink-0" />

@@ -11,7 +11,7 @@ function ThemeWireframePane({
   colors: ThemeCardPreviewColors;
   clip?: "left" | "right" | undefined;
 }) {
-  const line = "rgb(127 127 127 / 0.25)";
+  const line = "var(--preview-separator)";
   return (
     <span
       className="absolute inset-0"
@@ -87,7 +87,7 @@ function ThemeWireframePane({
         className="absolute right-[5%] top-[8%] h-[46%] w-[20%] rounded-lg"
         style={{
           backgroundColor: colors.surface,
-          boxShadow: `inset 0 0 0 1px ${line}, 0 2px 5px rgb(0 0 0 / 0.14)`,
+          boxShadow: `inset 0 0 0 1px ${line}, var(--shadow-preview)`,
         }}
       >
         {[0, 1, 2].map((row) => (

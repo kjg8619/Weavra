@@ -2850,7 +2850,7 @@ function SortableProjectItem({
         transition,
       }}
       className={`group/menu-item relative rounded-md ${
-        isDragging ? "z-20 opacity-80" : ""
+        isDragging ? "z-(--layer-sticky) opacity-80" : ""
       } ${isOver && !isDragging ? "ring-1 ring-primary/40" : ""}`}
       data-sidebar="menu-item"
       data-slot="sidebar-menu-item"
@@ -2958,7 +2958,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
       fixedHeader={
         // Lifted above the stage backdrop, whose fade bleeds below the
         // header and would otherwise paint across the search row's outline.
-        <SidebarGroup className="relative z-[1] px-2 pt-2 pb-1">
+        <SidebarGroup className="relative z-(--layer-raised-content) px-2 pt-2 pb-1">
           <SidebarMenu>
             <SidebarMenuItem>
               <CommandDialogTrigger

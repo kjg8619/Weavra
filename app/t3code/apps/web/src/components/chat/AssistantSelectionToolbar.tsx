@@ -7,6 +7,7 @@ import {
 import { QuoteIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ko } from "~/i18n/ko";
 import {
   captureAssistantTextSelection,
   type AssistantCitationSourceAnchor,
@@ -133,10 +134,8 @@ export function AssistantSelectionToolbar({
       size="xs"
       variant="glass"
       disabled={tooLong}
-      aria-label={
-        tooLong ? "선택한 내용이 너무 길어 인용할 수 없어요" : "선택한 내용을 작성기에 인용"
-      }
-      className="fixed z-50 max-w-[calc(100vw-1rem)] rounded-full px-2.5"
+      aria-label={tooLong ? ko.chat.selection.selectionTooLong : ko.chat.selection.quoteSelection}
+      className="fixed z-(--layer-selection-tools) max-w-[calc(100vw-1rem)] rounded-full px-2.5"
       style={{ left: selection.position.x, top: selection.position.y }}
       onPointerDown={(event) => event.preventDefault()}
       onClick={cite}
@@ -149,7 +148,7 @@ export function AssistantSelectionToolbar({
       }}
     >
       <QuoteIcon aria-hidden="true" className="size-3.5" />
-      {tooLong ? "선택 줄이기" : "인용"}
+      {tooLong ? ko.chat.selection.shorten : ko.chat.selection.quote}
     </Button>,
     document.body,
   );
