@@ -389,6 +389,20 @@ export const CASES = {
 // Scenario code runs only inside the disposable packaged-app capture session.
 // Every check owns its assertion rows and hashed raw observations. A missing
 // executor is an explicit FAIL; it cannot inherit a case/group verdict.
+export function deliverScenarioEvent(sockets, method, value) {
+  let delivered = 0;
+  for (const entry of sockets) {
+    if (entry.closed) continue;
+    for (const [id, tag] of entry.methods)
+      if (tag === method) {
+        entry.socket.send(JSON.stringify({ _tag: "Chunk", requestId: id, values: [value] }));
+        delivered++;
+      }
+  }
+  if (!delivered) throw new Error(`No live subscriber for scenario event: ${method}`);
+  return delivered;
+}
+
 export async function runScenarios(context) {
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
@@ -442,9 +456,9 @@ export async function runScenarios(context) {
       const decoded = JSON.parse(String(message));
       const frames = Array.isArray(decoded) ? decoded : [decoded];
       for (const frame of frames) {
-        if (frame._tag === "Interrupt") methods.delete(String(frame.requestId));
+        if (frame._tag === "Interrupt") methods.delete(frame.requestId);
         if (frame._tag === "Request") {
-          methods.set(String(frame.id), frame.tag);
+          methods.set(frame.id, frame.tag);
           requests.push({ method: frame.tag, command: frame.payload?.request?.type ?? null });
           if (replies.has(frame.tag)) {
             synthetic.add(String(frame.id));
@@ -560,7 +574,7 @@ export async function runScenarios(context) {
         });
         if (
           wire &&
-          methods.get(String(frame.requestId)) === "subscribeServerConfig" &&
+          methods.get(frame.requestId) === "subscribeServerConfig" &&
           frame._tag === "Chunk"
         )
           frame.values = frame.values.map((value) =>
@@ -568,11 +582,11 @@ export async function runScenarios(context) {
           );
         if (
           wire &&
-          methods.get(String(frame.requestId)) === "server.getConfig" &&
+          methods.get(frame.requestId) === "server.getConfig" &&
           frame.exit?._tag === "Success"
         )
           frame.exit.value = config(frame.exit.value);
-        const method = methods.get(String(frame.requestId));
+        const method = methods.get(frame.requestId);
         if (frame._tag === "Chunk")
           for (const value of frame.values)
             if (value.kind === "snapshot" || value.type === "snapshot")
@@ -1242,19 +1256,10 @@ export async function runScenarios(context) {
     );
   }
   function emit(method, value) {
-    let delivered = 0;
-    for (const entry of sockets) {
-      if (entry.closed) continue;
-      for (const [id, tag] of entry.methods)
-        if (tag === method) {
-          entry.socket.send(JSON.stringify({ _tag: "Chunk", requestId: id, values: [value] }));
-          delivered++;
-        }
-    }
-    if (!delivered) throw new Error(`No live subscriber for scenario event: ${method}`);
+    deliverScenarioEvent(sockets, method, value);
     observations.push({ authority: "SYNTHETIC_SUBSCRIPTION_EVENT", method, value });
   }
-  async function providerEvent(status = "error", update = false) {
+  async function providerEvent(status = "error", update = false, progress = false) {
     if (!liveConfig?.providers?.length) throw new Error("No live provider inventory for event");
     const providers = structuredClone(liveConfig.providers);
     const codex = providers.find((provider) => provider.instanceId === "codex");
@@ -1275,6 +1280,14 @@ export async function runScenarios(context) {
         updateCommand: "printf 'HIG update must not execute'",
         checkedAt: new Date().toISOString(),
         message: "HIG provider update available",
+      };
+    if (progress)
+      codex.updateState = {
+        status: "running",
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        message: "HIG synthetic update progress; no update process was launched",
+        output: null,
       };
     const event = { version: 1, type: "providerStatuses", payload: { providers } };
     emit("subscribeServerConfig", event);
@@ -1461,7 +1474,7 @@ export async function runScenarios(context) {
       '[data-chat-composer-form="true"] button[type="submit"]',
       reduced,
     );
-    await providerEvent("ready", true);
+    await providerEvent("ready", true, true);
     await motionProperties(
       assert,
       "SidebarProviderUpdatePill",
@@ -1484,37 +1497,25 @@ export async function runScenarios(context) {
   async function toolErrorContrast(assert, mode) {
     const { Database } = await import("bun:sqlite");
     const database = new Database(path.join(context.isolation.app, "userdata/state.sqlite"), {
-      readwrite: true,
+      readonly: true,
       create: false,
     });
     try {
-      database
-        .query(
-          `INSERT OR REPLACE INTO projection_thread_activities
-        (activity_id,thread_id,turn_id,tone,kind,summary,payload_json,created_at,sequence)
-        VALUES (?,?,?,?,?,?,?,?,?)`,
-        )
-        .run(
-          "hig-tool-error",
-          "baseline-error",
-          "turn-error",
-          "error",
-          "tool.completed",
-          "HIG failed tool fixture",
-          JSON.stringify({
-            toolCallId: "hig-tool",
-            itemType: "command_execution",
-            status: "failed",
-            command: "printf 'synthetic fixture; not executed'",
-            exitCode: 1,
-          }),
-          "2026-10-18T09:00:00.500Z",
-          999,
-        );
-      await page.reload();
+      assert(
+        "failed tool belongs to the seeded error turn",
+        database
+          .query("SELECT thread_id,turn_id FROM projection_thread_activities WHERE activity_id = ?")
+          .get("hig-tool-error"),
+        { thread_id: "baseline-error", turn_id: "turn-error" },
+      );
       await home();
       await thread("05 Error fixture");
       const icons = page.locator('[class*="text-tool-error-icon"]').filter({ visible: true });
+      if ((await icons.count()) === 0) {
+        const disclosure = page.getByRole("button", { name: /^Worked for / });
+        assert("one work disclosure belongs to the error fixture", await disclosure.count(), 1);
+        await disclosure.click();
+      }
       await icons.first().waitFor({ state: "visible" });
       await icons.first().scrollIntoViewIfNeeded();
       const samples = await sample(`tool-error-${mode}`, () => {
@@ -1574,9 +1575,6 @@ export async function runScenarios(context) {
         assert(`${mode}: tool-error icon contrast ${ratio}`, ratio >= 3, true);
       }
     } finally {
-      database
-        .query("DELETE FROM projection_thread_activities WHERE activity_id = ?")
-        .run("hig-tool-error");
       database.close();
     }
   }
@@ -1732,12 +1730,14 @@ export async function runScenarios(context) {
         await page.getByRole("button", { name: "Close the theme editor", exact: true }).click();
         await home();
         await thread("01 Conversation");
-        await page.locator("[data-assistant-citation-source]").evaluate((node) => {
-          const range = document.createRange();
-          range.selectNodeContents(node);
-          getSelection().removeAllRanges();
-          getSelection().addRange(range);
-        });
+        const paragraph = page.locator("[data-assistant-citation-source] p").first();
+        await paragraph.scrollIntoViewIfNeeded();
+        const box = await paragraph.boundingBox();
+        assert("assistant selection paragraph has geometry", box !== null, true);
+        await page.mouse.move(box.x + 3, box.y + 8);
+        await page.mouse.down();
+        await page.mouse.move(box.x + Math.min(box.width - 3, 280), box.y + 8, { steps: 8 });
+        await page.mouse.up();
         await page
           .getByRole("button", { name: "선택한 내용을 작성기에 인용", exact: true })
           .waitFor();
@@ -1748,7 +1748,12 @@ export async function runScenarios(context) {
         );
         await page.keyboard.press("Tab");
         await page.keyboard.press("Escape");
-        const beforeFocus = await page.evaluate(() => document.activeElement?.outerHTML);
+        await page
+          .getByRole("button", { name: "선택한 내용을 작성기에 인용", exact: true })
+          .waitFor({ state: "hidden" });
+        await page.evaluate(() => {
+          globalThis.higFocusOwner = document.activeElement;
+        });
         await (await named(page, "button", "panel")).hover();
         await page.locator('[data-slot="tooltip-popup"]').waitFor();
         const tooltip = await sample(`tooltip-${mode}`, () => {
@@ -1757,11 +1762,11 @@ export async function runScenarios(context) {
             pointerEvents: getComputedStyle(node).pointerEvents,
             zIndex: Number(getComputedStyle(node).zIndex),
             rect: node.getBoundingClientRect().toJSON(),
-            focus: document.activeElement?.outerHTML,
+            focusUnchanged: document.activeElement === globalThis.higFocusOwner,
           };
         });
         assert("tooltip remains a passive surface", tooltip.pointerEvents, "none");
-        assert("tooltip does not steal keyboard focus", tooltip.focus, beforeFocus);
+        assert("tooltip does not steal keyboard focus", tooltip.focusUnchanged, true);
         await frame(`tooltip-${mode}`);
         await page.mouse.move(640, 400);
         await context.win.evaluate((window) =>

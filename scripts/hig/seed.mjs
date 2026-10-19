@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
-export const FIXTURE_VERSION = "hig-offline-projection-v2";
+export const FIXTURE_VERSION = "hig-offline-projection-v3";
 export function assertProfile(base, home, workspace, app) {
   const canonical = NodeFS.realpathSync(base);
   if (
@@ -153,6 +153,25 @@ export function seed({ base, home, workspace, app }) {
           );
         }
       }
+      db.query(`INSERT OR REPLACE INTO projection_thread_activities
+        (activity_id,thread_id,turn_id,tone,kind,summary,payload_json,created_at,sequence)
+        VALUES (?,?,?,?,?,?,?,?,?)`).run(
+        "hig-tool-error",
+        "baseline-error",
+        "turn-error",
+        "error",
+        "tool.completed",
+        "HIG failed tool fixture",
+        JSON.stringify({
+          toolCallId: "hig-tool",
+          itemType: "command_execution",
+          status: "failed",
+          command: "printf 'synthetic fixture; not executed'",
+          exitCode: 1,
+        }),
+        "2026-10-18T09:00:00.500Z",
+        999,
+      );
     })();
     return {
       version: FIXTURE_VERSION,

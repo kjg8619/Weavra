@@ -3,7 +3,13 @@ import { Database } from "bun:sqlite";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
-import { expectedFiles, expectedCaptureFiles, chooseAlias, CASES } from "./cases.mjs";
+import {
+  expectedFiles,
+  expectedCaptureFiles,
+  chooseAlias,
+  CASES,
+  deliverScenarioEvent,
+} from "./cases.mjs";
 import {
   bounded,
   pngDimensions,
@@ -92,6 +98,30 @@ describe("executed scenario coverage", () => {
   test("cannot use a single case receipt for the final wave", () => {
     const input = { ...receipt(), selection: "all" };
     expect(() => validateCheckCoverage(input)).toThrow("Missing or unexpected");
+  });
+});
+
+describe("scenario subscription transport", () => {
+  test("preserves numeric subscription identities when delivering an event", () => {
+    const frames: string[] = [];
+    const subscriptions = [
+      {
+        closed: false,
+        methods: new Map([[7, "subscribeServerConfig"]]),
+        socket: { send: (frame: string) => frames.push(frame) },
+      },
+    ];
+    deliverScenarioEvent(subscriptions, "subscribeServerConfig", { type: "providerStatuses" });
+    expect(JSON.parse(frames[0] ?? "{}")).toEqual({
+      _tag: "Chunk",
+      requestId: 7,
+      values: [{ type: "providerStatuses" }],
+    });
+  });
+  test("rejects an event when no live subscriber can consume it", () => {
+    expect(() => deliverScenarioEvent([], "subscribeServerConfig", {})).toThrow(
+      "No live subscriber",
+    );
   });
 });
 
@@ -347,6 +377,8 @@ describe("state-bound capture evidence", () => {
           "thread_id,status,provider_name,provider_instance_id,runtime_mode,active_turn_id,last_error,updated_at",
         projection_turns:
           "thread_id,turn_id,pending_message_id,assistant_message_id,state,requested_at,started_at,completed_at,checkpoint_files_json",
+        projection_thread_activities:
+          "activity_id,thread_id,turn_id,tone,kind,summary,payload_json,created_at,sequence",
       };
       for (const [name, columns] of Object.entries(tables)) {
         db.run(
@@ -370,6 +402,10 @@ describe("state-bound capture evidence", () => {
       });
       expect(db.query("SELECT count(*) AS count FROM projection_turns").get()).toEqual({
         count: 5,
+      });
+      expect(db.query("SELECT kind,tone FROM projection_thread_activities").get()).toEqual({
+        kind: "tool.completed",
+        tone: "error",
       });
     } finally {
       db.close();
