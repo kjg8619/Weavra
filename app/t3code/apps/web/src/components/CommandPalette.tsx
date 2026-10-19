@@ -1558,7 +1558,7 @@ function OpenCommandPaletteDialog(props: {
               <span className="text-foreground">{actions.importAction.description}</span>
               <Button
                 variant="link"
-                size="sm"
+                size="default"
                 className="h-8 px-2.5 text-foreground underline"
                 onClick={(event) => {
                   event.stopPropagation();
