@@ -76,6 +76,26 @@ export function whenAstToExpression(node: KeybindingWhenNode | undefined): strin
   }
 }
 
+export function whenAstToKoreanExplanation(node: KeybindingWhenNode | undefined): string {
+  if (!node) return "항상";
+  switch (node.type) {
+    case "identifier":
+      if (node.name === "terminalFocus") return "터미널에 포커스";
+      if (node.name === "terminalOpen") return "터미널이 열려있음";
+      if (node.name === "isWeb") return "웹";
+      if (node.name === "isDesktop") return "데스크톱";
+      if (node.name === "true") return "항상";
+      if (node.name === "false") return "사용 안 함";
+      return `조건: ${node.name}`;
+    case "not":
+      return `아닌 ${whenAstToKoreanExplanation(node.node)}`;
+    case "and":
+      return `${whenAstToKoreanExplanation(node.left)} 그리고 ${whenAstToKoreanExplanation(node.right)}`;
+    case "or":
+      return `${whenAstToKoreanExplanation(node.left)} 또는 ${whenAstToKoreanExplanation(node.right)}`;
+  }
+}
+
 export function whenNodeRemoveLabel(node: KeybindingWhenNode, depth: number): string {
   if (depth === 0) return "Clear all conditions";
   if (node.type === "identifier" || (node.type === "not" && node.node.type === "identifier")) {

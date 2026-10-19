@@ -63,6 +63,7 @@ import {
   type WhenVariableOption,
   unknownWhenVariables,
   whenAstToExpression,
+  whenAstToKoreanExplanation,
   whenNodeRemoveLabel,
 } from "./KeybindingsSettings.logic";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
@@ -1047,7 +1048,14 @@ function KeybindingSettingsRow(props: KeybindingRowProps) {
       id={anchorId}
       className="group/row rounded-none"
       title={<KeybindingRowTitle row={row} />}
-      description={<KeybindingRowWhen row={row} editor={editor} variables={variables} />}
+      description={
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs opacity-70">
+            {whenAstToKoreanExplanation(row.binding.whenAst)}
+          </span>
+          <KeybindingRowWhen row={row} editor={editor} variables={variables} />
+        </div>
+      }
       control={
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           <KeybindingConflictWarning labels={editor.conflictLabels} />
