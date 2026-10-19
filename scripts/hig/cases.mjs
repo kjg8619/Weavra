@@ -3,6 +3,11 @@ export function iconTargetMeetsMinimum(control) {
   return control.rect.width >= 36 && control.rect.height >= 36;
 }
 
+export function assertIconTargetHits(assert, label, control) {
+  if (control.visible && !control.disabled && control.hits[0])
+    assert(`${label}: five icon hit points`, control.hits, [true, true, true, true, true]);
+}
+
 export const SIZES = [
   [1280, 800],
   [1920, 1080],
@@ -744,18 +749,36 @@ export async function runScenarios(context) {
     const controls = await sample(`${label}: icon targets`, () =>
       [...document.querySelectorAll("button[data-icon-control]")]
         .filter((node) => node.checkVisibility({ opacityProperty: true, visibilityProperty: true }))
-        .map((node) => ({
-          name: node.getAttribute("aria-label") ?? node.textContent,
-          rect: node.getBoundingClientRect().toJSON(),
-          disabled: node.matches(":disabled"),
-        })),
+        .map((node) => {
+          const rect = node.getBoundingClientRect();
+          const inset = Math.min(4, rect.width / 4, rect.height / 4);
+          const points = [
+            [rect.x + rect.width / 2, rect.y + rect.height / 2],
+            [rect.left + inset, rect.top + inset],
+            [rect.right - inset, rect.top + inset],
+            [rect.left + inset, rect.bottom - inset],
+            [rect.right - inset, rect.bottom - inset],
+          ];
+          return {
+            name: node.getAttribute("aria-label") ?? node.textContent,
+            rect: rect.toJSON(),
+            disabled: node.matches(":disabled"),
+            visible: true,
+            hits: points.map(([x, y]) => {
+              const hit = document.elementFromPoint(x, y);
+              return hit === node || node.contains(hit);
+            }),
+          };
+        }),
     );
-    for (const control of controls)
+    for (const control of controls) {
       assert(
         `${label}: ${control.name} >=36x36 (disabled=${control.disabled})`,
         iconTargetMeetsMinimum(control),
         true,
       );
+      assertIconTargetHits(assert, `${label}: ${control.name}`, control);
+    }
   }
   async function motionProperties(assert, label, selector, reduced = false) {
     await page.locator(selector).waitFor({ state: "attached" });
@@ -1702,6 +1725,7 @@ export async function runScenarios(context) {
             iconTargetMeetsMinimum(control),
             true,
           );
+          assertIconTargetHits(assert, `${row.file}: ${control.name}`, control);
           measured.push({ file: row.file, ...control });
         }
       }
