@@ -1,4 +1,8 @@
 // IDs are evidence identities, never capture-order counters.
+export function iconTargetMeetsMinimum(control) {
+  return control.rect.width >= 36 && control.rect.height >= 36;
+}
+
 export const SIZES = [
   [1280, 800],
   [1920, 1080],
@@ -169,6 +173,7 @@ export const CASES = {
       "reduced-motion",
       "semantic-colors",
       "contrast",
+      "icon-targets",
     ],
   },
   "03": {
@@ -694,6 +699,7 @@ export async function runScenarios(context) {
   async function owner(assert, label, selector) {
     await page.locator(selector).filter({ visible: true }).waitFor({ state: "visible" });
     await settle();
+    if (current.startsWith("02/")) await iconTargets(assert, label);
     const geometry = await sample(
       label,
       (selector) => {
@@ -733,6 +739,23 @@ export async function runScenarios(context) {
     assert(`${label}: five hit points`, geometry[0].hits, [true, true, true, true, true]);
     await frame(label);
     return geometry[0];
+  }
+  async function iconTargets(assert, label) {
+    const controls = await sample(`${label}: icon targets`, () =>
+      [...document.querySelectorAll("button[data-icon-control]")]
+        .filter((node) => node.checkVisibility({ opacityProperty: true, visibilityProperty: true }))
+        .map((node) => ({
+          name: node.getAttribute("aria-label") ?? node.textContent,
+          rect: node.getBoundingClientRect().toJSON(),
+          disabled: node.matches(":disabled"),
+        })),
+    );
+    for (const control of controls)
+      assert(
+        `${label}: ${control.name} >=36x36 (disabled=${control.disabled})`,
+        iconTargetMeetsMinimum(control),
+        true,
+      );
   }
   async function motionProperties(assert, label, selector, reduced = false) {
     await page.locator(selector).waitFor({ state: "attached" });
@@ -1353,11 +1376,10 @@ export async function runScenarios(context) {
   async function imageDialog() {
     await home();
     const image = await fs.readFile(path.join(output, "1280x800/36_chat_code_blocks.png"));
-    await page.locator('[data-chat-composer-form="true"] input[type="file"]').setInputFiles({
-      name: "hig-image.png",
-      mimeType: "image/png",
-      buffer: image,
-    });
+    await page.locator('[data-chat-composer-form="true"] input[type="file"]').setInputFiles([
+      { name: "hig-image.png", mimeType: "image/png", buffer: image },
+      { name: "hig-image-2.png", mimeType: "image/png", buffer: image },
+    ]);
     const preview = page.getByRole("button", { name: "hig-image.png 미리보기", exact: true });
     await preview.waitFor();
     await preview.click();
@@ -1659,6 +1681,45 @@ export async function runScenarios(context) {
         packet.manifest.length,
       );
       observations.push({ files: packet.manifest.map((row) => row.file) });
+    },
+    "02/icon-targets": async (assert) => {
+      const required = [
+        "메시지 보내기",
+        "생성 중지",
+        "파일 첨부",
+        "Close",
+        "Back",
+        "Forward",
+        "Refresh",
+      ];
+      const measured = [];
+      for (const row of packet.manifest) {
+        for (const control of row.controls.filter(
+          (c) => c.visible && (c.iconControl || required.includes(c.name)),
+        )) {
+          assert(
+            `${row.file}: ${control.name} >=36x36 (disabled=${control.disabled})`,
+            iconTargetMeetsMinimum(control),
+            true,
+          );
+          measured.push({ file: row.file, ...control });
+        }
+      }
+      for (const name of required)
+        assert(
+          `required icon target measured: ${name}`,
+          measured.some((c) => c.name === name),
+          true,
+        );
+      assert(
+        "disabled icon targets measured",
+        measured.some((c) => c.disabled),
+        true,
+      );
+      observations.push({ iconTargets: measured });
+      await home();
+      await iconTargets(assert, "empty composer");
+      await frame("icon-targets");
     },
     "02/portal-owner": async (assert) => {
       for (const mode of ["light", "dark"]) {
