@@ -10,6 +10,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import {
   BugIcon,
+  CheckIcon,
   FlaskConicalIcon,
   HammerIcon,
   ListChecksIcon,
@@ -167,6 +168,8 @@ export function ProjectScriptEditorDialog({
   const [previewUrl, setPreviewUrl] = useState("");
   const [autoOpenPreview, setAutoOpenPreview] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [commandError, setCommandError] = useState<string | null>(null);
+  const commandRef = useRef<HTMLTextAreaElement>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [savingRequest, setSavingRequest] = useState<ProjectScriptEditorRequest | null>(null);
   const pendingSubmissionRef = useRef<{ request: ProjectScriptEditorRequest } | null>(null);
@@ -198,6 +201,7 @@ export function ProjectScriptEditorDialog({
     setPreviewUrl(request.initial.previewUrl ?? "");
     setAutoOpenPreview(request.initial.autoOpenPreview);
     setValidationError(request.error ?? null);
+    setCommandError(null);
     setSavingRequest(null);
   }, [request]);
 
@@ -225,16 +229,18 @@ export function ProjectScriptEditorDialog({
     if (!request || pendingSubmissionRef.current !== null) return;
     const trimmedName = name.trim();
     const trimmedCommand = command.trim();
+    setValidationError(null);
+    setCommandError(null);
     if (trimmedName.length === 0) {
       setValidationError("Name is required.");
       return;
     }
     if (trimmedCommand.length === 0) {
-      setValidationError("Command is required.");
+      setCommandError("Command is required.");
+      commandRef.current?.focus();
       return;
     }
 
-    setValidationError(null);
     let payload: NewProjectScriptInput;
     try {
       const scriptIdForValidation =
@@ -321,6 +327,7 @@ export function ProjectScriptEditorDialog({
                             variant="outline"
                             className="size-9 shrink-0 hover:bg-popover active:bg-popover data-pressed:bg-popover data-pressed:shadow-xs/5 data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] dark:border-transparent dark:bg-white/[0.035] dark:data-pressed:before:shadow-none"
                             aria-label="Choose icon"
+                            data-icon-control=""
                           />
                         }
                       >
@@ -334,9 +341,10 @@ export function ProjectScriptEditorDialog({
                               <button
                                 key={entry.id}
                                 type="button"
+                                aria-pressed={isSelected}
                                 className={`relative flex flex-col items-center gap-2 rounded-md border px-2 py-2 text-xs dark:border-transparent ${
                                   isSelected
-                                    ? "border-primary/70 bg-primary/10 dark:ring-1 dark:ring-primary/30"
+                                    ? "bg-primary/10"
                                     : "border-border/70 hover:bg-accent/60 dark:bg-white/[0.035]"
                                 }`}
                                 onClick={() => {
@@ -346,6 +354,12 @@ export function ProjectScriptEditorDialog({
                               >
                                 <ScriptIcon icon={entry.id} className="size-4" />
                                 <span>{entry.label}</span>
+                                {isSelected && (
+                                  <CheckIcon
+                                    aria-hidden
+                                    className="absolute right-1 top-1 size-3.5 text-primary"
+                                  />
+                                )}
                               </button>
                             );
                           })}
@@ -376,13 +390,34 @@ export function ProjectScriptEditorDialog({
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="script-command">Command</Label>
+                  <Label htmlFor="script-command">
+                    Command <span className="font-normal text-muted-foreground">(required)</span>
+                  </Label>
+                  <p id="script-command-hint" className="text-sm text-muted-foreground">
+                    Enter the command to run for this action.
+                  </p>
                   <Textarea
                     id="script-command"
                     placeholder="bun test"
                     value={command}
-                    onChange={(event) => setCommand(event.target.value)}
+                    ref={commandRef}
+                    aria-required="true"
+                    aria-invalid={commandError !== null}
+                    aria-describedby={
+                      commandError
+                        ? "script-command-hint script-command-error"
+                        : "script-command-hint"
+                    }
+                    onChange={(event) => {
+                      setCommand(event.target.value);
+                      if (event.target.value.trim().length > 0) setCommandError(null);
+                    }}
                   />
+                  {commandError && (
+                    <p id="script-command-error" className="text-sm text-destructive" role="alert">
+                      {commandError}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="script-preview-url">Preview URL (optional)</Label>
