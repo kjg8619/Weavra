@@ -58,6 +58,8 @@ overlays reference.
   distinct control groups keep 8 px of separation.
 - Owned icon buttons opt into `data-icon-control`; its minimum dimensions apply to disabled
   buttons too, and press feedback must not scale the hit box below that minimum.
+- Icon buttons position a transparent square `::after` hit surface over their full rectangle.
+  Rounded paint stays on the button or its clipped artwork child, never on that hit surface.
 
 ## 5. Primitives and states
 

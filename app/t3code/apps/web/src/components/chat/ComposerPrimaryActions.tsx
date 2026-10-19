@@ -87,7 +87,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
       type="button"
       data-icon-control=""
       className={cn(
-        "flex cursor-pointer items-center justify-center rounded-full bg-destructive/90 text-white shadow-xs shadow-destructive/24 inset-shadow-[0_1px_--theme(--color-white/16%)] transition-[scale,opacity] duration-(--motion-feedback) motion-reduce:transition-opacity motion-reduce:hover:scale-100 hover:bg-destructive hover:scale-105 active:inset-shadow-[0_1px_--theme(--color-black/8%)] active:shadow-none",
+        "relative flex cursor-pointer items-center justify-center rounded-full bg-destructive/90 text-white shadow-xs shadow-destructive/24 inset-shadow-[0_1px_--theme(--color-white/16%)] transition-[scale,opacity] duration-(--motion-feedback) motion-reduce:transition-opacity motion-reduce:hover:scale-100 hover:bg-destructive hover:scale-105 active:inset-shadow-[0_1px_--theme(--color-black/8%)] active:shadow-none",
         "size-9",
       )}
       {...pointerFocusProps}
@@ -249,7 +249,10 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
       }
     >
       {stageBackdropVariant ? (
-        <span className="absolute inset-0 -z-(--layer-raised-content)" aria-hidden="true">
+        <span
+          className="absolute inset-0 -z-(--layer-raised-content) overflow-hidden rounded-full"
+          aria-hidden="true"
+        >
           <StageBackdropButtonArt variant={stageBackdropVariant} />
         </span>
       ) : null}
