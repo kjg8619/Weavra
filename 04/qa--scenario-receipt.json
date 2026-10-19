@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "selection": "04",
+  "revision": "4a63404c9cf8249ef3b089e4d76b9e2402ec7386",
+  "asarSha256": "964672237a8a0583a057a0c1ae7869e4a06d1f0a6a26e7d92369ac0ed8809005",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "59d4a003841a0f0fad2f7ad52232eccc4ada9a43648379deb99807d554da2f19",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-19T21:45:35.715Z",
+  "checks": [
+    {
+      "caseId": "04",
+      "checkId": "auth-error",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "provider feedback is in conversation flow",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "auth cause has independent recovery",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/auth-error/result.png",
+          "sha256": "2cddce4d82e1f4ba085ba6ac54a4c829b792bef22ca64c5e7f66f45fe1400259"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/auth-error/result.ax.json",
+          "sha256": "cdc07877ca7b2f51fc7c6cbf0f51602c9df4c22779ed629e06415ef3b3f493c5"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/auth-error/observations.json",
+          "sha256": "9cfe0019357e87448a1943462265b1cf271e09d56bd49e673ba544abf05952e4"
+        }
+      ]
+    },
+    {
+      "caseId": "04",
+      "checkId": "turn-error",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "turn failure remains after auth recovery",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "turn failure does not cover composer",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/turn-error/result.png",
+          "sha256": "3c52ae0d06dd8d8c84e2bf27a7a99ad3acf5a7a84ac6d36405be6d19d6809d80"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/turn-error/result.ax.json",
+          "sha256": "040e476ce9d285676aa6c2c10de59d72ca64a0412d7d15199a85c9dc5927b043"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/turn-error/observations.json",
+          "sha256": "fcbd02fcf7d19a518c3f1b4be13331fef01d8aefefc3f8e9b2966c0cd264bf5f"
+        }
+      ]
+    },
+    {
+      "caseId": "04",
+      "checkId": "independent-causes",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "auth cause represented once",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "turn cause independently retained",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/independent-causes/independent-causes.png",
+          "sha256": "b2437bb46d0a8570e529c714b166139dee627fce2156538ccae8c97992311f11"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/independent-causes/independent-causes.ax.json",
+          "sha256": "14b87f2efccd7455887fbbd070cf50e4568175a59428d542364bcf82a9a9dce8"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/independent-causes/result.png",
+          "sha256": "b2437bb46d0a8570e529c714b166139dee627fce2156538ccae8c97992311f11"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/independent-causes/result.ax.json",
+          "sha256": "14b87f2efccd7455887fbbd070cf50e4568175a59428d542364bcf82a9a9dce8"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/independent-causes/observations.json",
+          "sha256": "82cdb083f78b020a4bc94d54b9780a58cb42bcda75074ab0941d7f87128a5f66"
+        }
+      ]
+    },
+    {
+      "caseId": "04",
+      "checkId": "event-deduplication",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "same provider event renders one cause",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "repeated event does not authenticate",
+          "actual": false,
+          "expected": false
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/event-deduplication/result.png",
+          "sha256": "62d449ba9aa9b86b75930a487993c97d77856d2d824173684c5562b73e2f0fc1"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/event-deduplication/result.ax.json",
+          "sha256": "f124917d3842e874cb8c86aafbcd6505fd0ca4918b902884882a6d2340a063cf"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/event-deduplication/observations.json",
+          "sha256": "f7f98858c1054c17a5196f0632773a1348108ae8426c819db119b5de50c63921"
+        }
+      ]
+    },
+    {
+      "caseId": "04",
+      "checkId": "focused-completion",
+      "status": "FAIL",
+      "assertions": [],
+      "artifacts": [
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/focused-completion/result.png",
+          "sha256": "fd9e3f63072e4ff8a18eeefbbddbcbc4ebb1786ffc16026b884c4818985d2a99"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/focused-completion/result.ax.json",
+          "sha256": "b14a23d7c48e262e1d7e6e25b37d610a6db8077785b5e900a76cab9d7b82f5d2"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/focused-completion/observations.json",
+          "sha256": "0b7a84dcaefe714a0530ad5f4d6c45bb260835a4fad370f06f2dae290fde52ea"
+        }
+      ],
+      "error": "Error: Missing shell snapshot for completion fixture"
+    },
+    {
+      "caseId": "04",
+      "checkId": "unfocused-single-notice",
+      "status": "FAIL",
+      "assertions": [],
+      "artifacts": [
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/unfocused-single-notice/result.png",
+          "sha256": "fd9e3f63072e4ff8a18eeefbbddbcbc4ebb1786ffc16026b884c4818985d2a99"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/unfocused-single-notice/result.ax.json",
+          "sha256": "ab784c665a35794d52b320e237d3389563ae1e494ed547e24bcc117ca193f913"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/unfocused-single-notice/observations.json",
+          "sha256": "0b7a84dcaefe714a0530ad5f4d6c45bb260835a4fad370f06f2dae290fde52ea"
+        }
+      ],
+      "error": "TimeoutError: waitForFunction: Timeout 15000ms exceeded."
+    },
+    {
+      "caseId": "04",
+      "checkId": "modal-update-suppression",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "update never steals modal focus",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "routine provider update has no popup",
+          "actual": false,
+          "expected": false
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/modal-update-suppression/update-during-modal.png",
+          "sha256": "d078e04f41a9005c4e1a1328bb4b4562f56f49341e8063a934dbf59b319e761d"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/modal-update-suppression/update-during-modal.ax.json",
+          "sha256": "a3f44f659119102ef89e4c07fc36996fca2c5599471e44949733f545471ac5a5"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/modal-update-suppression/result.png",
+          "sha256": "d078e04f41a9005c4e1a1328bb4b4562f56f49341e8063a934dbf59b319e761d"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/modal-update-suppression/result.ax.json",
+          "sha256": "a3f44f659119102ef89e4c07fc36996fca2c5599471e44949733f545471ac5a5"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/modal-update-suppression/observations.json",
+          "sha256": "b79c854972426ac26558c5e4ddb4320a11bfbeaacc9e11317c2b2d8669c8f686"
+        }
+      ]
+    },
+    {
+      "caseId": "04",
+      "checkId": "no-replay",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "closing modal does not replay suppressed update",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "update remains discoverable in provider context",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no unsolicited update request",
+          "actual": false,
+          "expected": false
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/no-replay/result.png",
+          "sha256": "bde596c7cabaac6e120effa3dcfa00c128f4c72ae8bb635d3ff485206255ac77"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/no-replay/result.ax.json",
+          "sha256": "5988bd4bc4b4264e11b71d9277b1fc6fab52af2a46ff605e95efb08e9c879889"
+        },
+        {
+          "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/scenarios/04/no-replay/observations.json",
+          "sha256": "ec623792e8e2093a6ec25e3ae2785875c89e269e8184525a0605380829b728fe"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-19T21:46:51.829Z",
+  "capture": {
+    "file": "run-afd88022-3ab0-4e14-b3b8-5d6e4cf386fe/capture-manifest.json",
+    "sha256": "42c3fb26e395bdcdf360183f11c6e3b39d570a4290a0371e41ca5de534cdefcc"
+  },
+  "failure": "AssertionError [ERR_ASSERTION]: Scenario failed: 04/focused-completion: Error: Missing shell snapshot for completion fixture\n\n'FAIL' !== 'PASS'\n"
+}
