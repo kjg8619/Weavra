@@ -82,10 +82,10 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   const message = getProviderStatusMessage(status);
 
   return (
-    <div className="pointer-events-auto mx-auto w-fit max-w-[calc(100%-2rem)] pt-3">
+    <div className="mx-auto w-fit max-w-[calc(100%-2rem)] pt-3">
       <div
         className={cn(
-          "alert-glass relative inline-flex items-center gap-3 rounded-xl border py-3 ps-3.5 pe-10 text-card-foreground text-sm",
+          "alert-glass relative inline-flex items-center gap-3 rounded-xl border py-3 ps-3.5 pe-12 text-card-foreground text-sm",
           status.status === "warning"
             ? "border-warning/32 [&_svg]:text-warning"
             : "border-destructive/32 text-destructive-foreground [&_svg]:text-destructive",
@@ -117,7 +117,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
         </div>
         <Button
           aria-label={`${providerName} 공급자 ${status.status === "warning" ? "경고" : "오류"} 닫기`}
-          className="absolute top-2 right-2 size-6 text-muted-foreground hover:text-foreground"
+          className="absolute top-1 right-1 size-9 text-muted-foreground hover:text-foreground"
           onClick={onDismiss}
           size="icon-xs"
           variant="ghost"
