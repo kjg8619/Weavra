@@ -1,65 +1,38 @@
-# PR 02 current evidence - full icon hit rectangles
+# PR 02 deterministic capture packet
 
-Product head: `f49c15848e37cecf12024abcd7a65617614b42ff`.
-Base/shared runner: `ef605dbd4c71c88b8229f4bce0283890cc91d9a4`.
-app.asar SHA-256: `2c5d1f06efc60074f3fb5b605d7e2607faa579027822b8c2cfbd6202ea302a23`.
-Fixture: `hig-offline-projection-v3`.
+Product head: `4488aaba95c6cc5f9ce3b33d38559b504578c560`.
+Shared runner/base: `c90e69e93062c4cb2bc54caf75bdd3e85ee6d839`.
+app.asar SHA-256: `ae8e926311113f3d46ed222a4521158778aa5bc5ba33b044b885940039e1ce5a`.
+Fixture: hig-offline-projection-v4.
 
-This supersedes the d20f77e1 packet's corner-hit failure. Rounded button paint and 36x36 bounds are retained; a transparent square pseudo-element supplies the actual rectangular hit target. Border compensation keeps the hit surface inside the measured box. Native icon buttons now anchor that surface, and artwork is clipped on its inner child rather than clipping the target.
+## Fix and boundary
 
-## Executed acceptance
+The old fixture blocked renderer HTTP but allowed server-side live version checks to emit a late provider-update notice. The isolated profile now disables update checks and quota sources before launch. Initial/subscription update, progress, quota and remote-derived observations are frozen at the capture boundary; explicit labelled scenario inputs remain controlled. HTTP/WS handlers are installed before the fresh renderer load, and scenario setup subscribes to its configuration event before reloading. Raw startup settings and final profile settings are checked, not merely a projected flag.
 
-Build, extract, before/after capture, diff, measure-02, motion-02, accept_pr 02, independent --verify-packet and independent hit/overlap audit: exit 0. All seven case-02 checks passed (611 assertions). Harness: 44 passing tests; sidebar: 1 passing test. Targeted lint/fmt and web typecheck passed. No threshold was weakened.
+This follow-up changes no product sources or notification policy: git diff f49c1584..4488aaba95c6cc5f9ce3b33d38559b504578c560 -- app runtime is empty. A toast covering enabled controls remains a genuine product defect assigned to todo 04. See carry-forward.md for the exact QA run d frame.
 
-All 157 enabled foreground capture/live observations hit the intended control at the center and all four corners inset 4 CSS px. Eligibility exactly follows QA: visible, enabled, and the center hits the control. Disabled and center-obscured/modal-inert controls remain excluded only from hit assertions, not size assertions. A harness regression test proves one missed corner yields a scenario FAIL.
+## Consecutive fresh acceptance
 
-## Previously failing states
+| Run | Capture | Checks | Assertions | accept_pr 02 | standalone --verify-packet |
+|---|---|---:|---:|---:|---:|
+| 1 | run-aeb28c27-0d78-48f0-8cc4-38592dd4302f/capture-manifest.json | 8 | 620 | 0 | 0 |
+| 2 | run-60a29f63-a2be-4d06-8688-21c19b252681/capture-manifest.json | 8 | 620 | 0 | 0 |
 
-| State | Control | x,y,w,h | Five hits |
-|---|---|---|---|
-| 1280x800/04_empty_projects.png | Dismiss notification | 1217,79,36,36 | true,true,true,true,true |
-| 1280x800/37_chat_streaming_working.png | 생성 중지 | 1099,727,36,36 | true,true,true,true,true |
-| 1920x1080/04_empty_projects.png | Dismiss notification | 1857,79,36,36 | true,true,true,true,true |
-| 1920x1080/37_chat_streaming_working.png | 생성 중지 | 1419,1007,36,36 | true,true,true,true,true |
+Both runs create new isolated profiles and distinct capture UUIDs, without inheriting PASS. Each contains 152 primary records; all have identical empty unsolicited-notification state. Both have 127 eligible foreground icon occurrences, all five samples true. The 1920 browser-toolbar rectangles and five hit samples are exactly equal; all four controls identified by QA pass. Touched target intersections remain zero. The independent comparison is determinism.json / det-repeat-audit.mjs.
 
-The previous stored geometry produces exactly four failures with the strengthened check; see hit-baseline.json. The 1280x800 notification screen is byte-identical to the previous packet while all four corners now hit. The Stop visual remains round at the same size and location.
+The first full packet is preserved under repeat-01/pr-02; the root qa/scenario-receipt.json binds the second. Existing size (>=36x36), five-point inset (4px), foreground eligibility and overlap assertions are unchanged. A new frozen-network-notices scenario checks the actual browser state. 47 harness tests pass, including initial and late live-update regression tests and pre-launch setting isolation; formatter/lint and web typecheck exit 0.
 
-## Full observed icon inventory
+## Images and provenance
 
-| Control | CSS px |
-|---|---|
-| Toggle main sidebar | 36x36 |
-| Dismiss notification | 36x36 |
-| 파일 첨부 | 36x36 |
-| 메시지 보내기 | 36x36 |
-| Close | 36x36 |
-| Back | 36x36 |
-| Forward | 36x36 |
-| Refresh | 36x36 |
-| Open in system browser | 36x36 |
-| Annotate preview | 36x36 |
-| Capture screenshot | 36x36 |
-| Float preview over chat | 36x36 |
-| 생성 중지 | 36x36 |
-| 이전 미디어 | 36x36 |
-| image 미리보기 닫기 | 36x36 |
-| 다음 미디어 | 36x36 |
-| Minimize the theme editor | 36x36 |
-| Close the theme editor | 36x36 |
+Both primary matrices and both supplemental measurement/motion sets were regenerated with fixture v4. The complete table contains 192 pairs and 51 after-only scenario frames (435 image bindings). All current published URLs have matching HTTP 200 image content and SHA-256.
 
-All touched-target rectangles, including disabled boxes, have zero pairwise overlap. There are no new overlaps with other hittable controls. Raw manifest and live observation records are in hit-controls.json.
+- before/capture-manifest.json and after/capture-manifest.json: exact revisions, package/fixture/source hashes and primary images. The retained parent appRevision bb7649c97402d9a853f91b3a987f9fa48aa970eb is explicitly identified; product-source equality is asserted before reuse.
+- qa/scenario-receipt.json and repeat-01/pr-02/qa/scenario-receipt.json: two independent fresh runs and hashed observations.
+- determinism.json: notification/control equality and separate profile/capture identities.
+- det-controls.json: 17 observed current icon identities, all 36x36; 160 primary/live foreground samples pass. Ambient notification dismissal is no longer spuriously introduced by live input.
+- diff/pairs.json and supplemental-diff/pairs.json: 158 primary and 34 supplemental pairs, no missing dimensions or diff failures.
+- publication-index.json, attachment-map.json, publication-body.md, publication-verification.json: current published image/body/hash bindings.
+- det-pipeline.mjs, det-repeat-audit.mjs, det-audit.mjs, measure-02.mjs and motion-02.mjs: reproduction.
+- logs/det-*.json and .log: exact commands, exit codes, times. Only extra EOF newlines are normalized in Git log copies; local originals remain unchanged.
 
-## Packet contents
-
-- before/capture-manifest.json and after/capture-manifest.json bind current revisions, package hashes and all 152 primary records per side. The retained parent package is explicitly appRevision bb7649c97402d9a853f91b3a987f9fa48aa970eb; product-source equality at the test-only parent is checked by the runner.
-- diff/pairs.json contains all 158 primary pairs, with zero failures. supplemental-diff/pairs.json contains 26 supplemental pairs.
-- publication-index.json indexes 417 publication images (184 paired rows and 49 after-only frames).
-- qa/scenario-receipt.json binds the fresh seven-check packaged run and hashed observations.
-- hit-pipeline.mjs and hit-audit.mjs reproduce the pipeline and independent strict audit.
-- logs/hit-*.json records exact commands, timestamps and exit codes. Archived console logs normalize only extra EOF newlines for git whitespace hygiene; originals remain in the local packet's commands directory.
-
-The owner-approved October 19 amendment reserves the exhaustive universal Q1-Q12 matrix for the Final verification wave. It does not waive any executed five-point check. Earlier q5-* files are historical; this README, current capture manifests, hit-* packet and current scenario receipt are authoritative for this head.
-
-## Verified PR publication
-
-PR #74 now contains the refreshed 184-pair / 49-scenario table. All 417 real image URLs returned HTTP 200 with matching SHA-256; the unchanged strict publication verifier exited 0. Its initial run found 209 HTTP 404 responses and exited 1; those assets were re-uploaded while retaining the complete body reference set, then all 417 were rechecked. The original failure receipt is retained, not relabelled. attachment-map.json, publication-body.md and publication-verification.json bind the published URLs and body to the current packet.
+Controlled synthetic provider-update scenes remain labelled fixture inputs; they are not evidence that normal product toast placement is repaired. That placement belongs to todo 04. Full final-wave Q1-Q12 coverage remains separate under the owner-approved amendment. Only files referenced by the current manifests, two receipts and publication index certify this head; older unindexed directories and hit-/q5- packets are historical.

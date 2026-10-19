@@ -1,0 +1,13 @@
+{
+  "name": "det-verify-01",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "source /tmp/hig02-env.sh; bun '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/assert.mjs' --verify-packet '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02'"
+  ],
+  "startedAt": "2026-10-19T14:20:25.928Z",
+  "completedAt": "2026-10-19T14:20:26.157Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/det-verify-01.log",
+  "code": 0,
+  "signal": null
+}

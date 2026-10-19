@@ -1,0 +1,13 @@
+{
+  "name": "det-accept-02",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "source /tmp/hig02-env.sh; accept_pr() { WEAVRA_CAPTURE_REPO='/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02' WEAVRA_CAPTURE_APP='/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/app/weavra-desktop.app' bun '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/assert.mjs' --case \"$1\" --evidence '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/qa' || return; bun '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/assert.mjs' --verify-packet '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02' || return; git -C '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02' diff --check c90e69e93062c4cb2bc54caf75bdd3e85ee6d839 4488aaba95c6cc5f9ce3b33d38559b504578c560; }; accept_pr 02"
+  ],
+  "startedAt": "2026-10-19T14:20:26.185Z",
+  "completedAt": "2026-10-19T14:21:51.162Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/det-accept-02.log",
+  "code": 0,
+  "signal": null
+}

@@ -1,0 +1,20 @@
+{
+  "name": "det-product-unchanged",
+  "command": [
+    "git",
+    "-C",
+    "/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02",
+    "diff",
+    "--exit-code",
+    "f49c15848e37cecf12024abcd7a65617614b42ff",
+    "HEAD",
+    "--",
+    "app",
+    "runtime"
+  ],
+  "startedAt": "2026-10-19T14:15:30.741Z",
+  "completedAt": "2026-10-19T14:15:30.751Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/det-product-unchanged.log",
+  "code": 0,
+  "signal": null
+}

@@ -1,0 +1,51 @@
+{
+  "file": "1280x800/05_add_project_import_modal.png",
+  "beforeSha256": "616e49fe18abff75f9ee4f3088ac4db67ede1a7c88308bbc4a6e9dcb5ebd394e",
+  "afterSha256": "00fa2cfad276083597be17e2a73638de8f720c0299b5dd46f078eb5bcd41c63e",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 2488,
+    "diffRatio": 0.0024,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 0,
+        "x": 0,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1076
+      },
+      {
+        "gridX": 1,
+        "gridY": 0,
+        "x": 160,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0479
+      }
+    ],
+    "summary": "100/100 similarity; 2488/1024000 pixels differ; 2 hotspot region(s)."
+  }
+}

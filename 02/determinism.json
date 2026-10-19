@@ -1,0 +1,1552 @@
+{
+  "status": "PASS",
+  "distinctFreshCaptures": true,
+  "identicalNotificationState": true,
+  "identicalBrowserToolbar": true,
+  "rounds": [
+    {
+      "capture": "run-aeb28c27-0d78-48f0-8cc4-38592dd4302f/capture-manifest.json",
+      "startedAt": "2026-10-19T14:19:02.052Z",
+      "revision": "4488aaba95c6cc5f9ce3b33d38559b504578c560",
+      "asarSha256": "ae8e926311113f3d46ed222a4521158778aa5bc5ba33b044b885940039e1ce5a",
+      "fixtureVersion": "hig-offline-projection-v4",
+      "checks": [
+        {
+          "checkId": "portal-owner",
+          "status": "PASS",
+          "assertions": 152
+        },
+        {
+          "checkId": "escape-focus-return",
+          "status": "PASS",
+          "assertions": 3
+        },
+        {
+          "checkId": "compositor-motion",
+          "status": "PASS",
+          "assertions": 20
+        },
+        {
+          "checkId": "reduced-motion",
+          "status": "PASS",
+          "assertions": 32
+        },
+        {
+          "checkId": "semantic-colors",
+          "status": "PASS",
+          "assertions": 40
+        },
+        {
+          "checkId": "contrast",
+          "status": "PASS",
+          "assertions": 15
+        },
+        {
+          "checkId": "icon-targets",
+          "status": "PASS",
+          "assertions": 341
+        },
+        {
+          "checkId": "frozen-network-notices",
+          "status": "PASS",
+          "assertions": 17
+        }
+      ],
+      "profiles": [
+        {
+          "base": "/private/tmp/weavra-hig-stB6MF",
+          "policy": {
+            "settingsSnapshots": 2,
+            "unexpectedUpdateChecks": false,
+            "frozenFrames": 4
+          }
+        },
+        {
+          "base": "/private/tmp/weavra-hig-xYlPfC",
+          "policy": {
+            "settingsSnapshots": 2,
+            "unexpectedUpdateChecks": false,
+            "frozenFrames": 4
+          }
+        }
+      ],
+      "foreground": 127,
+      "notices": [
+        {
+          "file": "1280x800/01_first_launch_onboarding_connection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/02_onboarding_agents.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/03_onboarding_project_selection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/04_empty_projects.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/05_add_project_import_modal.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/06_local_folder_picker.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/07_chat_empty_project.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/08_project_selection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/09_right_panel_menu.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/10_right_files.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/11_add_action_dialog.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/12_right_agents.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/13_right_run_graph.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/14_device_setup_dialog.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/15_right_browser.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/16_right_terminal.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/17_settings_general.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/18_settings_appearance_light.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/19_settings_appearance_dark.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/20_settings_keybindings.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/21_settings_snapshots.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/22_settings_providers.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/23_settings_integrations.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/24_settings_source_control.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/25_settings_storage.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/26_settings_connections.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/27_settings_archive.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/28_add_custom_model_form.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/30_settings_licenses.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/31_chat_model_selector.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/32_chat_permission_menu.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/33_project_list_with_threads.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/34_chat_messages.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/35_chat_long_messages.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/36_chat_code_blocks.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/37_chat_streaming_working.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/38_chat_error.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/39_chat_empty_existing_thread.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/40_right_controlled_tasks.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/44_delete_thread_confirmation.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/45_rename_thread_inline.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/46_project_settings_control.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/46/prepare-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/47_project_settings_evidence.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/48_project_settings_model_fitness.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/01_first_launch_onboarding_connection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/02_onboarding_agents.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/03_onboarding_project_selection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/04_empty_projects.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/05_add_project_import_modal.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/06_local_folder_picker.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/07_chat_empty_project.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/08_project_selection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/09_right_panel_menu.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/10_right_files.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/11_add_action_dialog.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/12_right_agents.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/13_right_run_graph.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/14_device_setup_dialog.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/15_right_browser.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/16_right_terminal.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/17_settings_general.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/18_settings_appearance_light.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/19_settings_appearance_dark.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/20_settings_keybindings.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/21_settings_snapshots.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/22_settings_providers.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/23_settings_integrations.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/24_settings_source_control.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/25_settings_storage.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/26_settings_connections.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/27_settings_archive.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/28_add_custom_model_form.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/30_settings_licenses.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/31_chat_model_selector.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/32_chat_permission_menu.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/33_project_list_with_threads.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/34_chat_messages.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/35_chat_long_messages.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/36_chat_code_blocks.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/37_chat_streaming_working.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/38_chat_error.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/39_chat_empty_existing_thread.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/40_right_controlled_tasks.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/46_project_settings_control.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/46/prepare-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/47_project_settings_evidence.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/48_project_settings_model_fitness.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/48/end-default.png",
+          "mountedNotifications": 0
+        }
+      ],
+      "toolbar": [
+        {
+          "name": "Open in system browser",
+          "rect": {
+            "x": 1726,
+            "y": 53.5,
+            "width": 36,
+            "height": 36,
+            "top": 53.5,
+            "right": 1762,
+            "bottom": 89.5,
+            "left": 1726
+          },
+          "disabled": false,
+          "iconControl": true,
+          "visible": true,
+          "hits": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "name": "Annotate preview",
+          "rect": {
+            "x": 1768,
+            "y": 53.5,
+            "width": 36,
+            "height": 36,
+            "top": 53.5,
+            "right": 1804,
+            "bottom": 89.5,
+            "left": 1768
+          },
+          "disabled": false,
+          "iconControl": true,
+          "visible": true,
+          "hits": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "name": "Capture screenshot",
+          "rect": {
+            "x": 1808,
+            "y": 53.5,
+            "width": 36,
+            "height": 36,
+            "top": 53.5,
+            "right": 1844,
+            "bottom": 89.5,
+            "left": 1808
+          },
+          "disabled": false,
+          "iconControl": true,
+          "visible": true,
+          "hits": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "name": "Float preview over chat",
+          "rect": {
+            "x": 1848,
+            "y": 53.5,
+            "width": 36,
+            "height": 36,
+            "top": 53.5,
+            "right": 1884,
+            "bottom": 89.5,
+            "left": 1848
+          },
+          "disabled": false,
+          "iconControl": true,
+          "visible": true,
+          "hits": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        }
+      ]
+    },
+    {
+      "capture": "run-60a29f63-a2be-4d06-8688-21c19b252681/capture-manifest.json",
+      "startedAt": "2026-10-19T14:20:26.262Z",
+      "revision": "4488aaba95c6cc5f9ce3b33d38559b504578c560",
+      "asarSha256": "ae8e926311113f3d46ed222a4521158778aa5bc5ba33b044b885940039e1ce5a",
+      "fixtureVersion": "hig-offline-projection-v4",
+      "checks": [
+        {
+          "checkId": "portal-owner",
+          "status": "PASS",
+          "assertions": 152
+        },
+        {
+          "checkId": "escape-focus-return",
+          "status": "PASS",
+          "assertions": 3
+        },
+        {
+          "checkId": "compositor-motion",
+          "status": "PASS",
+          "assertions": 20
+        },
+        {
+          "checkId": "reduced-motion",
+          "status": "PASS",
+          "assertions": 32
+        },
+        {
+          "checkId": "semantic-colors",
+          "status": "PASS",
+          "assertions": 40
+        },
+        {
+          "checkId": "contrast",
+          "status": "PASS",
+          "assertions": 15
+        },
+        {
+          "checkId": "icon-targets",
+          "status": "PASS",
+          "assertions": 341
+        },
+        {
+          "checkId": "frozen-network-notices",
+          "status": "PASS",
+          "assertions": 17
+        }
+      ],
+      "profiles": [
+        {
+          "base": "/private/tmp/weavra-hig-guqQIo",
+          "policy": {
+            "settingsSnapshots": 2,
+            "unexpectedUpdateChecks": false,
+            "frozenFrames": 4
+          }
+        },
+        {
+          "base": "/private/tmp/weavra-hig-VcRKkv",
+          "policy": {
+            "settingsSnapshots": 2,
+            "unexpectedUpdateChecks": false,
+            "frozenFrames": 4
+          }
+        }
+      ],
+      "foreground": 127,
+      "notices": [
+        {
+          "file": "1280x800/01_first_launch_onboarding_connection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/02_onboarding_agents.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/03_onboarding_project_selection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/04_empty_projects.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/05_add_project_import_modal.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/06_local_folder_picker.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/07_chat_empty_project.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/08_project_selection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/09_right_panel_menu.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/10_right_files.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/11_add_action_dialog.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/12_right_agents.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/13_right_run_graph.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/14_device_setup_dialog.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/15_right_browser.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/16_right_terminal.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/17_settings_general.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/18_settings_appearance_light.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/19_settings_appearance_dark.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/20_settings_keybindings.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/21_settings_snapshots.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/22_settings_providers.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/23_settings_integrations.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/24_settings_source_control.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/25_settings_storage.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/26_settings_connections.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/27_settings_archive.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/28_add_custom_model_form.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/30_settings_licenses.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/31_chat_model_selector.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/32_chat_permission_menu.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/33_project_list_with_threads.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/34_chat_messages.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/35_chat_long_messages.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/36_chat_code_blocks.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/37_chat_streaming_working.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/38_chat_error.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/39_chat_empty_existing_thread.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/40_right_controlled_tasks.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/44_delete_thread_confirmation.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/45_rename_thread_inline.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/46_project_settings_control.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/46/prepare-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/47_project_settings_evidence.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1280x800/48_project_settings_model_fitness.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/dark/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1280x800/light/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/light/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/840x620/dark/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/light/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/2560x1440/dark/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/01_first_launch_onboarding_connection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/02_onboarding_agents.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/03_onboarding_project_selection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/04_empty_projects.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/05_add_project_import_modal.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/06_local_folder_picker.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/07_chat_empty_project.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/08_project_selection.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/09_right_panel_menu.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/10_right_files.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/11_add_action_dialog.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/12_right_agents.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/13_right_run_graph.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/14_device_setup_dialog.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/15_right_browser.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/16_right_terminal.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/17_settings_general.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/18_settings_appearance_light.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/19_settings_appearance_dark.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/20_settings_keybindings.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/21_settings_snapshots.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/22_settings_providers.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/23_settings_integrations.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/24_settings_source_control.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/25_settings_storage.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/26_settings_connections.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/27_settings_archive.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/28_add_custom_model_form.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/30_settings_licenses.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/31_chat_model_selector.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/32_chat_permission_menu.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/33_project_list_with_threads.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/34_chat_messages.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/35_chat_long_messages.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/36_chat_code_blocks.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/37_chat_streaming_working.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/38_chat_error.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/39_chat_empty_existing_thread.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/40_right_controlled_tasks.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/46_project_settings_control.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/46/prepare-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/47_project_settings_evidence.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "1920x1080/48_project_settings_model_fitness.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/48/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/dark/48/actions-end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/46/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/46/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/47/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/47/end-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/48/top-default.png",
+          "mountedNotifications": 0
+        },
+        {
+          "file": "matrix/1920x1080/light/48/end-default.png",
+          "mountedNotifications": 0
+        }
+      ],
+      "toolbar": [
+        {
+          "name": "Open in system browser",
+          "rect": {
+            "x": 1726,
+            "y": 53.5,
+            "width": 36,
+            "height": 36,
+            "top": 53.5,
+            "right": 1762,
+            "bottom": 89.5,
+            "left": 1726
+          },
+          "disabled": false,
+          "iconControl": true,
+          "visible": true,
+          "hits": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "name": "Annotate preview",
+          "rect": {
+            "x": 1768,
+            "y": 53.5,
+            "width": 36,
+            "height": 36,
+            "top": 53.5,
+            "right": 1804,
+            "bottom": 89.5,
+            "left": 1768
+          },
+          "disabled": false,
+          "iconControl": true,
+          "visible": true,
+          "hits": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "name": "Capture screenshot",
+          "rect": {
+            "x": 1808,
+            "y": 53.5,
+            "width": 36,
+            "height": 36,
+            "top": 53.5,
+            "right": 1844,
+            "bottom": 89.5,
+            "left": 1808
+          },
+          "disabled": false,
+          "iconControl": true,
+          "visible": true,
+          "hits": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "name": "Float preview over chat",
+          "rect": {
+            "x": 1848,
+            "y": 53.5,
+            "width": 36,
+            "height": 36,
+            "top": 53.5,
+            "right": 1884,
+            "bottom": 89.5,
+            "left": 1848
+          },
+          "disabled": false,
+          "iconControl": true,
+          "visible": true,
+          "hits": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        }
+      ]
+    }
+  ]
+}

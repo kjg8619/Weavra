@@ -1,0 +1,13 @@
+{
+  "name": "det-build",
+  "command": [
+    "/bin/bash",
+    "-lc",
+    "source /tmp/hig02-env.sh; cd '/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-02/app/t3code'; T3CODE_DESKTOP_SIGNED=false T3CODE_DESKTOP_SKIP_BUILD=false pnpm run dist:desktop:artifact --platform mac --target zip --arch arm64 --output-dir '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/after/package'"
+  ],
+  "startedAt": "2026-10-19T14:15:30.877Z",
+  "completedAt": "2026-10-19T14:16:24.546Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/commands/det-build.log",
+  "code": 0,
+  "signal": null
+}

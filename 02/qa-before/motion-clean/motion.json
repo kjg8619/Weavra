@@ -1,0 +1,193 @@
+{
+  "bundle": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-02/before/app/weavra-desktop.app",
+  "asarSha256": "1f20efbecb9f649859f375defe08285e16d2ba55f108f69aa03b4d1c12ca5b7f",
+  "at": "2026-10-19T14:27:27.147Z",
+  "runs": [
+    {
+      "tag": "dialog-normal",
+      "transitions": 6,
+      "animations": [
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 0
+        },
+        {
+          "type": "CSSTransition",
+          "name": "box-shadow",
+          "duration": 150
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "translate",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 140.85414741052008
+        },
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 140.85414741052008
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 140.85414741052008
+        },
+        {
+          "type": "CSSTransition",
+          "name": "translate",
+          "duration": 140.85414741052008
+        }
+      ],
+      "popup": {
+        "selector": "[data-slot=\"dialog-popup\"]",
+        "transitionProperty": "scale, opacity, translate",
+        "transitionDuration": "0.2s",
+        "boxShadow": "rgba(0, 0, 0, 0.65) 0px 24px 64px -24px"
+      },
+      "backdrop": {
+        "selector": "[data-slot=\"dialog-backdrop\"]",
+        "transitionProperty": "all",
+        "transitionDuration": "0.2s",
+        "backgroundColor": "color(srgb 0.989332 0.989513 0.98953 / 0.6)",
+        "zIndex": "50"
+      },
+      "frames": [
+        {
+          "label": "start",
+          "t": 0,
+          "file": "dialog-normal-open-start.png"
+        },
+        {
+          "label": "mid",
+          "t": 90,
+          "file": "dialog-normal-open-mid.png"
+        },
+        {
+          "label": "end",
+          "t": 180,
+          "file": "dialog-normal-open-end.png"
+        },
+        {
+          "label": "interrupted-escape-at-mid",
+          "t": 90,
+          "file": "dialog-normal-interrupted.png"
+        }
+      ]
+    },
+    {
+      "tag": "dialog-reduced",
+      "transitions": 6,
+      "animations": [
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 0
+        },
+        {
+          "type": "CSSTransition",
+          "name": "box-shadow",
+          "duration": 150
+        },
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "translate",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 200
+        },
+        {
+          "type": "CSSTransition",
+          "name": "scale",
+          "duration": 140.85414741052008
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 140.85414741052008
+        },
+        {
+          "type": "CSSTransition",
+          "name": "translate",
+          "duration": 140.85414741052008
+        },
+        {
+          "type": "CSSTransition",
+          "name": "opacity",
+          "duration": 140.85414741052008
+        }
+      ],
+      "popup": {
+        "selector": "[data-slot=\"dialog-popup\"]",
+        "transitionProperty": "scale, opacity, translate",
+        "transitionDuration": "0.2s",
+        "boxShadow": "rgba(0, 0, 0, 0.65) 0px 24px 64px -24px"
+      },
+      "backdrop": {
+        "selector": "[data-slot=\"dialog-backdrop\"]",
+        "transitionProperty": "all",
+        "transitionDuration": "0.2s",
+        "backgroundColor": "color(srgb 0.989332 0.989513 0.98953 / 0.6)",
+        "zIndex": "50"
+      },
+      "frames": [
+        {
+          "label": "start",
+          "t": 0,
+          "file": "dialog-reduced-open-start.png"
+        },
+        {
+          "label": "mid",
+          "t": 90,
+          "file": "dialog-reduced-open-mid.png"
+        },
+        {
+          "label": "end",
+          "t": 180,
+          "file": "dialog-reduced-open-end.png"
+        },
+        {
+          "label": "interrupted-escape-at-mid",
+          "t": 90,
+          "file": "dialog-reduced-interrupted.png"
+        }
+      ]
+    }
+  ],
+  "reducedTokens": {
+    "feedback": "",
+    "surface": ""
+  }
+}

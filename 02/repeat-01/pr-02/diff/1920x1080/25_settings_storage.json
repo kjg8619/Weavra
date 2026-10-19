@@ -1,0 +1,42 @@
+{
+  "file": "1920x1080/25_settings_storage.png",
+  "beforeSha256": "e69692ab9723d7d8081c09c74d5b5a8636cd702927fe8e4ebb3a05b69eb94287",
+  "afterSha256": "4fea5fca2ce57763e9f329437c2a5d942b77b8dde0ed63dbca8a9235e21f336c",
+  "beforeDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "afterDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1920,
+      "height": 1080
+    },
+    "actual": {
+      "width": 1920,
+      "height": 1080
+    },
+    "totalPixels": 2073600,
+    "diffPixels": 700,
+    "diffRatio": 0.0003,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 0,
+        "x": 0,
+        "y": 0,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0216
+      }
+    ],
+    "summary": "100/100 similarity; 700/2073600 pixels differ; 1 hotspot region(s)."
+  }
+}

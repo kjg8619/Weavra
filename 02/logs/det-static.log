@@ -1,0 +1,63 @@
+bun test v1.4.0 (34cbb9a40)
+
+../hig-01/scripts/hig/harness.test.ts:
+(pass) capture network notice isolation > a live update notice cannot enter the initial capture configuration [0.05ms]
+(pass) capture network notice isolation > late update and remote observations are frozen on the subscription too [0.04ms]
+(pass) capture network notice isolation > disables server-side checks before the disposable app starts [1.22ms]
+(pass) touched icon targets > fails the scenario when the center hits but an inset corner misses [0.95ms]
+(pass) touched icon targets > rejects undersized disabled controls rather than exempting them
+(pass) touched icon targets > requires both dimensions to meet the minimum
+(pass) touched icon targets > accepts the exact minimum even when disabled
+(pass) executed scenario coverage > expands all into every declared case without dropping task one [0.02ms]
+(pass) executed scenario coverage > rejects an unknown case instead of running another case [0.03ms]
+(pass) executed scenario coverage > fails a named check when no executor is registered [0.13ms]
+(pass) executed scenario coverage > fails an executor that returns without asserting [0.04ms]
+(pass) executed scenario coverage > fails a real assertion even if an observation exists [0.05ms]
+(pass) executed scenario coverage > rejects a group-only PASS without executed assertions [0.12ms]
+(pass) executed scenario coverage > rejects a missing check even if all remaining checks pass [0.06ms]
+(pass) executed scenario coverage > rejects duplicated checks used to fill the expected count [0.04ms]
+(pass) executed scenario coverage > replays assertion values rather than trusting a PASS string [0.02ms]
+(pass) executed scenario coverage > rejects a successful assertion without its source artifact [0.02ms]
+(pass) executed scenario coverage > cannot use a single case receipt for the final wave [0.29ms]
+(pass) scenario subscription transport > preserves numeric subscription identities when delivering an event [0.05ms]
+(pass) scenario subscription transport > rejects an event when no live subscriber can consume it
+(pass) state-bound capture evidence > contains exactly 92 desktop files and two stress files [0.09ms]
+(pass) state-bound capture evidence > rejects an image with the wrong dimensions [0.45ms]
+(pass) state-bound capture evidence > requires both themes and both boundaries at every matrix size [0.14ms]
+(pass) state-bound capture evidence > rejects a changed image under an old hash [0.04ms]
+(pass) state-bound capture evidence > rejects a non-PNG frame [0.02ms]
+(pass) state-bound capture evidence > rejects unpainted code despite visible DOM geometry [0.03ms]
+(pass) state-bound capture evidence > accepts painted code with matching image identity [0.07ms]
+(pass) state-bound capture evidence > rejects duplicate 47 and 48 evidence [0.06ms]
+(pass) state-bound capture evidence > rejects a fitness frame bound to the evidence target [0.03ms]
+(pass) state-bound capture evidence > rejects a stale packaged revision [0.02ms]
+(pass) state-bound capture evidence > rejects a source edit made after building [0.02ms]
+(pass) state-bound capture evidence > rejects a leaked non-sibling profile [0.62ms]
+(pass) state-bound capture evidence > rejects a missing required PNG [0.86ms]
+(pass) state-bound capture evidence > fails when a subscribed readiness event never arrives [1.21ms]
+(pass) state-bound capture evidence > rejects selector ambiguity rather than picking the first alias [0.07ms]
+(pass) state-bound capture evidence > rejects target rectangles outside the scrollport [0.06ms]
+(pass) state-bound capture evidence > rejects expected text mounted outside the visible viewport [0.03ms]
+(pass) state-bound capture evidence > rejects a hidden Files pane even when its label remains visible [0.03ms]
+(pass) state-bound capture evidence > rejects System selection on the Light appearance page [0.07ms]
+(pass) state-bound capture evidence > rejects a settings label visible only in another page's navigation [0.03ms]
+(pass) state-bound capture evidence > rejects a different selected thread with matching fixture text [0.01ms]
+(pass) state-bound capture evidence > rejects model fitness substituted for the Evidence section [0.02ms]
+(pass) state-bound capture evidence > rejects an end frame before the section boundary [0.02ms]
+(pass) state-bound capture evidence > accepts a visible Evidence heading at the declared top boundary [0.01ms]
+(pass) state-bound capture evidence > rejects an error toast without visible conversation recovery context [0.02ms]
+(pass) state-bound capture evidence > rejects a thread title without its visible rename input [0.04ms]
+(pass) state-bound capture evidence > seeds an existing isolated database without dispatching a turn [5.16ms]
+
+ 47 pass
+ 0 fail
+ 115 expect() calls
+Ran 47 tests across 1 file. [27.00ms]
+[1m[2mnote:[0m[0m You are running [94m`vp fmt`[39m as a Vite+ built-in command. If you meant to run the fmt npm script, use [94m`vpr fmt`[39m instead.
+Checking formatting...
+
+/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/cases.mjs (5ms)
+/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/harness.test.ts (3ms)
+
+Format issues found in above 2 files. Run without `--check` to fix.
+Finished in 59ms on 4 files using 15 threads.

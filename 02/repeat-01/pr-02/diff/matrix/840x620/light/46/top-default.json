@@ -1,0 +1,105 @@
+{
+  "file": "matrix/840x620/light/46/top-default.png",
+  "beforeSha256": "9fbea2d9e0f547f6e2fb16fb81136cf1ff41f3b03a0c1460d35105565d9d233c",
+  "afterSha256": "fc06f27c96e38cb05b32f03b7ce4d8684b207f39e26384333bf14ef0a4e4e939",
+  "beforeDimensions": {
+    "width": 840,
+    "height": 620
+  },
+  "afterDimensions": {
+    "width": 840,
+    "height": 620
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 840,
+      "height": 620
+    },
+    "actual": {
+      "width": 840,
+      "height": 620
+    },
+    "totalPixels": 520800,
+    "diffPixels": 6577,
+    "diffRatio": 0.0126,
+    "similarityScore": 99,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 6,
+        "gridY": 4,
+        "x": 630,
+        "y": 310,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.1985
+      },
+      {
+        "gridX": 5,
+        "gridY": 4,
+        "x": 525,
+        "y": 310,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.1703
+      },
+      {
+        "gridX": 4,
+        "gridY": 4,
+        "x": 420,
+        "y": 310,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.1651
+      },
+      {
+        "gridX": 3,
+        "gridY": 4,
+        "x": 315,
+        "y": 310,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.1179
+      },
+      {
+        "gridX": 1,
+        "gridY": 0,
+        "x": 105,
+        "y": 0,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.0796
+      },
+      {
+        "gridX": 7,
+        "gridY": 4,
+        "x": 735,
+        "y": 310,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.0608
+      },
+      {
+        "gridX": 0,
+        "gridY": 0,
+        "x": 0,
+        "y": 0,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.0059
+      },
+      {
+        "gridX": 3,
+        "gridY": 5,
+        "x": 315,
+        "y": 387,
+        "width": 105,
+        "height": 78,
+        "diffRatio": 0.0049
+      }
+    ],
+    "summary": "99/100 similarity; 6577/520800 pixels differ; 8 hotspot region(s)."
+  }
+}

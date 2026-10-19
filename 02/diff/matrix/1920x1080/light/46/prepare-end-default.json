@@ -1,7 +1,7 @@
 {
   "file": "matrix/1920x1080/light/46/prepare-end-default.png",
-  "beforeSha256": "72a6f7516ad9597a8eca7a9104eb6068baa037b3e1dfe14788a3598bf4354f0c",
-  "afterSha256": "87bae411210e4f5929804cc2bf13e6e6e914c71f03ed17adda470ecad3887ab2",
+  "beforeSha256": "03a82fb1dae0d22e02c44f07604f7149f829c56a80b39a2ecbf2468d05ada892",
+  "afterSha256": "ef3fc7b01be66f6f999bf46160ad419e46cc223c18ba2d087a36dc66c4772464",
   "beforeDimensions": {
     "width": 1920,
     "height": 1080
@@ -22,11 +22,20 @@
       "height": 1080
     },
     "totalPixels": 2073600,
-    "diffPixels": 5641,
-    "diffRatio": 0.0027,
+    "diffPixels": 7022,
+    "diffRatio": 0.0034,
     "similarityScore": 100,
     "alphaChannelIntact": true,
     "hotspots": [
+      {
+        "gridX": 3,
+        "gridY": 2,
+        "x": 720,
+        "y": 270,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0723
+      },
       {
         "gridX": 4,
         "gridY": 2,
@@ -34,7 +43,7 @@
         "y": 270,
         "width": 240,
         "height": 135,
-        "diffRatio": 0.0563
+        "diffRatio": 0.0555
       },
       {
         "gridX": 5,
@@ -43,16 +52,7 @@
         "y": 270,
         "width": 240,
         "height": 135,
-        "diffRatio": 0.0483
-      },
-      {
-        "gridX": 3,
-        "gridY": 2,
-        "x": 720,
-        "y": 270,
-        "width": 240,
-        "height": 135,
-        "diffRatio": 0.0399
+        "diffRatio": 0.0555
       },
       {
         "gridX": 0,
@@ -70,9 +70,18 @@
         "y": 270,
         "width": 240,
         "height": 135,
-        "diffRatio": 0.008
+        "diffRatio": 0.0074
+      },
+      {
+        "gridX": 2,
+        "gridY": 2,
+        "x": 480,
+        "y": 270,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0045
       }
     ],
-    "summary": "100/100 similarity; 5641/2073600 pixels differ; 5 hotspot region(s)."
+    "summary": "100/100 similarity; 7022/2073600 pixels differ; 6 hotspot region(s)."
   }
 }

@@ -1,0 +1,85 @@
+bun test v1.4.0 (34cbb9a40)
+
+../hig-01/scripts/hig/harness.test.ts:
+(pass) capture network notice isolation > a live update notice cannot enter the initial capture configuration [0.04ms]
+(pass) capture network notice isolation > late update and remote observations are frozen on the subscription too [0.03ms]
+(pass) capture network notice isolation > disables server-side checks before the disposable app starts [1.23ms]
+(pass) touched icon targets > fails the scenario when the center hits but an inset corner misses [0.96ms]
+(pass) touched icon targets > rejects undersized disabled controls rather than exempting them [0.01ms]
+(pass) touched icon targets > requires both dimensions to meet the minimum
+(pass) touched icon targets > accepts the exact minimum even when disabled
+(pass) executed scenario coverage > expands all into every declared case without dropping task one [0.03ms]
+(pass) executed scenario coverage > rejects an unknown case instead of running another case [0.03ms]
+(pass) executed scenario coverage > fails a named check when no executor is registered [0.13ms]
+(pass) executed scenario coverage > fails an executor that returns without asserting [0.04ms]
+(pass) executed scenario coverage > fails a real assertion even if an observation exists [0.05ms]
+(pass) executed scenario coverage > rejects a group-only PASS without executed assertions [0.12ms]
+(pass) executed scenario coverage > rejects a missing check even if all remaining checks pass [0.05ms]
+(pass) executed scenario coverage > rejects duplicated checks used to fill the expected count [0.04ms]
+(pass) executed scenario coverage > replays assertion values rather than trusting a PASS string [0.02ms]
+(pass) executed scenario coverage > rejects a successful assertion without its source artifact [0.02ms]
+(pass) executed scenario coverage > cannot use a single case receipt for the final wave [0.29ms]
+(pass) scenario subscription transport > preserves numeric subscription identities when delivering an event [0.05ms]
+(pass) scenario subscription transport > rejects an event when no live subscriber can consume it
+(pass) state-bound capture evidence > contains exactly 92 desktop files and two stress files [0.09ms]
+(pass) state-bound capture evidence > rejects an image with the wrong dimensions [0.45ms]
+(pass) state-bound capture evidence > requires both themes and both boundaries at every matrix size [0.14ms]
+(pass) state-bound capture evidence > rejects a changed image under an old hash [0.04ms]
+(pass) state-bound capture evidence > rejects a non-PNG frame [0.02ms]
+(pass) state-bound capture evidence > rejects unpainted code despite visible DOM geometry [0.03ms]
+(pass) state-bound capture evidence > accepts painted code with matching image identity [0.08ms]
+(pass) state-bound capture evidence > rejects duplicate 47 and 48 evidence [0.06ms]
+(pass) state-bound capture evidence > rejects a fitness frame bound to the evidence target [0.04ms]
+(pass) state-bound capture evidence > rejects a stale packaged revision [0.02ms]
+(pass) state-bound capture evidence > rejects a source edit made after building [0.02ms]
+(pass) state-bound capture evidence > rejects a leaked non-sibling profile [0.59ms]
+(pass) state-bound capture evidence > rejects a missing required PNG [0.60ms]
+(pass) state-bound capture evidence > fails when a subscribed readiness event never arrives [1.35ms]
+(pass) state-bound capture evidence > rejects selector ambiguity rather than picking the first alias [0.07ms]
+(pass) state-bound capture evidence > rejects target rectangles outside the scrollport [0.06ms]
+(pass) state-bound capture evidence > rejects expected text mounted outside the visible viewport [0.03ms]
+(pass) state-bound capture evidence > rejects a hidden Files pane even when its label remains visible [0.03ms]
+(pass) state-bound capture evidence > rejects System selection on the Light appearance page [0.07ms]
+(pass) state-bound capture evidence > rejects a settings label visible only in another page's navigation [0.03ms]
+(pass) state-bound capture evidence > rejects a different selected thread with matching fixture text [0.01ms]
+(pass) state-bound capture evidence > rejects model fitness substituted for the Evidence section [0.02ms]
+(pass) state-bound capture evidence > rejects an end frame before the section boundary [0.02ms]
+(pass) state-bound capture evidence > accepts a visible Evidence heading at the declared top boundary [0.02ms]
+(pass) state-bound capture evidence > rejects an error toast without visible conversation recovery context [0.01ms]
+(pass) state-bound capture evidence > rejects a thread title without its visible rename input [0.04ms]
+(pass) state-bound capture evidence > seeds an existing isolated database without dispatching a turn [5.17ms]
+
+ 47 pass
+ 0 fail
+ 115 expect() calls
+Ran 47 tests across 1 file. [27.00ms]
+[1m[2mnote:[0m[0m You are running [94m`vp fmt`[39m as a Vite+ built-in command. If you meant to run the fmt npm script, use [94m`vpr fmt`[39m instead.
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 53ms on 4 files using 15 threads.
+[1m[2mnote:[0m[0m You are running [94m`vp lint`[39m as a Vite+ built-in command. If you meant to run the lint npm script, use [94m`vpr lint`[39m instead.
+$ tsc --noEmit
+src/browser/browserRecording.ts(60,23): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/composerDraftStore.ts(356,21): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/composerDraftStore.ts(410,21): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/composerDraftStore.ts(427,21): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/composerDraftStore.ts(441,21): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/composerDraftStore.ts(442,19): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/connection/platform.ts(186,17): suggestion TS377117: `Effect.succeedNone` expresses this Option success value directly. effect(preferSucceedSomeOrNone)
+src/connection/platform.ts(195,17): suggestion TS377117: `Effect.succeedNone` expresses this Option success value directly. effect(preferSucceedSomeOrNone)
+src/connection/storage.ts(590,22): suggestion TS377117: `Effect.succeedNone` expresses this Option success value directly. effect(preferSucceedSomeOrNone)
+src/connection/storage.ts(626,22): suggestion TS377117: `Effect.succeedNone` expresses this Option success value directly. effect(preferSucceedSomeOrNone)
+src/connection/storage.ts(664,22): suggestion TS377117: `Effect.succeedNone` expresses this Option success value directly. effect(preferSucceedSomeOrNone)
+src/connection/storage.ts(706,22): suggestion TS377117: `Effect.succeedNone` expresses this Option success value directly. effect(preferSucceedSomeOrNone)
+src/environments/primary/auth.ts(41,20): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/environments/primary/auth.ts(73,28): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/environments/primary/auth.ts(89,23): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/environments/primary/auth.ts(90,23): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/environments/primary/auth.ts(101,28): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/promptStashStore.ts(58,48): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/reviewCommentContext.ts(6,17): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/reviewCommentContext.ts(8,15): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/reviewCommentContext.ts(18,22): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/reviewCommentContext.ts(19,20): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)
+src/state/desktopUpdate.ts(17,26): suggestion TS377098: This Schema number API accepts `NaN`, `Infinity`, and `-Infinity`. Use `Schema.Finite` for finite domain numbers. If non-finite values are intentional, disable this diagnostic for that line. effect(schemaNumber)

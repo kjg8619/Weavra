@@ -9,7 +9,7 @@ const WT = process.env.WEAVRA_CAPTURE_REPO;
 const bundle = process.env.WEAVRA_CAPTURE_APP;
 const out = process.env.WEAVRA_MEASURE_OUT;
 if (!WT || !bundle || !out) throw new Error("WEAVRA_CAPTURE_REPO, WEAVRA_CAPTURE_APP, WEAVRA_MEASURE_OUT required");
-const { assertProfile } = await import(`${WT}/scripts/hig/seed.mjs`);
+const { assertProfile, prepareCaptureProfile, installCaptureNetworkFixture } = await import(`${WT}/scripts/hig/seed.mjs`);
 const { _electron } = await import(`${WT}/app/t3code/apps/desktop/node_modules/playwright-core/index.mjs`);
 await FSP.mkdir(out, { recursive: true });
 const sha256 = (b) => Crypto.createHash("sha256").update(b).digest("hex");
@@ -20,6 +20,7 @@ const isolation = { base, home: Path.join(base, "home"), workspace: Path.join(ba
 for (const d of [isolation.home, isolation.workspace, isolation.app]) await FSP.mkdir(d);
 await FSP.mkdir(Path.join(isolation.workspace, "baseline-project"));
 assertProfile(base, isolation.home, isolation.workspace, isolation.app);
+prepareCaptureProfile(isolation);
 const application = await _electron.launch({
   executablePath: Path.join(bundle, "Contents/MacOS/weavra-desktop"),
   args: [`--user-data-dir=${isolation.home}/chromium`, "--disable-background-networking"],
@@ -28,12 +29,14 @@ const application = await _electron.launch({
 });
 const page = await application.firstWindow();
 page.setDefaultTimeout(15000);
+await installCaptureNetworkFixture(page);
 const win = await application.browserWindow(page);
 await page.route("**/*", async (route) => {
   const url = new URL(route.request().url());
   if (["http:", "https:"].includes(url.protocol) && !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) await route.abort();
   else await route.continue();
 });
+await page.reload();
 await win.evaluate((w) => w.setContentSize(1280, 800));
 await page.setViewportSize({ width: 1280, height: 800 });
 const click = (name, scope = page) => scope.getByRole("button", { name, exact: true }).filter({ visible: true }).first().click();
