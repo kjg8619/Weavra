@@ -68,7 +68,12 @@ function DisabledCommandPaletteResultRow(props: {
   item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
 }) {
   return (
-    <div className="flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base sm:min-h-7 sm:text-sm">
+    // Keys and clicks inside a disabled row must not reach the list, which would run its highlighted item.
+    <div
+      className="flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base sm:min-h-7 sm:text-sm"
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
       <span className="flex shrink-0 opacity-64">{props.item.icon}</span>
       {props.item.description || props.item.threadContentMatch ? (
         <span className="flex min-w-0 flex-1 flex-col">
