@@ -1,0 +1,13 @@
+{
+  "name": "build-after",
+  "command": [
+    "bash",
+    "-c",
+    "cd app/t3code && T3CODE_DESKTOP_SIGNED=false T3CODE_DESKTOP_SKIP_BUILD=false pnpm run dist:desktop:artifact --platform mac --target zip --arch arm64 --output-dir '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-03/after/package'"
+  ],
+  "startedAt": "2026-10-19T20:48:30.954Z",
+  "completedAt": "2026-10-19T20:49:23.273Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-03/commands/build-after.log",
+  "code": 0,
+  "signal": null
+}

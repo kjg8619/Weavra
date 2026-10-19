@@ -1,0 +1,13 @@
+{
+  "name": "focused-tests",
+  "command": [
+    "bash",
+    "-c",
+    "cd app/t3code/apps/web && pnpm exec vp test run --project unit src/components/settings/WeavraControls.test.tsx src/components/settings/CapabilityInventory.test.tsx src/components/settings/WeavraSettings.test.tsx"
+  ],
+  "startedAt": "2026-10-19T20:46:38.820Z",
+  "completedAt": "2026-10-19T20:46:41.024Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-03/commands/focused-tests.log",
+  "code": 0,
+  "signal": null
+}

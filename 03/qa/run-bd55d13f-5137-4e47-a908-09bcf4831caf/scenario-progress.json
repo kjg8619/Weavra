@@ -1,0 +1,579 @@
+[
+  {
+    "caseId": "03",
+    "checkId": "unsupported",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "unsupported: DOM disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "unsupported: AX disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "unsupported: no prepare/confirm/planner requests",
+        "actual": 0,
+        "expected": 0
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/unsupported/unsupported.png",
+        "sha256": "f6e3b9e76cfb1a20d3f358ad98da59677f7f9d1b837fa82f557c8ceeafd47f8c"
+      },
+      {
+        "file": "scenarios/03/unsupported/unsupported.ax.json",
+        "sha256": "9f034d1e60b573e69c0f56f10a1aa83248919806cf32e041f084e9c50d38d2ed"
+      },
+      {
+        "file": "scenarios/03/unsupported/result.png",
+        "sha256": "f6e3b9e76cfb1a20d3f358ad98da59677f7f9d1b837fa82f557c8ceeafd47f8c"
+      },
+      {
+        "file": "scenarios/03/unsupported/result.ax.json",
+        "sha256": "9f034d1e60b573e69c0f56f10a1aa83248919806cf32e041f084e9c50d38d2ed"
+      },
+      {
+        "file": "scenarios/03/unsupported/observations.json",
+        "sha256": "2720559c298be2f5522313b68e8df8ebf62103fa5c115c3bcd81297c0fc22209"
+      }
+    ]
+  },
+  {
+    "caseId": "03",
+    "checkId": "disconnected",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "disconnected: DOM disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "disconnected: AX disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "disconnected: no prepare/confirm/planner requests",
+        "actual": 0,
+        "expected": 0
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/disconnected/disconnected.png",
+        "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+      },
+      {
+        "file": "scenarios/03/disconnected/disconnected.ax.json",
+        "sha256": "d00e75aea666c80e40d557f8e1fb282aa20f1a932eea32d37ed0f03090233c66"
+      },
+      {
+        "file": "scenarios/03/disconnected/result.png",
+        "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+      },
+      {
+        "file": "scenarios/03/disconnected/result.ax.json",
+        "sha256": "d00e75aea666c80e40d557f8e1fb282aa20f1a932eea32d37ed0f03090233c66"
+      },
+      {
+        "file": "scenarios/03/disconnected/observations.json",
+        "sha256": "9fe873ca43a83f98514ad9e379e7a7e7d06892eb56122203a510d25af65b4a72"
+      }
+    ]
+  },
+  {
+    "caseId": "03",
+    "checkId": "stale",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "stale: DOM disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "stale: AX disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "stale: no prepare/confirm/planner requests",
+        "actual": 0,
+        "expected": 0
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/stale/stale.png",
+        "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+      },
+      {
+        "file": "scenarios/03/stale/stale.ax.json",
+        "sha256": "92706a2e575d8b768d1004996dbafbaed90a1da86b360a4816d8003ca1f157ed"
+      },
+      {
+        "file": "scenarios/03/stale/result.png",
+        "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+      },
+      {
+        "file": "scenarios/03/stale/result.ax.json",
+        "sha256": "92706a2e575d8b768d1004996dbafbaed90a1da86b360a4816d8003ca1f157ed"
+      },
+      {
+        "file": "scenarios/03/stale/observations.json",
+        "sha256": "c6ad477bc2447aec3e769c6cbd87883b232e4984a5c3421755b8aa493ac25821"
+      }
+    ]
+  },
+  {
+    "caseId": "03",
+    "checkId": "missing-scope",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "missing-scope: DOM disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "missing-scope: AX disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "missing-scope: no prepare/confirm/planner requests",
+        "actual": 0,
+        "expected": 0
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/missing-scope/missing-scope.png",
+        "sha256": "09b586b1e4ee3dbd271c68e91f6e4ee5c970746be0a350768ec4c9170a856a86"
+      },
+      {
+        "file": "scenarios/03/missing-scope/missing-scope.ax.json",
+        "sha256": "161a86e5f3a55cf8f5c88bcb5e2adfe159770d4da2d1f56fce164dd7911d7437"
+      },
+      {
+        "file": "scenarios/03/missing-scope/result.png",
+        "sha256": "09b586b1e4ee3dbd271c68e91f6e4ee5c970746be0a350768ec4c9170a856a86"
+      },
+      {
+        "file": "scenarios/03/missing-scope/result.ax.json",
+        "sha256": "161a86e5f3a55cf8f5c88bcb5e2adfe159770d4da2d1f56fce164dd7911d7437"
+      },
+      {
+        "file": "scenarios/03/missing-scope/observations.json",
+        "sha256": "1a8cfac068e2dd907092a94762e9d04dc5300c944574ab1fdba0432b7ebf1a59"
+      }
+    ]
+  },
+  {
+    "caseId": "03",
+    "checkId": "fresh",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "fresh preparation is available",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "one explicit prepare request",
+        "actual": 1,
+        "expected": 1
+      },
+      {
+        "label": "no confirmation or execution",
+        "actual": 0,
+        "expected": 0
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/fresh/result.png",
+        "sha256": "ac638816cb55c4183a274315c11644239970cedcaac1160f9aae48d5a73b4cf1"
+      },
+      {
+        "file": "scenarios/03/fresh/result.ax.json",
+        "sha256": "bb2894808f60195b73476511b0db30df49739615b6701a571e5c7a470bb21228"
+      },
+      {
+        "file": "scenarios/03/fresh/observations.json",
+        "sha256": "8e7c8826c08e15fcfce22296b1a114aa8a6d64f92df7c22a3e3d3c212e08260a"
+      }
+    ]
+  },
+  {
+    "caseId": "03",
+    "checkId": "foreign-owner",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "foreign owner still permits Runtime recovery judgment",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "foreign-owner-explanation: visible body",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "foreign-owner-explanation",
+        "actual": true,
+        "expected": true
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/foreign-owner/foreign-owner-explanation.png",
+        "sha256": "9d8cfb0300ff4d7187d36b05aaff8335bdfbb564bb842a40c4098382557d858f"
+      },
+      {
+        "file": "scenarios/03/foreign-owner/foreign-owner-explanation.ax.json",
+        "sha256": "55a848bd9d07d679181b7f3d37433c0520f432631139b256ac60f8c3828732e1"
+      },
+      {
+        "file": "scenarios/03/foreign-owner/result.png",
+        "sha256": "abdca76905081fa339b479fe71ea3efb863f110246eecabebf07eeb18860863b"
+      },
+      {
+        "file": "scenarios/03/foreign-owner/result.ax.json",
+        "sha256": "3a913aeb5f893480da49024c720eb762e833d2cb246b323e7c37cfd9e62bedb4"
+      },
+      {
+        "file": "scenarios/03/foreign-owner/observations.json",
+        "sha256": "28bd6cdad7643c112a817a45e8beaa2c7c31db713f546dcbd9facd31d1926786"
+      }
+    ]
+  },
+  {
+    "caseId": "03",
+    "checkId": "confirmation-binding",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "stale binding prevents confirm request",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "only explicitly requested prepare occurred",
+        "actual": 1,
+        "expected": 1
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/confirmation-binding/result.png",
+        "sha256": "6d175dee60e0b577c5ad70ba10a09c772580228f91c9cdf3a050f748aa146f5a"
+      },
+      {
+        "file": "scenarios/03/confirmation-binding/result.ax.json",
+        "sha256": "3e7fc55524703312934dfca29f1f7b9c54d04d1b89b7b6ceb48b93647dfd1b7b"
+      },
+      {
+        "file": "scenarios/03/confirmation-binding/observations.json",
+        "sha256": "a144d0adcbaca5d9822a288d2cc59275f2012a30a4fa403dd137f9d084172836"
+      }
+    ]
+  },
+  {
+    "caseId": "03",
+    "checkId": "no-reconnect-replay",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "disconnected: DOM disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "disconnected: AX disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "disconnected: no prepare/confirm/planner requests",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "no queued intent replay after reconnect",
+        "actual": 0,
+        "expected": 0
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/no-reconnect-replay/disconnected.png",
+        "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+      },
+      {
+        "file": "scenarios/03/no-reconnect-replay/disconnected.ax.json",
+        "sha256": "dc1eb9d7e0646a46ab6de3a303a7d2cc194c3b8d2da875894b5373cb1c145739"
+      },
+      {
+        "file": "scenarios/03/no-reconnect-replay/result.png",
+        "sha256": "09b586b1e4ee3dbd271c68e91f6e4ee5c970746be0a350768ec4c9170a856a86"
+      },
+      {
+        "file": "scenarios/03/no-reconnect-replay/result.ax.json",
+        "sha256": "aacd1f299dc39bee9c549efed465be07f023fc8035e53d5b2b3c6b0d6a763b6a"
+      },
+      {
+        "file": "scenarios/03/no-reconnect-replay/observations.json",
+        "sha256": "a8e202f45cd9b1c3643fe76c3a218880d650d562bf5db7b9785b32be392ddf8d"
+      }
+    ]
+  },
+  {
+    "caseId": "03",
+    "checkId": "diagnostic-copy",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "labelled diagnostic disclosure",
+        "actual": 1,
+        "expected": 1
+      },
+      {
+        "label": "no model dispatch",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "no Runtime mutation",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "diagnostic-identities: visible body",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "diagnostic-identities",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "diagnostic copy action",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "copy preserves exact fixture path",
+        "actual": true,
+        "expected": true
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/diagnostic-copy/diagnostic-identities.png",
+        "sha256": "474e81a1b75a8db840e87f2a07fd2cd2006c92984ba93c14860f9d6e7596cf2c"
+      },
+      {
+        "file": "scenarios/03/diagnostic-copy/diagnostic-identities.ax.json",
+        "sha256": "1efc8ddce974fddfca00828cc76e2919edc2571b965163c20730eb1b3a801a2c"
+      },
+      {
+        "file": "scenarios/03/diagnostic-copy/result.png",
+        "sha256": "23e0bdf6a0abc6b7ca4a889020e42f1fb485f5e54fe964daf476b628b45b91f6"
+      },
+      {
+        "file": "scenarios/03/diagnostic-copy/result.ax.json",
+        "sha256": "dea47164aefeea06dffcb0ad51fcc0777bf7cee9dc9940297a0be68122cbf191"
+      },
+      {
+        "file": "scenarios/03/diagnostic-copy/observations.json",
+        "sha256": "ce471120e4bcb3f8546e36dcf55b6b9ea7c0143a745a564c1771be0ad227e05b"
+      }
+    ]
+  },
+  {
+    "caseId": "03",
+    "checkId": "unknown-disclosure",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "unknown details are collapsed",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "unknown detail is initially collapsed",
+        "actual": "false",
+        "expected": "false"
+      },
+      {
+        "label": "no model dispatch",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "no Runtime mutation",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "unknown-detail-preserved: visible body",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "unknown-detail-preserved",
+        "actual": true,
+        "expected": true
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/unknown-disclosure/unknown-detail-preserved.png",
+        "sha256": "474e81a1b75a8db840e87f2a07fd2cd2006c92984ba93c14860f9d6e7596cf2c"
+      },
+      {
+        "file": "scenarios/03/unknown-disclosure/unknown-detail-preserved.ax.json",
+        "sha256": "c0f8c5cd30ae784a11c9ff429cbd871d20b7612c2afd68322b6c0490c6af08c7"
+      },
+      {
+        "file": "scenarios/03/unknown-disclosure/result.png",
+        "sha256": "474e81a1b75a8db840e87f2a07fd2cd2006c92984ba93c14860f9d6e7596cf2c"
+      },
+      {
+        "file": "scenarios/03/unknown-disclosure/result.ax.json",
+        "sha256": "c0f8c5cd30ae784a11c9ff429cbd871d20b7612c2afd68322b6c0490c6af08c7"
+      },
+      {
+        "file": "scenarios/03/unknown-disclosure/observations.json",
+        "sha256": "ef9362486cbc734f48da930bcbc66467c8d0f8cf85d5f1ec91b2a1b687f32be5"
+      }
+    ]
+  },
+  {
+    "caseId": "03",
+    "checkId": "request-counters",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "unsupported: DOM disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "unsupported: AX disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "unsupported: no prepare/confirm/planner requests",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "disconnected: DOM disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "disconnected: AX disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "disconnected: no prepare/confirm/planner requests",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "stale: DOM disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "stale: AX disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "stale: no prepare/confirm/planner requests",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "missing-scope: DOM disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "missing-scope: AX disabled",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "missing-scope: no prepare/confirm/planner requests",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "no model request across unavailable variants",
+        "actual": 0,
+        "expected": 0
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/03/request-counters/unsupported.png",
+        "sha256": "f6e3b9e76cfb1a20d3f358ad98da59677f7f9d1b837fa82f557c8ceeafd47f8c"
+      },
+      {
+        "file": "scenarios/03/request-counters/unsupported.ax.json",
+        "sha256": "1f5dffe9eb3d65cc7178d7491693c0ec05b4b016ef67d3c007bd7e947eef1c21"
+      },
+      {
+        "file": "scenarios/03/request-counters/disconnected.png",
+        "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+      },
+      {
+        "file": "scenarios/03/request-counters/disconnected.ax.json",
+        "sha256": "8bc5383c71b2f2c8631e691e393248284caeb8d42ba20a45de842659d94fdaaf"
+      },
+      {
+        "file": "scenarios/03/request-counters/stale.png",
+        "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+      },
+      {
+        "file": "scenarios/03/request-counters/stale.ax.json",
+        "sha256": "07be6f152e45d9c33649fc0992eb459ecf3620c9bbce9872a64823c925f69ece"
+      },
+      {
+        "file": "scenarios/03/request-counters/missing-scope.png",
+        "sha256": "09b586b1e4ee3dbd271c68e91f6e4ee5c970746be0a350768ec4c9170a856a86"
+      },
+      {
+        "file": "scenarios/03/request-counters/missing-scope.ax.json",
+        "sha256": "b9e90dff3a2aee31d97d90d22701106c1986b4871164920491eff8e157e93062"
+      },
+      {
+        "file": "scenarios/03/request-counters/result.png",
+        "sha256": "09b586b1e4ee3dbd271c68e91f6e4ee5c970746be0a350768ec4c9170a856a86"
+      },
+      {
+        "file": "scenarios/03/request-counters/result.ax.json",
+        "sha256": "b9e90dff3a2aee31d97d90d22701106c1986b4871164920491eff8e157e93062"
+      },
+      {
+        "file": "scenarios/03/request-counters/observations.json",
+        "sha256": "eb9a5dcc135cff4730d189aa0df1a78e50242ce4f0df0ec9d24e37aad75fbf4a"
+      }
+    ]
+  }
+]

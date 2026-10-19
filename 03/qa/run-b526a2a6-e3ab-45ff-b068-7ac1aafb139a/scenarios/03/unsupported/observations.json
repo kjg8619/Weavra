@@ -1,0 +1,167 @@
+{
+  "actions": [
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "unsupported: pointer and keyboard activation attempts",
+      "status": "COMPLETED"
+    }
+  ],
+  "observations": [
+    {
+      "fixture": "unsupported",
+      "authority": "SYNTHETIC_WIRE_OBSERVATION; NOT_RUNTIME_EXECUTION",
+      "observation": {
+        "status": "CONNECTED",
+        "stale": false,
+        "state": {
+          "ownerId": "hig-owner",
+          "nextRequestId": "hig-owner:1",
+          "projectRevision": 0,
+          "stateRevision": null,
+          "ownedRunId": null,
+          "busy": false,
+          "cancelling": false,
+          "startFailure": null,
+          "preview": null,
+          "browserPreview": null,
+          "factPreview": null,
+          "pendingApproval": null,
+          "projectFacts": {
+            "status": "available",
+            "entries": []
+          },
+          "snapshot": {
+            "status": {
+              "source": "durable-canonical-state",
+              "ownerObserved": false,
+              "state": "missing",
+              "writerPresent": false,
+              "run": null
+            },
+            "graph": null,
+            "graphAvailable": false,
+            "evidence": null,
+            "configuration": {
+              "source": "project-config-not-frozen-run-config",
+              "status": "missing"
+            }
+          }
+        },
+        "capabilities": {
+          "authority": "Runtime/Kernel",
+          "control": "workflow-control-v1",
+          "ownerId": "hig-owner",
+          "commands": [
+            "control.hello",
+            "control.snapshot",
+            "workflow.prepare",
+            "workflow.confirm",
+            "workflow.cancel",
+            "approval.resolve",
+            "browser.inspect",
+            "browser.prepare",
+            "browser.confirm",
+            "facts.prepare",
+            "facts.confirm"
+          ],
+          "maxRequestBytes": 32768,
+          "maxResponseBytes": 65536,
+          "resultLimit": 64,
+          "previewTtlMs": 300000,
+          "runtimeVersion": "hig-synthetic",
+          "readiness": "READY",
+          "recipes": []
+        },
+        "observedAt": 1792443105490,
+        "errorCode": null
+      }
+    },
+    {
+      "variant": "unsupported",
+      "ax": "- heading \"Weavra · 워크플로 제어\" [level=2]\n- heading \"Runtime 실행 제어\" [level=3]\n- text: 제어할 수 없음\n- paragraph: Kang의 MacBook Pro · baseline-project\n- paragraph: Runtime은 작업을 준비하고 Kernel은 검증·완료를 판단해요. 연결이 끊겨도 작업을 자동으로 재개하거나 요청을 대기열에 넣지 않아요.\n- button \"연결 진단 정보\"\n- region \"Runtime 기능 목록\":\n  - heading \"Runtime 기능 목록\" [level=3]\n  - text: 제공되지 않음\n  - paragraph: 조회 전용이에요. Runtime이 각 동작의 권한을 확인하며, 이 목록은 도구 접근·Policy 허용·승인·검증 증거를 부여하지 않아요.\n  - group: 기능 관찰 상세\n- status:\n  - text: idle\n  - paragraph: 명령은 Runtime에 작업을 요청해요. 결과는 Runtime의 공식 스냅샷으로만 확인해요.\n- text: 워크플로 목표\n- textbox \"워크플로 목표\" [disabled]:\n  - /placeholder: 이 checkout에서 수행할 작업을 입력해 주세요\n- text: 검토한 실행 절차(선택 사항)\n- combobox \"검토한 실행 절차\" [disabled]:\n  - option \"실행 절차 없음\" [selected]\n- paragraph: 이 연결은 Runtime 워크플로 제어를 지원하지 않아요. 읽기 전용 관찰을 이용해 주세요.\n- button \"워크플로 준비\" [disabled]\n- region \"검토한 프로젝트 사실\":\n  - heading \"검토한 프로젝트 사실\" [level=3]\n  - text: 참고 자료 전용\n  - paragraph: 허용된 로컬 소스 하나와 짧은 설명을 대조해 검토해 주세요. 자동 추출이나 프로바이더 호출은 없어요. 비밀값·추론 원문·대화 기록·도구 출력은 넣지 마세요. 사실 정보는 권한을 부여하거나 검사·검토를 대신하거나 Run을 완료할 수 없어요. 완료 판정은 Kernel이 담당해요.\n  - text: 사실 출처 · 프로젝트 상대 파일 경로\n  - textbox \"사실 출처\" [disabled]:\n    - /placeholder: src/project-notes.txt\n  - text: 사실 설명\n  - textbox \"사실 설명\" [disabled]:\n    - /placeholder: 출처로 확인할 수 있는 짧은 설명 하나\n  - button \"사실 검토 준비\" [disabled]\n  - paragraph: Runtime은 관찰하거나 worker에 전달할 때마다 출처 식별 정보와 digest를 확인해요. 같은 출처를 다시 검토하면 사실 ID는 유지하고 검토 내용을 바꿔요. 출처는 최대 16개예요.\n  - paragraph: 사실 정보를 불러올 수 없거나 관찰이 오래됐어요. 현재 유효한 사실로 판단하지 않아요.\n- region \"브라우저 증거와 검사 등록\":\n  - heading \"브라우저 검사\" [level=3]\n  - paragraph: 관찰 → 예상 결과 검토 → 등록 → 독립 검증\n  - button \"브라우저 증거 새로고침\" [disabled]\n  - paragraph: 로컬 정적 문서만 지원해요. 후보는 기록된 관찰일 뿐 검사나 현재 페이지 상태의 증거가 아니에요. Runtime이 등록과 새 격리 HOME·프로필·CDP-pipe 캡처를 수행하고 Kernel이 완료를 판정해요. 브라우저 격리는 OS sandbox가 아니에요. 개인 브라우저 세션·스크립트·상호작용은 허용하지 않아요."
+    },
+    {
+      "requests": [
+        {
+          "method": "subscribeServerConfig",
+          "command": null
+        },
+        {
+          "method": "subscribeTerminalMetadata",
+          "command": null
+        },
+        {
+          "method": "subscribeDeviceState",
+          "command": null
+        },
+        {
+          "method": "subscribeServerLifecycle",
+          "command": null
+        },
+        {
+          "method": "previewAutomation.connect",
+          "command": null
+        },
+        {
+          "method": "subscribeProjectClones",
+          "command": null
+        },
+        {
+          "method": "assets.createUrl",
+          "command": null
+        },
+        {
+          "method": "projects.readFile",
+          "command": null
+        },
+        {
+          "method": "previewAutomation.focusHost",
+          "command": null
+        },
+        {
+          "method": "subscribeVcsStatus",
+          "command": null
+        },
+        {
+          "method": "server.discoverSourceControl",
+          "command": null
+        },
+        {
+          "method": "vcs.listRefs",
+          "command": null
+        },
+        {
+          "method": "orchestration.subscribeShell",
+          "command": null
+        },
+        {
+          "method": "server.refreshProviders",
+          "command": null
+        },
+        {
+          "method": "orchestration.subscribeThread",
+          "command": null
+        },
+        {
+          "method": "server.reportClientActivity",
+          "command": null
+        },
+        {
+          "method": "weavra.observe",
+          "command": null
+        },
+        {
+          "method": "projects.searchEntries",
+          "command": null
+        }
+      ]
+    }
+  ]
+}

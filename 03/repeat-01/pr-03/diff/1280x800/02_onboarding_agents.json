@@ -1,0 +1,60 @@
+{
+  "file": "1280x800/02_onboarding_agents.png",
+  "beforeSha256": "ac5d9b7ba3ba6b3a0383684235ff78231e4e4344d6d2aa5b8bfc9cff0c7f3aa1",
+  "afterSha256": "9019b6752a1b0ab9565ca5f54542945f0235638ce67972f72a256eab00acb405",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 2749,
+    "diffRatio": 0.0027,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 5,
+        "gridY": 6,
+        "x": 800,
+        "y": 600,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1158
+      },
+      {
+        "gridX": 5,
+        "gridY": 5,
+        "x": 800,
+        "y": 500,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0559
+      },
+      {
+        "gridX": 3,
+        "gridY": 2,
+        "x": 480,
+        "y": 200,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0002
+      }
+    ],
+    "summary": "100/100 similarity; 2749/1024000 pixels differ; 3 hotspot region(s)."
+  }
+}

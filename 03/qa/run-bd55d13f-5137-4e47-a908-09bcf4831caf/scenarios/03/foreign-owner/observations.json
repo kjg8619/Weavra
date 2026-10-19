@@ -1,0 +1,103 @@
+{
+  "actions": [
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    }
+  ],
+  "observations": [
+    {
+      "fixture": "foreign-owner",
+      "authority": "SYNTHETIC_WIRE_OBSERVATION; NOT_RUNTIME_EXECUTION",
+      "observation": {
+        "status": "CONNECTED",
+        "stale": false,
+        "state": {
+          "ownerId": "hig-owner",
+          "nextRequestId": "hig-owner:1",
+          "projectRevision": 0,
+          "stateRevision": null,
+          "ownedRunId": null,
+          "busy": false,
+          "cancelling": false,
+          "startFailure": null,
+          "preview": null,
+          "browserPreview": null,
+          "factPreview": null,
+          "pendingApproval": null,
+          "projectFacts": {
+            "status": "available",
+            "entries": []
+          },
+          "snapshot": {
+            "status": {
+              "source": "durable-canonical-state",
+              "ownerObserved": false,
+              "state": "available",
+              "writerPresent": true,
+              "run": {
+                "runId": "hig-foreign-run",
+                "status": "RUNNING",
+                "phase": "IMPLEMENT",
+                "workflow": "STANDARD",
+                "risk": "R1",
+                "executionMode": "EDIT",
+                "codeRevision": 0,
+                "currentStep": {
+                  "stepId": "implement",
+                  "attempt": 0
+                },
+                "activeAgentCount": 1,
+                "taskContractDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "createdAt": 1,
+                "updatedAt": 1
+              }
+            },
+            "graph": null,
+            "graphAvailable": false,
+            "evidence": null,
+            "configuration": {
+              "source": "project-config-not-frozen-run-config",
+              "status": "missing"
+            }
+          }
+        },
+        "capabilities": {
+          "authority": "Runtime/Kernel",
+          "control": "workflow-control-v1",
+          "ownerId": "hig-owner",
+          "commands": [
+            "control.hello",
+            "control.snapshot",
+            "workflow.prepare",
+            "workflow.confirm",
+            "workflow.cancel",
+            "approval.resolve",
+            "browser.inspect",
+            "browser.prepare",
+            "browser.confirm",
+            "facts.prepare",
+            "facts.confirm"
+          ],
+          "maxRequestBytes": 32768,
+          "maxResponseBytes": 65536,
+          "resultLimit": 64,
+          "previewTtlMs": 300000,
+          "runtimeVersion": "hig-synthetic",
+          "readiness": "READY",
+          "recipes": []
+        },
+        "observedAt": 1792443193313,
+        "errorCode": null
+      }
+    },
+    {
+      "label": "foreign-owner-explanation",
+      "result": "Weavra · 워크플로 제어Runtime 실행 제어제어 연결됨Kang의 MacBook Pro · baseline-projectRuntime은 작업을 준비하고 Kernel은 검증·완료를 판단해요. 연결이 끊겨도 작업을 자동으로 재개하거나 요청을 대기열에 넣지 않아요.연결 진단 정보Runtime 기능 목록제공되지 않음조회 전용이에요. Runtime이 각 동작의 권한을 확인하며, 이 목록은 도구 접근·Policy 허용·승인·검증 증거를 부여하지 않아요.기능 관찰 상세프로젝트 범위: 90b8bdc9-b406-4f6b-b4dd-21379ac65c1a / 825d8b24-ae21-4fd7-948c-a5d6b4726cf7 / /private/tmp/weavra-hig-xSdjEe/workspace/baseline-project기능 목록이 제공되지 않아 확인할 수 없어요. 일반 읽기 전용 관찰과는 별도이며, 기능 목록을 보려면 제어 관찰 권한이 필요해요.idle명령은 Runtime에 작업을 요청해요. 결과는 Runtime의 공식 스냅샷으로만 확인해요.공식 Run: hig-foreign-run저장된 상태: 실행 중 · Run revision: UNKNOWN · 프로젝트 revision: 0소유 프로세스 작업: idle · 쓰기 잠금 존재: true작업 공간의 일부 변경을 자동으로 되돌리지 않아요.수용 기준과 검증 증거 확인다른 Runtime 소유자가 이 프로젝트의 활성 Run을 관리하고 있어요. 소유 프로세스가 종료됐다면 워크플로 준비 시 해당 Run을 INTERRUPTED로 기록해요. 작업은 재개하지 않고 일부 변경을 보존해요. 소유자가 실행 중이거나 종료를 확인할 수 없으면 요청을 거부해요.워크플로 목표Inspect orphan ownership검토한 실행 절차(선택 사항)실행 절차 없음Runtime에 계획 미리보기를 요청해요. 준비는 로컬 저장·승인·실행이 아니며, 확인 후 시작하기 전에는 실행하지 않아요.워크플로 준비검토한 프로젝트 사실참고 자료 전용허용된 로컬 소스 하나와 짧은 설명을 대조해 검토해 주세요. 자동 추출이나 프로바이더 호출은 없어요. 비밀값·추론 원문·대화 기록·도구 출력은 넣지 마세요. 사실 정보는 권한을 부여하거나 검사·검토를 대신하거나 Run을 완료할 수 없어요. 완료 판정은 Kernel이 담당해요.사실 출처 · 프로젝트 상대 파일 경로사실 설명사실 검토 준비Runtime은 관찰하거나 worker에 전달할 때마다 출처 식별 정보와 digest를 확인해요. 같은 출처를 다시 검토하면 사실 ID는 유지하고 검토 내용을 바꿔요. 출처는 최대 16개예요.이 checkout에는 검토한 사실이 없어요.브라우저 검사관찰 → 예상 결과 검토 → 등록 → 독립 검증브라우저 증거 새로고침로컬 정적 문서만 지원해요. 후보는 기록된 관찰일 뿐 검사나 현재 페이지 상태의 증거가 아니에요. Runtime이 등록과 새 격리 HOME·프로필·CDP-pipe 캡처를 수행하고 Kernel이 완료를 판정해요. 브라우저 격리는 OS sandbox가 아니에요. 개인 브라우저 세션·스크립트·상호작용은 허용하지 않아요."
+    }
+  ]
+}

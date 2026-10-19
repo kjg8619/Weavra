@@ -1,0 +1,51 @@
+{
+  "file": "1280x800/37_chat_streaming_working.png",
+  "beforeSha256": "7fa1fd13466099dfd8918d1e52165d11c99653bce38f2ba3146831b877bce102",
+  "afterSha256": "181a441cf44d2a55badcd45830eb2439565ed09937e59b81e71955767b7b8338",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 526,
+    "diffRatio": 0.0005,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 2,
+        "gridY": 2,
+        "x": 320,
+        "y": 200,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0201
+      },
+      {
+        "gridX": 3,
+        "gridY": 1,
+        "x": 480,
+        "y": 100,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0127
+      }
+    ],
+    "summary": "100/100 similarity; 526/1024000 pixels differ; 2 hotspot region(s)."
+  }
+}

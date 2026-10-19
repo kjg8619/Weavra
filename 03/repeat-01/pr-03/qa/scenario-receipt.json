@@ -1,0 +1,605 @@
+{
+  "schemaVersion": 1,
+  "selection": "03",
+  "revision": "9e8c3ac3d082b667c35709669cd333c04b1e57f1",
+  "asarSha256": "a6823b8c3d5785fa2f79db26063578d9a5d4b11d3cecfb48348d4cbd1919ca86",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "59d4a003841a0f0fad2f7ad52232eccc4ada9a43648379deb99807d554da2f19",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-19T20:50:54.413Z",
+  "checks": [
+    {
+      "caseId": "03",
+      "checkId": "unsupported",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "unsupported: DOM disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "unsupported: AX disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "unsupported: no prepare/confirm/planner requests",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/unsupported/unsupported.png",
+          "sha256": "f6e3b9e76cfb1a20d3f358ad98da59677f7f9d1b837fa82f557c8ceeafd47f8c"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/unsupported/unsupported.ax.json",
+          "sha256": "3b9c84348535bdca29c14e189ffbb08c7b018326fb72c608ea258849491f230a"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/unsupported/result.png",
+          "sha256": "a41d0e640959b8ccd2694875046f02423cc7699a61426754f5c09a1e04dd1a40"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/unsupported/result.ax.json",
+          "sha256": "3b9c84348535bdca29c14e189ffbb08c7b018326fb72c608ea258849491f230a"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/unsupported/observations.json",
+          "sha256": "57ba218da3f7b71726656d05808d1bbf23a18c221a4245e17e49d3cbe51294ed"
+        }
+      ]
+    },
+    {
+      "caseId": "03",
+      "checkId": "disconnected",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "disconnected: DOM disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disconnected: AX disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disconnected: no prepare/confirm/planner requests",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/disconnected/disconnected.png",
+          "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/disconnected/disconnected.ax.json",
+          "sha256": "b1a7b6f32244b69b54da73527ef175d44cf9006c5f9c6d9732f8eb760d28c738"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/disconnected/result.png",
+          "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/disconnected/result.ax.json",
+          "sha256": "b1a7b6f32244b69b54da73527ef175d44cf9006c5f9c6d9732f8eb760d28c738"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/disconnected/observations.json",
+          "sha256": "bbc025c82fda377ab3e5111055884c7c90b47bc3dd87cc882a1b957e5ab7c041"
+        }
+      ]
+    },
+    {
+      "caseId": "03",
+      "checkId": "stale",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "stale: DOM disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "stale: AX disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "stale: no prepare/confirm/planner requests",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/stale/stale.png",
+          "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/stale/stale.ax.json",
+          "sha256": "d861125df7fcb38eecef18190a0ef1798c6a961e42c88107eeb9753b4bafff42"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/stale/result.png",
+          "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/stale/result.ax.json",
+          "sha256": "d861125df7fcb38eecef18190a0ef1798c6a961e42c88107eeb9753b4bafff42"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/stale/observations.json",
+          "sha256": "57114821d757ef94ccef7aebf49401b3eb23d038700f952717a28cead3bb384d"
+        }
+      ]
+    },
+    {
+      "caseId": "03",
+      "checkId": "missing-scope",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "missing-scope: DOM disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "missing-scope: AX disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "missing-scope: no prepare/confirm/planner requests",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/missing-scope/missing-scope.png",
+          "sha256": "09b586b1e4ee3dbd271c68e91f6e4ee5c970746be0a350768ec4c9170a856a86"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/missing-scope/missing-scope.ax.json",
+          "sha256": "da9689b32b71da7cf9f9e9303c212d1b9c631359b7f5f3ac04524db9ae9bad4d"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/missing-scope/result.png",
+          "sha256": "09b586b1e4ee3dbd271c68e91f6e4ee5c970746be0a350768ec4c9170a856a86"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/missing-scope/result.ax.json",
+          "sha256": "da9689b32b71da7cf9f9e9303c212d1b9c631359b7f5f3ac04524db9ae9bad4d"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/missing-scope/observations.json",
+          "sha256": "eca0409951f851828f82a8053d1a7c896797f50a4ac5b841ce77d71fda85aba5"
+        }
+      ]
+    },
+    {
+      "caseId": "03",
+      "checkId": "fresh",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "fresh preparation is available",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "one explicit prepare request",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "no confirmation or execution",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/fresh/result.png",
+          "sha256": "0fc25c67ce944703ee3274b5dd8242465603a0df74d25b2b9ca9254041ad98f1"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/fresh/result.ax.json",
+          "sha256": "1a03154268680ff084f0a405fca53069be52601e5bd2c1fe16ffd6ea67dc8257"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/fresh/observations.json",
+          "sha256": "78bc0740f2279358a6dd8d9199eccbbdc9ccf0bb069a6a5f8ea35d1db4298621"
+        }
+      ]
+    },
+    {
+      "caseId": "03",
+      "checkId": "foreign-owner",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "foreign owner still permits Runtime recovery judgment",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "foreign-owner-explanation: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "foreign-owner-explanation",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/foreign-owner/foreign-owner-explanation.png",
+          "sha256": "c828a0052e88b71537df3ced1bfdf6a2f604d50996ce5cb6ef19a538171e3664"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/foreign-owner/foreign-owner-explanation.ax.json",
+          "sha256": "f62a824c8766c37d6a1c36136349e5ff6434dd51002c59b9e7cf5e22f881c905"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/foreign-owner/result.png",
+          "sha256": "f2945fa0d0eb8a2592692366dd5041ebedbe030611995a60a082ea5eac5a1752"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/foreign-owner/result.ax.json",
+          "sha256": "1d6e1fe663f18c9869c635bd9347cdcfa7b465a7aa9f5f279fad6da71fc61343"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/foreign-owner/observations.json",
+          "sha256": "a6836ee8e43b5c4e1601d5c84cc83d40f2b57b5361943194f3dd7c58beb5bd84"
+        }
+      ]
+    },
+    {
+      "caseId": "03",
+      "checkId": "confirmation-binding",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "stale binding prevents confirm request",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "only explicitly requested prepare occurred",
+          "actual": 1,
+          "expected": 1
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/confirmation-binding/result.png",
+          "sha256": "5f71936813a83030a20d7016ecd2d88380469a176c682f7dd49411df876a79f6"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/confirmation-binding/result.ax.json",
+          "sha256": "bbed9b021fe8e0b1e8504a2e8fbbde64616031162e0535849037086dd408606a"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/confirmation-binding/observations.json",
+          "sha256": "12ffbe4184f8c71554364f4654c72752af61b8bdb1a032fbfbc681c8228b2e1b"
+        }
+      ]
+    },
+    {
+      "caseId": "03",
+      "checkId": "no-reconnect-replay",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "disconnected: DOM disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disconnected: AX disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disconnected: no prepare/confirm/planner requests",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no queued intent replay after reconnect",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/no-reconnect-replay/disconnected.png",
+          "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/no-reconnect-replay/disconnected.ax.json",
+          "sha256": "d8ef46feb3e8421f4aea9bf9cde4dc89223d802c940be74f43762e8a30932bfd"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/no-reconnect-replay/result.png",
+          "sha256": "09b586b1e4ee3dbd271c68e91f6e4ee5c970746be0a350768ec4c9170a856a86"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/no-reconnect-replay/result.ax.json",
+          "sha256": "ae916cc4fedc2a6489c0ee4bccf16ee80f92b669b1fefe6a2f480d654126e281"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/no-reconnect-replay/observations.json",
+          "sha256": "c3148d4e7df85fc8e4f5e87af33c5293ff49aa3d24d37b779004c93c583c9b83"
+        }
+      ]
+    },
+    {
+      "caseId": "03",
+      "checkId": "diagnostic-copy",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "labelled diagnostic disclosure",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "diagnostic-identities: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "diagnostic-identities",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "diagnostic copy action",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "copy preserves exact fixture path",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/diagnostic-copy/diagnostic-identities.png",
+          "sha256": "24cb4badcbd2394c1cc00cbf10aef513771bb03495568130fa29717d9b9f7642"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/diagnostic-copy/diagnostic-identities.ax.json",
+          "sha256": "8b9269afad161a4f59acd5b8ed42eb8a08bc5ff9eaccb29ed9e467e9acf85eef"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/diagnostic-copy/result.png",
+          "sha256": "17b0a48dbe45c455c0c7981a51b27e01e355993c72fcb2306551ed3d0575863e"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/diagnostic-copy/result.ax.json",
+          "sha256": "2020fb24aff0415a0dfa528ccd4cb2c7f9b29e7046c3b2d72bdaac7be74c89c2"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/diagnostic-copy/observations.json",
+          "sha256": "c344ececfdbb2a31d32eeeb8c676f0c13c8765f1e73bb67cc3480cd5473633d3"
+        }
+      ]
+    },
+    {
+      "caseId": "03",
+      "checkId": "unknown-disclosure",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "unknown details are collapsed",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "unknown detail is initially collapsed",
+          "actual": "false",
+          "expected": "false"
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "unknown-detail-preserved: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "unknown-detail-preserved",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/unknown-disclosure/unknown-detail-preserved.png",
+          "sha256": "24cb4badcbd2394c1cc00cbf10aef513771bb03495568130fa29717d9b9f7642"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/unknown-disclosure/unknown-detail-preserved.ax.json",
+          "sha256": "9d0abc1856fbb1db7416cd672edccebd48cddecc9b41c5c8305d1f3fc9d1c80d"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/unknown-disclosure/result.png",
+          "sha256": "24cb4badcbd2394c1cc00cbf10aef513771bb03495568130fa29717d9b9f7642"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/unknown-disclosure/result.ax.json",
+          "sha256": "9d0abc1856fbb1db7416cd672edccebd48cddecc9b41c5c8305d1f3fc9d1c80d"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/unknown-disclosure/observations.json",
+          "sha256": "d11e40972bd153f6230c2268c5a5e5cf4cd2c5e29a34503eb48ae057c2755d91"
+        }
+      ]
+    },
+    {
+      "caseId": "03",
+      "checkId": "request-counters",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "unsupported: DOM disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "unsupported: AX disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "unsupported: no prepare/confirm/planner requests",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "disconnected: DOM disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disconnected: AX disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disconnected: no prepare/confirm/planner requests",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "stale: DOM disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "stale: AX disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "stale: no prepare/confirm/planner requests",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "missing-scope: DOM disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "missing-scope: AX disabled",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "missing-scope: no prepare/confirm/planner requests",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no model request across unavailable variants",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/unsupported.png",
+          "sha256": "f6e3b9e76cfb1a20d3f358ad98da59677f7f9d1b837fa82f557c8ceeafd47f8c"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/unsupported.ax.json",
+          "sha256": "839e71827ae9d69d00a65e6254b2875b24523a9c6d1f21044e97af4647396d79"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/disconnected.png",
+          "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/disconnected.ax.json",
+          "sha256": "10840bb1b7dbf48e1ae9931dd9066a8f925d8ab326aa1a2041504205c5c07244"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/stale.png",
+          "sha256": "6aba14d663bf1001a709c7af35457a012ffdde82cf639e1ee31cae83544b9643"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/stale.ax.json",
+          "sha256": "9b6bc8413de591ee106f5c44a320840cf3968d0517ca67485cf646da7242353c"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/missing-scope.png",
+          "sha256": "09b586b1e4ee3dbd271c68e91f6e4ee5c970746be0a350768ec4c9170a856a86"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/missing-scope.ax.json",
+          "sha256": "0e722358e7e5de3811586933ee5a2e3efe89d827b4c23f1d7287497607fe37db"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/result.png",
+          "sha256": "09b586b1e4ee3dbd271c68e91f6e4ee5c970746be0a350768ec4c9170a856a86"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/result.ax.json",
+          "sha256": "0e722358e7e5de3811586933ee5a2e3efe89d827b4c23f1d7287497607fe37db"
+        },
+        {
+          "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/scenarios/03/request-counters/observations.json",
+          "sha256": "0fd980bd7c0f33e78d6bb0399b28c8623a1115f0c1bd31f976ea75060be35459"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-19T20:52:11.822Z",
+  "capture": {
+    "file": "run-b526a2a6-e3ab-45ff-b068-7ac1aafb139a/capture-manifest.json",
+    "sha256": "41e0cc546f19f098982bf13def2b6f54c1d976bb3c5c30e4a643c5916f7a866b"
+  }
+}

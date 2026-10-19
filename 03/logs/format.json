@@ -1,0 +1,13 @@
+{
+  "name": "format",
+  "command": [
+    "bash",
+    "-c",
+    "cd app/t3code && pnpm exec vp fmt --check apps/web/src/components/settings/WeavraControls.tsx apps/web/src/components/settings/WeavraSettings.tsx apps/web/src/components/settings/CapabilityInventory.tsx apps/web/src/components/settings/WeavraControls.test.tsx apps/web/src/components/settings/WeavraSettings.test.tsx apps/web/src/components/onboarding/WelcomeWizard.tsx"
+  ],
+  "startedAt": "2026-10-19T20:46:41.037Z",
+  "completedAt": "2026-10-19T20:46:41.462Z",
+  "log": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-03/commands/format.log",
+  "code": 0,
+  "signal": null
+}

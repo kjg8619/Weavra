@@ -1,0 +1,171 @@
+{
+  "actions": [
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "explicitly prepare synthetic draft",
+      "status": "COMPLETED"
+    }
+  ],
+  "observations": [
+    {
+      "fixture": "fresh",
+      "authority": "SYNTHETIC_WIRE_OBSERVATION; NOT_RUNTIME_EXECUTION",
+      "observation": {
+        "status": "CONNECTED",
+        "stale": false,
+        "state": {
+          "ownerId": "hig-owner",
+          "nextRequestId": "hig-owner:1",
+          "projectRevision": 0,
+          "stateRevision": null,
+          "ownedRunId": null,
+          "busy": false,
+          "cancelling": false,
+          "startFailure": null,
+          "preview": null,
+          "browserPreview": null,
+          "factPreview": null,
+          "pendingApproval": null,
+          "projectFacts": {
+            "status": "available",
+            "entries": []
+          },
+          "snapshot": {
+            "status": {
+              "source": "durable-canonical-state",
+              "ownerObserved": false,
+              "state": "missing",
+              "writerPresent": false,
+              "run": null
+            },
+            "graph": null,
+            "graphAvailable": false,
+            "evidence": null,
+            "configuration": {
+              "source": "project-config-not-frozen-run-config",
+              "status": "missing"
+            }
+          }
+        },
+        "capabilities": {
+          "authority": "Runtime/Kernel",
+          "control": "workflow-control-v1",
+          "ownerId": "hig-owner",
+          "commands": [
+            "control.hello",
+            "control.snapshot",
+            "workflow.prepare",
+            "workflow.confirm",
+            "workflow.cancel",
+            "approval.resolve",
+            "browser.inspect",
+            "browser.prepare",
+            "browser.confirm",
+            "facts.prepare",
+            "facts.confirm"
+          ],
+          "maxRequestBytes": 32768,
+          "maxResponseBytes": 65536,
+          "resultLimit": 64,
+          "previewTtlMs": 300000,
+          "runtimeVersion": "hig-synthetic",
+          "readiness": "READY",
+          "recipes": []
+        },
+        "observedAt": 1792443113572,
+        "errorCode": null
+      }
+    },
+    {
+      "requests": [
+        {
+          "method": "subscribeServerConfig",
+          "command": null
+        },
+        {
+          "method": "subscribeTerminalMetadata",
+          "command": null
+        },
+        {
+          "method": "subscribeDeviceState",
+          "command": null
+        },
+        {
+          "method": "subscribeServerLifecycle",
+          "command": null
+        },
+        {
+          "method": "previewAutomation.connect",
+          "command": null
+        },
+        {
+          "method": "subscribeProjectClones",
+          "command": null
+        },
+        {
+          "method": "assets.createUrl",
+          "command": null
+        },
+        {
+          "method": "projects.readFile",
+          "command": null
+        },
+        {
+          "method": "previewAutomation.focusHost",
+          "command": null
+        },
+        {
+          "method": "subscribeVcsStatus",
+          "command": null
+        },
+        {
+          "method": "server.discoverSourceControl",
+          "command": null
+        },
+        {
+          "method": "vcs.listRefs",
+          "command": null
+        },
+        {
+          "method": "orchestration.subscribeShell",
+          "command": null
+        },
+        {
+          "method": "server.refreshProviders",
+          "command": null
+        },
+        {
+          "method": "orchestration.subscribeThread",
+          "command": null
+        },
+        {
+          "method": "server.reportClientActivity",
+          "command": null
+        },
+        {
+          "method": "weavra.observe",
+          "command": null
+        },
+        {
+          "method": "weavra.controlObserve",
+          "command": null
+        },
+        {
+          "method": "projects.searchEntries",
+          "command": null
+        },
+        {
+          "method": "weavra.control",
+          "command": "workflow.prepare"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "file": "matrix/840x620/light/48/end-default.png",
+  "beforeSha256": "595b6b2d770043e9c7b59db851d035e2e21d7e2612e65d4c7762bfaf76b184be",
+  "afterSha256": "779d2b1af5a4ebc87c52862753daeb0df35482e20bb4d6cb95ed3383540a5375",
+  "beforeDimensions": {
+    "width": 840,
+    "height": 620
+  },
+  "afterDimensions": {
+    "width": 840,
+    "height": 620
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 840,
+      "height": 620
+    },
+    "actual": {
+      "width": 840,
+      "height": 620
+    },
+    "totalPixels": 520800,
+    "diffPixels": 325,
+    "diffRatio": 0.0006,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 7,
+        "gridY": 5,
+        "x": 735,
+        "y": 387,
+        "width": 105,
+        "height": 78,
+        "diffRatio": 0.0223
+      },
+      {
+        "gridX": 7,
+        "gridY": 6,
+        "x": 735,
+        "y": 465,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.0085
+      },
+      {
+        "gridX": 6,
+        "gridY": 5,
+        "x": 630,
+        "y": 387,
+        "width": 105,
+        "height": 78,
+        "diffRatio": 0.0048
+      },
+      {
+        "gridX": 6,
+        "gridY": 6,
+        "x": 630,
+        "y": 465,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.0022
+      },
+      {
+        "gridX": 7,
+        "gridY": 7,
+        "x": 735,
+        "y": 542,
+        "width": 105,
+        "height": 78,
+        "diffRatio": 0.0011
+      },
+      {
+        "gridX": 2,
+        "gridY": 7,
+        "x": 210,
+        "y": 542,
+        "width": 105,
+        "height": 78,
+        "diffRatio": 0.001
+      },
+      {
+        "gridX": 2,
+        "gridY": 4,
+        "x": 210,
+        "y": 310,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.0001
+      }
+    ],
+    "summary": "100/100 similarity; 325/520800 pixels differ; 7 hotspot region(s)."
+  }
+}

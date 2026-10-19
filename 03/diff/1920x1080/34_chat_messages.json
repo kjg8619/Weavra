@@ -1,0 +1,42 @@
+{
+  "file": "1920x1080/34_chat_messages.png",
+  "beforeSha256": "86be65763f5a7991de60457434d68db0695bbc0c196b91ca89f40c6a07797416",
+  "afterSha256": "2533c6bf18a310d881dff132f120b90a6bbff2cd3ccb5344d13febbcbf0e6502",
+  "beforeDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "afterDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1920,
+      "height": 1080
+    },
+    "actual": {
+      "width": 1920,
+      "height": 1080
+    },
+    "totalPixels": 2073600,
+    "diffPixels": 116,
+    "diffRatio": 0.0001,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 3,
+        "x": 0,
+        "y": 405,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0036
+      }
+    ],
+    "summary": "100/100 similarity; 116/2073600 pixels differ; 1 hotspot region(s)."
+  }
+}

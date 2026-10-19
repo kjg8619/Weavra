@@ -1,0 +1,42 @@
+{
+  "file": "1920x1080/33_project_list_with_threads.png",
+  "beforeSha256": "0a4495730faeb5bde7f541f2d0ba2adb7e13bb64e8b9f82930e486f2a498d18d",
+  "afterSha256": "47cce4a13eba45943d871b1c75ec295db209e7502c659a11c4c4dac1f1177420",
+  "beforeDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "afterDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1920,
+      "height": 1080
+    },
+    "actual": {
+      "width": 1920,
+      "height": 1080
+    },
+    "totalPixels": 2073600,
+    "diffPixels": 116,
+    "diffRatio": 0.0001,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 3,
+        "x": 0,
+        "y": 405,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0036
+      }
+    ],
+    "summary": "100/100 similarity; 116/2073600 pixels differ; 1 hotspot region(s)."
+  }
+}

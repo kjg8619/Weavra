@@ -1,0 +1,96 @@
+{
+  "file": "matrix/840x620/light/47/top-default.png",
+  "beforeSha256": "36d8d2474136eb8e5fb489827b9772e22a1852d027c524d4830b5025cfa594a4",
+  "afterSha256": "302ca6e9b3ecc15be9d55c95cf39d95be8ac45347326f0883272194cb6cece13",
+  "beforeDimensions": {
+    "width": 840,
+    "height": 620
+  },
+  "afterDimensions": {
+    "width": 840,
+    "height": 620
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 840,
+      "height": 620
+    },
+    "actual": {
+      "width": 840,
+      "height": 620
+    },
+    "totalPixels": 520800,
+    "diffPixels": 301,
+    "diffRatio": 0.0006,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 7,
+        "gridY": 5,
+        "x": 735,
+        "y": 387,
+        "width": 105,
+        "height": 78,
+        "diffRatio": 0.0131
+      },
+      {
+        "gridX": 7,
+        "gridY": 4,
+        "x": 735,
+        "y": 310,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.0085
+      },
+      {
+        "gridX": 6,
+        "gridY": 4,
+        "x": 630,
+        "y": 310,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.007
+      },
+      {
+        "gridX": 7,
+        "gridY": 7,
+        "x": 735,
+        "y": 542,
+        "width": 105,
+        "height": 78,
+        "diffRatio": 0.0054
+      },
+      {
+        "gridX": 7,
+        "gridY": 6,
+        "x": 735,
+        "y": 465,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.0018
+      },
+      {
+        "gridX": 2,
+        "gridY": 6,
+        "x": 210,
+        "y": 465,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.001
+      },
+      {
+        "gridX": 2,
+        "gridY": 3,
+        "x": 210,
+        "y": 232,
+        "width": 105,
+        "height": 78,
+        "diffRatio": 0.0001
+      }
+    ],
+    "summary": "100/100 similarity; 301/520800 pixels differ; 7 hotspot region(s)."
+  }
+}

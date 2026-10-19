@@ -1,0 +1,60 @@
+{
+  "file": "matrix/840x620/dark/46/end-default.png",
+  "beforeSha256": "a4b0c862cf5e83da0be36cd4ce1b747398130ba1fe9379907c3be6818a4b6729",
+  "afterSha256": "40a9d50929758603bd76e463818da96dd0756bdeb973c3886061127a29dce8c9",
+  "beforeDimensions": {
+    "width": 840,
+    "height": 620
+  },
+  "afterDimensions": {
+    "width": 840,
+    "height": 620
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 840,
+      "height": 620
+    },
+    "actual": {
+      "width": 840,
+      "height": 620
+    },
+    "totalPixels": 520800,
+    "diffPixels": 336,
+    "diffRatio": 0.0006,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 7,
+        "gridY": 4,
+        "x": 735,
+        "y": 310,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.0247
+      },
+      {
+        "gridX": 7,
+        "gridY": 3,
+        "x": 735,
+        "y": 232,
+        "width": 105,
+        "height": 78,
+        "diffRatio": 0.0139
+      },
+      {
+        "gridX": 7,
+        "gridY": 2,
+        "x": 735,
+        "y": 155,
+        "width": 105,
+        "height": 77,
+        "diffRatio": 0.0027
+      }
+    ],
+    "summary": "100/100 similarity; 336/520800 pixels differ; 3 hotspot region(s)."
+  }
+}
