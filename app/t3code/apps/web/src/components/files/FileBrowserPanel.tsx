@@ -99,7 +99,7 @@ export type FileBrowserBodyState =
   | { readonly kind: "loading" }
   | { readonly kind: "error"; readonly message: string }
   | { readonly kind: "empty" }
-  | { readonly kind: "no-results"; readonly query: string }
+  | { readonly kind: "no-results"; readonly query: string; readonly searching: boolean }
   | { readonly kind: "ready" };
 
 /**
@@ -119,12 +119,11 @@ export function resolveFileBrowserBodyState(input: {
   if (!input.ready) return { kind: "loading" };
   const query = input.query.trim();
   if (query) {
-    if (input.searchPending) return { kind: "loading" };
     const needle = query.toLowerCase();
     const localMatch = input.entryPaths.some((path) => path.toLowerCase().includes(needle));
-    return localMatch || input.searchMatchCount > 0
-      ? { kind: "ready" }
-      : { kind: "no-results", query };
+    if (localMatch || input.searchMatchCount > 0) return { kind: "ready" };
+    // Nothing loaded matches; a project-wide search may still be running.
+    return { kind: "no-results", query, searching: input.searchPending };
   }
   return input.entryPaths.length === 0 ? { kind: "empty" } : { kind: "ready" };
 }
@@ -583,7 +582,7 @@ export default function FileBrowserPanel({
       >
         {bodyState.kind === "loading" ? (
           <div role="status" className="px-3 py-2 text-xs text-muted-foreground">
-            {query.trim() ? "파일을 검색하는 중이에요…" : "파일을 불러오는 중이에요…"}
+            파일을 불러오는 중이에요…
           </div>
         ) : bodyState.kind === "error" ? (
           <div role="alert" className="flex flex-col items-start gap-2 p-4 text-xs leading-relaxed">
@@ -604,6 +603,11 @@ export default function FileBrowserPanel({
         ) : bodyState.kind === "no-results" ? (
           <div className="flex flex-col items-start gap-2 p-4 text-xs leading-relaxed">
             <p className="text-foreground">'{bodyState.query}'와 일치하는 파일이 없어요.</p>
+            {bodyState.searching ? (
+              <p role="status" className="text-muted-foreground">
+                프로젝트 전체에서 더 찾는 중이에요…
+              </p>
+            ) : null}
             <Button type="button" size="xs" variant="outline" onClick={closeSearch}>
               검색 지우기
             </Button>

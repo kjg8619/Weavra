@@ -35,12 +35,18 @@ describe("Files body state", () => {
     expect(resolveFileBrowserBodyState({ ...base, query: "absent" })).toEqual({
       kind: "no-results",
       query: "absent",
+      searching: false,
     });
   });
 
-  it("is searching, not empty, while the search is pending", () => {
-    expect(resolveFileBrowserBodyState({ ...base, query: "abs", searchPending: true }).kind).toBe(
-      "loading",
+  it("says nothing loaded matches while the project-wide search is still running", () => {
+    expect(resolveFileBrowserBodyState({ ...base, query: "abs", searchPending: true })).toEqual({
+      kind: "no-results",
+      query: "abs",
+      searching: true,
+    });
+    expect(resolveFileBrowserBodyState({ ...base, query: "index", searchPending: true }).kind).toBe(
+      "ready",
     );
   });
 
