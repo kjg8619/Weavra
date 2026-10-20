@@ -1,0 +1,34 @@
+{
+  "head": "69f2cc6c645b6a07525a6a4439c9252741a2d7da",
+  "base": "f95305dfd3fc334a5a311b6fdbce463c6d075583",
+  "branch": "hig/15-source-control-status",
+  "baseBranch": "hig/14-link-destination",
+  "ownedFiles": [
+    "app/t3code/apps/web/src/components/settings/SourceControlSettings.tsx",
+    "app/t3code/apps/web/src/components/settings/SourceControlSettings.test.tsx"
+  ],
+  "checks": [
+    {"name": "focused", "tests": 7, "files": 1, "exitCode": 0},
+    {"name": "fmt", "exitCode": 0},
+    {"name": "lint", "exitCode": 0, "preExistingWarnings": ["Git search-target set-state-in-effect"]},
+    {"name": "web-typecheck", "exitCode": 0},
+    {"name": "diff-check", "exitCode": 0},
+    {"name": "visual-stripes", "exitCode": 0},
+    {"name": "build-before", "exitCode": 0},
+    {"name": "build-after", "exitCode": 0}
+  ],
+  "package": {
+    "version": "0.0.42",
+    "target": "mac/zip/arm64",
+    "beforeAsarSha256": "ceb1d0b17dc0b78b93c4232ac72c3ad520f714b8410ec96c65e512104ae7371d",
+    "afterAsarSha256": "ff19aa84dee4fbe54299dd3e74ed3dc086c371e54c99278528b92ee48cd85fd8"
+  },
+  "runnerHead": "08e5df5d37ba6bd3ab7e09f698ddf7a9c42550ed",
+  "model": "gpt-6.1-sol",
+  "provider": "chatgpt-subscription",
+  "limitations": [
+    "Fresh TSX LSP diagnostics time out; actual web typecheck passes.",
+    "Existing Settings Escape focus restoration is outside todo 15.",
+    "The complete universal Q matrix and repository-wide CI belong to the Final wave."
+  ]
+}

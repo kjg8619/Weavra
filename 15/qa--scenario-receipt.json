@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "selection": "15",
+  "revision": "69f2cc6c645b6a07525a6a4439c9252741a2d7da",
+  "asarSha256": "ff19aa84dee4fbe54299dd3e74ed3dc086c371e54c99278528b92ee48cd85fd8",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "9b6e94870cca736303e7b6c328af5aebbe39b5dc87ce30eb059a6aa59c670db7",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T17:28:02.636Z",
+  "checks": [
+    {
+      "caseId": "15",
+      "checkId": "installed-ready",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "discovery fixture reached actual consumer",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "tool installation axis visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "separate authentication axis visible",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/installed-ready/source-control-installed-ready.png",
+          "sha256": "e9b8dfafe86b8f8931970993a9251f30e8fa25812942b73fa571fc778b8a6b62"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/installed-ready/source-control-installed-ready.ax.json",
+          "sha256": "ee8f9ad30578612796b154eb5e34ce0ee8e13c09ebb4e4f02d21ff3d951e47ca"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/installed-ready/result.png",
+          "sha256": "e9b8dfafe86b8f8931970993a9251f30e8fa25812942b73fa571fc778b8a6b62"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/installed-ready/result.ax.json",
+          "sha256": "ee8f9ad30578612796b154eb5e34ce0ee8e13c09ebb4e4f02d21ff3d951e47ca"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/installed-ready/observations.json",
+          "sha256": "17e276fc00eda7943f24c21505dd583d04b99cb51248e0afdf7c21141efaaf6f"
+        }
+      ]
+    },
+    {
+      "caseId": "15",
+      "checkId": "unauthenticated",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "discovery fixture reached actual consumer",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "tool installation axis visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "separate authentication axis visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "missing login not reported as ready",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/unauthenticated/source-control-unauthenticated.png",
+          "sha256": "2041ac588837bee42587c8543aae71b5e66e62f62e2ef07bcfca83675bd08e8e"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/unauthenticated/source-control-unauthenticated.ax.json",
+          "sha256": "0beeed9487ca775c8db2e1622963d715768f4dc9c0fdb9038a197e3ac7b56751"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/unauthenticated/result.png",
+          "sha256": "2041ac588837bee42587c8543aae71b5e66e62f62e2ef07bcfca83675bd08e8e"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/unauthenticated/result.ax.json",
+          "sha256": "0beeed9487ca775c8db2e1622963d715768f4dc9c0fdb9038a197e3ac7b56751"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/unauthenticated/observations.json",
+          "sha256": "f490ac073db064da5a19c1d901a50089732219416de9458b9840d81ce8e25c51"
+        }
+      ]
+    },
+    {
+      "caseId": "15",
+      "checkId": "authenticated",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "discovery fixture reached actual consumer",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "tool installation axis visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "separate authentication axis visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "authenticated value shown",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/authenticated/source-control-authenticated.png",
+          "sha256": "facebdb732a90aa10cc780dabca61fbb3d459386704004fb4075c842cf030be3"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/authenticated/source-control-authenticated.ax.json",
+          "sha256": "cee8b146c799fd3ac730c13dd72a2f2f592c6218c48390fd9205ddc5ffae5555"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/authenticated/result.png",
+          "sha256": "facebdb732a90aa10cc780dabca61fbb3d459386704004fb4075c842cf030be3"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/authenticated/result.ax.json",
+          "sha256": "cee8b146c799fd3ac730c13dd72a2f2f592c6218c48390fd9205ddc5ffae5555"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/authenticated/observations.json",
+          "sha256": "9b38f01c6acbd6db364f1ad1f7989913e9ca4d9505e2ba9a22a94be73a6d6f26"
+        }
+      ]
+    },
+    {
+      "caseId": "15",
+      "checkId": "unavailable",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "discovery fixture reached actual consumer",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "tool installation axis visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "separate authentication axis visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "missing tool explicitly identified",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/unavailable/source-control-unavailable.png",
+          "sha256": "b0e03a6ecd4e07644237b633ef2819925baca1b89b24595afffc3219aba3c797"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/unavailable/source-control-unavailable.ax.json",
+          "sha256": "eb445f8012cace4ca703d46c21fce91fac67540c49296a94d08031f3c86ba21a"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/unavailable/result.png",
+          "sha256": "b0e03a6ecd4e07644237b633ef2819925baca1b89b24595afffc3219aba3c797"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/unavailable/result.ax.json",
+          "sha256": "eb445f8012cace4ca703d46c21fce91fac67540c49296a94d08031f3c86ba21a"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/unavailable/observations.json",
+          "sha256": "c2d3d2ed52ff6d2f5fe5082d9b642006c9d9d57405726efc214eab8446e5f0f0"
+        }
+      ]
+    },
+    {
+      "caseId": "15",
+      "checkId": "no-authentication-side-effect",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "discovery fixture reached actual consumer",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "tool installation axis visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "separate authentication axis visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "missing login not reported as ready",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reading discovery/details never authenticates",
+          "actual": false,
+          "expected": false
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/no-authentication-side-effect/source-control-unauthenticated.png",
+          "sha256": "2041ac588837bee42587c8543aae71b5e66e62f62e2ef07bcfca83675bd08e8e"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/no-authentication-side-effect/source-control-unauthenticated.ax.json",
+          "sha256": "6eb6a789015c91a2e867ee6eeae10b145a71fd98f6a85eff185a3daed189157e"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/no-authentication-side-effect/result.png",
+          "sha256": "774c803636eecb0c4bfa19a4268fe209270dc5335c4165a9ed78716c3d4beb87"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/no-authentication-side-effect/result.ax.json",
+          "sha256": "60055bf28f19dbe692e697abf67f11142e839112bd3b9dc6b8de67b53b2e3633"
+        },
+        {
+          "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/scenarios/15/no-authentication-side-effect/observations.json",
+          "sha256": "e527335211ab49a2af17e117e98affdc4d92acc26794a9e178f61569ac3e83e1"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T17:29:01.796Z",
+  "capture": {
+    "file": "run-0a33ccf4-302b-4964-bf82-76bc12e0f949/capture-manifest.json",
+    "sha256": "78205b83fc911135ca339b7721f8491333102a7ccd0b56649c720cceea0a7b79"
+  }
+}
