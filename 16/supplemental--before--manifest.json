@@ -1,0 +1,671 @@
+{
+  "revision": "69f2cc6c645b6a07525a6a4439c9252741a2d7da",
+  "side": "before",
+  "asarSha256": "b7f961a940a65bd204867e477fd557dc187c263a2e55d1245ed318f330088e61",
+  "scriptSha256": "d8cb2abfbb4926b8205350b2fff772c2b9b6423bb6b574d5a88876bfa0107ccd",
+  "source": "actual packaged app, fresh task-owned profile, no synthetic auth override",
+  "screenshots": [
+    {
+      "file": "1280x800/light/top.png",
+      "sha256": "fd8f32f34c2a66d62ff95bc4ea6bd0078a7c131fd4422e7cc0af809c4e084fb7",
+      "mode": "light",
+      "size": [
+        1280,
+        800
+      ],
+      "position": "top",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 748,
+        "clientHeight": 748
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1280x800/light/end.png",
+      "sha256": "fd8f32f34c2a66d62ff95bc4ea6bd0078a7c131fd4422e7cc0af809c4e084fb7",
+      "mode": "light",
+      "size": [
+        1280,
+        800
+      ],
+      "position": "end",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 748,
+        "clientHeight": 748
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1280x800/light/hover.png",
+      "sha256": "0b899f9b4eccc984c3d4fd77dffb72dfd825e02f22928b65d57edc0ac843f73e",
+      "mode": "light",
+      "size": [
+        1280,
+        800
+      ],
+      "position": "hover",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 748,
+        "clientHeight": 748
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1280x800/light/focus.png",
+      "sha256": "404c000be96124b4fd120d567e70e04fde81ee9588d4bb3a8107af6c3c92c7d1",
+      "mode": "light",
+      "size": [
+        1280,
+        800
+      ],
+      "position": "focus",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 748,
+        "clientHeight": 748
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1280x800/light/open.png",
+      "sha256": "ed73766136b05cae9a8fe2d9355e522a8c4cbdec07f5cb8f99ad4d95d82f8799",
+      "mode": "light",
+      "size": [
+        1280,
+        800
+      ],
+      "position": "open",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 748,
+        "clientHeight": 748
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1920x1080/light/top.png",
+      "sha256": "b78143333d53a58ad98f191076b21ec47c5432f0b79d17b96974ba6fc779f5e0",
+      "mode": "light",
+      "size": [
+        1920,
+        1080
+      ],
+      "position": "top",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 1028,
+        "clientHeight": 1028
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1920x1080/light/end.png",
+      "sha256": "b78143333d53a58ad98f191076b21ec47c5432f0b79d17b96974ba6fc779f5e0",
+      "mode": "light",
+      "size": [
+        1920,
+        1080
+      ],
+      "position": "end",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 1028,
+        "clientHeight": 1028
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1920x1080/light/hover.png",
+      "sha256": "34e88dae64075881c4994111d056c640ad276d804423484adea7a66145e872f1",
+      "mode": "light",
+      "size": [
+        1920,
+        1080
+      ],
+      "position": "hover",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 1028,
+        "clientHeight": 1028
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1920x1080/light/focus.png",
+      "sha256": "34e88dae64075881c4994111d056c640ad276d804423484adea7a66145e872f1",
+      "mode": "light",
+      "size": [
+        1920,
+        1080
+      ],
+      "position": "focus",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 1028,
+        "clientHeight": 1028
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1920x1080/light/open.png",
+      "sha256": "f2b1c55b97ac3bf48b18f21b0785b4785ab04132c2d36a850335ef33a0400a23",
+      "mode": "light",
+      "size": [
+        1920,
+        1080
+      ],
+      "position": "open",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 1028,
+        "clientHeight": 1028
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1280x800/dark/top.png",
+      "sha256": "9d36890a750a4cf9e6c85bbe4d6d586a484aeffacba1c0da24cd4b34fa48f6ac",
+      "mode": "dark",
+      "size": [
+        1280,
+        800
+      ],
+      "position": "top",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 748,
+        "clientHeight": 748
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1280x800/dark/end.png",
+      "sha256": "32d3dcef47efb88f8a070e233401ddbe2d7f377e651aa4a10bde58a16ee96b08",
+      "mode": "dark",
+      "size": [
+        1280,
+        800
+      ],
+      "position": "end",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 748,
+        "clientHeight": 748
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1280x800/dark/hover.png",
+      "sha256": "7d0665e0b04426311fc4143e890214d37b40b0f4a9b30a47cadc14d3a3d820de",
+      "mode": "dark",
+      "size": [
+        1280,
+        800
+      ],
+      "position": "hover",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 748,
+        "clientHeight": 748
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1280x800/dark/focus.png",
+      "sha256": "6086290803bd08b2560a5ff4ad1c21514847e5cf97a0aa5182e97c4ee4fb3153",
+      "mode": "dark",
+      "size": [
+        1280,
+        800
+      ],
+      "position": "focus",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 748,
+        "clientHeight": 748
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1280x800/dark/open.png",
+      "sha256": "831dc49fa4d24164c0373a18ce66ced0896dac800f608dc2b8c5c195a560344a",
+      "mode": "dark",
+      "size": [
+        1280,
+        800
+      ],
+      "position": "open",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 748,
+        "clientHeight": 748
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1920x1080/dark/top.png",
+      "sha256": "85c76b30fd3e526681abdff7e46f72cac2620da6b5e6b45e90373a39c17c5a27",
+      "mode": "dark",
+      "size": [
+        1920,
+        1080
+      ],
+      "position": "top",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 1028,
+        "clientHeight": 1028
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1920x1080/dark/end.png",
+      "sha256": "85c76b30fd3e526681abdff7e46f72cac2620da6b5e6b45e90373a39c17c5a27",
+      "mode": "dark",
+      "size": [
+        1920,
+        1080
+      ],
+      "position": "end",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 1028,
+        "clientHeight": 1028
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1920x1080/dark/hover.png",
+      "sha256": "632547e0bb7a50fd74c824a85907bac84514daa0274584cbd07c6ff28e4981ea",
+      "mode": "dark",
+      "size": [
+        1920,
+        1080
+      ],
+      "position": "hover",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 1028,
+        "clientHeight": 1028
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1920x1080/dark/focus.png",
+      "sha256": "632547e0bb7a50fd74c824a85907bac84514daa0274584cbd07c6ff28e4981ea",
+      "mode": "dark",
+      "size": [
+        1920,
+        1080
+      ],
+      "position": "focus",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 1028,
+        "clientHeight": 1028
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    },
+    {
+      "file": "1920x1080/dark/open.png",
+      "sha256": "4a6cd4ef4dec7a0f2050299592f713ffc26fd1489e6106477828963f75c7360e",
+      "mode": "dark",
+      "size": [
+        1920,
+        1080
+      ],
+      "position": "open",
+      "geometry": {
+        "scrollTop": 0,
+        "scrollHeight": 1028,
+        "clientHeight": 1028
+      },
+      "native": {
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 949
+        },
+        "minimum": [
+          840,
+          620
+        ]
+      }
+    }
+  ],
+  "failures": [],
+  "closed": true
+}

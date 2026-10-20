@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "selection": "16",
+  "revision": "878a9162cd8ce64b39c36531d772cdbd3885b658",
+  "asarSha256": "6d70bf40832cc8495a559e315ccab214418dfb5444aa3281457fc6c5f917b549",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "9b6e94870cca736303e7b6c328af5aebbe39b5dc87ce30eb059a6aa59c670db7",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T18:01:29.238Z",
+  "checks": [
+    {
+      "caseId": "16",
+      "checkId": "empty-connection-action",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "one local connection draft action",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "local draft action available",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "action opens connection draft",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/empty-connection-action/result.png",
+          "sha256": "7ee349151ce8ddbc8f39b496c9eaa2ec440daa9589ad250356cc9908af78fd4a"
+        },
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/empty-connection-action/result.ax.json",
+          "sha256": "a40132e9b6d3f4b382bdcdfe0da3c3da353da87706d600813eb92f687f46b978"
+        },
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/empty-connection-action/observations.json",
+          "sha256": "34051ccb98cfbd4b05d349d26ff66053eca225dba9adb161d01a192ac41d8e4a"
+        }
+      ]
+    },
+    {
+      "caseId": "16",
+      "checkId": "capability-copy-parity",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "empty guidance does not instruct unavailable activation",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "actual local capability agrees with action",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/capability-copy-parity/result.png",
+          "sha256": "0196e837a60284f2f5cd8d0e9c422bdfc44d39ddac55bb35e4853feaf17a8af5"
+        },
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/capability-copy-parity/result.ax.json",
+          "sha256": "a7bc5245a8797970c1e0b12c87283c936a0f86f88d25fb1adc94f9736c503e16"
+        },
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/capability-copy-parity/observations.json",
+          "sha256": "2b2a85c62995bf4bd32e611dbbebdec5118ba86d063ab415d6782cfb2bff49ad"
+        }
+      ]
+    },
+    {
+      "caseId": "16",
+      "checkId": "unavailable-disabled",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "local draft remains available in local-only environment",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "local draft opens without host mutation",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/unavailable-disabled/result.png",
+          "sha256": "5e85ebbc8a178393572dd198c1c92d037e5c7b3486766c874f50cac47188d91e"
+        },
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/unavailable-disabled/result.ax.json",
+          "sha256": "e7e14cc759cec30199d3f797f83d903560b2f848a39f20f7055ae73b94ba8928"
+        },
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/unavailable-disabled/observations.json",
+          "sha256": "886a9d5462ec392fed4e46b44a0efd420c3c78aa21d29be7ce78924953b6a393"
+        }
+      ]
+    },
+    {
+      "caseId": "16",
+      "checkId": "direct-remote",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "direct connection draft remains supported",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "retired hosted relay not presented",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "no remote connection is opened by reading draft",
+          "actual": false,
+          "expected": false
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/direct-remote/result.png",
+          "sha256": "f5168d52f9fa9c19f65a7d56ad33d7d51612838f6fb4a8cf335bc89728adc3f5"
+        },
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/direct-remote/result.ax.json",
+          "sha256": "79a87555a15c547dbc00eee4dd076702357f5aa94fc65798d116f056f07c6503"
+        },
+        {
+          "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/scenarios/16/direct-remote/observations.json",
+          "sha256": "01ef3e1e997288e2a3fe850bac0ee353e5a79f0a3077e3090fd99042504674af"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T18:02:24.979Z",
+  "capture": {
+    "file": "run-51b50fea-b08c-4f50-98dc-f25efa0cf0da/capture-manifest.json",
+    "sha256": "ceaf479882e1829ef00b49c2d9e5c1ca227162e92cfbba102264a1bf3451e9bb"
+  }
+}
