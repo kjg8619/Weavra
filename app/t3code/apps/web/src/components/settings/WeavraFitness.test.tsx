@@ -30,12 +30,15 @@ vi.mock("./settingsLayout", () => ({
 import { WeavraFitness } from "./WeavraFitness";
 
 let renderer: ReactTestRenderer;
+const focusOpener = vi.fn();
 const text = () => JSON.stringify(renderer.toJSON());
 const buttons = () => renderer.root.findAllByType("button");
 const named = (label: string) =>
   buttons().filter((node) => JSON.stringify(node.props.children).includes(label));
 
 beforeEach(() => {
+  vi.stubGlobal("document", new EventTarget());
+  focusOpener.mockReset();
   mocks.invoke.mockReset().mockResolvedValue(
     AsyncResult.success({
       command: "list",
@@ -48,11 +51,13 @@ beforeEach(() => {
         environmentId={EnvironmentId.make("env")}
         projectId={ProjectId.make("project")}
       />,
+      { createNodeMock: () => ({ focus: focusOpener }) },
     );
   });
 });
 afterEach(() => {
   act(() => renderer.unmount());
+  vi.unstubAllGlobals();
 });
 
 it("says up front that records are only read and that evaluation needs separate approval", () => {
@@ -69,14 +74,22 @@ it("explains the record workflow in a disclosure that issues no request", () => 
   expect(named("읽기 전용 안내")[0]!.props["aria-expanded"]).toBe(true);
   expect(text()).toContain("기록 목록을 읽어요");
   expect(mocks.invoke).not.toHaveBeenCalled();
-  const stop = vi.fn();
-  act(() => named("읽기 전용 안내")[0]!.props.onKeyDown({ key: "Escape", stopPropagation: stop }));
+  const escape = () => {
+    const event = Object.assign(new Event("keydown", { cancelable: true }), { key: "Escape" });
+    act(() => {
+      document.dispatchEvent(event);
+    });
+    return event;
+  };
+  expect(escape().defaultPrevented).toBe(true);
   expect(named("읽기 전용 안내")[0]!.props["aria-expanded"]).toBe(false);
   expect(text()).not.toContain("기록 목록을 읽어요");
-  expect(stop).toHaveBeenCalledTimes(1);
+  expect(focusOpener).toHaveBeenCalledTimes(1);
   // Closed again: Escape is left alone so it keeps its normal meaning.
-  act(() => named("읽기 전용 안내")[0]!.props.onKeyDown({ key: "Escape", stopPropagation: stop }));
-  expect(stop).toHaveBeenCalledTimes(1);
+  expect(escape().defaultPrevented).toBe(false);
+  act(() => named("읽기 전용 안내")[0]!.props.onClick());
+  expect(escape().defaultPrevented).toBe(true);
+  expect(focusOpener).toHaveBeenCalledTimes(2);
 });
 
 it("loads records with one read-only list request and explains an empty result", async () => {

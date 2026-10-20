@@ -39,6 +39,7 @@ vi.mock("../ui/button", () => ({
 
 const threadRef = scopeThreadRef(EnvironmentId.make("env"), ThreadId.make("thread"));
 let renderer: ReactTestRenderer;
+const focusOpener = vi.fn();
 
 function render(status: WeavraRunGraph["status"], nodes: WeavraRunGraph["nodes"]) {
   mocks.result = AsyncResult.success({
@@ -78,6 +79,8 @@ const steps: WeavraRunGraph["nodes"] = [
 ];
 
 beforeEach(() => {
+  vi.stubGlobal("document", new EventTarget());
+  focusOpener.mockReset();
   mocks.navigate.mockReset();
   mocks.groups = [
     { projectKey: "other-key", memberProjects: [{ environmentId: "other-env", id: "project" }] },
@@ -87,6 +90,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   act(() => renderer.unmount());
+  vi.unstubAllGlobals();
 });
 
 it("links a blocked Run's completion card to the result surface", () => {
@@ -131,6 +135,7 @@ function renderEmpty(result: unknown) {
         projectId={ProjectId.make("project")}
         workspaceRoot="/workspace"
       />,
+      { createNodeMock: () => ({ focus: focusOpener }) },
     );
   });
 }
@@ -176,16 +181,24 @@ it("keeps an unsupported environment read-only and explains it in an in-app disc
   ).toBe(true);
   expect(text()).toContain("서버가 통제 작업 관찰을 지원하지 않아서");
   expect(mocks.navigate).not.toHaveBeenCalled();
-  // Escape closes the disclosure and leaves focus on its opener (the panel holds nothing focusable).
+  // Escape reaches the disclosure after focus has moved away from its opener.
   const opener = () =>
     renderer.root.find(
       (node) => node.type === "button" && node.props["aria-expanded"] !== undefined,
     );
-  const stop = vi.fn();
-  act(() => opener().props.onKeyDown({ key: "Escape", stopPropagation: stop }));
+  const escape = () => {
+    const event = Object.assign(new Event("keydown", { cancelable: true }), { key: "Escape" });
+    act(() => {
+      document.dispatchEvent(event);
+    });
+    return event;
+  };
+  expect(escape().defaultPrevented).toBe(true);
   expect(text()).not.toContain("서버가 통제 작업 관찰을 지원하지 않아서");
-  expect(stop).toHaveBeenCalledTimes(1);
+  expect(focusOpener).toHaveBeenCalledTimes(1);
   // Closed again: Escape is left alone so it keeps its normal meaning.
-  act(() => opener().props.onKeyDown({ key: "Escape", stopPropagation: stop }));
-  expect(stop).toHaveBeenCalledTimes(1);
+  expect(escape().defaultPrevented).toBe(false);
+  act(() => opener().props.onClick());
+  expect(escape().defaultPrevented).toBe(true);
+  expect(focusOpener).toHaveBeenCalledTimes(2);
 });

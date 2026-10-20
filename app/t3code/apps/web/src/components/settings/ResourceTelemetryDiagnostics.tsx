@@ -250,14 +250,17 @@ function IconStat({
   return (
     <div className="group min-w-0 px-4 py-4 sm:px-5">
       <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.11em] text-muted-foreground">
-        <span className="text-muted-foreground transition-colors group-hover:text-foreground/65">
+        <span
+          aria-hidden="true"
+          className="shrink-0 text-muted-foreground transition-colors group-hover:text-foreground/65"
+        >
           {icon}
         </span>
-        <span className="truncate">{label}</span>
+        <span className="min-w-0 break-keep text-pretty">{label}</span>
       </div>
       <div
         className={cn(
-          "mt-2.5 truncate font-mono text-2xl font-semibold tracking-[-0.05em] tabular-nums text-foreground",
+          "mt-2.5 break-words font-mono text-2xl font-semibold tracking-[-0.05em] tabular-nums text-foreground",
           tone === "warning" && "text-amber-700 dark:text-amber-300",
           tone === "danger" && "text-destructive-foreground",
         )}
@@ -265,7 +268,7 @@ function IconStat({
         {value}
       </div>
       {detail ? (
-        <div className="mt-1.5 truncate text-sm text-muted-foreground">{detail}</div>
+        <div className="mt-1.5 break-keep text-sm text-pretty text-muted-foreground">{detail}</div>
       ) : null}
     </div>
   );
@@ -1001,7 +1004,7 @@ export function ResourceTelemetryDiagnostics({
               Sampling every {snapshot ? formatSampleInterval(snapshot.sampleIntervalMs) : "..."}
             </div>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-y divide-border/55 md:grid-cols-3">
+          <div className="grid grid-cols-2 divide-x divide-y divide-border/55 xl:grid-cols-3">
             <IconStat
               icon={<CpuIcon className="size-3.5" />}
               label="Current CPU"

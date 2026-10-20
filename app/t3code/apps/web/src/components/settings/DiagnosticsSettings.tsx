@@ -94,18 +94,18 @@ function StatBlock({
 }) {
   return (
     <div className="min-w-0 border-border/60 px-4 py-3 sm:px-5">
-      <div className="flex min-w-0 items-center gap-1.5 text-sm font-medium uppercase tracking-[0.08em] text-muted-foreground">
-        <span className="min-w-0 truncate">{label}</span>
+      <div className="flex min-w-0 items-center gap-2 text-sm font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        <span className="min-w-0 break-keep text-pretty">{label}</span>
         {tooltip ? (
           <Tooltip>
             <TooltipTrigger
               render={
                 <button
                   type="button"
-                  className="cursor-pointer inline-flex size-3.5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                  className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
                   aria-label={`${label} details`}
                 >
-                  <InfoIcon className="size-3" />
+                  <InfoIcon className="size-4" />
                 </button>
               }
             />
@@ -120,7 +120,7 @@ function StatBlock({
       </div>
       <div
         className={cn(
-          "mt-1 truncate font-mono text-lg font-semibold tabular-nums text-foreground",
+          "mt-1 break-words font-mono text-lg font-semibold tabular-nums text-foreground",
           tone === "warning" && "text-amber-700 dark:text-amber-400",
           tone === "danger" && "text-destructive-foreground",
         )}
@@ -133,21 +133,21 @@ function StatBlock({
 
 function StatsGrid({ children }: { children: ReactNode }) {
   return (
-    <div className="relative grid grid-cols-2 sm:grid-cols-4">
+    <div className="relative grid grid-cols-2 xl:grid-cols-4">
       <span
         className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-border/60"
         aria-hidden
       />
       <span
-        className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-border/60 sm:hidden"
+        className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-border/60 xl:hidden"
         aria-hidden
       />
       <span
-        className="pointer-events-none absolute inset-y-0 left-1/4 hidden w-px bg-border/60 sm:block"
+        className="pointer-events-none absolute inset-y-0 left-1/4 hidden w-px bg-border/60 xl:block"
         aria-hidden
       />
       <span
-        className="pointer-events-none absolute inset-y-0 left-3/4 hidden w-px bg-border/60 sm:block"
+        className="pointer-events-none absolute inset-y-0 left-3/4 hidden w-px bg-border/60 xl:block"
         aria-hidden
       />
       {children}

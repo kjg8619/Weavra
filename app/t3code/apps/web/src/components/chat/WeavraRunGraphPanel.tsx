@@ -256,19 +256,28 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
 function UnsupportedGraphHelp() {
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const opener = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setOpen(false);
+      opener.current?.focus();
+    };
+    document.addEventListener("keydown", dismiss, { capture: true });
+    return () => document.removeEventListener("keydown", dismiss, { capture: true });
+  }, [open]);
   return (
     <div className="mt-2 break-keep text-pretty">
       <Button
+        ref={opener}
         variant="outline"
+        className="h-auto min-h-8 max-w-full border-muted-foreground whitespace-normal break-keep text-pretty"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
-        onKeyDown={(event) => {
-          // Escape closes the open disclosure first; once closed it keeps its normal meaning.
-          if (event.key !== "Escape" || !open) return;
-          event.stopPropagation();
-          setOpen(false);
-        }}
       >
         이 환경에서 볼 수 없는 이유
       </Button>
@@ -358,7 +367,19 @@ export function WeavraRunGraphPanel(props: {
         ) : graph ? (
           <GraphView graph={graph} failure={failure} />
         ) : (
-          <div className="space-y-3 text-sm break-keep text-pretty text-muted-foreground">
+          <div className="flex flex-col items-start gap-3 text-sm break-keep text-pretty text-muted-foreground">
+            {projectKey ? (
+              <Button
+                variant="outline"
+                className="h-auto min-h-8 max-w-full border-muted-foreground whitespace-normal break-keep text-pretty"
+                data-weavra-action="graph-open-project-settings"
+                onClick={() => {
+                  void navigate({ to: "/projects/$projectKey", params: { projectKey } });
+                }}
+              >
+                프로젝트 설정 열기
+              </Button>
+            ) : null}
             <p>
               {snapshot && !run
                 ? "이 프로젝트에 아직 Weavra Run이 없어요. 통제 작업을 실행하면 단계가 여기에 그려져요."
@@ -368,17 +389,6 @@ export function WeavraRunGraphPanel(props: {
               통제 작업을 시작하기 전 준비 상태와 설정은 프로젝트 설정의 ‘Weavra · 워크플로
               제어’에서 확인해요. 이 그래프에서는 아무것도 실행하지 않아요.
             </p>
-            {projectKey ? (
-              <Button
-                variant="outline"
-                data-weavra-action="graph-open-project-settings"
-                onClick={() => {
-                  void navigate({ to: "/projects/$projectKey", params: { projectKey } });
-                }}
-              >
-                프로젝트 설정 열기
-              </Button>
-            ) : null}
           </div>
         )}
       </div>

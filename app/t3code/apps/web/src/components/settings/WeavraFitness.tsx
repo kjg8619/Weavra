@@ -152,6 +152,19 @@ export function WeavraFitness({
   );
   const [helpOpen, setHelpOpen] = useState(false);
   const helpId = useId();
+  const helpOpener = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!helpOpen) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setHelpOpen(false);
+      helpOpener.current?.focus();
+    };
+    document.addEventListener("keydown", dismiss, { capture: true });
+    return () => document.removeEventListener("keydown", dismiss, { capture: true });
+  }, [helpOpen]);
   const lifecycle = useRef({ connected: false, active: false });
   const pending = useRef(false);
   useEffect(() => {
@@ -205,6 +218,7 @@ export function WeavraFitness({
           <Button
             variant="outline"
             disabled={!connected || busy}
+            className="h-auto min-h-8 max-w-full border-muted-foreground whitespace-normal break-keep text-pretty"
             onClick={() => {
               void read({ projectId, command: "list" });
             }}
@@ -219,16 +233,12 @@ export function WeavraFitness({
         </p>
         <div>
           <Button
+            ref={helpOpener}
             variant="outline"
             aria-expanded={helpOpen}
+            className="h-auto min-h-8 max-w-full border-muted-foreground whitespace-normal break-keep text-pretty"
             aria-controls={helpId}
             onClick={() => setHelpOpen((value) => !value)}
-            onKeyDown={(event) => {
-              // Escape closes the open disclosure first; once closed it keeps its normal meaning.
-              if (event.key !== "Escape" || !helpOpen) return;
-              event.stopPropagation();
-              setHelpOpen(false);
-            }}
           >
             읽기 전용 안내
           </Button>
