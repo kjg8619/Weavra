@@ -102,7 +102,7 @@ function StatBlock({
               render={
                 <button
                   type="button"
-                  className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                  className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-muted-foreground"
                   aria-label={`${label} details`}
                 >
                   <InfoIcon className="size-4" />

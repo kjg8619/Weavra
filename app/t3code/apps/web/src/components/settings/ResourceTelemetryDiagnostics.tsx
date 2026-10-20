@@ -1004,7 +1004,7 @@ export function ResourceTelemetryDiagnostics({
               Sampling every {snapshot ? formatSampleInterval(snapshot.sampleIntervalMs) : "..."}
             </div>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-y divide-border/55 xl:grid-cols-3">
+          <div className="grid grid-cols-1 divide-x divide-y divide-border/55 min-[1000px]:grid-cols-2 xl:grid-cols-3">
             <IconStat
               icon={<CpuIcon className="size-3.5" />}
               label="Current CPU"
