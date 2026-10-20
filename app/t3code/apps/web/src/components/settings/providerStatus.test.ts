@@ -18,6 +18,19 @@ const provider: ServerProvider = {
 };
 
 describe("getProviderSummary", () => {
+  it("keeps account metadata and long diagnostics out of the structured headline", () => {
+    const message = "Synthetic CLI diagnostic\n".repeat(80);
+    const summary = getProviderSummary({
+      ...provider,
+      auth: { status: "authenticated", label: "account-".repeat(80) },
+      message,
+    });
+    expect(summary.headline).toBe(
+      getProviderSummary({ ...provider, auth: { status: "authenticated" } }).headline,
+    );
+    expect(summary.detail).toBe(message);
+  });
+
   it("reports ready providers with unknown authentication as available", () => {
     expect(getProviderSummary({ ...provider, auth: { status: "unknown" } })).toEqual({
       headline: "Available",

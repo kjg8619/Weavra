@@ -571,9 +571,7 @@ export function ProviderInstanceCard({
     statusKey === "warning" || statusKey === "error" ? (
       <span className={cn("size-1.5 shrink-0 rounded-full", statusStyle.dot)} aria-hidden />
     ) : null;
-  // Trouble states carry the server's explanation (a failed probe, a shadow
-  // home entry that is not a symlink, a missing binary). Show it wherever the
-  // headline shows so the user can act without opening the editor.
+  // The list carries the structured state; diagnostics belong to the detail.
   const needsAttention = statusKey === "warning" || statusKey === "error";
   const editorStatusNode =
     isAuthenticated && authEmail ? (
@@ -582,17 +580,11 @@ export function ProviderInstanceCard({
         <span>Authenticated as</span>
         <ProviderAuthEmail email={authEmail} />
         {authLabel ? <span>· {authLabel}</span> : null}
-        {summary.detail ? (
-          <span className="min-w-0 [overflow-wrap:anywhere]">· {summary.detail}</span>
-        ) : null}
       </>
     ) : (
       <>
         {statusDotNode}
         <span>{summary.headline}</span>
-        {summary.detail ? (
-          <span className="min-w-0 [overflow-wrap:anywhere]">· {summary.detail}</span>
-        ) : null}
       </>
     );
   if (mode === "list") {
@@ -607,7 +599,6 @@ export function ProviderInstanceCard({
         <div
           className={cn(
             "pointer-events-none relative flex min-w-0 flex-1 items-start gap-3 rounded-md text-left transition-opacity",
-            !enabled && !selected && "opacity-60 group-hover:opacity-100",
           )}
         >
           <button
@@ -659,14 +650,11 @@ export function ProviderInstanceCard({
                 )
               ) : null}
             </span>
-            <span className="mt-0.5 flex items-start gap-1.5 text-[13px] leading-[1.45] text-muted-foreground/80">
+            <span className="mt-0.5 flex items-start gap-1.5 text-sm leading-normal text-muted-foreground">
               {statusDotNode ? (
                 <span className="flex h-[1.45em] shrink-0 items-center">{statusDotNode}</span>
               ) : null}
-              <span className="line-clamp-2 [overflow-wrap:anywhere]">
-                {summary.headline}
-                {needsAttention && summary.detail ? ` · ${summary.detail}` : null}
-              </span>
+              <span className="break-keep text-pretty">{summary.headline}</span>
             </span>
           </span>
         </div>
@@ -807,6 +795,14 @@ export function ProviderInstanceCard({
   return (
     <>
       <SettingsSection title={displayName} icon={titleIconNode} headerAction={editorHeaderAction}>
+        {summary.detail ? (
+          <details className="mx-3 min-w-0 rounded-lg bg-muted/30 p-3 text-sm text-foreground sm:mx-4">
+            <summary className="cursor-pointer break-keep text-pretty rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+              원문 진단 및 복구 안내
+            </summary>
+            <p className="mt-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{summary.detail}</p>
+          </details>
+        ) : null}
         <SettingsRow
           title="Display name"
           status={
@@ -892,7 +888,7 @@ export function ProviderInstanceCard({
           className={readOnly ? "opacity-50 select-none" : undefined}
         >
           <div className="px-3 py-3 sm:px-4">
-            <p className="mb-3 text-xs text-muted-foreground">
+            <p className="mb-3 text-sm text-muted-foreground">
               Favorites, visibility, and ordering are saved on this device. Custom models are saved
               on the selected environment.
             </p>
