@@ -597,10 +597,12 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
                   else props.onChoose(suggestion, "insert");
                 }}
               >
-                <span className="font-medium text-foreground">{suggestion.label}</span>
+                <span className="break-keep font-medium text-foreground text-pretty">
+                  {suggestion.label}
+                </span>
                 <span
                   id={reasonId}
-                  className="font-normal text-muted-foreground text-sm leading-5 group-hover:text-accent-foreground"
+                  className="break-keep font-normal text-muted-foreground text-pretty text-sm leading-5 group-hover:text-accent-foreground"
                 >
                   {suggestion.reason}
                 </span>
@@ -648,7 +650,7 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
           </Button>
         </div>
       ) : null}
-      <p className="mt-2 font-normal text-muted-foreground text-sm leading-5">
+      <p className="mt-2 break-keep font-normal text-muted-foreground text-pretty text-sm leading-5">
         제안은 작성기에만 넣고 보내지 않아요. 실행 모드 {mode.label}: {scope}
         {mode.description}
       </p>
