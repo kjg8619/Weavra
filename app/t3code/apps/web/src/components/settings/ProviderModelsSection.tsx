@@ -227,9 +227,14 @@ export function ProviderModelsSection({
     if (!isAdding) return;
     const reveal = () => addFormRef.current?.scrollIntoView({ block: "nearest" });
     reveal();
+    const observer = new ResizeObserver(reveal);
+    if (addFormRef.current) observer.observe(addFormRef.current);
     window.addEventListener("resize", reveal);
-    return () => window.removeEventListener("resize", reveal);
-  }, [isAdding, error]);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", reveal);
+    };
+  }, [isAdding]);
 
   const handleAdd = () => {
     if (driverKind === "antigravity") return;
