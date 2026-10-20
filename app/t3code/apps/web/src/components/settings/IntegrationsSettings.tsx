@@ -539,7 +539,7 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
             data-icon-control
             size="icon"
             variant="outline"
-            className="border-foreground/60 text-foreground"
+            className="border-foreground/60 text-foreground focus-visible:ring-foreground"
             aria-label="Reset link target to default"
             onClick={() => updateSettings({ browserLinkTarget: DEFAULT_BROWSER_LINK_TARGET })}
           >
@@ -558,14 +558,29 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
           }}
         >
           <SelectTrigger
-            className="w-full min-w-0 border-foreground/60 py-2 text-foreground sm:w-48 [&_[data-slot=select-icon]_svg]:opacity-100"
+            className="w-full min-w-0 border-foreground/60 py-2 text-foreground focus-visible:border-foreground focus-visible:ring-foreground sm:w-48 [&_[data-slot=select-icon]_svg]:opacity-100"
             aria-label="Open links in"
           >
             <SelectValue className="overflow-visible whitespace-normal text-clip break-keep text-pretty">
               {LINK_TARGET_LABELS[linkTarget]}
             </SelectValue>
           </SelectTrigger>
-          <SelectPopup align="end" alignItemWithTrigger={false} className="text-foreground">
+          <SelectPopup
+            align="end"
+            alignItemWithTrigger={false}
+            className="text-foreground [&_[role=option]]:focus-visible:outline-2 [&_[role=option]]:focus-visible:-outline-offset-2 [&_[role=option]]:focus-visible:outline-foreground"
+            onKeyDownCapture={(event) => {
+              if (event.key !== "Tab") return;
+              const items = Array.from(
+                event.currentTarget.querySelectorAll<HTMLElement>('[role="option"]'),
+              );
+              const current = items.findIndex((item) => item === document.activeElement);
+              const next = (current + (event.shiftKey ? -1 : 1) + items.length) % items.length;
+              event.preventDefault();
+              event.stopPropagation();
+              items[next]?.focus();
+            }}
+          >
             {(Object.keys(LINK_TARGET_LABELS) as ReadonlyArray<BrowserLinkTarget>).map((target) => (
               <SelectItem
                 key={target}
