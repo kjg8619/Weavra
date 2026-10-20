@@ -424,6 +424,7 @@ export function ProviderInstanceCard({
   onRunUpdate,
   isUpdating = false,
 }: ProviderInstanceCardProps) {
+  const [diagnosticExpanded, setDiagnosticExpanded] = useState(false);
   const enabled = resolveProviderInstanceEnabled(instance);
   // A locally disabled provider reads "Disabled" with a muted dot even if its
   // last server status is stale. Enabled providers use the server status.
@@ -796,12 +797,25 @@ export function ProviderInstanceCard({
     <>
       <SettingsSection title={displayName} icon={titleIconNode} headerAction={editorHeaderAction}>
         {summary.detail ? (
-          <details className="mx-3 min-w-0 rounded-lg bg-muted/30 p-3 text-sm text-foreground sm:mx-4">
-            <summary className="cursor-pointer break-keep text-pretty rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          <div className="mx-3 min-w-0 rounded-lg bg-muted/30 p-3 text-sm text-foreground sm:mx-4">
+            <Button
+              variant="ghost"
+              size="default"
+              aria-expanded={diagnosticExpanded}
+              aria-controls={`provider-instance-${instanceId}-diagnostic`}
+              className="h-auto min-h-8 whitespace-normal break-keep text-pretty transition-[opacity,transform] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:ring-0 focus-visible:ring-offset-0 [&:active:not([aria-haspopup])]:scale-100"
+              onClick={() => setDiagnosticExpanded((value) => !value)}
+            >
               원문 진단 및 복구 안내
-            </summary>
-            <p className="mt-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{summary.detail}</p>
-          </details>
+            </Button>
+            <p
+              id={`provider-instance-${instanceId}-diagnostic`}
+              hidden={!diagnosticExpanded}
+              className="mt-2 whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              {summary.detail}
+            </p>
+          </div>
         ) : null}
         <SettingsRow
           title="Display name"
