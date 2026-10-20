@@ -18,10 +18,27 @@ import {
   shortcutToKeybindingInput,
   unknownWhenVariables,
   whenAstToExpression,
+  whenAstToKoreanExplanation,
   whenNodeRemoveLabel,
+  WHEN_VARIABLE_LABELS,
 } from "./KeybindingsSettings.logic";
 
 describe("KeybindingsSettings.logic", () => {
+  it("covers every builtin condition identifier with presentation metadata", () => {
+    expect(new Set(Object.keys(WHEN_VARIABLE_LABELS))).toEqual(new Set(buildWhenVariableOptions()));
+  });
+
+  it.each(["toString", "constructor", "__proto__"])(
+    "keeps the custom condition %s renderable without inherited metadata",
+    (name) => {
+      const parsed = parseWhenExpressionDraft(name);
+      if (!parsed.ok) throw new Error("Custom identifier did not parse");
+      const explanation = whenAstToKoreanExplanation(parsed.value);
+      expect(unknownWhenVariables(parsed.value)).toEqual([name]);
+      expect(typeof explanation).toBe("string");
+    },
+  );
+
   it("groups default aliases without dropping any editable binding or changing its AST", () => {
     const rows = buildKeybindingRows(DEFAULT_RESOLVED_KEYBINDINGS, "");
 
@@ -70,6 +87,8 @@ describe("KeybindingsSettings.logic", () => {
     "terminalFocus || (terminalOpen && !modelPickerOpen)",
     "customModeActive && (isDesktop || !isWeb)",
     "true && !false",
+    "previewFocus && previewOpen",
+    "!(previewFocus || !terminalFocus)",
   ])("preserves resolver outcomes after serializing the displayed AST for %s", (expression) => {
     const ast = parseKeybindingWhenExpression(expression);
     if (!ast) throw new Error("Fixture expression did not parse");
@@ -83,6 +102,8 @@ describe("KeybindingsSettings.logic", () => {
       "terminalFocus",
       "terminalOpen",
       "modelPickerOpen",
+      "previewFocus",
+      "previewOpen",
       "customModeActive",
       "isDesktop",
       "isWeb",

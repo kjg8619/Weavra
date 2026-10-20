@@ -34,11 +34,25 @@ export type KeybindingCommandOption = KeybindingCommand;
 const CORE_WHEN_VARIABLES = [
   "terminalFocus",
   "terminalOpen",
+  "previewFocus",
+  "previewOpen",
   "isWeb",
   "isDesktop",
   "true",
   "false",
 ] as const;
+
+export const WHEN_VARIABLE_LABELS: Readonly<Record<string, string>> = {
+  terminalFocus: "터미널에 입력 초점이 있음",
+  terminalOpen: "터미널이 열려 있음",
+  previewFocus: "브라우저 패널에 키보드 초점이 있음",
+  previewOpen: "브라우저 패널이 열려 있음",
+  modelPickerOpen: "모델 선택기가 열려 있음",
+  isWeb: "웹에서 사용 중",
+  isDesktop: "데스크톱 앱에서 사용 중",
+  true: "항상",
+  false: "항상 거짓",
+};
 
 const DEFAULT_WHEN_VARIABLES = new Set<string>(CORE_WHEN_VARIABLES);
 for (const binding of DEFAULT_RESOLVED_KEYBINDINGS) {
@@ -79,15 +93,12 @@ export function whenAstToExpression(node: KeybindingWhenNode | undefined): strin
 export function whenAstToKoreanExplanation(node: KeybindingWhenNode | undefined): string {
   if (!node) return "항상";
   switch (node.type) {
-    case "identifier":
-      if (node.name === "terminalFocus") return "터미널에 입력 초점이 있음";
-      if (node.name === "terminalOpen") return "터미널이 열려 있음";
-      if (node.name === "modelPickerOpen") return "모델 선택기가 열려 있음";
-      if (node.name === "isWeb") return "웹에서 사용 중";
-      if (node.name === "isDesktop") return "데스크톱 앱에서 사용 중";
-      if (node.name === "true") return "항상";
-      if (node.name === "false") return "항상 거짓";
-      return `사용자 정의 조건 ‘${node.name}’ (고급 조건에서 원문 확인)`;
+    case "identifier": {
+      const label = Object.hasOwn(WHEN_VARIABLE_LABELS, node.name)
+        ? WHEN_VARIABLE_LABELS[node.name]
+        : undefined;
+      return label ?? `사용자 정의 조건 ‘${node.name}’ (고급 조건에서 원문 확인)`;
+    }
     case "not":
       return `(${whenAstToKoreanExplanation(node.node)})이 아님`;
     case "and":

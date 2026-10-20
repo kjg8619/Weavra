@@ -83,7 +83,7 @@ function KeybindingPill({ value }: { value: string }) {
   return (
     <KbdGroup className="bg-transparent p-0 shadow-none">
       {parts.map(({ part, key }) => (
-        <Kbd key={key} className="min-w-6 justify-center px-1.5">
+        <Kbd key={key} className="min-w-6 justify-center px-1.5 text-foreground">
           {part === "mod"
             ? navigator.platform.toLowerCase().includes("mac")
               ? "⌘"
