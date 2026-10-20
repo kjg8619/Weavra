@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "selection": "13",
+  "revision": "b4077b9d4c13004fb891b15dc5388022209c1c8a",
+  "asarSha256": "e5e0eed9a75b0caf9a4fb0716a4cd56f5316c12f81f29faf69774fe112a9f892",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "9b6e94870cca736303e7b6c328af5aebbe39b5dc87ce30eb059a6aa59c670db7",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T15:27:02.558Z",
+  "checks": [
+    {
+      "caseId": "13",
+      "checkId": "snapshot-hierarchy",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "content heading describes outcome rather than repeating navigation",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "capture and attachment outcome present",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/snapshot-hierarchy/result.png",
+          "sha256": "3894e908ad8a3140884c7b40e33a40cc5f556ca4996859ed2aef194b160890a8"
+        },
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/snapshot-hierarchy/result.ax.json",
+          "sha256": "566c022e842b55a7a65976caf53500e20c59c40cca9724c59400113e654b5270"
+        },
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/snapshot-hierarchy/observations.json",
+          "sha256": "3668ec582b0d240d191f6374c1c0e0a9cc08c8e1909b99760b8da2413b7cc53d"
+        }
+      ]
+    },
+    {
+      "caseId": "13",
+      "checkId": "capture-attachment-explanation",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "snapshot-explanation: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "snapshot-explanation",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "opening settings did not request model",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/capture-attachment-explanation/snapshot-explanation.png",
+          "sha256": "3894e908ad8a3140884c7b40e33a40cc5f556ca4996859ed2aef194b160890a8"
+        },
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/capture-attachment-explanation/snapshot-explanation.ax.json",
+          "sha256": "8ea2e07311cf38b3f974c13aae75529a9a35b435801655e1bb5c404f3bb89c81"
+        },
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/capture-attachment-explanation/result.png",
+          "sha256": "3894e908ad8a3140884c7b40e33a40cc5f556ca4996859ed2aef194b160890a8"
+        },
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/capture-attachment-explanation/result.ax.json",
+          "sha256": "8ea2e07311cf38b3f974c13aae75529a9a35b435801655e1bb5c404f3bb89c81"
+        },
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/capture-attachment-explanation/observations.json",
+          "sha256": "4e7dd6abfff2ba8d285f9ba4089cbed49993525cd51cd5fad8779232fc35f225"
+        }
+      ]
+    },
+    {
+      "caseId": "13",
+      "checkId": "toggle-preservation",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "snapshot toggle is present",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "navigation preserves snapshot toggle",
+          "actual": null,
+          "expected": null
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/toggle-preservation/result.png",
+          "sha256": "3894e908ad8a3140884c7b40e33a40cc5f556ca4996859ed2aef194b160890a8"
+        },
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/toggle-preservation/result.ax.json",
+          "sha256": "7051889bfac6c88b6321cd99d83652c77eb002d0588ac442e8e529c5f8a08935"
+        },
+        {
+          "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/scenarios/13/toggle-preservation/observations.json",
+          "sha256": "c0437903c7ec57983d87c14f66bc656ef2e35d35ca2cce8b69f1c0c5ddd474c7"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T15:27:58.772Z",
+  "capture": {
+    "file": "run-9b6466ff-8317-461b-9624-15ec0f8b9c55/capture-manifest.json",
+    "sha256": "efd95a8cd122472d07355dc5e4d7d59a74470193e83446d1a4ac583d578ce4dd"
+  }
+}
