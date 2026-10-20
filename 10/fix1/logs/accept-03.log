@@ -1,0 +1,304 @@
+{
+  "schemaVersion": 1,
+  "selection": "10",
+  "revision": "da28577ba32d1476b65595301c41b1f670557b03",
+  "asarSha256": "62d94b3a6bc8a4fb89caa27976eec382859be9994923b3dae21509083e2f4414",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "b5c3b2c9734412ba6ad468dcbd4302d815eefb72bc76bb70048989b9f8d6c7c8",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T08:17:25.696Z",
+  "checks": [
+    {
+      "caseId": "10",
+      "checkId": "graph-no-snapshot",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "graph-next-step: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "graph-next-step",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "read-only graph next destination",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "destination preserves project",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/graph-no-snapshot/graph-next-step.png",
+          "sha256": "e1ace523ec214422e3901ffbeda02d41597385746429ed0b848b1b3270f9659f"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/graph-no-snapshot/graph-next-step.ax.json",
+          "sha256": "5074a5df4481c8de2131dc220f62162a8419ef366390fc2e85fb22d1ac6fd771"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/graph-no-snapshot/result.png",
+          "sha256": "20fe428b90926fbc2a9f5a5c956147f09cd985532d56dc04a4fba7f75b9b33b4"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/graph-no-snapshot/result.ax.json",
+          "sha256": "a46991a787098ae7e3260c8e2d06b2aba11df96b0081dd12fe7e9af669278d5e"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/graph-no-snapshot/observations.json",
+          "sha256": "8c7fd723fe1773c02e9f2253d6b4eebbdc1d66714333d2a4b1c9954d8a896232"
+        }
+      ]
+    },
+    {
+      "caseId": "10",
+      "checkId": "fitness-no-record",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "fitness-empty-help: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "fitness-empty-help",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/fitness-no-record/fitness-empty-help.png",
+          "sha256": "cc88bca39177e272268d409eed749b5752456616def5002d4a4cd64f6cc87a7b"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/fitness-no-record/fitness-empty-help.ax.json",
+          "sha256": "ced3984358e15ca4710783dfec603d71bf5cb3157fcc8c701f4b99f830f257f3"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/fitness-no-record/result.png",
+          "sha256": "cc88bca39177e272268d409eed749b5752456616def5002d4a4cd64f6cc87a7b"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/fitness-no-record/result.ax.json",
+          "sha256": "ced3984358e15ca4710783dfec603d71bf5cb3157fcc8c701f4b99f830f257f3"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/fitness-no-record/observations.json",
+          "sha256": "276e9319ff98714b5589366ed871f3ae9cf1b1054f06b5e20f1fc59b7cfb337f"
+        }
+      ]
+    },
+    {
+      "caseId": "10",
+      "checkId": "read-only-next-step",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "fitness help action exists",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "fitness-help: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "fitness-help",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/read-only-next-step/fitness-help.png",
+          "sha256": "f4e4f6d10f6af2224931298211afa7608c05078116b2d99018faae0946766d31"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/read-only-next-step/fitness-help.ax.json",
+          "sha256": "1e2f14c56046462a2f35a04f335ab163d43e121b6de538cf71dc67922348c48f"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/read-only-next-step/result.png",
+          "sha256": "87f01923c6a7efe261bfcaff0e1ca90331944b73d68de1faa631c13d6da94702"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/read-only-next-step/result.ax.json",
+          "sha256": "1e2f14c56046462a2f35a04f335ab163d43e121b6de538cf71dc67922348c48f"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/read-only-next-step/observations.json",
+          "sha256": "d82181b9c3ab70e5f51245e1624cc0c48083c62ce9b2605755dd486168b02f6a"
+        }
+      ]
+    },
+    {
+      "caseId": "10",
+      "checkId": "no-evaluation-request",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no evaluation command exists",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/no-evaluation-request/result.png",
+          "sha256": "d62be575323d8b1446b654008d1f19f1075d384e87e42e425a77d9df846f237e"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/no-evaluation-request/result.ax.json",
+          "sha256": "4454b0812ed66dcd8a9db3a06dc1d3d590bc3e9fbe6efc94564c793183e21c1a"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/no-evaluation-request/observations.json",
+          "sha256": "fa677f428f5a3c30d21aedef49d903e99adfa5792a38cd4fab7f11d7983271d9"
+        }
+      ]
+    },
+    {
+      "caseId": "10",
+      "checkId": "contrast",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "fitness-contrast-light: sampled composited background",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "fitness-contrast-light: worst sampled text contrast 4.786450631694082",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "fitness-contrast-dark: sampled composited background",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "fitness-contrast-dark: worst sampled text contrast 4.920430630087239",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/contrast/fitness-contrast-light.png",
+          "sha256": "a890ce73ac58ce8962187d41ac2acf80f25b3d3c8ee22e45131e6c8fb1426e10"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/contrast/fitness-contrast-light.ax.json",
+          "sha256": "79922be1160fb6a7daea33366091b68eee1c8e45c0d05699c9e38925fc519648"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/contrast/fitness-contrast-dark.png",
+          "sha256": "2e4e0046b233285dfc99969b1d83945dd6a04cd661098cd745b74e476b7502e8"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/contrast/fitness-contrast-dark.ax.json",
+          "sha256": "ae2a1623b9fe8f28ea781f86a5280450e8c817719c66cc84f7a97d500f16484d"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/contrast/result.png",
+          "sha256": "2e4e0046b233285dfc99969b1d83945dd6a04cd661098cd745b74e476b7502e8"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/contrast/result.ax.json",
+          "sha256": "ae2a1623b9fe8f28ea781f86a5280450e8c817719c66cc84f7a97d500f16484d"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/contrast/observations.json",
+          "sha256": "dca8a74a0d88dff73bfe7e1cbc6ae5d4d8cf4abde4655cef85b4ef62f40dede8"
+        }
+      ]
+    },
+    {
+      "caseId": "10",
+      "checkId": "text-size",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "explanatory text measured",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "explanatory text at least fourteen pixels",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/text-size/result.png",
+          "sha256": "c2cb5891dc8071fd7e49ede8d1ad5b721c574946da2b6f6ebd3f0965f3455ed8"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/text-size/result.ax.json",
+          "sha256": "0b7887f581153f51e4e11971eb55aa94ff58ec41ffcfd6fda29213162cd5d9cb"
+        },
+        {
+          "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/scenarios/10/text-size/observations.json",
+          "sha256": "462bb6fec24c29c90b794437b6171367a868989d5e14cd0eecb5d0604fc7a52d"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T08:19:11.190Z",
+  "capture": {
+    "file": "run-5bd9d8cc-d81a-46a4-b3f5-2a2a88b35379/capture-manifest.json",
+    "sha256": "8424b43e6fb966a04c7564fce77a69a4f826a3f83bf93049791689168c33d1f5"
+  }
+}
