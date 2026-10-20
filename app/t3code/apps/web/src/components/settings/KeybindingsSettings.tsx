@@ -23,6 +23,7 @@ import {
 } from "react";
 import {
   type KeybindingCommand,
+  type KeybindingShortcut,
   type KeybindingWhenNode,
   type ServerRemoveKeybindingInput,
   type ServerUpsertKeybindingInput,
@@ -44,7 +45,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Kbd, KbdGroup } from "../ui/kbd";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Toggle } from "../ui/toggle";
 import { toastManager } from "../ui/toast";
@@ -53,16 +54,19 @@ import {
   buildKeybindingCommandOptions,
   buildWhenVariableOptions,
   commandLabel,
+  groupKeybindingRows,
   DEFAULT_WHEN_VARIABLE,
   isKnownWhenVariable,
   keybindingConflictLabels,
   keybindingFromKeyboardEvent,
+  shortcutToKeybindingParts,
   parseWhenExpressionDraft,
   type KeybindingCommandOption,
   type KeybindingRow,
   type WhenVariableOption,
   unknownWhenVariables,
   whenAstToExpression,
+  whenAstToKoreanExplanation,
   whenNodeRemoveLabel,
 } from "./KeybindingsSettings.logic";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
@@ -70,10 +74,10 @@ import { keybindingSearchAnchorId, searchableSetting } from "./settingsSearch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useAtomCommand } from "../../state/use-atom-command";
 
-function KeybindingPill({ value }: { value: string }) {
-  // Keys dedupe repeated parts; a literal "+" in a shortcut splits into empty strings.
+function KeybindingPill({ value }: { value: KeybindingShortcut }) {
+  // Keep literal keys separate from the input format's "+" separators.
   const seenParts = new Map<string, number>();
-  const parts = value.split("+").map((part) => {
+  const parts = shortcutToKeybindingParts(value).map((part) => {
     const seen = seenParts.get(part) ?? 0;
     seenParts.set(part, seen + 1);
     return { part, key: seen === 0 ? part : `${part}-${seen}` };
@@ -81,7 +85,7 @@ function KeybindingPill({ value }: { value: string }) {
   return (
     <KbdGroup className="bg-transparent p-0 shadow-none">
       {parts.map(({ part, key }) => (
-        <Kbd key={key} className="min-w-6 justify-center px-1.5">
+        <Kbd key={key} className="min-w-6 justify-center px-1.5 text-foreground">
           {part === "mod"
             ? navigator.platform.toLowerCase().includes("mac")
               ? "⌘"
@@ -606,11 +610,13 @@ function WhenExpressionBuilder({
   variables,
   onChange,
   onValidityChange,
+  rawOnly = false,
 }: {
   value: KeybindingWhenNode | undefined;
   variables: ReadonlyArray<WhenVariableOption>;
   onChange: (value: KeybindingWhenNode | undefined) => void;
   onValidityChange?: (valid: boolean) => void;
+  rawOnly?: boolean;
 }) {
   const expression = whenAstToExpression(value);
   const [expressionDraft, setExpressionDraft] = useState(expression);
@@ -649,6 +655,33 @@ function WhenExpressionBuilder({
     }
     updateExpressionValue({ type: "and", left: value, right: group });
   };
+
+  if (rawOnly) {
+    return (
+      <div className="w-full min-w-0 space-y-2 text-sm text-foreground">
+        <label className="flex flex-col gap-2">
+          조건 원문
+          <Input
+            value={expressionDraft}
+            onChange={(event) => updateExpressionDraft(event.currentTarget.value)}
+            aria-label="When expression"
+            aria-invalid={Boolean(parseError)}
+            className="min-h-9 border-foreground/70 font-mono text-sm text-foreground"
+          />
+        </label>
+        {parseError ? (
+          <p role="alert" className="break-keep text-pretty text-sm text-destructive-foreground">
+            변수와 !, &amp;&amp;, ||, 괄호를 사용하세요.
+          </p>
+        ) : null}
+        {unknownIdentifiers.length > 0 ? (
+          <p className="break-keep text-pretty text-sm text-foreground">
+            사용자 정의 조건은 원문 그대로 유지돼요. 이 화면에서는 의미를 추측하지 않아요.
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="w-[min(34rem,calc(100vw-2rem))] space-y-3">
@@ -851,6 +884,8 @@ function KeybindingKeyControl({
       {isDirty ? (
         <Button
           size="sm"
+          variant="outline"
+          className="min-h-9 border-foreground/70 px-3 text-foreground disabled:opacity-100"
           disabled={isSaving || keyDraft.trim().length === 0 || !isWhenDraftValid}
           onClick={save}
         >
@@ -863,11 +898,11 @@ function KeybindingKeyControl({
           onClick={() => setDraft({ isRecording: true })}
           aria-label={`Edit shortcut for ${commandLabel(row.command)}: ${formatShortcutLabel(row.binding.shortcut)}`}
           className={cn(
-            "inline-flex h-8 cursor-pointer items-center rounded-md border border-transparent px-1.5 sm:h-7 outline-none transition-colors hover:border-border/70 hover:bg-accent focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/24",
+            "inline-flex min-h-8 cursor-pointer items-center rounded-md border border-foreground/70 px-2.5 text-foreground outline-none transition-colors hover:bg-accent focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring",
             pillClassName,
           )}
         >
-          <KeybindingPill value={row.key} />
+          <KeybindingPill value={row.binding.shortcut} />
         </button>
       ) : (
         <Input
@@ -905,29 +940,54 @@ function WhenClauseControl({
   onValidityChange: (valid: boolean) => void;
 }) {
   return (
-    <Popover>
-      <PopoverTrigger
+    <Dialog>
+      <DialogTrigger
         render={
           <Button
-            variant={expression ? "ghost" : "ghost-muted"}
-            size="micro"
-            className="min-w-0 shrink font-mono"
+            variant="outline"
+            size="sm"
+            className="h-auto min-h-8 shrink-0 border-foreground/70 px-2.5 text-sm text-foreground"
           />
         }
         aria-label={`Edit when clause for ${label}`}
       >
-        <span className="truncate">{expression || "Always"}</span>
-        <ChevronDownIcon className="size-3.5 shrink-0 opacity-60" />
-      </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={6}>
+        <span>고급 조건</span>
+        <ChevronDownIcon className="size-3.5 shrink-0" />
+      </DialogTrigger>
+      <DialogContent
+        showCloseButton={false}
+        bottomStickOnMobile={false}
+        className="row-start-1 max-h-[calc(100dvh-2rem)] max-w-3xl overflow-y-auto p-4"
+        viewportClassName="grid-rows-1 items-center"
+      >
+        <DialogTitle className="mb-3 break-keep text-pretty text-sm font-medium">
+          고급 조건
+        </DialogTitle>
+        <p className="mb-3 break-keep text-pretty text-sm font-normal text-foreground">
+          {whenAstToKoreanExplanation(value)}. 조건을 바꾸려면 원문을 편집한 뒤 저장하세요.
+        </p>
+        <p className="mb-3 break-keep text-pretty text-sm font-normal text-foreground">
+          원문: <code className="break-all select-text">{expression || "true"}</code>
+        </p>
         <WhenExpressionBuilder
+          rawOnly
           value={value}
           variables={variables}
           onChange={onChange}
           onValidityChange={onValidityChange}
         />
-      </PopoverContent>
-    </Popover>
+        <DialogClose
+          render={
+            <Button
+              variant="outline"
+              className="mt-3 min-h-9 border-foreground/70 px-3 text-sm text-foreground"
+            />
+          }
+        >
+          닫기
+        </DialogClose>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -954,7 +1014,8 @@ function KeybindingRowMenu({
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="text-muted-foreground hover:text-foreground"
+            data-icon-control=""
+            className="border-foreground/70 text-foreground hover:text-foreground"
             disabled={isSaving}
             aria-label={`Actions for ${commandLabel(row.command)}`}
           />
@@ -1009,8 +1070,7 @@ function KeybindingRowWhen({
   variables: ReadonlyArray<WhenVariableOption>;
 }) {
   return (
-    <span className="flex h-6 items-center gap-1.5">
-      <span className="text-[12px] leading-none text-muted-foreground/70">When</span>
+    <span className="flex items-center gap-2">
       <WhenClauseControl
         label={commandLabel(row.command)}
         expression={editor.whenDraftExpression}
@@ -1038,31 +1098,47 @@ function KeybindingHoverRowMenu(props: {
 }
 
 /** One binding as a settings row: pills flush right, actions fading in beside them on hover. */
-function KeybindingSettingsRow(props: KeybindingRowProps) {
-  const { row, isSaving, anchorId, allRows, variables, onSave, onReset, onRemove } = props;
+function KeybindingAliasControls(props: KeybindingRowProps) {
+  const { row, isSaving, allRows, variables, onSave, onReset, onRemove } = props;
   const editor = useKeybindingRowEditor({ row, allRows, onSave });
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <KeybindingConflictWarning labels={editor.conflictLabels} />
+      <KeybindingHoverRowMenu row={row} isSaving={isSaving} onReset={onReset} onRemove={onRemove} />
+      <KeybindingKeyControl row={row} editor={editor} isSaving={isSaving} />
+      <KeybindingRowWhen row={row} editor={editor} variables={variables} />
+    </div>
+  );
+}
 
+function KeybindingSettingsRow({
+  aliases,
+  ...props
+}: Omit<KeybindingRowProps, "row"> & { readonly aliases: ReadonlyArray<KeybindingRow> }) {
+  const row = aliases[0];
+  if (!row) return null;
   return (
     <SettingsRow
-      id={anchorId}
+      id={props.anchorId}
       className="group/row rounded-none"
       title={<KeybindingRowTitle row={row} />}
-      description={<KeybindingRowWhen row={row} editor={editor} variables={variables} />}
+      description={
+        <>
+          <span className="block break-keep text-pretty text-sm font-normal text-foreground">
+            {whenAstToKoreanExplanation(row.binding.whenAst)}
+          </span>
+          {aliases.length > 1 ? (
+            <span className="block break-keep text-pretty text-sm font-normal text-foreground">
+              같은 동작을 실행하는 단축키 {aliases.length}개
+            </span>
+          ) : null}
+        </>
+      }
       control={
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <KeybindingConflictWarning labels={editor.conflictLabels} />
-          <KeybindingHoverRowMenu
-            row={row}
-            isSaving={isSaving}
-            onReset={onReset}
-            onRemove={onRemove}
-          />
-          <KeybindingKeyControl
-            row={row}
-            editor={editor}
-            isSaving={isSaving}
-            pillClassName="-mr-1.5"
-          />
+        <div className="flex flex-col items-end gap-2">
+          {aliases.map((alias) => (
+            <KeybindingAliasControls key={alias.id} {...props} row={alias} />
+          ))}
         </div>
       }
     />
@@ -1316,12 +1392,12 @@ function KeybindingsList(props: KeybindingsListProps) {
   return (
     <div>
       {isAddingBinding ? <NewKeybindingSettingsRow {...newProps} /> : null}
-      {rows.map((row) => (
+      {groupKeybindingRows(rows).map((aliases) => (
         <KeybindingSettingsRow
-          key={row.id}
-          row={row}
-          anchorId={anchorIds.get(row.id)}
-          isSaving={savingCommand === row.command}
+          key={aliases[0]?.id}
+          aliases={aliases}
+          anchorId={anchorIds.get(aliases[0]?.id ?? "")}
+          isSaving={savingCommand === aliases[0]?.command}
           {...rowActions}
         />
       ))}
