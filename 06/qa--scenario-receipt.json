@@ -1,0 +1,497 @@
+{
+  "schemaVersion": 1,
+  "selection": "06",
+  "revision": "6d90b11c57d0c200577e20d4ab7d6accc3204bd1",
+  "asarSha256": "d3cbcee439ca3839ff4b3f776eaea112e374dd39fac2f4877c3045741d6c70fa",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "870dc5bb24f2f8fedf1399f20f400a63080758f127ea7dbff92bab020e74a92f",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T01:54:53.286Z",
+  "checks": [
+    {
+      "caseId": "06",
+      "checkId": "both-sidebars",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "requested sidebar variant selected",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "working fixture visible in this sidebar",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selected fixture agrees with detail",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "requested sidebar variant selected",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "working fixture visible in this sidebar",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "selected fixture agrees with detail",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/both-sidebars/current-sidebar.png",
+          "sha256": "a7af3f8a5354fd0f5262af9dd004846c1d3d2d24960a4a9bbbb0751db60c3c5b"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/both-sidebars/current-sidebar.ax.json",
+          "sha256": "9e168760f092b8ea14721f3e4304d52e83a0aa0c8308c416ed48f381fbc6d929"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/both-sidebars/legacy-sidebar.png",
+          "sha256": "d6900335c5e4aa37588c14c514326c413a5ec7bb8286900608a00f5d0b321097"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/both-sidebars/legacy-sidebar.ax.json",
+          "sha256": "35a1d7862e713119b6593bd5cea67491837e75934c4498dcb018306351ba2d23"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/both-sidebars/result.png",
+          "sha256": "5ad13769a7e60b34fd77e7ce7e57c72e5cde2adaafa3c2d1b3c40acad8ca6d62"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/both-sidebars/result.ax.json",
+          "sha256": "35a1d7862e713119b6593bd5cea67491837e75934c4498dcb018306351ba2d23"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/both-sidebars/observations.json",
+          "sha256": "9bf9fc3dbe790ce257e42225131e9c538fc8f491bae57ed41f83a10ef30e7299"
+        }
+      ]
+    },
+    {
+      "caseId": "06",
+      "checkId": "phase-activity-freshness",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "requested sidebar variant selected",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "phase or observation uncertainty is explicit",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "detail and selected thread agree",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "requested sidebar variant selected",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "phase or observation uncertainty is explicit",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "detail and selected thread agree",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/phase-activity-freshness/current-sidebar.png",
+          "sha256": "e3631f61f5b35cb77f45eabcfc750d9c1416e733f96a53d9c9bf68e1c2aad094"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/phase-activity-freshness/current-sidebar.ax.json",
+          "sha256": "583cbd5f0a4ea22954266ab24e16a3146bda00bb576ef62bfbf703e07222cc87"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/phase-activity-freshness/legacy-sidebar.png",
+          "sha256": "e02c068bc26e3e80889572b3db7cf18e263663ea0ad184c9ca85ec8b8d48398e"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/phase-activity-freshness/legacy-sidebar.ax.json",
+          "sha256": "9403bbd29215dd86d04f42d321a5d1ff13c85c18de37ccfd231a8f65e6c83c50"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/phase-activity-freshness/result.png",
+          "sha256": "3a9e39ddd81e9bf7fb1dc3d58a29c7191132817138dea509b45e4db0f5e5bea2"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/phase-activity-freshness/result.ax.json",
+          "sha256": "9403bbd29215dd86d04f42d321a5d1ff13c85c18de37ccfd231a8f65e6c83c50"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/phase-activity-freshness/observations.json",
+          "sha256": "45f517938305bd1e41ec21fdef85a449b31439c85db5401342512b07da26710d"
+        }
+      ]
+    },
+    {
+      "caseId": "06",
+      "checkId": "unknown-counts",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "requested sidebar variant selected",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "missing fixture phase is not fabricated",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "unknown is not rewritten to zero",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "requested sidebar variant selected",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "missing fixture phase is not fabricated",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "unknown is not rewritten to zero",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/unknown-counts/current-sidebar.png",
+          "sha256": "5c274b67f5b5f10d6e0f17890a051c0932332137b2ec0b91751ffcff3200417d"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/unknown-counts/current-sidebar.ax.json",
+          "sha256": "2fd1a80617b48e65c451f359dc4e20215b3c1edacc80fde933f7d1e8c50da76a"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/unknown-counts/legacy-sidebar.png",
+          "sha256": "f62c1fe65bb1d871758e442b1d27d9756555561b7d925c7e85159f42b513b203"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/unknown-counts/legacy-sidebar.ax.json",
+          "sha256": "821ca7e41251ac1ddf48fba8da916358f6870c8354e0f0cd2885bdf00a8ec304"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/unknown-counts/result.png",
+          "sha256": "5bad5b00fa68625fec0beca5089c2cab6f95c53eae9401328b2faa870aec1818"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/unknown-counts/result.ax.json",
+          "sha256": "821ca7e41251ac1ddf48fba8da916358f6870c8354e0f0cd2885bdf00a8ec304"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/unknown-counts/observations.json",
+          "sha256": "45f517938305bd1e41ec21fdef85a449b31439c85db5401342512b07da26710d"
+        }
+      ]
+    },
+    {
+      "caseId": "06",
+      "checkId": "stalled-recovery",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "failure remains visible beside matching thread",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "matching recovery content reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "reopening does not erase unresolved recovery",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/stalled-recovery/result.png",
+          "sha256": "50d07c9175669cbeb9f83e04adc64c11cd2c11b22ca9a9091acebbf3a4bce9d1"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/stalled-recovery/result.ax.json",
+          "sha256": "b308f05388c4d74d4e1348ec9087775b5aa7ebad464249084007738dbc1cbba9"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/stalled-recovery/observations.json",
+          "sha256": "fa677f428f5a3c30d21aedef49d903e99adfa5792a38cd4fab7f11d7983271d9"
+        }
+      ]
+    },
+    {
+      "caseId": "06",
+      "checkId": "footer-wrap",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "requested sidebar variant selected",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "footer text observed",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no isolated final Korean syllable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "footer text observed",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no isolated final Korean syllable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "footer text observed",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no isolated final Korean syllable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "requested sidebar variant selected",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "footer text observed",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no isolated final Korean syllable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "footer text observed",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no isolated final Korean syllable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "footer text observed",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no isolated final Korean syllable",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-current-840.png",
+          "sha256": "251edef240da73e58324e5b059d5278107b61ab0cf33316895b8d69a25c7ca6c"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-current-840.ax.json",
+          "sha256": "61e1ef757054b07da00e40b083da9efc852cc2f0c927f34b2693ab0ed8b056ab"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-current-1280.png",
+          "sha256": "8b028c4f869b0e9052313fee37ef0a16cd9836db1620cc023695f6a5eaa616f0"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-current-1280.ax.json",
+          "sha256": "cf5c3128e50f164e20e8d43b47575997e4edd1bc52339a6af54f77e909bd5f62"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-current-1920.png",
+          "sha256": "16b9fcdf3527685d57cabb77462586e1683b68a7c3e6a8cbd9cb09bf35cba551"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-current-1920.ax.json",
+          "sha256": "ee960c3e78c9fbd0a6f47387347d1d6eb6e5ef821708f07bf5bad51e931dc1ae"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/current-sidebar.png",
+          "sha256": "73bb8414b49b4ff7e1dee9be728ca17519bc0be595cebfe0fd3237ac03068d83"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/current-sidebar.ax.json",
+          "sha256": "8d9228e0e6416c871ced2694c03ff5f8fbc27cf6ace751b1858a8fb827861162"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-legacy-840.png",
+          "sha256": "3696e6f8d1de582cccc26dfa01c0b5afc804840925b44d06f82e43335e7c4320"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-legacy-840.ax.json",
+          "sha256": "801755288a05b92cabb839b87ec2dfff08b694e3d9e968dae3e389d53ff25d36"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-legacy-1280.png",
+          "sha256": "b60d629294d60370ab30d9d458d806ddc8d3d4145e5c6fbbc8eb1d84345d53ac"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-legacy-1280.ax.json",
+          "sha256": "39e4b0a48a9d2cfad1ebd29d9c2b167f5aac8b6f65ccb2b851bb93d998e9de92"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-legacy-1920.png",
+          "sha256": "023d4400bab33f14167c653f3002f5cd74a64890dd4b06e1fe7602b51f2e0637"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/footer-legacy-1920.ax.json",
+          "sha256": "dff732642c3fa7215e945ef3266ed1560de0d20a14907f4238893f36bc9b1950"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/legacy-sidebar.png",
+          "sha256": "13cba4a6f93922f4f1249ea85f7b1fc924f538ebcbcbc1218349505a0466c551"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/legacy-sidebar.ax.json",
+          "sha256": "2fb5458d22c851eec2e45b506e02ddfc50475e6d9ae058270219777c839f3d5b"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/result.png",
+          "sha256": "d9af47eb0fc3b037df77c44ef27aff5adf013046c3d76bc6c2fd4a74d957c248"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/result.ax.json",
+          "sha256": "2fb5458d22c851eec2e45b506e02ddfc50475e6d9ae058270219777c839f3d5b"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/footer-wrap/observations.json",
+          "sha256": "bc1a2a3a0bf07b012949009245529293382a476012533b760aadd8ce22a6305a"
+        }
+      ]
+    },
+    {
+      "caseId": "06",
+      "checkId": "reduced-motion",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "requested sidebar variant selected",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "reduced motion stops indefinite spatial animation",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "status information remains visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "requested sidebar variant selected",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reduced motion stops indefinite spatial animation",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "status information remains visible",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/reduced-motion/current-sidebar.png",
+          "sha256": "d3373e26e9e685a46ca6693abe0d76a8e359fa703a520288cc5cad91133551fc"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/reduced-motion/current-sidebar.ax.json",
+          "sha256": "454005ed9fb8eb3b7467e07a6b619b093d8274043d709270468a41c6df94d35f"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/reduced-motion/legacy-sidebar.png",
+          "sha256": "fb63dd0d08958f20ba6724c6bc1eff3690b1bd7fcc52db4f15f55c856fc64958"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/reduced-motion/legacy-sidebar.ax.json",
+          "sha256": "749b491fc45732238744f571324ba877b94fd301c3e1baeb148cb5e62234d198"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/reduced-motion/result.png",
+          "sha256": "fb63dd0d08958f20ba6724c6bc1eff3690b1bd7fcc52db4f15f55c856fc64958"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/reduced-motion/result.ax.json",
+          "sha256": "7673d3b535bd42eaf30690caa1edcbfc86506b25569a6a1f4a85d66399f3a013"
+        },
+        {
+          "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/scenarios/06/reduced-motion/observations.json",
+          "sha256": "e8b852cb1a411b41b7292fcf752bd08cf54d0bf6baf2b036085f71ba59171a68"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T01:56:04.102Z",
+  "capture": {
+    "file": "run-cb6b157f-bdd5-4c96-a25b-12956409ea1d/capture-manifest.json",
+    "sha256": "5594d331679fcdc3b34b0fff9896190b1b8e898b14dff98f74f1cd38d16661ef"
+  }
+}
