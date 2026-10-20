@@ -403,9 +403,9 @@ export function WeavraFitness({
           </div>
         )}
         <p className="text-sm text-muted-foreground">
-          미확인은 0이 아니에요. 통제된 검토·수정과 모의 검사는 실제 모델 오류율을 뜻하지 않아요.
-          비용·HTTP 시도 횟수·상위 backend 식별 정보는 알 수 없을 수 있어요. 프롬프트·추론·인증
-          정보·도구 기록은 전송하지 않아요.
+          미확인은 0이 아니에요. 통제된 검토와 수정, 모의 검사는 실제 모델 오류율을 뜻하지 않아요.
+          비용, HTTP 시도 횟수, 상위 backend 식별 정보는 알 수 없을 수 있어요. 프롬프트, 추론, 인증
+          정보, 도구 기록은 전송하지 않아요.
         </p>
       </SettingsGroup>
     </SettingsSection>
