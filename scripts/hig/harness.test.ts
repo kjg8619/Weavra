@@ -10,6 +10,14 @@ import {
   CASES,
   deliverScenarioEvent,
   readCompletedCopy,
+  resolveShellBaseline,
+  awaitFocusLoss,
+  createRpcLedger,
+  countInActiveDialog,
+  COMMAND_DIALOG_POPUP,
+  switchCheckedState,
+  SIDEBAR_VARIANT_MARKERS,
+  TOAST_SELECTOR,
   iconTargetMeetsMinimum,
   assertIconTargetHits,
 } from "./cases.mjs";
@@ -132,6 +140,162 @@ describe("diagnostic copy synchronization", () => {
     await expect(
       readCompletedCopy(Promise.reject(new Error("denied")), async () => path, 1_000),
     ).rejects.toThrow("denied");
+  });
+});
+
+describe("resumed shell baseline", () => {
+  const thread = (id: string, state: string) => ({ id, latestTurn: { state } });
+  const http = { snapshotSequence: 40, threads: [thread("baseline-working", "running")] };
+  test("a resumed client uses the HTTP snapshot once the stream confirms synchronized", () => {
+    const baseline = resolveShellBaseline({ httpSnapshot: http, synchronized: true });
+    expect(baseline.snapshotSequence).toBe(40);
+    expect(baseline.threads[0].id).toBe("baseline-working");
+  });
+  test("later stream events are applied in sequence and older ones ignored", () => {
+    const baseline = resolveShellBaseline({
+      httpSnapshot: http,
+      synchronized: true,
+      events: [
+        { kind: "thread-upserted", sequence: 39, thread: thread("baseline-working", "stale") },
+        { kind: "thread-upserted", sequence: 41, thread: thread("baseline-working", "error") },
+      ],
+    });
+    expect(baseline.snapshotSequence).toBe(41);
+    expect(baseline.threads[0].latestTurn.state).toBe("error");
+    expect(http.threads[0].latestTurn.state).toBe("running");
+  });
+  test("a stream snapshot is used as-is", () => {
+    expect(resolveShellBaseline({ streamSnapshot: http, synchronized: false }).threads).toHaveLength(1);
+  });
+  test("an HTTP snapshot the stream never confirmed is not a settled baseline", () => {
+    expect(() => resolveShellBaseline({ httpSnapshot: http, synchronized: false })).toThrow(
+      "Missing shell snapshot",
+    );
+  });
+  test("synchronized without any snapshot still fails", () => {
+    expect(() => resolveShellBaseline({ httpSnapshot: null, synchronized: true })).toThrow(
+      "Missing shell snapshot",
+    );
+    expect(() =>
+      resolveShellBaseline({ httpSnapshot: { threads: [] }, synchronized: true }),
+    ).toThrow("Missing shell snapshot");
+  });
+});
+
+describe("renderer focus loss", () => {
+  test("a blur that arrives later passes once focus is really gone", async () => {
+    let blur!: () => void;
+    const blurred = new Promise<void>((resolve) => (blur = resolve));
+    const waiting = awaitFocusLoss(blurred, async () => false, 1_000);
+    await Promise.resolve();
+    blur();
+    await expect(waiting).resolves.toBeUndefined();
+  });
+  test("a window that never blurs times out", async () => {
+    await expect(awaitFocusLoss(new Promise(() => {}), async () => false, 1)).rejects.toThrow(
+      "Timeout: renderer window blur",
+    );
+  });
+  test("a blur event while the document still has focus fails", async () => {
+    await expect(awaitFocusLoss(Promise.resolve(), async () => true, 1_000)).rejects.toThrow(
+      "still reports document focus",
+    );
+  });
+});
+
+describe("provider readiness settling", () => {
+  const method = "server.discoverSourceControl";
+  test("waits for a response that lands after the dialog opens", async () => {
+    const ledger = createRpcLedger();
+    ledger.request("0:7", method);
+    const waiting = ledger.settled(method, 1_000);
+    await Promise.resolve();
+    ledger.exit("0:7");
+    await expect(waiting).resolves.toBeUndefined();
+  });
+  test("a request still in flight is not settled", async () => {
+    const ledger = createRpcLedger();
+    ledger.request("0:1", method);
+    ledger.exit("0:1");
+    ledger.request("0:2", method);
+    await expect(ledger.settled(method, 1)).rejects.toThrow(`Timeout: ${method} settled`);
+  });
+  test("no request at all is not settled", async () => {
+    const ledger = createRpcLedger();
+    ledger.request("0:3", "server.getConfig");
+    ledger.exit("0:3");
+    await expect(createRpcLedger().settled(method, 1)).rejects.toThrow("Timeout");
+    await expect(ledger.settled(method, 1)).rejects.toThrow("Timeout");
+  });
+  test("an interrupted request neither completes nor blocks forever", async () => {
+    const ledger = createRpcLedger();
+    ledger.request("0:4", method);
+    ledger.cancel("0:4");
+    await expect(ledger.settled(method, 1)).rejects.toThrow("Timeout");
+    ledger.request("0:5", method);
+    ledger.exit("0:5");
+    await expect(ledger.settled(method, 1_000)).resolves.toBeUndefined();
+  });
+});
+
+describe("dialog-scoped folder count", () => {
+  // Models the page: nine visible matches page-wide, `inDialog` of them inside the popup.
+  const page = (inDialog: number) => ({
+    locator: (selector: string) => ({
+      getByText: (text: string, options: { exact: boolean }) => ({
+        filter: (filter: { visible: boolean }) => ({
+          count: async () => {
+            expect([selector, text, options.exact, filter.visible]).toEqual([
+              COMMAND_DIALOG_POPUP,
+              "baseline-project",
+              true,
+              true,
+            ]);
+            return inDialog;
+          },
+        }),
+      }),
+    }),
+    getByText: () => ({ filter: () => ({ count: async () => 9 }) }),
+  });
+  test("counts only the active dialog's row", async () => {
+    expect(await countInActiveDialog(page(1), "baseline-project")).toBe(1);
+  });
+  test("a missing or duplicated dialog row is still observable", async () => {
+    expect(await countInActiveDialog(page(0), "baseline-project")).toBe(0);
+    expect(await countInActiveDialog(page(2), "baseline-project")).toBe(2);
+  });
+});
+
+describe("sidebar variant switch state", () => {
+  const state = (
+    ariaChecked: string | null,
+    dataChecked: string | null,
+    dataUnchecked: string | null,
+  ) => switchCheckedState({ ariaChecked, dataChecked, dataUnchecked });
+  test("reads the Base UI data-checked state the product switch actually exposes", () => {
+    expect(state(null, "", null)).toBe(true);
+    expect(state(null, null, "")).toBe(false);
+  });
+  test("aria-checked wins when present", () => {
+    expect(state("true", null, "")).toBe(true);
+    expect(state("false", "", null)).toBe(false);
+  });
+  test("missing or contradictory state is unknown, so the variant assertion still fails", () => {
+    expect(state(null, null, null)).toBeNull();
+    expect(state(null, "", "")).toBeNull();
+  });
+  test("each sidebar variant has its own render marker", () => {
+    expect(SIDEBAR_VARIANT_MARKERS.current).not.toContain("new-thread-button");
+    expect(SIDEBAR_VARIANT_MARKERS.legacy).not.toContain("sidebar-row");
+  });
+});
+
+describe("toast observation", () => {
+  test("targets rendered toasts rather than a slot the product never emits", () => {
+    expect(TOAST_SELECTOR).not.toContain("toast-root");
+    expect(TOAST_SELECTOR).toContain('[data-slot="toast-viewport"] > *');
+    expect(TOAST_SELECTOR).toContain('[data-slot="toast-popup"]');
   });
 });
 
