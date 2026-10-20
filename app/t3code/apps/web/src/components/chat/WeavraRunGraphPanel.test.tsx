@@ -8,7 +8,11 @@ import { selectActiveRightPanel, useRightPanelStore } from "../../rightPanelStor
 import { WeavraRunGraphPanel } from "./WeavraRunGraphPanel";
 import type { WeavraRunGraph } from "./weavraRunGraphLayout";
 
-const mocks = vi.hoisted(() => ({ result: undefined as unknown }));
+const mocks = vi.hoisted(() => ({
+  result: undefined as unknown,
+  navigate: vi.fn(),
+  groups: [] as unknown[],
+}));
 vi.mock("@effect/atom-react", () => ({ useAtomValue: () => mocks.result }));
 vi.mock("../../state/weavraObservations", () => ({
   observations: { stateAtom: () => ({}) },
@@ -17,11 +21,20 @@ vi.mock("../../state/environments", () => ({
   useEnvironment: () => ({ connection: { phase: "connected" } }),
 }));
 vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => mocks.navigate,
   useParams: ({ select }: { select: (params: Record<string, string>) => unknown }) =>
     select({ environmentId: "env", threadId: "thread" }),
 }));
+vi.mock("../settings/useSettingsProjectGroups", () => ({
+  useSettingsProjectGroups: () => mocks.groups,
+}));
 vi.mock("../ui/badge", () => ({
   Badge: (props: ComponentProps<"span">) => <span {...props} />,
+}));
+vi.mock("../ui/button", () => ({
+  Button: ({ variant, ...props }: ComponentProps<"button"> & { variant?: string }) => (
+    <button data-variant={variant} {...props} />
+  ),
 }));
 
 const threadRef = scopeThreadRef(EnvironmentId.make("env"), ThreadId.make("thread"));
@@ -65,6 +78,11 @@ const steps: WeavraRunGraph["nodes"] = [
 ];
 
 beforeEach(() => {
+  mocks.navigate.mockReset();
+  mocks.groups = [
+    { projectKey: "other-key", memberProjects: [{ environmentId: "other-env", id: "project" }] },
+    { projectKey: "project-key", memberProjects: [{ environmentId: "env", id: "project" }] },
+  ];
   useRightPanelStore.setState({ byThreadKey: {}, userActionRevisionByThreadKey: {} });
 });
 afterEach(() => {
@@ -102,4 +120,60 @@ it("shows no failure link for a completed Run", () => {
   );
   expect(resultLinks()).toHaveLength(0);
   expect(text()).not.toContain("결과 화면에서 확인");
+});
+
+function renderEmpty(result: unknown) {
+  mocks.result = result;
+  act(() => {
+    renderer = create(
+      <WeavraRunGraphPanel
+        environmentId={EnvironmentId.make("env")}
+        projectId={ProjectId.make("project")}
+        workspaceRoot="/workspace"
+      />,
+    );
+  });
+}
+const settingsButtons = () =>
+  renderer.root.findAll(
+    (node) =>
+      node.type === "button" && node.props["data-weavra-action"] === "graph-open-project-settings",
+  );
+
+it("sends a project without a snapshot to its own settings without any other request", () => {
+  renderEmpty(AsyncResult.success({ support: "supported", observation: undefined }));
+  expect(text()).toContain("스냅샷이 아직 없어서");
+  const buttons = settingsButtons();
+  expect(buttons).toHaveLength(1);
+  act(() => buttons[0]!.props.onClick());
+  expect(mocks.navigate).toHaveBeenCalledTimes(1);
+  expect(mocks.navigate).toHaveBeenCalledWith({
+    to: "/projects/$projectKey",
+    params: { projectKey: "project-key" },
+  });
+});
+
+it("offers no settings link when the project has no logical group", () => {
+  mocks.groups = [];
+  renderEmpty(AsyncResult.success({ support: "supported", observation: undefined }));
+  expect(settingsButtons()).toHaveLength(0);
+  expect(text()).toContain("아무것도 실행하지 않아요");
+});
+
+it("keeps an unsupported environment read-only and explains it in an in-app disclosure", () => {
+  renderEmpty(AsyncResult.success({ support: "unsupported", observation: undefined }));
+  expect(settingsButtons()).toHaveLength(0);
+  const toggle = renderer.root.find(
+    (node) => node.type === "button" && node.props["aria-expanded"] !== undefined,
+  );
+  expect(toggle.props["aria-expanded"]).toBe(false);
+  expect(text()).not.toContain("서버가 통제 작업 관찰을 지원하지 않아서");
+  act(() => toggle.props.onClick());
+  expect(
+    renderer.root.find(
+      (node) => node.type === "button" && node.props["aria-expanded"] !== undefined,
+    ).props["aria-expanded"],
+  ).toBe(true);
+  expect(text()).toContain("서버가 통제 작업 관찰을 지원하지 않아서");
+  expect(mocks.navigate).not.toHaveBeenCalled();
 });

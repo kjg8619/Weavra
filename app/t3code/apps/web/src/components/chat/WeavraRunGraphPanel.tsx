@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
-import { useParams } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useNavigate, useParams } from "@tanstack/react-router";
+import { useEffect, useId, useRef, useState } from "react";
 import type { EnvironmentId, ProjectId, WeavraSnapshotEnvelope } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
@@ -9,7 +9,9 @@ import { observations } from "../../state/weavraObservations";
 import { cn } from "../../lib/utils";
 import { useRightPanelStore } from "../../rightPanelStore";
 import { resolveThreadRouteRef } from "../../threadRoutes";
+import { useSettingsProjectGroups } from "../settings/useSettingsProjectGroups";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import { weavraLabel } from "../weavraLabels";
 import { GRAPH_CARD, layoutWeavraRunGraph, type WeavraRunGraph } from "./weavraRunGraphLayout";
 
@@ -27,12 +29,12 @@ const dot: Record<GraphStatus, string> = {
 };
 const text: Record<GraphStatus, string> = {
   pending: "text-muted-foreground",
-  running: "text-sky-500 dark:text-sky-400",
-  waiting_approval: "text-amber-600 dark:text-amber-400",
-  passed: "text-emerald-600 dark:text-emerald-400",
-  failed: "text-red-600 dark:text-red-400",
-  blocked: "text-red-600 dark:text-red-400",
-  revised: "text-violet-600 dark:text-violet-400",
+  running: "text-sky-700 dark:text-sky-400",
+  waiting_approval: "text-amber-700 dark:text-amber-400",
+  passed: "text-emerald-700 dark:text-emerald-400",
+  failed: "text-red-700 dark:text-red-400",
+  blocked: "text-red-700 dark:text-red-400",
+  revised: "text-violet-700 dark:text-violet-400",
   cancelled: "text-muted-foreground",
   skipped: "text-muted-foreground",
   unknown: "text-muted-foreground",
@@ -67,7 +69,7 @@ function FailureResultLink({ openResult }: { openResult: GraphFailure["openResul
     <button
       type="button"
       data-weavra-action="graph-open-task-result"
-      className="block max-w-full truncate text-left font-mono text-red-600 underline underline-offset-2 hover:text-red-500 dark:text-red-400"
+      className="block max-w-full text-left font-mono break-words text-red-700 underline underline-offset-2 hover:text-red-600 dark:text-red-400"
       // The viewport captures mouse pointers for dragging, which would swallow this click.
       onPointerDown={(event) => event.stopPropagation()}
       onClick={openResult}
@@ -104,7 +106,7 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
   ).length;
   return (
     <>
-      <p className="font-mono text-[11px] text-muted-foreground">
+      <p className="font-mono text-sm text-muted-foreground">
         {done}/{cards.length} 통과 · {active} 진행 중
       </p>
       <div
@@ -142,7 +144,7 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
               <div
                 key={column.key}
                 className={cn(
-                  "absolute border-b pb-1 font-mono text-[10px] text-muted-foreground",
+                  "absolute border-b pb-1 font-mono text-sm break-words text-muted-foreground",
                   column.running > 0 ? "border-sky-500 text-foreground" : "border-transparent",
                 )}
                 style={{ left: column.x, top: column.y, width: GRAPH_CARD.width }}
@@ -189,7 +191,7 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
                       : undefined
                   }
                   className={cn(
-                    "absolute overflow-hidden rounded-md border bg-card px-2.5 py-2 text-[11px] shadow-xs",
+                    "absolute overflow-hidden rounded-md border bg-card px-2.5 py-2 text-sm shadow-xs",
                     node.status === "running" || node.status === "waiting_approval"
                       ? "border-sky-500/70"
                       : "border-border",
@@ -205,7 +207,7 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
                       {node.attempt !== undefined ? ` #${node.attempt}` : ""}
                     </span>
                   </div>
-                  <p className={cn("mt-0.5 truncate font-mono", text[node.status])}>
+                  <p className={cn("mt-0.5 font-mono break-words", text[node.status])}>
                     {weavraLabel(node.status)}
                     {failure && node.id === completionId && failure.summary
                       ? ` · ${failure.summary}`
@@ -214,7 +216,7 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
                   {failure && node.id === completionId ? (
                     <FailureResultLink openResult={failure.openResult} />
                   ) : (
-                    <p className="truncate font-mono text-muted-foreground">
+                    <p className="line-clamp-2 font-mono break-words text-muted-foreground">
                       {[
                         node.role,
                         ...children.map((c) => `${weavraLabel(c.kind)} ${weavraLabel(c.status)}`),
@@ -230,15 +232,15 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
         </div>
       </div>
       {failure && completionId === undefined ? (
-        <p data-weavra="run-graph-failure" className="mt-3 text-xs">
+        <p data-weavra="run-graph-failure" className="mt-3 text-sm">
           {failure.summary ? (
-            <span className="mr-2 text-red-600 dark:text-red-400">{failure.summary}</span>
+            <span className="mr-2 text-red-700 dark:text-red-400">{failure.summary}</span>
           ) : null}
           <FailureResultLink openResult={failure.openResult} />
         </p>
       ) : null}
       {otherEdges.length > 0 ? (
-        <ul aria-label="그 밖의 관계" className="mt-3 space-y-1 text-xs text-muted-foreground">
+        <ul aria-label="그 밖의 관계" className="mt-3 space-y-1 text-sm text-muted-foreground">
           {otherEdges.map((edge) => (
             <li key={`${edge.from}->${edge.to}:${edge.kind}`} className="break-all">
               <code>{edge.from}</code> → <code>{edge.to}</code> · {weavraLabel(edge.kind)}
@@ -247,6 +249,31 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
         </ul>
       ) : null}
     </>
+  );
+}
+
+/** Why the graph cannot be drawn on this environment; read-only, nothing is sent. */
+function UnsupportedGraphHelp() {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  return (
+    <div className="mt-2">
+      <Button
+        variant="outline"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((value) => !value)}
+      >
+        이 환경에서 볼 수 없는 이유
+      </Button>
+      {open ? (
+        <p id={panelId} className="mt-2 text-sm text-muted-foreground">
+          이 환경의 서버가 통제 작업 관찰을 지원하지 않아서 Run 그래프를 만들 수 없어요. 그래프는
+          보기 전용이라 이 환경에서는 아무것도 실행하거나 바꾸지 않아요. 통제 작업을 지원하는
+          환경에서 이 프로젝트를 열면 단계가 보여요.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -259,6 +286,12 @@ export function WeavraRunGraphPanel(props: {
     observations.stateAtom(props.environmentId, props.projectId, props.workspaceRoot),
   );
   const environment = useEnvironment(props.environmentId);
+  const navigate = useNavigate();
+  const projectKey = useSettingsProjectGroups().find((group) =>
+    group.memberProjects.some(
+      (member) => member.environmentId === props.environmentId && member.id === props.projectId,
+    ),
+  )?.projectKey;
   const view = Option.getOrUndefined(AsyncResult.value(result));
   const snapshot = view?.observation?.snapshot;
   const graph = snapshot?.data.graph ?? null;
@@ -299,28 +332,48 @@ export function WeavraRunGraphPanel(props: {
           {snapshot ? (stale ? "과거 스냅샷" : "공식 스냅샷") : "스냅샷 없음"}
         </Badge>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-1 text-sm text-muted-foreground">
         Runtime이 기록한 단계와 관계를 보여주는 보기 전용 그래프예요. 여기서 실행·승인·재시도는 하지
         않아요.
       </p>
       {run ? (
-        <p className="mt-2 text-xs">
+        <p className="mt-2 text-sm">
           {run.workflow} / {run.risk} · {weavraLabel(run.status)}
         </p>
       ) : null}
       <div className="mt-3">
         {view?.support === "unsupported" ? (
-          <p className="text-sm text-muted-foreground">
-            이 환경은 통제 작업의 읽기 전용 연결을 지원하지 않아요.
-          </p>
+          <>
+            <p className="text-sm text-muted-foreground">
+              이 환경은 통제 작업의 읽기 전용 연결을 지원하지 않아요.
+            </p>
+            <UnsupportedGraphHelp />
+          </>
         ) : graph ? (
           <GraphView graph={graph} failure={failure} />
         ) : (
-          <p className="text-sm text-muted-foreground">
-            {snapshot && !run
-              ? "이 프로젝트에 아직 Weavra Run이 없어요. 통제 작업을 실행하면 단계가 여기에 그려져요."
-              : "그래프를 확인할 수 없어요. 이벤트나 캐시 조각으로 그래프를 재구성하지 않아요."}
-          </p>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              {snapshot && !run
+                ? "이 프로젝트에 아직 Weavra Run이 없어요. 통제 작업을 실행하면 단계가 여기에 그려져요."
+                : "받은 스냅샷이 아직 없어서 그래프를 그릴 수 없어요. 이벤트나 캐시 조각으로 그래프를 재구성하지 않아요."}
+            </p>
+            <p>
+              통제 작업을 시작하기 전 준비 상태와 설정은 프로젝트 설정의 ‘Weavra · 워크플로
+              제어’에서 확인해요. 이 그래프에서는 아무것도 실행하지 않아요.
+            </p>
+            {projectKey ? (
+              <Button
+                variant="outline"
+                data-weavra-action="graph-open-project-settings"
+                onClick={() => {
+                  void navigate({ to: "/projects/$projectKey", params: { projectKey } });
+                }}
+              >
+                프로젝트 설정 열기
+              </Button>
+            ) : null}
+          </div>
         )}
       </div>
     </div>
