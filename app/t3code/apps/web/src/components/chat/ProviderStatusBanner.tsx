@@ -117,7 +117,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
         </div>
         <Button
           aria-label={`${providerName} 공급자 ${status.status === "warning" ? "경고" : "오류"} 닫기`}
-          className="absolute top-1 right-1 size-9 text-muted-foreground hover:text-foreground"
+          className="absolute top-1 right-1 size-9 text-muted-foreground hover:text-foreground sm:size-9"
           onClick={onDismiss}
           size="icon-xs"
           variant="ghost"

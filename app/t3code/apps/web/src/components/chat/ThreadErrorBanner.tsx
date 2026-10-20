@@ -63,7 +63,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
             <Button
               variant="ghost"
               size="icon-xs"
-              className="size-9"
+              className="size-9 sm:size-9"
               aria-label="오류 닫기"
               onClick={onDismiss}
             >
