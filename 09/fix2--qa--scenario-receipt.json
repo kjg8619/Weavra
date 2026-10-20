@@ -1,0 +1,1298 @@
+{
+  "schemaVersion": 1,
+  "selection": "09",
+  "revision": "de4f90da2065bd78c8bd89cfdff8390eea702c20",
+  "asarSha256": "e5c831db165d2522294f2019f088968420c2246ab66457d5dc589611982d5142",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "8fa6413981213a1063ed12f997ed042494824e446098ba9c6b549c29476fa2a2",
+    "capture.mjs": "3e0a797f8339987715a193f31684734488cb512aca8822ac07f3a62f7efb2d55",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T07:27:18.186Z",
+  "checks": [
+    {
+      "caseId": "09",
+      "checkId": "fix2-sheet",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "draft/light/840/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-840x620-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-light-840x620-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-840x620-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-840x620-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft/light/840/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-840x620-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-light-840x620-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-840x620-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-840x620-x1.5 original centring negative control",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "draft/light/1280/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1280x800-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-light-1280x800-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1280x800-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1280x800-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft/light/1280/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1280x800-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-light-1280x800-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1280x800-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft/light/1920/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1920x1080-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-light-1920x1080-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1920x1080-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1920x1080-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft/light/1920/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1920x1080-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-light-1920x1080-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1920x1080-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-light-1920x1080-x1.5 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft/dark/840/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-840x620-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-dark-840x620-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-840x620-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-840x620-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft/dark/840/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-840x620-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-dark-840x620-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-840x620-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-840x620-x1.5 original centring negative control",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "draft/dark/1280/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1280x800-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-dark-1280x800-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1280x800-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1280x800-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft/dark/1280/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1280x800-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-dark-1280x800-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1280x800-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft/dark/1920/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1920x1080-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-dark-1920x1080-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1920x1080-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1920x1080-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft/dark/1920/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1920x1080-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "draft-dark-1920x1080-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1920x1080-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "draft-dark-1920x1080-x1.5 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread/light/840/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-840x620-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-light-840x620-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-840x620-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-840x620-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread/light/840/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-840x620-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-light-840x620-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-840x620-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-840x620-x1.5 original centring negative control",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "thread/light/1280/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1280x800-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-light-1280x800-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1280x800-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1280x800-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread/light/1280/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1280x800-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-light-1280x800-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1280x800-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread/light/1920/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1920x1080-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-light-1920x1080-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1920x1080-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1920x1080-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread/light/1920/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1920x1080-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-light-1920x1080-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1920x1080-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-light-1920x1080-x1.5 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread/dark/840/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-840x620-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-dark-840x620-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-840x620-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-840x620-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread/dark/840/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-840x620-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-dark-840x620-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-840x620-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-840x620-x1.5 original centring negative control",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "thread/dark/1280/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1280x800-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-dark-1280x800-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1280x800-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1280x800-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread/dark/1280/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1280x800-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-dark-1280x800-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1280x800-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread/dark/1920/1 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1920x1080-x1 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-dark-1920x1080-x1 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1920x1080-x1 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1920x1080-x1 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread/dark/1920/1.5 launcher exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1920x1080-x1.5 scroll origin",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "thread-dark-1920x1080-x1.5 first row fully visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1920x1080-x1.5 all rows reachable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread-dark-1920x1080-x1.5 original fit geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "full sheet matrix",
+          "actual": 24,
+          "expected": 24
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-840x620-x1-top.png",
+          "sha256": "daf745fd2687ba60b5e26372677624686d9bfef670d469f352abb06fd4c70d2f"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-840x620-x1-top.ax.json",
+          "sha256": "3fdac75accfba7384a78680ca2ed8d13e78dd1a00cb269b9b3a9851b2576bac2"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-840x620-x1-end.png",
+          "sha256": "daf745fd2687ba60b5e26372677624686d9bfef670d469f352abb06fd4c70d2f"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-840x620-x1-end.ax.json",
+          "sha256": "3fdac75accfba7384a78680ca2ed8d13e78dd1a00cb269b9b3a9851b2576bac2"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-840x620-x1.5-top.png",
+          "sha256": "5160841c54cd0823d0091097546aec5bbf8132f8efdafdf3c1c020116e4c180f"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-840x620-x1.5-top.ax.json",
+          "sha256": "8f1c4b2057f3442c4ed3b05a4abe5906d803ccad0bc7ea1c156a66da16b55432"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-840x620-x1.5-end.png",
+          "sha256": "75f83e68d1dec086618e5471fcdecdd48532d97b0e906e6dd27ad1b254e59210"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-840x620-x1.5-end.ax.json",
+          "sha256": "8f1c4b2057f3442c4ed3b05a4abe5906d803ccad0bc7ea1c156a66da16b55432"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1280x800-x1-top.png",
+          "sha256": "c954721363867ef88fa8c937310415461da708f79a6ccfc2c5d70115036e1c15"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1280x800-x1-top.ax.json",
+          "sha256": "0b94908dc339df079104e47c0a21534e1d106678e5b01e96c7f906385fdd96e8"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1280x800-x1-end.png",
+          "sha256": "c954721363867ef88fa8c937310415461da708f79a6ccfc2c5d70115036e1c15"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1280x800-x1-end.ax.json",
+          "sha256": "0b94908dc339df079104e47c0a21534e1d106678e5b01e96c7f906385fdd96e8"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1280x800-x1.5-top.png",
+          "sha256": "29bcc1a2454385d418aadd23f2c2b8fd43f0d953107461cf9281184371de2847"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1280x800-x1.5-top.ax.json",
+          "sha256": "4fd222c36bda69d17543ca2539f470015d0d23817771baa2d9cdc6f1e7b347f0"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1280x800-x1.5-end.png",
+          "sha256": "5bd9eacd813fcaf612918db95edae08beb15978c4aaf7bb01add3dcf7d7b48ce"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1280x800-x1.5-end.ax.json",
+          "sha256": "4fd222c36bda69d17543ca2539f470015d0d23817771baa2d9cdc6f1e7b347f0"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1920x1080-x1-top.png",
+          "sha256": "7b370cdf50481d1aa2963e84587686394308b2b3fb2574a3bd459ed973bb56b9"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1920x1080-x1-top.ax.json",
+          "sha256": "8c157fdb9c5122e2bea58e71f0a582a788fc71f51fc63802f37bdf1aecc194db"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1920x1080-x1-end.png",
+          "sha256": "7b370cdf50481d1aa2963e84587686394308b2b3fb2574a3bd459ed973bb56b9"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1920x1080-x1-end.ax.json",
+          "sha256": "8c157fdb9c5122e2bea58e71f0a582a788fc71f51fc63802f37bdf1aecc194db"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1920x1080-x1.5-top.png",
+          "sha256": "5fd384f1204642d3991a24ee0310d3e49416eea6a67444fe5be0fd92f16c1b95"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1920x1080-x1.5-top.ax.json",
+          "sha256": "6e6274c3d649a44c91bed643ae8a7b9237e13191c5ca06024c32edf53115fcf8"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1920x1080-x1.5-end.png",
+          "sha256": "5fd384f1204642d3991a24ee0310d3e49416eea6a67444fe5be0fd92f16c1b95"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-light-1920x1080-x1.5-end.ax.json",
+          "sha256": "6e6274c3d649a44c91bed643ae8a7b9237e13191c5ca06024c32edf53115fcf8"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-840x620-x1-top.png",
+          "sha256": "49a46859d84ed672d57d121fb00ccc88851c2aade72c5330535147b926fefe09"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-840x620-x1-top.ax.json",
+          "sha256": "6feab30f476c0d3cffb93c65b2b354ac5116d06b8d8b93a11342a88d72b7b067"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-840x620-x1-end.png",
+          "sha256": "49a46859d84ed672d57d121fb00ccc88851c2aade72c5330535147b926fefe09"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-840x620-x1-end.ax.json",
+          "sha256": "6feab30f476c0d3cffb93c65b2b354ac5116d06b8d8b93a11342a88d72b7b067"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-840x620-x1.5-top.png",
+          "sha256": "416c133d03992e0183bdb3e311c2abfee850ae7d78c7f39c4f2405419a098dea"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-840x620-x1.5-top.ax.json",
+          "sha256": "361dec9745125a8df6cdcbb9139e724bd6b4cc83042819e0f73557be1f8e0ad1"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-840x620-x1.5-end.png",
+          "sha256": "39e05bf189a9dfed369e4fa8c99c8874f8203bf466f3fd3830693d7e815555a4"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-840x620-x1.5-end.ax.json",
+          "sha256": "361dec9745125a8df6cdcbb9139e724bd6b4cc83042819e0f73557be1f8e0ad1"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1280x800-x1-top.png",
+          "sha256": "36a47f905dcd9102f48606047eab8355de3dcd9eb92b7a7549a525f009ceabc5"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1280x800-x1-top.ax.json",
+          "sha256": "2809505cef4689434f684852eeb8eabac4bdd27aa50319f916f7ef4ef8610644"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1280x800-x1-end.png",
+          "sha256": "36a47f905dcd9102f48606047eab8355de3dcd9eb92b7a7549a525f009ceabc5"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1280x800-x1-end.ax.json",
+          "sha256": "2809505cef4689434f684852eeb8eabac4bdd27aa50319f916f7ef4ef8610644"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1280x800-x1.5-top.png",
+          "sha256": "fab2fe982a14bf91e378390f9eeaeaacce4ec00ff8a642146b51a3807bd1cf26"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1280x800-x1.5-top.ax.json",
+          "sha256": "1501eda387269ed52568732ce7881292c015223974566bf274fd78f0959c4600"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1280x800-x1.5-end.png",
+          "sha256": "7cfa705f42fbe313a68c5f337e4af673a925523fbd2b95ab819ff801673225a2"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1280x800-x1.5-end.ax.json",
+          "sha256": "1501eda387269ed52568732ce7881292c015223974566bf274fd78f0959c4600"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1920x1080-x1-top.png",
+          "sha256": "bd633f332c6b373cf68ce2e82469ae2c8c94bd32fd583c3e58b34f64aa8139b4"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1920x1080-x1-top.ax.json",
+          "sha256": "688c64c59702f521e1b283c5e53e66b8ae96122e699678b95be9388d1ea6c12e"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1920x1080-x1-end.png",
+          "sha256": "bd633f332c6b373cf68ce2e82469ae2c8c94bd32fd583c3e58b34f64aa8139b4"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1920x1080-x1-end.ax.json",
+          "sha256": "688c64c59702f521e1b283c5e53e66b8ae96122e699678b95be9388d1ea6c12e"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1920x1080-x1.5-top.png",
+          "sha256": "197ae5382611fd58746590c21006be5e9c6025f719fd33d9ed0a0cd31da54099"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1920x1080-x1.5-top.ax.json",
+          "sha256": "da4748d5e20ea4ea7c762f3b80581b7b1212c428ed497b69b9c455f024a5355b"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1920x1080-x1.5-end.png",
+          "sha256": "197ae5382611fd58746590c21006be5e9c6025f719fd33d9ed0a0cd31da54099"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-draft-dark-1920x1080-x1.5-end.ax.json",
+          "sha256": "da4748d5e20ea4ea7c762f3b80581b7b1212c428ed497b69b9c455f024a5355b"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-840x620-x1-top.png",
+          "sha256": "3a1962afbd7727e46033d16bb56856b0bc1cdd27222cc41b6c125ce8b818d09f"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-840x620-x1-top.ax.json",
+          "sha256": "417681faebd890510e5eb1795b9b87b2c6ccc2937a53393a6987b1c8fcf94811"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-840x620-x1-end.png",
+          "sha256": "8dba3ec0f67e7b8516638ba52841ad0af4aced3cfd26d37e69d7a19694c9045e"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-840x620-x1-end.ax.json",
+          "sha256": "417681faebd890510e5eb1795b9b87b2c6ccc2937a53393a6987b1c8fcf94811"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-840x620-x1.5-top.png",
+          "sha256": "cbd33cd9d55e235f76cf10d289c5147e6934b0c2f800531676456b0d0ab4e9fd"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-840x620-x1.5-top.ax.json",
+          "sha256": "a5228bd5278b47ce64f64d015273038646594d70a71bb00b11aec8ff1516c03f"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-840x620-x1.5-end.png",
+          "sha256": "1696a386e07c177631f4a390de8372ea600aaed0d2d2188b85dfd3f0b5c9dc4b"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-840x620-x1.5-end.ax.json",
+          "sha256": "a5228bd5278b47ce64f64d015273038646594d70a71bb00b11aec8ff1516c03f"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1280x800-x1-top.png",
+          "sha256": "bb7b5762cd1e4c893cbad70f0e91575c289ee6ae325bb98b555ab5f9cc073940"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1280x800-x1-top.ax.json",
+          "sha256": "2375083cbc5d9dc759fbc08d8d21cdff6cff8bc647d51f54f94d58d72493b0df"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1280x800-x1-end.png",
+          "sha256": "bb7b5762cd1e4c893cbad70f0e91575c289ee6ae325bb98b555ab5f9cc073940"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1280x800-x1-end.ax.json",
+          "sha256": "2375083cbc5d9dc759fbc08d8d21cdff6cff8bc647d51f54f94d58d72493b0df"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1280x800-x1.5-top.png",
+          "sha256": "e9177801355055a3cbac397ea6f94938d113f7eebdfc32ba3e5e07d403899130"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1280x800-x1.5-top.ax.json",
+          "sha256": "b465fb3b656c90be2129d442a7adbba848e0db2f8ebbc18fe8d3b775e75c78ad"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1280x800-x1.5-end.png",
+          "sha256": "cf3c5de23342d5a79b7c85653979c3fd4211b4c0bfb6b12b7067fea765a4d6d0"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1280x800-x1.5-end.ax.json",
+          "sha256": "b465fb3b656c90be2129d442a7adbba848e0db2f8ebbc18fe8d3b775e75c78ad"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1920x1080-x1-top.png",
+          "sha256": "4a904b372c7df93482ec2e526114ee15e0b8d5097580c923247a8bdc2d920e02"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1920x1080-x1-top.ax.json",
+          "sha256": "c56931e7be8543c75e81fed60b0e1b64aa6f0afbf7a2c76a6c2784182050e764"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1920x1080-x1-end.png",
+          "sha256": "4a904b372c7df93482ec2e526114ee15e0b8d5097580c923247a8bdc2d920e02"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1920x1080-x1-end.ax.json",
+          "sha256": "c56931e7be8543c75e81fed60b0e1b64aa6f0afbf7a2c76a6c2784182050e764"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1920x1080-x1.5-top.png",
+          "sha256": "36acddfed31622aa0fbf37ca8735605513a91dc4e98975aeb022dc4386203519"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1920x1080-x1.5-top.ax.json",
+          "sha256": "e68cb2e6a62de83a4eba7e0e96af01a3546d7c1c6e12d2534e7430be241c17ec"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1920x1080-x1.5-end.png",
+          "sha256": "df7b525a3d98ced4d600582bce3ece062b7dabea5626f956c34e84de5b2c2f1b"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-light-1920x1080-x1.5-end.ax.json",
+          "sha256": "e68cb2e6a62de83a4eba7e0e96af01a3546d7c1c6e12d2534e7430be241c17ec"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-840x620-x1-top.png",
+          "sha256": "29540b8be43c5fe9ba873558dc0d4168ecd21625aa0fbd3142200dd1941d888c"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-840x620-x1-top.ax.json",
+          "sha256": "2090bd7e27f950aaa7ab38b9128b8c7b401e337bf348f35e0f15e33956a5edcc"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-840x620-x1-end.png",
+          "sha256": "29540b8be43c5fe9ba873558dc0d4168ecd21625aa0fbd3142200dd1941d888c"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-840x620-x1-end.ax.json",
+          "sha256": "2090bd7e27f950aaa7ab38b9128b8c7b401e337bf348f35e0f15e33956a5edcc"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-840x620-x1.5-top.png",
+          "sha256": "15855f7dcdb1d1fcd109d92bb872aa21022ca6995df7679a78d1b655b71529fa"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-840x620-x1.5-top.ax.json",
+          "sha256": "5e3c1b0528acdf9e98fd64d6ac7170d244419976104b8a83472a1ef8f7953eda"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-840x620-x1.5-end.png",
+          "sha256": "28f88e6b8d8d9ad2166f45532542c617a42471df2daaff0900505ede5bf5f208"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-840x620-x1.5-end.ax.json",
+          "sha256": "5e3c1b0528acdf9e98fd64d6ac7170d244419976104b8a83472a1ef8f7953eda"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1280x800-x1-top.png",
+          "sha256": "0f9a5b90c4c599c61ce58539cb9d7b293c82396be6208b2daed598ba4112691c"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1280x800-x1-top.ax.json",
+          "sha256": "d451e7b2d8806803b4c1172457d40798de3ec987d022fa21a8dc32e7f23bf99d"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1280x800-x1-end.png",
+          "sha256": "0f9a5b90c4c599c61ce58539cb9d7b293c82396be6208b2daed598ba4112691c"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1280x800-x1-end.ax.json",
+          "sha256": "d451e7b2d8806803b4c1172457d40798de3ec987d022fa21a8dc32e7f23bf99d"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1280x800-x1.5-top.png",
+          "sha256": "7acc0f66f4bfc17880d3a8303cb0ccefe3bb2818f034b830c954076011685a33"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1280x800-x1.5-top.ax.json",
+          "sha256": "d45d859bfd023913ed916671c656cb972c97d7be4590282e736b3f6fcfaac29e"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1280x800-x1.5-end.png",
+          "sha256": "42a4ebab7993f9278c01c7b63b3b2df430c5ad6e6b2606f4efdc7d20b09ddc81"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1280x800-x1.5-end.ax.json",
+          "sha256": "d45d859bfd023913ed916671c656cb972c97d7be4590282e736b3f6fcfaac29e"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1920x1080-x1-top.png",
+          "sha256": "ba3aa9ef575f3dedf6e6062da04cf725c6d9b189a8ac56dd6f303e902544ee1d"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1920x1080-x1-top.ax.json",
+          "sha256": "17d128f2f298512955413311582f30484dfc26237c77e00f182d7e7847bad1d7"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1920x1080-x1-end.png",
+          "sha256": "9fde5e048fc4beaa6bb053c357ca3602b3438c50448f323252cca52dd5e9fb83"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1920x1080-x1-end.ax.json",
+          "sha256": "17d128f2f298512955413311582f30484dfc26237c77e00f182d7e7847bad1d7"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1920x1080-x1.5-top.png",
+          "sha256": "23f3698d1367ccb3e655a0238dd043358269cefe86e5a582ca4e0eb885396c3b"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1920x1080-x1.5-top.ax.json",
+          "sha256": "98abe4dc4db77e19076d9ab8b65c285b6ec9459a3736d623e7789ea0ea8462f3"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1920x1080-x1.5-end.png",
+          "sha256": "e38fa325ce9eaef421e7c577c635c04a53bb33489bc6b421bca43a9cc8c65070"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/fix2-sheet-thread-dark-1920x1080-x1.5-end.ax.json",
+          "sha256": "98abe4dc4db77e19076d9ab8b65c285b6ec9459a3736d623e7789ea0ea8462f3"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/result.png",
+          "sha256": "34bd642e7e50c092f7eb301f8cf80b3ef2ef5488e9729129f3c61c40892572a0"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/result.ax.json",
+          "sha256": "9354f30a5bb5893aa6a181a67fab96013bf352b1fa62410a63636a2f6c9db681"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/fix2-sheet/observations.json",
+          "sha256": "785d3de124bb21c549ea97b96ad0ca9156777df56982d6a4dfd9c665b3036f50"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "locked-destination-reason",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "unavailable destinations retained",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disabled destination has associated reason",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reason is present and readable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disabled destination has associated reason",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reason is present and readable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disabled destination has associated reason",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reason is present and readable",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/locked-destination-reason/result.png",
+          "sha256": "964e7f73eb661a651a311056ce4d99b9514ebde4126f32f6ac05f218a3a1dcab"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/locked-destination-reason/result.ax.json",
+          "sha256": "5f2dad29e17cae9125ea43276b0585aaa779915582b9bded3669d8b35b8b87be"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/locked-destination-reason/observations.json",
+          "sha256": "0b7a84dcaefe714a0530ad5f4d6c45bb260835a4fad370f06f2dae290fde52ea"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "files-loading",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "files-loading: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "files-loading",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-loading/files-loading.png",
+          "sha256": "96f211d1fa0808c58e101f31cf3b70d102de57edef60e75b10e6e3cb1c8acc1a"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-loading/files-loading.ax.json",
+          "sha256": "bb5b52aaa2f319980d5811c572b1ccbdeda5c941302839cf8bb688a2c6dd7a31"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-loading/result.png",
+          "sha256": "a8564b6937901cf72f44cbd226082a409462f236dc5e1cc3bc27b3cf96282927"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-loading/result.ax.json",
+          "sha256": "157e2d56b842c4a2a428fb07214a61fbba46af8d2204078e0a22f66502148a14"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-loading/observations.json",
+          "sha256": "1b45e3fa3b9560fa86eb8d7fe66d7085c97ba7db7afd61500dfdda0bf2081bf0"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "files-empty",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "files-empty: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "files-empty",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-empty/files-empty.png",
+          "sha256": "a8564b6937901cf72f44cbd226082a409462f236dc5e1cc3bc27b3cf96282927"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-empty/files-empty.ax.json",
+          "sha256": "20fad8106f91ea376c433559db8b29d324d46d7e6c9825185c833e073d1c8853"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-empty/result.png",
+          "sha256": "a8564b6937901cf72f44cbd226082a409462f236dc5e1cc3bc27b3cf96282927"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-empty/result.ax.json",
+          "sha256": "20fad8106f91ea376c433559db8b29d324d46d7e6c9825185c833e073d1c8853"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-empty/observations.json",
+          "sha256": "d1012e16a657c0344b368a85fb6db34b603315301c24aed1e0ab14b138707d77"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "files-no-results",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "files-no-results: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "files-no-results",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "clearing search restores actual entries",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-no-results/files-no-results.png",
+          "sha256": "5bd80ec794406a968d4aedf1e857ae84eb356367587d47ac60d669ba306efca9"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-no-results/files-no-results.ax.json",
+          "sha256": "df4f4f4a8c596de118e0b1ea35393c82f2aa89939a11725e7a5d5b09c7c9ceee"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-no-results/result.png",
+          "sha256": "aa6e2a99f6f4cd8cefb29fc8ebe14742bbe3a4ef3f5c1a59a234b5f8d73ae13d"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-no-results/result.ax.json",
+          "sha256": "254d9486326da868ab89661a515bdeac9b0b2bd9a9d7262225115bd1cde2b0d0"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-no-results/observations.json",
+          "sha256": "2dbe741d3ee83435a92ea0de7f36929e77152fe103b6ece840ab69ba56f8b75f"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "files-error",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "files-error: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "files-error",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-error/files-error.png",
+          "sha256": "aade4591385c2fe15d4fdec5f94877e0dfb7325ac452e63904f5c79a1adea646"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-error/files-error.ax.json",
+          "sha256": "c0d87b91d92a43a4021e7254c697f19dd3e73b1905ddaa8df73871c8aeac429a"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-error/result.png",
+          "sha256": "59ae2189ac4f846f270b7cd83e378467c0c8433f050f9b25701319c0ee3c3033"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-error/result.ax.json",
+          "sha256": "c0d87b91d92a43a4021e7254c697f19dd3e73b1905ddaa8df73871c8aeac429a"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/files-error/observations.json",
+          "sha256": "310a540acc9cf65db48ac51b82707effcd253fc715ab277cea1b9a6e6590706a"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "refresh",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "refresh reached data boundary",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/refresh/result.png",
+          "sha256": "0101d4bd82bed815566e28cd4f7cb6a606c5221d4689ef594ca26e04100edda8"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/refresh/result.ax.json",
+          "sha256": "6ba1af5d9ffb7948ab741272214cc753fc019c51a27301800a546e3d789fcd79"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/refresh/observations.json",
+          "sha256": "cfd3925b63bae71fe6940954cb0f319cba76c61aebf5ff5d94a009758206f403"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "pane-isolation",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "Files query does not filter conversation",
+          "actual": [
+            "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "printf 'local fixture only\\n'\n"
+          ],
+          "expected": [
+            "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "printf 'local fixture only\\n'\n"
+          ]
+        },
+        {
+          "label": "selected thread unchanged",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/pane-isolation/result.png",
+          "sha256": "1a97975aabf005dcd04df8cac347181702589f678c2b21847c6c8920568b7e5c"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/pane-isolation/result.ax.json",
+          "sha256": "fe9d4c099936e7202d538ddbc0ea1473ae4d8fd9b55e57282247b1e1b1446a6a"
+        },
+        {
+          "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/scenarios/09/pane-isolation/observations.json",
+          "sha256": "0b7a84dcaefe714a0530ad5f4d6c45bb260835a4fad370f06f2dae290fde52ea"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T07:31:02.189Z",
+  "capture": {
+    "file": "run-d2bcb7b3-6270-446d-ab68-f793448784ef/capture-manifest.json",
+    "sha256": "2169b229d56b21533ad870393e8e35b5c07793bf9fd0e24df606cc678b88cbbc"
+  }
+}
