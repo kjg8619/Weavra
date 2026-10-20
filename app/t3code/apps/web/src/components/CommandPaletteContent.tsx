@@ -1,5 +1,5 @@
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
-import { type ComponentProps, type ReactNode, useLayoutEffect, useRef } from "react";
+import { type ComponentProps, type ReactNode, useId, useLayoutEffect, useRef } from "react";
 
 import { Command, CommandFooter, CommandInput, CommandPanel } from "./ui/command";
 import { Kbd, KbdGroup } from "./ui/kbd";
@@ -10,6 +10,8 @@ type CommandPaletteContentProps = Omit<ComponentProps<typeof Command>, "children
   readonly footerActionLabel?: ReactNode;
   readonly footerTrailing?: ReactNode;
   readonly inputAccessory?: ReactNode;
+  /** Visible name of the input for the current mode; it stays while typing. */
+  readonly inputLabel?: ReactNode;
   readonly inputProps: ComponentProps<typeof CommandInput>;
   readonly panelClassName?: string;
   readonly showBackHint?: boolean;
@@ -27,6 +29,7 @@ export function CommandPaletteContent({
   footerActionLabel,
   footerTrailing,
   inputAccessory,
+  inputLabel,
   inputProps,
   panelClassName,
   showBackHint,
@@ -34,6 +37,8 @@ export function CommandPaletteContent({
   ...commandProps
 }: CommandPaletteContentProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const generatedInputId = useId();
+  const inputId = inputProps.id ?? generatedInputId;
 
   // Direct-open flows replace the initial palette view after the dialog has
   // already moved focus. Reclaim it when the replacement input mounts so
@@ -45,8 +50,16 @@ export function CommandPaletteContent({
   return (
     <div className="contents" data-testid={testId}>
       <Command {...commandProps}>
+        {inputLabel ? (
+          <label
+            htmlFor={inputId}
+            className="block px-[calc(var(--command-shell-inset)+0.75rem)] pt-2.5 text-muted-foreground text-sm"
+          >
+            {inputLabel}
+          </label>
+        ) : null}
         <div className="relative">
-          <CommandInput {...inputProps} ref={inputRef} />
+          <CommandInput {...inputProps} id={inputId} ref={inputRef} />
           {inputAccessory}
         </div>
         <CommandPanel className={panelClassName}>{children}</CommandPanel>

@@ -2587,6 +2587,16 @@ function OpenCommandPaletteDialog(props: {
     remoteProjectInputPlaceholder(addProjectCloneFlow) ??
     getCommandPaletteInputPlaceholder(paletteMode);
   const isSubmenu = paletteMode === "submenu" || paletteMode === "submenu-browse";
+  // The input's visible name follows the current mode, so a typed path or query
+  // never loses its purpose once the placeholder disappears.
+  const inputLabel =
+    addProjectCloneFlow?.step === "repository"
+      ? "복제할 저장소"
+      : addProjectCloneFlow?.step === "confirm"
+        ? "복제할 위치"
+        : isBrowsing
+          ? "폴더 경로"
+          : "검색";
   const hasHighlightedBrowseItem = highlightedItemValue?.startsWith("browse:") ?? false;
   const canSubmitBrowsePath =
     isBrowsing &&
@@ -2950,6 +2960,7 @@ function OpenCommandPaletteDialog(props: {
       footerActionLabel={footerActionLabel}
       footerTrailing={footerTrailing}
       inputAccessory={inputAccessory}
+      inputLabel={inputLabel}
       inputProps={{
         // The submit button is absolutely positioned over the field, so the
         // inner input must reserve enough room for the full action label.
