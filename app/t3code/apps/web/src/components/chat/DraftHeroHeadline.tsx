@@ -49,6 +49,40 @@ export function findActiveProjectGroup<
   );
 }
 
+function pathTail(workspaceRoot: string, segments: number): string {
+  const parts = workspaceRoot.split(/[\\/]+/).filter((part) => part.length > 0);
+  return parts.slice(-segments).join("/");
+}
+
+/**
+ * Folder detail for groups whose display name another group shares, so two
+ * same-named projects stay distinguishable in the menu and the headline. The
+ * last two path segments are used; the full path only when those still collide.
+ * Uniquely named groups get no detail.
+ */
+export function buildAmbiguousProjectDetails(
+  groups: ReadonlyArray<{
+    readonly projectKey: string;
+    readonly displayName: string;
+    readonly workspaceRoot: string;
+  }>,
+): Map<string, string> {
+  const byName = new Map<string, typeof groups>();
+  for (const group of groups) {
+    byName.set(group.displayName, [...(byName.get(group.displayName) ?? []), group]);
+  }
+  const details = new Map<string, string>();
+  for (const sameNamed of byName.values()) {
+    if (sameNamed.length < 2) continue;
+    const tails = sameNamed.map((group) => pathTail(group.workspaceRoot, 2));
+    const tailsAreUnique = new Set(tails).size === tails.length;
+    sameNamed.forEach((group, index) => {
+      details.set(group.projectKey, tailsAreUnique ? tails[index]! : group.workspaceRoot);
+    });
+  }
+  return details;
+}
+
 interface DraftHeroHeadlineProps {
   readonly draftId: DraftId | null;
   readonly activeProjectRef: ScopedProjectRef | null;
@@ -135,9 +169,14 @@ export function DraftHeroHeadline({
     () => new Map(projectPickerEntries.map((entry) => [entry.group.projectKey, entry] as const)),
     [projectPickerEntries],
   );
+  const projectDetailByKey = useMemo(
+    () => buildAmbiguousProjectDetails(projectGroups),
+    [projectGroups],
+  );
   const activeProjectGroup = findActiveProjectGroup(projectGroups, activeProjectRef);
   const activeProjectKey = activeProjectGroup?.projectKey ?? "";
   const activeProjectDisplayName = activeProjectGroup?.displayName ?? activeProjectTitle;
+  const activeProjectDetail = projectDetailByKey.get(activeProjectKey) ?? null;
   const hasResolvedProject = activeProjectTitle !== null;
   const canChooseProject = projectPickerEntries.length > 0;
   const shouldShowProjectMenu = canChooseProject;
@@ -154,10 +193,16 @@ export function DraftHeroHeadline({
           }
         >
           {activeProjectDisplayName ?? "프로젝트 선택"}
+          {activeProjectDetail ? (
+            <span className="ms-2 font-normal text-muted-foreground text-sm">
+              {activeProjectDetail}
+            </span>
+          ) : null}
         </TooltipTrigger>
         {activeProjectDisplayName ? (
           <TooltipPopup side="top" className="max-w-80">
             {activeProjectDisplayName}
+            {activeProjectDetail ? ` (${activeProjectDetail})` : ""}
           </TooltipPopup>
         ) : null}
       </Tooltip>
@@ -216,6 +261,11 @@ export function DraftHeroHeadline({
                     {group.displayName}
                   </TooltipPopup>
                 </Tooltip>
+                {projectDetailByKey.has(group.projectKey) ? (
+                  <span className="min-w-0 truncate font-normal text-muted-foreground text-sm">
+                    {projectDetailByKey.get(group.projectKey)}
+                  </span>
+                ) : null}
                 {showProjectEnvironments ? (
                   <ProjectEnvironmentBadge
                     group={group}
