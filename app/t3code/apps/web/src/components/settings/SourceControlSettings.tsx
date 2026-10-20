@@ -319,7 +319,7 @@ function DiscoveryItemRow({
 
       {hasDetails ? (
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-          <CollapsibleContent>
+          <CollapsibleContent className="transition-none">
             <div className="space-y-3 break-keep px-3 pb-4 pt-1 text-pretty text-sm leading-relaxed text-foreground sm:px-4">
               {auth ? (
                 <>
