@@ -145,15 +145,14 @@ function isVcsNotReady(item: VcsDiscoveryItem | SourceControlProviderDiscoveryIt
 
 function authPresentation(auth: SourceControlProviderAuth): {
   readonly label: string;
-  readonly badge: "warning" | null;
 } {
   if (auth.status === "authenticated") {
-    return { label: "Authenticated", badge: null };
+    return { label: "로그인됨" };
   }
   if (auth.status === "unauthenticated") {
-    return { label: "Not authenticated", badge: "warning" };
+    return { label: "로그인 필요" };
   }
-  return { label: "Status unknown", badge: null };
+  return { label: "확인 안 됨" };
 }
 
 function RedactedAccount(props: { readonly account: string | null }) {
@@ -163,6 +162,7 @@ function RedactedAccount(props: { readonly account: string | null }) {
       ariaLabel="Toggle source control account visibility"
       revealTooltip="Click to reveal account"
       hideTooltip="Click to hide account"
+      className="min-h-9 px-2.5 !text-sm !leading-normal !text-foreground focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-foreground focus-visible:outline-offset-2"
     />
   );
 }
@@ -215,47 +215,33 @@ function itemSummary({
     return <span>Support for {item.label} is coming soon.</span>;
   }
 
-  if (item.status !== "available") {
-    return <span>Not available on this server: {item.installHint}</span>;
-  }
-
   if (auth) {
-    if (auth.status === "authenticated") {
-      return (
-        <>
-          <span>Authenticated</span>
-          {authAccount ? (
-            <>
-              <span aria-hidden>as</span>
-              <RedactedAccount account={authAccount} />
-            </>
-          ) : null}
-        </>
-      );
-    }
-
-    if (!item.executable) {
-      return <span>Available. {item.installHint}</span>;
-    }
-
-    if (auth.status === "unauthenticated") {
-      return (
-        <span>
-          {item.label} is not authenticated on this server. Sign in or configure credentials using
-          the <code className="rounded bg-muted px-1 py-px text-[11px]">{item.executable}</code>{" "}
-          tool on the server host to enable change request features.
-        </span>
-      );
-    }
-    const authDetail = optionLabel(auth.detail);
     return (
-      <span>
-        Could not verify {item.label}. {authDetail ?? item.installHint}
+      <span className="grid gap-2">
+        <span className="flex flex-wrap gap-x-6 gap-y-2">
+          <span data-source-control-installation={item.status}>
+            도구: {item.status === "available" ? "도구 설치됨" : "설치 필요"}
+            {item.status === "available" && !item.executable ? " (내장 연동)" : null}
+          </span>
+          <span data-source-control-auth={auth.status}>인증: {authPresentation(auth).label}</span>
+        </span>
+        {authAccount ? <RedactedAccount account={authAccount} /> : null}
+        <span>
+          {item.status !== "available"
+            ? "서버 호스트에서 도구를 설치한 뒤 다시 확인해 주세요."
+            : auth.status === "authenticated"
+              ? "이 서버에서 변경 요청 기능을 사용할 수 있어요."
+              : auth.status === "unauthenticated"
+                ? "도구 준비와 로그인은 별개예요. 설정 안내에서 인증 방법을 확인해 주세요."
+                : "로그인 상태를 확인하지 못했어요. 설정 안내의 원문 진단을 확인해 주세요."}
+        </span>
       </span>
     );
   }
 
-  return <span>Available</span>;
+  return (
+    <span>{item.status === "available" ? "도구 설치됨" : `설치 필요: ${item.installHint}`}</span>
+  );
 }
 
 function DiscoveryItemRow({
@@ -270,10 +256,9 @@ function DiscoveryItemRow({
     ? item.status === "available" && item.auth.status === "authenticated"
     : item.status === "available" && item.implemented;
   const auth = isProviderDiscoveryItem(item) ? item.auth : null;
-  const authStatus = auth ? authPresentation(auth) : null;
   const authAccount = auth ? optionLabel(auth.account) : null;
   const [isExpanded, setIsExpanded] = useState(false);
-  const hasDetails = children !== undefined;
+  const hasDetails = children !== undefined || auth !== null;
   const searchTargetId = useSettingsSearchTargetId();
 
   useEffect(() => {
@@ -284,6 +269,7 @@ function DiscoveryItemRow({
 
   return (
     <div
+      data-source-control-provider={auth ? item.kind : undefined}
       className={cn(
         "first:rounded-t-xl last:rounded-b-xl transition-colors hover:bg-muted/20",
         isVcsNotReady(item) && "opacity-80",
@@ -303,31 +289,28 @@ function DiscoveryItemRow({
                   Coming Soon
                 </Badge>
               ) : null}
-              {authStatus?.badge ? (
-                <Badge variant={authStatus.badge} size="sm">
-                  {authStatus.label}
-                </Badge>
-              ) : null}
             </div>
-            <p className="flex min-w-0 flex-wrap items-center gap-x-1 text-[13px] leading-[1.45] text-muted-foreground/80">
+            <div className="min-w-0 break-keep text-pretty text-sm leading-relaxed text-foreground">
               {itemSummary({ item, auth, authAccount })}
-            </p>
+            </div>
           </div>
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
             {hasDetails ? (
               <Button
                 size="icon-xs"
-                variant="ghost-muted"
+                variant="outline"
+                data-icon-control
+                className="scroll-m-2 border-foreground/70 text-foreground focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-foreground focus-visible:outline-offset-2"
                 onClick={() => setIsExpanded((open) => !open)}
                 aria-expanded={isExpanded}
-                aria-label={`Toggle ${item.label} details`}
+                aria-label={auth ? `${item.label} 설정 안내` : `Toggle ${item.label} details`}
               >
                 <ChevronDownIcon
                   className={cn("size-3.5 transition-transform", isExpanded && "rotate-180")}
                 />
               </Button>
             ) : null}
-            {!isVcsNotReady(item) ? (
+            {!isVcsNotReady(item) && !auth ? (
               <Switch checked={enabled} disabled aria-label={`${item.label} availability`} />
             ) : null}
           </div>
@@ -336,8 +319,27 @@ function DiscoveryItemRow({
 
       {hasDetails ? (
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-          <CollapsibleContent>
-            <div className="px-3 pb-4 pt-1 sm:px-4">{children}</div>
+          <CollapsibleContent className="transition-none">
+            <div className="space-y-3 break-keep px-3 pb-4 pt-1 text-pretty text-sm leading-relaxed text-foreground sm:px-4">
+              {auth ? (
+                <>
+                  <p>
+                    서버 호스트에서 아래 안내를 따라 설정한 뒤 환경을 다시 확인해 주세요. 안내를
+                    열어도 설치나 로그인을 실행하지 않아요.
+                  </p>
+                  <pre className="whitespace-pre-wrap break-words rounded-lg bg-muted p-3 font-mono text-sm select-text">
+                    {item.installHint}
+                  </pre>
+                  {optionLabel(item.detail) ? (
+                    <p className="select-text break-words">도구 진단: {optionLabel(item.detail)}</p>
+                  ) : null}
+                  {optionLabel(auth.detail) ? (
+                    <p className="select-text break-words">원문 진단: {optionLabel(auth.detail)}</p>
+                  ) : null}
+                </>
+              ) : null}
+              {children}
+            </div>
           </CollapsibleContent>
         </Collapsible>
       ) : null}
@@ -517,7 +519,8 @@ export function SourceControlSettingsPanel() {
           input: {},
         }),
   );
-  const result = discovery.data ?? EMPTY_DISCOVERY_RESULT;
+  const result =
+    discovery.error === null ? (discovery.data ?? EMPTY_DISCOVERY_RESULT) : EMPTY_DISCOVERY_RESULT;
   const hasVersionControlSystems = result.versionControlSystems.length > 0;
   const hasDiscoveryItems = hasVersionControlSystems || result.sourceControlProviders.length > 0;
   const isInitialScanPending = discovery.isPending && discovery.data === null;
@@ -530,7 +533,9 @@ export function SourceControlSettingsPanel() {
         render={
           <Button
             size="icon-xs"
-            variant="ghost-muted"
+            variant="outline"
+            data-icon-control
+            className="scroll-m-2 border-foreground/70 text-foreground disabled:opacity-100 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-foreground focus-visible:outline-offset-2"
             onClick={handleScan}
             disabled={discovery.isPending}
             aria-label="Rescan server environment"
