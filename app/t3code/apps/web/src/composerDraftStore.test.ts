@@ -1350,7 +1350,8 @@ describe("composerDraftStore project draft thread mapping", () => {
       branch: "feature/test",
       worktreePath: "/tmp/worktree-test",
       envMode: "worktree",
-      runtimeMode: "full-access",
+      // No mode was chosen for this draft, so it falls back to approval-required.
+      runtimeMode: "approval-required",
       interactionMode: "default",
       createdAt: "2026-01-01T00:00:00.000Z",
     });
@@ -1361,10 +1362,22 @@ describe("composerDraftStore project draft thread mapping", () => {
       branch: "feature/test",
       worktreePath: "/tmp/worktree-test",
       envMode: "worktree",
-      runtimeMode: "full-access",
+      runtimeMode: "approval-required",
       interactionMode: "default",
       createdAt: "2026-01-01T00:00:00.000Z",
     });
+  });
+
+  it("keeps a saved full-access choice instead of the unset fallback", () => {
+    const store = useComposerDraftStore.getState();
+    store.setProjectDraftThreadId(projectRef, draftId, { threadId, runtimeMode: "full-access" });
+    expect(useComposerDraftStore.getState().getDraftThread(draftId)?.runtimeMode).toBe(
+      "full-access",
+    );
+    store.setProjectDraftThreadId(projectRef, draftId, { threadId });
+    expect(useComposerDraftStore.getState().getDraftThread(draftId)?.runtimeMode).toBe(
+      "full-access",
+    );
   });
 
   it("removes a draft's previous project mapping when retargeted in place", () => {

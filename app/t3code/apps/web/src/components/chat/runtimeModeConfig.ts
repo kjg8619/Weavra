@@ -6,7 +6,7 @@ export const runtimeModeConfig: Record<
   { label: string; description: string; icon: LucideIcon }
 > = {
   "approval-required": {
-    label: "승인 후 실행",
+    label: "승인 필요",
     description: "명령 실행과 파일 변경 전에 물어봐요.",
     icon: LockIcon,
   },
