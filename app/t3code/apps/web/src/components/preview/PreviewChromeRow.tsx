@@ -182,7 +182,10 @@ export function PreviewChromeRow({
         <InputGroup variant="ghost" className="group/address h-9 min-w-0 flex-1">
           {/* A visible name that stays while a URL is typed; the placeholder does not. */}
           <InputGroupAddon>
-            <label htmlFor={addressInputId} className="text-muted-foreground text-xs">
+            <label
+              htmlFor={addressInputId}
+              className="shrink-0 whitespace-nowrap text-muted-foreground text-xs"
+            >
               주소
             </label>
           </InputGroupAddon>
