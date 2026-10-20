@@ -3722,7 +3722,7 @@ export function ConnectionsSettings() {
                       render={
                         <Button
                           variant="outline"
-                          className="min-h-9 border-foreground/60 px-3 text-sm text-foreground outline-offset-2 focus-visible:outline-2 focus-visible:outline-foreground"
+                          className="min-h-9 border-foreground/60 px-3 text-sm text-foreground transition-[opacity,transform] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-foreground focus-visible:outline-offset-2"
                           aria-label="Add environment"
                           disabled={!connectionActions.canOpenDraft}
                         >
