@@ -447,7 +447,6 @@ export function ThreadStatusLabel({
         render={
           <span
             aria-label={accessibleLabel}
-            tabIndex={activity || observation ? 0 : undefined}
             className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] ${status.colorClass}`}
           />
         }
