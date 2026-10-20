@@ -1,0 +1,304 @@
+{
+  "schemaVersion": 1,
+  "selection": "10",
+  "revision": "e3f9546d257ae62a1f835e9a643086eb41fb7e1b",
+  "asarSha256": "8f10b00efab59c2b637648a65b8e76d7a1bd1ff0a26a57c3511d3c96953009f2",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "b5c3b2c9734412ba6ad468dcbd4302d815eefb72bc76bb70048989b9f8d6c7c8",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T06:49:10.049Z",
+  "checks": [
+    {
+      "caseId": "10",
+      "checkId": "graph-no-snapshot",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "graph-next-step: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "graph-next-step",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "read-only graph next destination",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "destination preserves project",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/graph-no-snapshot/graph-next-step.png",
+          "sha256": "b2b598577b5d0a3e4cbb29e8f8faa9f6d4429eb182af7fb673ea58f5ad859fb1"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/graph-no-snapshot/graph-next-step.ax.json",
+          "sha256": "c955487db45993243e6cc572aeca6d008cee58fe7dba573d70a4b33cd2fce4a3"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/graph-no-snapshot/result.png",
+          "sha256": "20fe428b90926fbc2a9f5a5c956147f09cd985532d56dc04a4fba7f75b9b33b4"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/graph-no-snapshot/result.ax.json",
+          "sha256": "b06fd973a013bebc4c2034efc220a87317a0512066d6b50149db249344f39e81"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/graph-no-snapshot/observations.json",
+          "sha256": "24d33d50dc327184ce15d9922124b7351a476005aad23b03ae11773af82383b1"
+        }
+      ]
+    },
+    {
+      "caseId": "10",
+      "checkId": "fitness-no-record",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "fitness-empty-help: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "fitness-empty-help",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/fitness-no-record/fitness-empty-help.png",
+          "sha256": "7b457e7f9887ec42d3cf28e4315c807bebd233bc5d04034d5215c96625e29fd2"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/fitness-no-record/fitness-empty-help.ax.json",
+          "sha256": "b60f647a0dc511713bbdec63170e02021d937341ef6a089cf9430999d561960c"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/fitness-no-record/result.png",
+          "sha256": "7b457e7f9887ec42d3cf28e4315c807bebd233bc5d04034d5215c96625e29fd2"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/fitness-no-record/result.ax.json",
+          "sha256": "b60f647a0dc511713bbdec63170e02021d937341ef6a089cf9430999d561960c"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/fitness-no-record/observations.json",
+          "sha256": "276e9319ff98714b5589366ed871f3ae9cf1b1054f06b5e20f1fc59b7cfb337f"
+        }
+      ]
+    },
+    {
+      "caseId": "10",
+      "checkId": "read-only-next-step",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "fitness help action exists",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "fitness-help: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "fitness-help",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/read-only-next-step/fitness-help.png",
+          "sha256": "45ad3ce2b2e69c0319592bfdfa16dae199b07f9e4a7214b575710accb3b7d33e"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/read-only-next-step/fitness-help.ax.json",
+          "sha256": "5ec841b1bd935bdf5ad17a86cba3195b262a0f33090265fd7c4cddebfa0a8953"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/read-only-next-step/result.png",
+          "sha256": "45ad3ce2b2e69c0319592bfdfa16dae199b07f9e4a7214b575710accb3b7d33e"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/read-only-next-step/result.ax.json",
+          "sha256": "5ec841b1bd935bdf5ad17a86cba3195b262a0f33090265fd7c4cddebfa0a8953"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/read-only-next-step/observations.json",
+          "sha256": "d82181b9c3ab70e5f51245e1624cc0c48083c62ce9b2605755dd486168b02f6a"
+        }
+      ]
+    },
+    {
+      "caseId": "10",
+      "checkId": "no-evaluation-request",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no evaluation command exists",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/no-evaluation-request/result.png",
+          "sha256": "ab9d97abf4362e3266cd563855bc0651d7db403c8035db36a6126f4706b3f043"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/no-evaluation-request/result.ax.json",
+          "sha256": "a9173a4299aff3513d97c0db7a5391ef8c197ce2fd113a5ede0e4d77f28e470e"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/no-evaluation-request/observations.json",
+          "sha256": "fa677f428f5a3c30d21aedef49d903e99adfa5792a38cd4fab7f11d7983271d9"
+        }
+      ]
+    },
+    {
+      "caseId": "10",
+      "checkId": "contrast",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "fitness-contrast-light: sampled composited background",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "fitness-contrast-light: worst sampled text contrast 4.786450631694082",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "fitness-contrast-dark: sampled composited background",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "fitness-contrast-dark: worst sampled text contrast 4.920430630087239",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/contrast/fitness-contrast-light.png",
+          "sha256": "723a4bfe39191f558ce2d4dddfe5a530b94ce2e6104d02a29558dbf0392b09e7"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/contrast/fitness-contrast-light.ax.json",
+          "sha256": "64189f3479e44d262dcb6f56def60748b816d4a2966a18659fc37a5b27fb1ab3"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/contrast/fitness-contrast-dark.png",
+          "sha256": "831e220bb5d791a39482bf7757d3c1aa680b76430062b93c59ea975fc632e100"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/contrast/fitness-contrast-dark.ax.json",
+          "sha256": "70c74e48a00cbdc1ef6b2c9c5d3496f5099eea40d8e66a4734989c4d84500a76"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/contrast/result.png",
+          "sha256": "1f7c09ed273c601e80a7253df2dab92c5e66e0bb6855db0ea4986ce7a303c6dc"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/contrast/result.ax.json",
+          "sha256": "70c74e48a00cbdc1ef6b2c9c5d3496f5099eea40d8e66a4734989c4d84500a76"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/contrast/observations.json",
+          "sha256": "c999bc81eb3c5fe4158eeba98f9eed9f7a9e493321bf4c4bc18ca2bbf8d6f5e2"
+        }
+      ]
+    },
+    {
+      "caseId": "10",
+      "checkId": "text-size",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "explanatory text measured",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "explanatory text at least fourteen pixels",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/text-size/result.png",
+          "sha256": "c28db9f44b1d5395f42c0c0ab10f6bcd7e16bf47606d5f4761709451bd2ad0c5"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/text-size/result.ax.json",
+          "sha256": "ebee1b9eb2f2f750de0d93f446293d7d916178f1bb42b1829d81c7a0b3432737"
+        },
+        {
+          "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/scenarios/10/text-size/observations.json",
+          "sha256": "462bb6fec24c29c90b794437b6171367a868989d5e14cd0eecb5d0604fc7a52d"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T06:50:14.318Z",
+  "capture": {
+    "file": "run-8c88f073-8bcc-4230-b9f5-8d40c6df0a3f/capture-manifest.json",
+    "sha256": "38590c34d15014532bfbe8e81d68c07c45dc3ee76e9f585d76d39ffb7be57eaf"
+  }
+}
