@@ -322,7 +322,7 @@ export function ProjectScriptEditorDialog({
                           <Button
                             type="button"
                             variant="outline"
-                            className="size-9 shrink-0 hover:bg-popover active:bg-popover data-pressed:bg-popover data-pressed:shadow-xs/5 data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] dark:border-transparent dark:bg-white/[0.035] dark:data-pressed:before:shadow-none"
+                            className="size-9 shrink-0 border-foreground/60! hover:bg-popover active:bg-popover data-pressed:bg-popover data-pressed:shadow-xs/5 data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] dark:bg-white/[0.035] dark:data-pressed:before:shadow-none"
                             aria-label="Choose icon"
                             data-icon-control=""
                             ref={iconTriggerRef}
@@ -340,10 +340,10 @@ export function ProjectScriptEditorDialog({
                                 key={entry.id}
                                 type="button"
                                 aria-pressed={isSelected}
-                                className={`relative flex min-h-9 flex-col items-center gap-2 rounded-md border px-3 py-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 dark:border-transparent ${
+                                className={`relative flex min-h-9 flex-col items-center gap-2 rounded-md border border-foreground/60 px-3 py-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 ${
                                   isSelected
-                                    ? "border-transparent bg-primary/10"
-                                    : "border-border/70 hover:bg-accent/60 dark:bg-white/[0.035]"
+                                    ? "bg-primary/10"
+                                    : "hover:bg-accent/60 dark:bg-white/[0.035]"
                                 }`}
                                 onClick={() => {
                                   setIcon(entry.id);
@@ -399,6 +399,7 @@ export function ProjectScriptEditorDialog({
                   </p>
                   <Textarea
                     id="script-command"
+                    className="border-foreground/60! has-aria-invalid:border-destructive-foreground! has-focus-visible:ring-ring! has-focus-visible:has-aria-invalid:ring-destructive-foreground!"
                     placeholder="bun test"
                     value={command}
                     ref={commandRef}
@@ -470,7 +471,7 @@ export function ProjectScriptEditorDialog({
               <Button
                 type="button"
                 variant="destructive-outline"
-                className="mr-auto min-h-8 px-3 active:scale-100!"
+                className="mr-auto min-h-8 border-destructive-foreground! px-3 active:scale-100!"
                 disabled={isSaving}
                 onClick={() => setDeleteConfirmOpen(true)}
               >
@@ -480,7 +481,7 @@ export function ProjectScriptEditorDialog({
             <Button
               type="button"
               variant="outline"
-              className="min-h-8 px-3 active:scale-100!"
+              className="min-h-8 border-foreground/60! px-3 active:scale-100!"
               onClick={close}
             >
               Cancel
