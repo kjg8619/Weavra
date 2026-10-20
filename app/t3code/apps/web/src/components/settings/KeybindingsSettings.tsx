@@ -44,7 +44,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Kbd, KbdGroup } from "../ui/kbd";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
-import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Toggle } from "../ui/toggle";
 import { toastManager } from "../ui/toast";
@@ -882,6 +882,8 @@ function KeybindingKeyControl({
       {isDirty ? (
         <Button
           size="sm"
+          variant="outline"
+          className="min-h-9 border-foreground/70 px-3 text-foreground disabled:opacity-100"
           disabled={isSaving || keyDraft.trim().length === 0 || !isWhenDraftValid}
           onClick={save}
         >
@@ -936,8 +938,8 @@ function WhenClauseControl({
   onValidityChange: (valid: boolean) => void;
 }) {
   return (
-    <Popover modal="trap-focus">
-      <PopoverTrigger
+    <Dialog>
+      <DialogTrigger
         render={
           <Button
             variant="outline"
@@ -949,14 +951,16 @@ function WhenClauseControl({
       >
         <span>고급 조건</span>
         <ChevronDownIcon className="size-3.5 shrink-0" />
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        sideOffset={6}
-        className="max-w-[calc(100vw-2rem)]"
-        viewportClassName="overflow-y-auto"
-        aria-label="고급 조건"
+      </DialogTrigger>
+      <DialogContent
+        showCloseButton={false}
+        bottomStickOnMobile={false}
+        className="row-start-1 max-h-[calc(100dvh-2rem)] max-w-3xl overflow-y-auto p-4"
+        viewportClassName="grid-rows-1 items-center"
       >
+        <DialogTitle className="mb-3 break-keep text-pretty text-sm font-medium">
+          고급 조건
+        </DialogTitle>
         <p className="mb-3 break-keep text-pretty text-sm font-normal text-foreground">
           {whenAstToKoreanExplanation(value)}. 조건을 바꾸려면 원문을 편집한 뒤 저장하세요.
         </p>
@@ -970,7 +974,7 @@ function WhenClauseControl({
           onChange={onChange}
           onValidityChange={onValidityChange}
         />
-        <PopoverClose
+        <DialogClose
           render={
             <Button
               variant="outline"
@@ -979,9 +983,9 @@ function WhenClauseControl({
           }
         >
           닫기
-        </PopoverClose>
-      </PopoverContent>
-    </Popover>
+        </DialogClose>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1008,7 +1012,8 @@ function KeybindingRowMenu({
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="text-muted-foreground hover:text-foreground"
+            data-icon-control=""
+            className="border-foreground/70 text-foreground hover:text-foreground"
             disabled={isSaving}
             aria-label={`Actions for ${commandLabel(row.command)}`}
           />
