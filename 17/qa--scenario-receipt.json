@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "selection": "17",
+  "revision": "621cf6d77608171a21260c8a810f76bc99af06c8",
+  "asarSha256": "03e50bae86b90a75e9965e29f082ae35d19ecc38e2801cfab47b74bf67e9b1bf",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "2f625cde8930cc2ee4b08343fe9ca1ce8fee70553d4162575bb772b6795d3b69",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "68c839b49a3e5b951ea4b6c432d43044c683d9f03bc1be7206817bb0c6101bcf"
+  },
+  "startedAt": "2026-10-20T19:04:21.065Z",
+  "checks": [
+    {
+      "caseId": "17",
+      "checkId": "empty-archive-route",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "archive has direct next action",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "returns to conversation list",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-c06a4889-607c-4c8f-8998-a097e3651953/scenarios/17/empty-archive-route/result.png",
+          "sha256": "8401043c2f4543ccac1da4af11ca5744c5bde20f437abb6e4208b6c83e1ba266"
+        },
+        {
+          "file": "run-c06a4889-607c-4c8f-8998-a097e3651953/scenarios/17/empty-archive-route/result.ax.json",
+          "sha256": "253093aa842ca6f27823c532bfd669133b69cd661682ad7571f33bae62d6215f"
+        },
+        {
+          "file": "run-c06a4889-607c-4c8f-8998-a097e3651953/scenarios/17/empty-archive-route/observations.json",
+          "sha256": "fe7b01d19e1e366f85e28a581a5f6454c15d2642c59242d5a25e35f9fa6e7f50"
+        }
+      ]
+    },
+    {
+      "caseId": "17",
+      "checkId": "return-to-conversation",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "return preserves selected conversation",
+          "actual": "#/e150e44a-f922-4871-8834-692a8f108351/baseline-code",
+          "expected": "#/e150e44a-f922-4871-8834-692a8f108351/baseline-code"
+        },
+        {
+          "label": "return preserves unsent draft",
+          "actual": "HIG archive return draft",
+          "expected": "HIG archive return draft"
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-c06a4889-607c-4c8f-8998-a097e3651953/scenarios/17/return-to-conversation/result.png",
+          "sha256": "f5f2cee72ecbe45271742d9eeda4e350c3f3cf8b41fdba0151dacf25bda03fbd"
+        },
+        {
+          "file": "run-c06a4889-607c-4c8f-8998-a097e3651953/scenarios/17/return-to-conversation/result.ax.json",
+          "sha256": "a87852d0d11c085e9247968dd031312c2551cfab5f74a9725b30e8bc619f4884"
+        },
+        {
+          "file": "run-c06a4889-607c-4c8f-8998-a097e3651953/scenarios/17/return-to-conversation/observations.json",
+          "sha256": "ad410d3abaf97ab5588cd5afa9a9185145e96f31a42b5798cadc1010135675d8"
+        }
+      ]
+    },
+    {
+      "caseId": "17",
+      "checkId": "archive-restore",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "archive contains correct fixture",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "restored conversation retains content",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "other fixture remains present",
+          "actual": 1,
+          "expected": 1
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-c06a4889-607c-4c8f-8998-a097e3651953/scenarios/17/archive-restore/result.png",
+          "sha256": "f14c86248b2f3eb6d872f8aa170d83d2966cdc966f1e70d50bb4b64ff89055c4"
+        },
+        {
+          "file": "run-c06a4889-607c-4c8f-8998-a097e3651953/scenarios/17/archive-restore/result.ax.json",
+          "sha256": "bcf5ed4c745467570cbc9372327c5ba724d6b853d8d2667678f937258e56300e"
+        },
+        {
+          "file": "run-c06a4889-607c-4c8f-8998-a097e3651953/scenarios/17/archive-restore/observations.json",
+          "sha256": "2522627914e9a484203ff5bf769cb4350abb8fea12e7502e0f0284ed90a2a2e2"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T19:05:18.540Z",
+  "capture": {
+    "file": "run-c06a4889-607c-4c8f-8998-a097e3651953/capture-manifest.json",
+    "sha256": "a8de9d285766828e23aeab98e302272199b0f8aca77d01817104dc715e29e663"
+  }
+}
