@@ -15,7 +15,7 @@ import {
   type ThreadPullRequestBadge,
 } from "@t3tools/shared/threadPullRequests";
 import { FolderGit2Icon, TerminalIcon } from "lucide-react";
-import { useMemo, type MouseEvent } from "react";
+import { useMemo, type MouseEvent, type ReactNode } from "react";
 import { buttonVariants, InlineButton } from "./ui/button";
 import { cn } from "../lib/utils";
 import { useEnvironment, usePrimaryEnvironmentId } from "../state/environments";
@@ -463,9 +463,15 @@ export function ThreadStatusLabel({
   );
 }
 
-/** Joins the last two words with a no-break space so a wrapped line never ends in a lone short word. */
-function keepTailTogether(text: string): string {
-  return text.replace(/ (\S{1,2})$/, "\u00a0$1");
+/** Keeps the last two words on one line so a wrapped line never ends in a lone short word. */
+function keepTailTogether(text: string): ReactNode {
+  const match = /^(.*\S) (\S+ \S{1,2})$/.exec(text);
+  if (!match) return text;
+  return (
+    <>
+      {match[1]} <span className="whitespace-nowrap">{match[2]}</span>
+    </>
+  );
 }
 
 export function ThreadStatusDetails({ status }: { status: ThreadStatusPill }) {
