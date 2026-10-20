@@ -17,6 +17,7 @@ import {
   recordScenarioArtifact,
   createRpcLedger,
   countInActiveDialog,
+  savedActionIsVisible,
   COMMAND_DIALOG_POPUP,
   switchCheckedState,
   SIDEBAR_VARIANT_MARKERS,
@@ -370,6 +371,45 @@ describe("dialog-scoped folder count", () => {
   test("a missing or duplicated dialog row is still observable", async () => {
     expect(await countInActiveDialog(page(0), "baseline-project")).toBe(0);
     expect(await countInActiveDialog(page(2), "baseline-project")).toBe(2);
+  });
+});
+
+describe("saved action visibility", () => {
+  const page = (controls: readonly { role: string; name: string; visible: boolean }[]) => ({
+    getByRole: (role: string, options: { name: string; exact: boolean }) => ({
+      isVisible: async () =>
+        controls.some(
+          (control) =>
+            control.role === role &&
+            (options.exact ? control.name === options.name : control.name.includes(options.name)) &&
+            control.visible,
+        ),
+    }),
+  });
+  test("finds the persisted action through its baseline Run accessible name", async () => {
+    expect(
+      await savedActionIsVisible(
+        page([{ role: "button", name: "Run HIG saved action", visible: true }]),
+      ),
+    ).toBe(true);
+  });
+  test("rejects a different action, menu item or bare-name control", async () => {
+    expect(
+      await savedActionIsVisible(
+        page([
+          { role: "button", name: "Run HIG saved action extra", visible: true },
+          { role: "menuitem", name: "Run HIG saved action", visible: true },
+          { role: "button", name: "HIG saved action", visible: true },
+        ]),
+      ),
+    ).toBe(false);
+  });
+  test("does not count an invisible saved action", async () => {
+    expect(
+      await savedActionIsVisible(
+        page([{ role: "button", name: "Run HIG saved action", visible: false }]),
+      ),
+    ).toBe(false);
   });
 });
 
