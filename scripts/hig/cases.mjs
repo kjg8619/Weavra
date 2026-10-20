@@ -561,6 +561,10 @@ export function countInActiveDialog(page, text) {
     .count();
 }
 
+export function savedActionIsVisible(page) {
+  return page.getByRole("button", { name: "Run HIG saved action", exact: true }).isVisible();
+}
+
 export function deliverScenarioEvent(sockets, method, value) {
   let delivered = 0;
   for (const entry of sockets) {
@@ -3970,7 +3974,7 @@ export async function runScenarios(context) {
       await page.locator('[data-slot="dialog-popup"]').waitFor({ state: "hidden" });
       assert(
         "saved action visible",
-        await page.getByRole("button", { name: "HIG saved action", exact: true }).isVisible(),
+        await savedActionIsVisible(page),
         true,
       );
       assert("save does not dispatch model", packet.counters.model, 0);
