@@ -95,6 +95,7 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -217,7 +218,7 @@ import { pullRequestPanelContext } from "./pullRequest/pullRequestDetail.logic";
 import { PullRequestDetailPanel } from "./pullRequest/PullRequestDetailPanel";
 import { PullRequestDetailGhost } from "./pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavailableState";
-import { RightPanelTabs } from "./RightPanelTabs";
+import { RightPanelTabs, resolveDockDestinationReasons } from "./RightPanelTabs";
 import { AgentsPanel } from "./AgentsPanel";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { ThreadPullRequestsPanel } from "./pullRequest/ThreadPullRequestsPanel";
@@ -374,6 +375,7 @@ import { useWeavraTask } from "./chat/useWeavraTask";
 import { weavraLabel } from "./weavraLabels";
 import { createPageScrollController, type PageScrollKey } from "./chat/pageScrollController";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
+import { runtimeModeConfig } from "./chat/runtimeModeConfig";
 import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
@@ -490,6 +492,11 @@ import {
   shouldWriteThreadErrorToCurrentServerThread,
   startNewThreadForProject,
   codexArtifactTemplatePromptToAppend,
+  applyFirstRequestSuggestion,
+  buildFirstRequestSuggestions,
+  resolveFreshDraftRuntimeMode,
+  type FirstRequestSuggestion,
+  type SuggestionInsertMode,
   toolGroupConsumesUpwardNavigation,
   waitForStartedServerThread,
   shouldRefocusComposerOnWindowFocus,
@@ -554,6 +561,100 @@ const EMPTY_PROVIDERS: ServerProvider[] = [];
 const EMPTY_USAGE_LIMIT_SOURCES: UsageLimitSourceSnapshots = [];
 const EMPTY_PROVIDER_SKILLS: ServerProvider["skills"] = [];
 const EMPTY_PENDING_USER_INPUT_ANSWERS: Record<string, PendingUserInputDraftAnswer> = {};
+
+/**
+ * Read-only first requests for an empty conversation, plus the scope of the
+ * current execution mode. Choosing one only fills the draft; it never sends.
+ * Unsent text asks for an explicit append or replace first.
+ */
+const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
+  suggestions: ReadonlyArray<FirstRequestSuggestion>;
+  hasDraftText: boolean;
+  projectName: string | null;
+  runtimeMode: RuntimeMode;
+  onChoose: (suggestion: FirstRequestSuggestion, mode: SuggestionInsertMode) => void;
+}) {
+  const idPrefix = useId();
+  const [pending, setPending] = useState<FirstRequestSuggestion | null>(null);
+  const mode = runtimeModeConfig[props.runtimeMode];
+  const scope = props.projectName ? `${props.projectName}에서 ` : "";
+  if (props.suggestions.length === 0) return null;
+  return (
+    <section aria-label="첫 요청 제안" className="pointer-events-auto mx-auto w-full max-w-3xl">
+      <ul className="grid gap-2 sm:auto-cols-fr sm:grid-flow-col">
+        {props.suggestions.map((suggestion) => {
+          const reasonId = `${idPrefix}-${suggestion.id}`;
+          return (
+            <li key={suggestion.id} className="min-w-0">
+              <button
+                type="button"
+                data-suggestion={suggestion.id}
+                aria-describedby={reasonId}
+                aria-expanded={props.hasDraftText ? pending?.id === suggestion.id : undefined}
+                className="group flex min-h-11 w-full flex-col items-start gap-0.5 rounded-lg border border-border bg-background/80 px-3 py-2 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => {
+                  if (props.hasDraftText) setPending(suggestion);
+                  else props.onChoose(suggestion, "insert");
+                }}
+              >
+                <span className="font-medium text-foreground">{suggestion.label}</span>
+                <span
+                  id={reasonId}
+                  className="font-normal text-muted-foreground text-sm leading-5 group-hover:text-accent-foreground"
+                >
+                  {suggestion.reason}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {pending && props.hasDraftText ? (
+        <div
+          role="group"
+          aria-label="작성 중인 내용 처리"
+          className="mt-2 flex flex-wrap items-center gap-2 text-sm"
+        >
+          <span className="text-muted-foreground">작성 중인 내용이 있어요.</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 px-3 sm:h-8"
+            onClick={() => {
+              props.onChoose(pending, "append");
+              setPending(null);
+            }}
+          >
+            뒤에 이어 쓰기
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 px-3 sm:h-8"
+            onClick={() => {
+              props.onChoose(pending, "replace");
+              setPending(null);
+            }}
+          >
+            제안으로 바꾸기
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 px-3 sm:h-8"
+            onClick={() => setPending(null)}
+          >
+            취소
+          </Button>
+        </div>
+      ) : null}
+      <p className="mt-2 font-normal text-muted-foreground text-sm leading-5">
+        제안은 작성기에만 넣고 보내지 않아요. 실행 모드 {mode.label}: {scope}
+        {mode.description}
+      </p>
+    </section>
+  );
+});
 function useDraftHeroLayoutTransition(isDraftHeroState: boolean) {
   const transitionGroupRef = useRef<HTMLDivElement | null>(null);
   const composerAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -1951,8 +2052,11 @@ export default function ChatView(props: ChatViewProps) {
   // session.lastError. Bump a tick so the banner hides immediately. Mirrors
   // the branch mismatch banner.
   const [, setThreadErrorBannerDismissTick] = useState(0);
-  const defaultRuntimeMode = resolveProjectSettings(settings, activeThread?.projectId ?? null)
-    .settings.defaultRuntimeMode;
+  const threadProjectSettings = resolveProjectSettings(settings, activeThread?.projectId ?? null);
+  const defaultRuntimeMode = resolveFreshDraftRuntimeMode({
+    configured: threadProjectSettings.settings.defaultRuntimeMode,
+    source: threadProjectSettings.sources.defaultRuntimeMode,
+  });
   // Implicit drafts follow their current project/environment, including retargets.
   // Explicit composer choices and existing server threads retain their permissions.
   const runtimeMode = composerRuntimeMode ?? activeServerThread?.runtimeMode ?? defaultRuntimeMode;
@@ -2559,8 +2663,13 @@ export default function ChatView(props: ChatViewProps) {
       setLogicalProjectDraftThreadId(logicalProjectKey, activeProjectRef, nextDraftId, {
         threadId: nextThreadId,
         createdAt: new Date().toISOString(),
-        runtimeMode: resolveProjectSettings(settings, activeProject.id, activeProject).settings
-          .defaultRuntimeMode,
+        runtimeMode: (() => {
+          const projectSettings = resolveProjectSettings(settings, activeProject.id, activeProject);
+          return resolveFreshDraftRuntimeMode({
+            configured: projectSettings.settings.defaultRuntimeMode,
+            source: projectSettings.sources.defaultRuntimeMode,
+          });
+        })(),
         interactionMode: DEFAULT_INTERACTION_MODE,
         ...input,
       });
@@ -3806,7 +3915,6 @@ export default function ChatView(props: ChatViewProps) {
   )
     ? activeProviderStatus
     : null;
-  const hasTimelineTopBanner = Boolean(visibleThreadError) || visibleProviderStatus !== null;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const activeThreadWorktreePath = activeThread?.worktreePath ?? null;
   const activeWorkspaceRoot = activeThreadWorktreePath ?? activeProjectCwd ?? undefined;
@@ -3841,6 +3949,27 @@ export default function ChatView(props: ChatViewProps) {
     }
   }, [environmentId, gitStatusCwd, liveIsGitRepo]);
   const isGitRepo = liveIsGitRepo ?? recallCheckoutIsRepo(environmentId, gitStatusCwd) ?? true;
+  // Suggestions speak only from observation, so the "assume a repository" fallback is not used.
+  const firstRequestSuggestions = useMemo(
+    () =>
+      buildFirstRequestSuggestions({
+        isGitRepository: liveIsGitRepo ?? recallCheckoutIsRepo(environmentId, gitStatusCwd),
+      }),
+    [environmentId, gitStatusCwd, liveIsGitRepo],
+  );
+  const composerHasDraftText = useComposerDraftStore(
+    (store) => (store.getComposerDraft(composerDraftTarget)?.prompt ?? "").trim().length > 0,
+  );
+  const chooseFirstRequestSuggestion = useCallback(
+    (suggestion: FirstRequestSuggestion, mode: SuggestionInsertMode) => {
+      const nextPrompt = applyFirstRequestSuggestion(promptRef.current, suggestion.prompt, mode);
+      setComposerDraftPrompt(composerDraftTarget, nextPrompt);
+      promptRef.current = nextPrompt;
+      composerRef.current?.resetCursorState({ prompt: nextPrompt, cursor: nextPrompt.length });
+      composerRef.current?.focusAtEnd();
+    },
+    [composerDraftTarget, composerRef, setComposerDraftPrompt],
+  );
   // Keep a hidden, off-flow strip mounted for existing threads so the composer
   // can measure whether its relocated controls fit. The visible chrome remains
   // content-driven: Git/environment context or controls that actually fit.
@@ -6129,6 +6258,18 @@ export default function ChatView(props: ChatViewProps) {
     useRightPanelStore.getState().openPullRequest(activeThreadRef, linkedThreadPullRequest);
   }, [activeThreadRef, linkedThreadPullRequest, supportsPullRequests]);
   const pullRequestSurfaceAvailable = supportsPullRequests && linkedThreadPullRequest !== null;
+  // The same facts that decide each Git/PR destination's availability name its missing prerequisite.
+  const dockDestinationReasons = resolveDockDestinationReasons({
+    isServerThread,
+    isGitRepository: isGitRepo
+      ? (liveIsGitRepo ?? recallCheckoutIsRepo(environmentId, gitStatusCwd))
+      : false,
+    hasUpstream: gitStatusQuery.data?.hasUpstream,
+    supportsPullRequests,
+    hasBranchPullRequest: linkedThreadPullRequest !== null,
+    supportsThreadPullRequests,
+    linkedPullRequestCount: visiblePullRequestCount,
+  });
   const supportsSettlement = serverConfig?.environment.capabilities.threadSettlement === true;
   const supportsSnooze = serverConfig?.environment.capabilities.threadSnooze === true;
   const supportsPinning = serverConfig?.environment.capabilities.threadPinning === true;
@@ -10292,8 +10433,9 @@ export default function ChatView(props: ChatViewProps) {
                 </div>
               </div>
             ) : null}
-            {/* Banners overlay the timeline without changing its content height. */}
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-(--layer-sticky) flex flex-col">
+            {/* Provider status and turn errors sit in document flow above the timeline, so they
+                never cover messages, the composer or a modal. Each cause keeps its own recovery. */}
+            <div className="flex shrink-0 flex-col empty:hidden" data-chat-feedback-region="true">
               <ProviderStatusBanner
                 status={visibleProviderStatus}
                 onDismiss={() => setDismissedProviderStatusBannerKey(providerStatusBannerKey)}
@@ -10394,7 +10536,7 @@ export default function ChatView(props: ChatViewProps) {
                 onManualNavigation={cancelTimelineLiveFollowForUserNavigation}
                 cancelPositionRestoreRef={cancelPositionRestoreRef}
                 hideEmptyPlaceholder={isDraftHeroState || threadDetailLoading}
-                topFadeEnabled={!hasTimelineTopBanner}
+                topFadeEnabled
                 loadEarlier={paintOnlyDisplayedTimeline ? null : loadEarlierTurns}
                 queuedMessages={paintOnlyDisplayedTimeline ? EMPTY_QUEUED_MESSAGES : queuedMessages}
                 onSteerQueuedMessage={onSteerQueuedMessage}
@@ -10472,7 +10614,32 @@ export default function ChatView(props: ChatViewProps) {
                           activeProjectRef={activeProjectRef}
                           activeProjectTitle={activeProject?.title ?? null}
                         />
+                        {activeProject ? (
+                          <div className="mt-6">
+                            <FirstRequestSuggestions
+                              suggestions={firstRequestSuggestions}
+                              hasDraftText={composerHasDraftText}
+                              projectName={activeProject.title}
+                              runtimeMode={runtimeMode}
+                              onChoose={chooseFirstRequestSuggestion}
+                            />
+                          </div>
+                        ) : null}
                       </div>
+                    </div>
+                  ) : isServerThread &&
+                    activeProject &&
+                    timelineEntries.length === 0 &&
+                    threadSyncPhase === null &&
+                    !isWorking ? (
+                    <div className="absolute inset-x-0 bottom-full z-(--layer-content) pb-4">
+                      <FirstRequestSuggestions
+                        suggestions={firstRequestSuggestions}
+                        hasDraftText={composerHasDraftText}
+                        projectName={activeProject.title}
+                        runtimeMode={runtimeMode}
+                        onChoose={chooseFirstRequestSuggestion}
+                      />
                     </div>
                   ) : null}
                   <div
@@ -10848,6 +11015,7 @@ export default function ChatView(props: ChatViewProps) {
           filesAvailable={activeProject !== null}
           pullRequestAvailable={pullRequestSurfaceAvailable}
           pullRequestsAvailable={pullRequestsSurfaceAvailable}
+          destinationReasons={dockDestinationReasons}
           agentsAvailable
           deviceAvailable={activeThreadRef !== null}
           liveAgentCount={agentPanelModel.liveCount}
@@ -10911,6 +11079,7 @@ export default function ChatView(props: ChatViewProps) {
             filesAvailable={activeProject !== null}
             pullRequestAvailable={pullRequestSurfaceAvailable}
             pullRequestsAvailable={pullRequestsSurfaceAvailable}
+            destinationReasons={dockDestinationReasons}
             agentsAvailable
             deviceAvailable={activeThreadRef !== null}
             liveAgentCount={agentPanelModel.liveCount}

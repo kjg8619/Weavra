@@ -5,6 +5,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   RightPanelTabs,
+  resolveDockDestinationReasons,
   resolvePullRequestTabLink,
   shouldOpenDefaultBrowserProfileFromMenuClick,
   surfaceShortcutActionForKey,
@@ -326,5 +327,71 @@ describe("pull request tab snapshots", () => {
         link,
       ),
     ).toBe(newer);
+  });
+});
+
+describe("dock destination reasons", () => {
+  const base = {
+    isServerThread: true,
+    isGitRepository: true,
+    hasUpstream: true,
+    supportsPullRequests: true,
+    hasBranchPullRequest: false,
+    supportsThreadPullRequests: true,
+    linkedPullRequestCount: 0,
+  } as const;
+
+  it("names a non-Git folder as the reason for every Git destination", () => {
+    const reasons = resolveDockDestinationReasons({ ...base, isGitRepository: false });
+    expect(reasons.diff).toContain("Git 저장소가 아니에요");
+    expect(reasons.pullRequest).toContain("Git 저장소가 아니라서");
+  });
+
+  it("names the missing remote when a Git branch has no upstream and no PR", () => {
+    const reasons = resolveDockDestinationReasons({ ...base, hasUpstream: false });
+    expect(reasons.diff).toBeUndefined();
+    expect(reasons.pullRequest).toContain("원격에 올라가 있지 않아요");
+  });
+
+  it("with a remote but no PR, only the PR destinations explain themselves", () => {
+    const reasons = resolveDockDestinationReasons(base);
+    expect(reasons.diff).toBeUndefined();
+    expect(reasons.pullRequest).toBe("이 branch에는 아직 PR이 없어요.");
+    expect(reasons.pullRequests).toBe("이 대화에 연결된 PR이 없어요.");
+  });
+
+  it("satisfying a prerequisite removes only its destination's reason", () => {
+    const branchPr = resolveDockDestinationReasons({ ...base, hasBranchPullRequest: true });
+    expect(branchPr.pullRequest).toBeUndefined();
+    expect(branchPr.pullRequests).toBeDefined();
+    const linked = resolveDockDestinationReasons({ ...base, linkedPullRequestCount: 1 });
+    expect(linked.pullRequests).toBeUndefined();
+    expect(linked.pullRequest).toBeDefined();
+  });
+
+  it("does not report an unknown Git state as missing", () => {
+    const reasons = resolveDockDestinationReasons({
+      ...base,
+      isGitRepository: undefined,
+      hasUpstream: undefined,
+    });
+    expect(reasons.diff).toBeUndefined();
+    expect(reasons.pullRequest).toBe("이 branch에는 아직 PR이 없어요.");
+  });
+
+  it("explains a draft before it becomes a server thread", () => {
+    const reasons = resolveDockDestinationReasons({ ...base, isServerThread: false });
+    expect(reasons.diff).toContain("대화를 시작하면");
+    expect(reasons.pullRequests).toContain("대화를 시작하면");
+  });
+
+  it("explains an environment without PR support", () => {
+    const reasons = resolveDockDestinationReasons({
+      ...base,
+      supportsPullRequests: false,
+      supportsThreadPullRequests: false,
+    });
+    expect(reasons.pullRequest).toContain("지원하지 않아요");
+    expect(reasons.pullRequests).toContain("연결하지 않아요");
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
+import { EventEmitter } from "node:events";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -9,6 +10,17 @@ import {
   chooseAlias,
   CASES,
   deliverScenarioEvent,
+  readCompletedCopy,
+  resolveShellBaseline,
+  awaitFocusLoss,
+  takeWindowFocus,
+  recordScenarioArtifact,
+  createRpcLedger,
+  countInActiveDialog,
+  COMMAND_DIALOG_POPUP,
+  switchCheckedState,
+  SIDEBAR_VARIANT_MARKERS,
+  TOAST_SELECTOR,
   iconTargetMeetsMinimum,
   assertIconTargetHits,
 } from "./cases.mjs";
@@ -90,6 +102,306 @@ describe("capture network notice isolation", () => {
     } finally {
       await NodeFSP.rm(base, { recursive: true });
     }
+  });
+});
+
+describe("diagnostic copy synchronization", () => {
+  const path = "/tmp/hig/workspace/" + "x".repeat(200);
+  test("a write that completes after the click is read only once it lands", async () => {
+    let clipboard = "";
+    let complete!: () => void;
+    const written = new Promise<void>((resolve) => (complete = resolve));
+    const reading = readCompletedCopy(written, async () => clipboard, 1_000);
+    await Promise.resolve();
+    clipboard = `연결 주소: ws://x\n작업 공간 전체 경로: ${path}`;
+    complete();
+    expect((await reading).values).toContain(path);
+  });
+  test("a truncated or wrong write does not contain the exact path", async () => {
+    const copied = await readCompletedCopy(
+      Promise.resolve(),
+      async () => `작업 공간 전체 경로: ${path.slice(0, -1)}\n기타: ${path}/extra`,
+      1_000,
+    );
+    expect(copied.values).not.toContain(path);
+  });
+  test("a write that never completes fails instead of reading stale state", async () => {
+    let read = false;
+    await expect(
+      readCompletedCopy(
+        new Promise<void>(() => {}),
+        async () => {
+          read = true;
+          return path;
+        },
+        1,
+      ),
+    ).rejects.toThrow("Timeout: diagnostic clipboard write completion");
+    expect(read).toBe(false);
+  });
+  test("a rejected write fails", async () => {
+    await expect(
+      readCompletedCopy(Promise.reject(new Error("denied")), async () => path, 1_000),
+    ).rejects.toThrow("denied");
+  });
+});
+
+describe("resumed shell baseline", () => {
+  const thread = (id: string, state: string) => ({ id, latestTurn: { state } });
+  const http = { snapshotSequence: 40, threads: [thread("baseline-working", "running")] };
+  test("a resumed client uses the HTTP snapshot once the stream confirms synchronized", () => {
+    const baseline = resolveShellBaseline({ httpSnapshot: http, synchronized: true });
+    expect(baseline.snapshotSequence).toBe(40);
+    expect(baseline.threads[0].id).toBe("baseline-working");
+  });
+  test("later stream events are applied in sequence and older ones ignored", () => {
+    const baseline = resolveShellBaseline({
+      httpSnapshot: http,
+      synchronized: true,
+      events: [
+        { kind: "thread-upserted", sequence: 39, thread: thread("baseline-working", "stale") },
+        { kind: "thread-upserted", sequence: 41, thread: thread("baseline-working", "error") },
+      ],
+    });
+    expect(baseline.snapshotSequence).toBe(41);
+    expect(baseline.threads[0].latestTurn.state).toBe("error");
+    expect(http.threads[0].latestTurn.state).toBe("running");
+  });
+  test("a stream snapshot is used as-is", () => {
+    expect(resolveShellBaseline({ streamSnapshot: http, synchronized: false }).threads).toHaveLength(1);
+  });
+  test("an HTTP snapshot the stream never confirmed is not a settled baseline", () => {
+    expect(() => resolveShellBaseline({ httpSnapshot: http, synchronized: false })).toThrow(
+      "Missing shell snapshot",
+    );
+  });
+  test("synchronized without any snapshot still fails", () => {
+    expect(() => resolveShellBaseline({ httpSnapshot: null, synchronized: true })).toThrow(
+      "Missing shell snapshot",
+    );
+    expect(() =>
+      resolveShellBaseline({ httpSnapshot: { threads: [] }, synchronized: true }),
+    ).toThrow("Missing shell snapshot");
+  });
+});
+
+describe("renderer focus loss", () => {
+  test("a blur that arrives later passes once focus is really gone", async () => {
+    let blur!: () => void;
+    const blurred = new Promise<void>((resolve) => (blur = resolve));
+    const waiting = awaitFocusLoss(blurred, async () => false, 1_000);
+    await Promise.resolve();
+    blur();
+    await expect(waiting).resolves.toBeUndefined();
+  });
+  test("a window that never blurs times out", async () => {
+    await expect(awaitFocusLoss(new Promise(() => {}), async () => false, 1)).rejects.toThrow(
+      "Timeout: renderer window blur",
+    );
+  });
+  test("a blur event while the document still has focus fails", async () => {
+    await expect(awaitFocusLoss(Promise.resolve(), async () => true, 1_000)).rejects.toThrow(
+      "still reports document focus",
+    );
+  });
+});
+
+describe("app window focus loss", () => {
+  // A stand-in for BrowserWindow: one key window per "app", and focusing another
+  // window of the app takes key status from the current one.
+  class FakeWindow extends EventEmitter {
+    static key: FakeWindow | null = null;
+    static created = 0;
+    constructor(
+      readonly options: { title?: string } = {},
+      readonly ignoresBlur = false,
+    ) {
+      super();
+      if (options.title) FakeWindow.created++;
+    }
+    isFocused() {
+      return FakeWindow.key === this;
+    }
+    blur() {
+      if (this.ignoresBlur || !this.isFocused()) return;
+      FakeWindow.key = null;
+      this.emit("blur");
+    }
+    focus() {
+      const previous = FakeWindow.key;
+      FakeWindow.key = this;
+      if (previous && previous !== this) previous.emit("blur");
+    }
+    webViewFocused = true;
+    blurWebView() {
+      this.webViewFocused = false;
+    }
+    async loadURL() {}
+    show() {}
+  }
+  const reset = () => {
+    FakeWindow.key = null;
+    FakeWindow.created = 0;
+    (globalThis as { __higFocusSink?: unknown }).__higFocusSink = undefined;
+  };
+
+  test("a focused window that accepts blur loses focus without a second window", async () => {
+    reset();
+    const main = new FakeWindow();
+    main.focus();
+    expect(await takeWindowFocus(main, 1_000)).toEqual({ before: true, sink: false, after: false });
+    expect(FakeWindow.created).toBe(0);
+    expect(main.webViewFocused).toBe(false);
+  });
+  test("a window still key after blur loses focus to a second window of the same app", async () => {
+    reset();
+    class StubbornWindow extends FakeWindow {
+      constructor(options: { title?: string } = {}) {
+        super(options, true);
+      }
+    }
+    const main = new StubbornWindow();
+    main.focus();
+    expect(await takeWindowFocus(main, 1_000)).toEqual({ before: true, sink: true, after: false });
+    expect(FakeWindow.created).toBe(1);
+    expect(main.webViewFocused).toBe(false);
+  });
+  test("a window that never became key, because another app is frontmost, still has its web view blurred", async () => {
+    reset();
+    const main = new FakeWindow();
+    expect(await takeWindowFocus(main, 1_000)).toEqual({ before: false, sink: false, after: false });
+    expect(FakeWindow.created).toBe(0);
+    expect(main.webViewFocused).toBe(false);
+  });
+  test("a window that keeps focus is reported, so the check fails instead of passing", async () => {
+    reset();
+    class KeyWindow extends FakeWindow {
+      constructor(options: { title?: string } = {}) {
+        super(options, true);
+      }
+      override focus() {
+        if (this.options.title) return; // the second window never becomes key
+        super.focus();
+      }
+    }
+    const main = new KeyWindow();
+    main.focus();
+    expect((await takeWindowFocus(main, 1)).after).toBe(true);
+  });
+});
+
+describe("scenario artifact names", () => {
+  test("a second capture under the same name in one check fails immediately", () => {
+    const artifacts: Array<{ file: string; sha256: string }> = [];
+    recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-current-840.png", "a");
+    expect(() =>
+      recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-current-840.png", "b"),
+    ).toThrow("Scenario artifact name collision");
+    expect(artifacts).toEqual([
+      { file: "scenarios/06/footer-wrap/footer-current-840.png", sha256: "a" },
+    ]);
+  });
+  test("variant-specific names coexist", () => {
+    const artifacts: Array<{ file: string; sha256: string }> = [];
+    recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-current-840.png", "a");
+    recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-legacy-840.png", "b");
+    expect(artifacts.length).toBe(2);
+  });
+});
+
+describe("provider readiness settling", () => {
+  const method = "server.discoverSourceControl";
+  test("waits for a response that lands after the dialog opens", async () => {
+    const ledger = createRpcLedger();
+    ledger.request("0:7", method);
+    const waiting = ledger.settled(method, 1_000);
+    await Promise.resolve();
+    ledger.exit("0:7");
+    await expect(waiting).resolves.toBeUndefined();
+  });
+  test("a request still in flight is not settled", async () => {
+    const ledger = createRpcLedger();
+    ledger.request("0:1", method);
+    ledger.exit("0:1");
+    ledger.request("0:2", method);
+    await expect(ledger.settled(method, 1)).rejects.toThrow(`Timeout: ${method} settled`);
+  });
+  test("no request at all is not settled", async () => {
+    const ledger = createRpcLedger();
+    ledger.request("0:3", "server.getConfig");
+    ledger.exit("0:3");
+    await expect(createRpcLedger().settled(method, 1)).rejects.toThrow("Timeout");
+    await expect(ledger.settled(method, 1)).rejects.toThrow("Timeout");
+  });
+  test("an interrupted request neither completes nor blocks forever", async () => {
+    const ledger = createRpcLedger();
+    ledger.request("0:4", method);
+    ledger.cancel("0:4");
+    await expect(ledger.settled(method, 1)).rejects.toThrow("Timeout");
+    ledger.request("0:5", method);
+    ledger.exit("0:5");
+    await expect(ledger.settled(method, 1_000)).resolves.toBeUndefined();
+  });
+});
+
+describe("dialog-scoped folder count", () => {
+  // Models the page: nine visible matches page-wide, `inDialog` of them inside the popup.
+  const page = (inDialog: number) => ({
+    locator: (selector: string) => ({
+      getByText: (text: string, options: { exact: boolean }) => ({
+        filter: (filter: { visible: boolean }) => ({
+          count: async () => {
+            expect([selector, text, options.exact, filter.visible]).toEqual([
+              COMMAND_DIALOG_POPUP,
+              "baseline-project",
+              true,
+              true,
+            ]);
+            return inDialog;
+          },
+        }),
+      }),
+    }),
+    getByText: () => ({ filter: () => ({ count: async () => 9 }) }),
+  });
+  test("counts only the active dialog's row", async () => {
+    expect(await countInActiveDialog(page(1), "baseline-project")).toBe(1);
+  });
+  test("a missing or duplicated dialog row is still observable", async () => {
+    expect(await countInActiveDialog(page(0), "baseline-project")).toBe(0);
+    expect(await countInActiveDialog(page(2), "baseline-project")).toBe(2);
+  });
+});
+
+describe("sidebar variant switch state", () => {
+  const state = (
+    ariaChecked: string | null,
+    dataChecked: string | null,
+    dataUnchecked: string | null,
+  ) => switchCheckedState({ ariaChecked, dataChecked, dataUnchecked });
+  test("reads the Base UI data-checked state the product switch actually exposes", () => {
+    expect(state(null, "", null)).toBe(true);
+    expect(state(null, null, "")).toBe(false);
+  });
+  test("aria-checked wins when present", () => {
+    expect(state("true", null, "")).toBe(true);
+    expect(state("false", "", null)).toBe(false);
+  });
+  test("missing or contradictory state is unknown, so the variant assertion still fails", () => {
+    expect(state(null, null, null)).toBeNull();
+    expect(state(null, "", "")).toBeNull();
+  });
+  test("each sidebar variant has its own render marker", () => {
+    expect(SIDEBAR_VARIANT_MARKERS.current).not.toContain("new-thread-button");
+    expect(SIDEBAR_VARIANT_MARKERS.legacy).not.toContain("sidebar-row");
+  });
+});
+
+describe("toast observation", () => {
+  test("targets rendered toasts rather than a slot the product never emits", () => {
+    expect(TOAST_SELECTOR).not.toContain("toast-root");
+    expect(TOAST_SELECTOR).toContain('[data-slot="toast-viewport"] > *');
+    expect(TOAST_SELECTOR).toContain('[data-slot="toast-popup"]');
   });
 });
 

@@ -34,6 +34,9 @@ import {
 import {
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
   agentControlledBrowserCloseConfirmation,
+  applyFirstRequestSuggestion,
+  buildFirstRequestSuggestions,
+  resolveFreshDraftRuntimeMode,
   branchMismatchKey,
   buildExpiredTerminalContextToastCopy,
   buildLoadingThreadFromShell,
@@ -584,6 +587,68 @@ const helloWorldTemplate: CodexArtifactTemplate = {
   skillDirectory: "/Users/test/.codex/skills/artifact-template-hello-world",
   skillName: "artifact-template-hello-world",
 };
+
+describe("fresh draft execution mode", () => {
+  it("starts an untouched profile in approval-required instead of the built-in full access", () => {
+    expect(resolveFreshDraftRuntimeMode({ configured: "full-access", source: "environment" })).toBe(
+      "approval-required",
+    );
+  });
+
+  it("keeps a saved environment choice other than the built-in default", () => {
+    expect(resolveFreshDraftRuntimeMode({ configured: "auto", source: "environment" })).toBe(
+      "auto",
+    );
+    expect(
+      resolveFreshDraftRuntimeMode({ configured: "approval-required", source: "environment" }),
+    ).toBe("approval-required");
+  });
+
+  it("keeps a project's saved full access", () => {
+    expect(resolveFreshDraftRuntimeMode({ configured: "full-access", source: "project" })).toBe(
+      "full-access",
+    );
+  });
+});
+
+describe("first request suggestions", () => {
+  it("offers one to three distinct read-only requests, each with a reason", () => {
+    for (const isGitRepository of [true, false, undefined]) {
+      const suggestions = buildFirstRequestSuggestions({ isGitRepository });
+      expect(suggestions.length).toBeGreaterThanOrEqual(1);
+      expect(suggestions.length).toBeLessThanOrEqual(3);
+      expect(new Set(suggestions.map((s) => s.id)).size).toBe(suggestions.length);
+      for (const suggestion of suggestions) {
+        expect(suggestion.label.trim()).not.toBe("");
+        expect(suggestion.reason.trim()).not.toBe("");
+      }
+    }
+  });
+
+  it("only offers the Git request when the checkout is observed to be a repository", () => {
+    const ids = (isGitRepository: boolean | undefined) =>
+      buildFirstRequestSuggestions({ isGitRepository }).map((s) => s.id);
+    expect(ids(true)).toContain("recent-changes");
+    expect(ids(false)).not.toContain("recent-changes");
+    expect(ids(undefined)).not.toContain("recent-changes");
+  });
+
+  it("fills an empty draft without asking", () => {
+    expect(applyFirstRequestSuggestion("  ", "Read the README.", "insert")).toBe(
+      "Read the README.",
+    );
+  });
+
+  it("never drops unsent text without an explicit choice", () => {
+    expect(() => applyFirstRequestSuggestion("my notes", "Read the README.", "insert")).toThrow();
+    expect(applyFirstRequestSuggestion("my notes\n", "Read the README.", "append")).toBe(
+      "my notes\n\nRead the README.",
+    );
+    expect(applyFirstRequestSuggestion("my notes", "Read the README.", "replace")).toBe(
+      "Read the README.",
+    );
+  });
+});
 
 describe("artifact template composer insertion", () => {
   it("does not insert an already-present prompt", () => {
