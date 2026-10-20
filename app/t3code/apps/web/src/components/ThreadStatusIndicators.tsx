@@ -447,19 +447,17 @@ export function ThreadStatusLabel({
         render={
           <span
             aria-label={accessibleLabel}
-            className={`inline-flex min-w-0 flex-col items-start text-sm leading-5 ${status.colorClass}`}
+            tabIndex={activity || observation ? 0 : undefined}
+            className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] ${status.colorClass}`}
           />
         }
       >
-        <span className="inline-flex items-center gap-1">
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${status.dotClass} ${
-              status.pulse ? "animate-status-pulse" : ""
-            }`}
-          />
-          <span className="hidden md:inline">{statusLabel}</span>
-        </span>
-        <ThreadStatusDetails status={status} />
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${status.dotClass} ${
+            status.pulse ? "animate-status-pulse" : ""
+          }`}
+        />
+        <span className="hidden md:inline">{statusLabel}</span>
       </TooltipTrigger>
       <TooltipPopup side="top">{accessibleLabel}</TooltipPopup>
     </Tooltip>
