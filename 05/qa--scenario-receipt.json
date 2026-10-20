@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "selection": "05",
+  "revision": "e79d143532639ecc9621c30f5612726970a0a067",
+  "asarSha256": "2e8d2018ccfd1980360e2519e72cb06fb545f185e7f673d6801f7652895dc64b",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "7b89667f47fd7f11a49fca9e245251836c761b2e2e58d0f5fb58eca64861844a",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T02:40:52.096Z",
+  "checks": [
+    {
+      "caseId": "05",
+      "checkId": "read-only-default",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "fresh unset draft requires approval",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/read-only-default/fresh-mode.png",
+          "sha256": "f773b53a02f6c615573fa22db0a11f93056384fef38888c35d1ada839fa44fb1"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/read-only-default/fresh-mode.ax.json",
+          "sha256": "b9f202eb4f90a4cf1f065f369c95490885f3a7171c74ec52f4b3f2f4a11bb274"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/read-only-default/result.png",
+          "sha256": "f773b53a02f6c615573fa22db0a11f93056384fef38888c35d1ada839fa44fb1"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/read-only-default/result.ax.json",
+          "sha256": "b9f202eb4f90a4cf1f065f369c95490885f3a7171c74ec52f4b3f2f4a11bb274"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/read-only-default/observations.json",
+          "sha256": "0b7a84dcaefe714a0530ad5f4d6c45bb260835a4fad370f06f2dae290fde52ea"
+        }
+      ]
+    },
+    {
+      "caseId": "05",
+      "checkId": "saved-mode-preserved",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "saved fixture mode survives restart",
+          "actual": "승인 필요",
+          "expected": "승인 필요"
+        },
+        {
+          "label": "seeded approval-required stays selected",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/saved-mode-preserved/result.png",
+          "sha256": "8ffcbfcaf978905e9dfaac137679e8b8201cf891d07cd3c61be4c09650b502cd"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/saved-mode-preserved/result.ax.json",
+          "sha256": "efed49c4f0c8a1a6488dfe8a59d7adeea81c7cb704f60234af2241d01978de1f"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/saved-mode-preserved/observations.json",
+          "sha256": "0b7a84dcaefe714a0530ad5f4d6c45bb260835a4fad370f06f2dae290fde52ea"
+        }
+      ]
+    },
+    {
+      "caseId": "05",
+      "checkId": "three-suggestions",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "one to three distinct suggested requests",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "suggestions explain factual purpose",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "one to three distinct suggested requests",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "suggestions explain factual purpose",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/three-suggestions/new-empty.png",
+          "sha256": "f773b53a02f6c615573fa22db0a11f93056384fef38888c35d1ada839fa44fb1"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/three-suggestions/new-empty.ax.json",
+          "sha256": "67dbb03f67cb618c8717b40c45828417485be19a11c3e3287d4bc51ebf43f841"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/three-suggestions/existing-empty.png",
+          "sha256": "a0baca7e65e054851d32dde8d581b3a5fa999121657b7e137a916e59834d1fab"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/three-suggestions/existing-empty.ax.json",
+          "sha256": "4613e1452e3b5ed366fc111ff869866a9dbcba981bc8c7c537a7f76bf590cb13"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/three-suggestions/result.png",
+          "sha256": "a0baca7e65e054851d32dde8d581b3a5fa999121657b7e137a916e59834d1fab"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/three-suggestions/result.ax.json",
+          "sha256": "4613e1452e3b5ed366fc111ff869866a9dbcba981bc8c7c537a7f76bf590cb13"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/three-suggestions/observations.json",
+          "sha256": "d63004b226d1f7211c8a5f0d86fa23cb74d80d7ae99097b2ac4a0ecf44bcab27"
+        }
+      ]
+    },
+    {
+      "caseId": "05",
+      "checkId": "no-send-on-suggestion",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "suggestion exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "suggestion inserted into draft",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/no-send-on-suggestion/result.png",
+          "sha256": "168e1c8d71b7bde56ecf9559ac84f08d0af3045058468618fb7beeb89c6c028c"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/no-send-on-suggestion/result.ax.json",
+          "sha256": "2efac03848b07d61bee7c752429104bdf27fb00d3fef6b4048b32dacc817e729"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/no-send-on-suggestion/observations.json",
+          "sha256": "fa677f428f5a3c30d21aedef49d903e99adfa5792a38cd4fab7f11d7983271d9"
+        }
+      ]
+    },
+    {
+      "caseId": "05",
+      "checkId": "selected-project",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "one checked current project",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "selected project matches workspace",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "focus does not activate project",
+          "actual": "BP\nbaseline-project",
+          "expected": "BP\nbaseline-project"
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/selected-project/result.png",
+          "sha256": "e00d7837fc98a283f1d041ae2ec83f0f3a3102a0203885c86860889243031556"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/selected-project/result.ax.json",
+          "sha256": "4fce8e40915481a7dc91870ec333f741c87b492b06db99272ff87f18e502215c"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/selected-project/observations.json",
+          "sha256": "a0a1da3e47ff06015cd2d5bfabc2b7dcc98a022c034965c37a1d2f6dcd275104"
+        }
+      ]
+    },
+    {
+      "caseId": "05",
+      "checkId": "explicit-escalation",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "focus does not grant full access",
+          "actual": "승인 필요",
+          "expected": "승인 필요"
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "no Runtime mutation",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/explicit-escalation/result.png",
+          "sha256": "b5bb9b6a210e96d94fc28720c9ce661da41bd4f1fcac5badec53a5c341b1d8ef"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/explicit-escalation/result.ax.json",
+          "sha256": "4ffd3baffd01198b4951d73d358121997e3c5d735dc2bccf51994051592ab9b1"
+        },
+        {
+          "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/scenarios/05/explicit-escalation/observations.json",
+          "sha256": "a59523b818fa8d09682cda485b93d93d4d95bf56e43d4dd563b9db4f9fc8ce1e"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T02:41:53.484Z",
+  "capture": {
+    "file": "run-20279eb0-3669-4dbd-a50e-a50f1cf4272c/capture-manifest.json",
+    "sha256": "431cd8bef49b7d95e68d4a7bb07ff35fb7224cd3ad1fd89f91b08d5128504a48"
+  }
+}
