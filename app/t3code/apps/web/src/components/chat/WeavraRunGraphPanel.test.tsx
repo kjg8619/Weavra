@@ -40,6 +40,7 @@ vi.mock("../ui/button", () => ({
 const threadRef = scopeThreadRef(EnvironmentId.make("env"), ThreadId.make("thread"));
 let renderer: ReactTestRenderer;
 const focusOpener = vi.fn();
+let focusFrame: FrameRequestCallback | undefined;
 
 function render(status: WeavraRunGraph["status"], nodes: WeavraRunGraph["nodes"]) {
   mocks.result = AsyncResult.success({
@@ -80,6 +81,11 @@ const steps: WeavraRunGraph["nodes"] = [
 
 beforeEach(() => {
   vi.stubGlobal("document", new EventTarget());
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    focusFrame = callback;
+    return 1;
+  });
+  focusFrame = undefined;
   focusOpener.mockReset();
   mocks.navigate.mockReset();
   mocks.groups = [
@@ -190,6 +196,10 @@ it("keeps an unsupported environment read-only and explains it in an in-app disc
     const event = Object.assign(new Event("keydown", { cancelable: true }), { key: "Escape" });
     act(() => {
       document.dispatchEvent(event);
+    });
+    act(() => {
+      focusFrame?.(0);
+      focusFrame = undefined;
     });
     return event;
   };

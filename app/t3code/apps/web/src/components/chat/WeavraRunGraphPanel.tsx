@@ -264,7 +264,8 @@ function UnsupportedGraphHelp() {
       event.preventDefault();
       event.stopImmediatePropagation();
       setOpen(false);
-      opener.current?.focus();
+      // Restore after the sheet's queued Tab focus movement and the disclosure commit.
+      requestAnimationFrame(() => opener.current?.focus());
     };
     document.addEventListener("keydown", dismiss, { capture: true });
     return () => document.removeEventListener("keydown", dismiss, { capture: true });
@@ -359,10 +360,10 @@ export function WeavraRunGraphPanel(props: {
       <div className="mt-3">
         {view?.support === "unsupported" ? (
           <>
+            <UnsupportedGraphHelp />
             <p className="text-sm break-keep text-pretty text-muted-foreground">
               이 환경은 통제 작업의 읽기 전용 연결을 지원하지 않아요.
             </p>
-            <UnsupportedGraphHelp />
           </>
         ) : graph ? (
           <GraphView graph={graph} failure={failure} />

@@ -31,6 +31,7 @@ import { WeavraFitness } from "./WeavraFitness";
 
 let renderer: ReactTestRenderer;
 const focusOpener = vi.fn();
+let focusFrame: FrameRequestCallback | undefined;
 const text = () => JSON.stringify(renderer.toJSON());
 const buttons = () => renderer.root.findAllByType("button");
 const named = (label: string) =>
@@ -38,6 +39,11 @@ const named = (label: string) =>
 
 beforeEach(() => {
   vi.stubGlobal("document", new EventTarget());
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    focusFrame = callback;
+    return 1;
+  });
+  focusFrame = undefined;
   focusOpener.mockReset();
   mocks.invoke.mockReset().mockResolvedValue(
     AsyncResult.success({
@@ -78,6 +84,10 @@ it("explains the record workflow in a disclosure that issues no request", () => 
     const event = Object.assign(new Event("keydown", { cancelable: true }), { key: "Escape" });
     act(() => {
       document.dispatchEvent(event);
+    });
+    act(() => {
+      focusFrame?.(0);
+      focusFrame = undefined;
     });
     return event;
   };

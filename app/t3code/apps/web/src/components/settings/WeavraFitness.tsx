@@ -160,7 +160,7 @@ export function WeavraFitness({
       event.preventDefault();
       event.stopImmediatePropagation();
       setHelpOpen(false);
-      helpOpener.current?.focus();
+      requestAnimationFrame(() => helpOpener.current?.focus());
     };
     document.addEventListener("keydown", dismiss, { capture: true });
     return () => document.removeEventListener("keydown", dismiss, { capture: true });
