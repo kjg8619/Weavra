@@ -69,6 +69,9 @@ it("explains the record workflow in a disclosure that issues no request", () => 
   expect(named("읽기 전용 안내")[0]!.props["aria-expanded"]).toBe(true);
   expect(text()).toContain("기록 목록을 읽어요");
   expect(mocks.invoke).not.toHaveBeenCalled();
+  act(() => named("읽기 전용 안내")[0]!.props.onKeyDown({ key: "Escape" }));
+  expect(named("읽기 전용 안내")[0]!.props["aria-expanded"]).toBe(false);
+  expect(text()).not.toContain("기록 목록을 읽어요");
 });
 
 it("loads records with one read-only list request and explains an empty result", async () => {

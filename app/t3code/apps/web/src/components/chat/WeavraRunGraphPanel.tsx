@@ -257,12 +257,15 @@ function UnsupportedGraphHelp() {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   return (
-    <div className="mt-2">
+    <div className="mt-2 break-keep text-pretty">
       <Button
         variant="outline"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && open) setOpen(false);
+        }}
       >
         이 환경에서 볼 수 없는 이유
       </Button>
@@ -332,7 +335,7 @@ export function WeavraRunGraphPanel(props: {
           {snapshot ? (stale ? "과거 스냅샷" : "공식 스냅샷") : "스냅샷 없음"}
         </Badge>
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <p className="mt-1 text-sm break-keep text-pretty text-muted-foreground">
         Runtime이 기록한 단계와 관계를 보여주는 보기 전용 그래프예요. 여기서 실행·승인·재시도는 하지
         않아요.
       </p>
@@ -344,7 +347,7 @@ export function WeavraRunGraphPanel(props: {
       <div className="mt-3">
         {view?.support === "unsupported" ? (
           <>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm break-keep text-pretty text-muted-foreground">
               이 환경은 통제 작업의 읽기 전용 연결을 지원하지 않아요.
             </p>
             <UnsupportedGraphHelp />
@@ -352,7 +355,7 @@ export function WeavraRunGraphPanel(props: {
         ) : graph ? (
           <GraphView graph={graph} failure={failure} />
         ) : (
-          <div className="space-y-3 text-sm text-muted-foreground">
+          <div className="space-y-3 text-sm break-keep text-pretty text-muted-foreground">
             <p>
               {snapshot && !run
                 ? "이 프로젝트에 아직 Weavra Run이 없어요. 통제 작업을 실행하면 단계가 여기에 그려져요."

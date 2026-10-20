@@ -194,7 +194,7 @@ export function WeavraFitness({
   };
   return (
     <SettingsSection id="weavra-fitness" title="프로바이더 적합성 · 읽기 전용">
-      <SettingsGroup divided={false} className="space-y-5 p-4">
+      <SettingsGroup divided={false} className="space-y-5 p-4 break-keep text-pretty">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-medium">순위가 아닌 계약 준수 증거</h3>
@@ -203,7 +203,6 @@ export function WeavraFitness({
             </p>
           </div>
           <Button
-            size="sm"
             variant="outline"
             disabled={!connected || busy}
             onClick={() => {
@@ -220,11 +219,13 @@ export function WeavraFitness({
         </p>
         <div>
           <Button
-            size="sm"
             variant="outline"
             aria-expanded={helpOpen}
             aria-controls={helpId}
             onClick={() => setHelpOpen((value) => !value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && helpOpen) setHelpOpen(false);
+            }}
           >
             읽기 전용 안내
           </Button>
@@ -334,7 +335,6 @@ export function WeavraFitness({
                     </label>
                   ))}
                   <Button
-                    size="sm"
                     variant="outline"
                     disabled={!connected || busy || !left || !right || left === right}
                     onClick={() => {

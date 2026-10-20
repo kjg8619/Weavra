@@ -176,4 +176,11 @@ it("keeps an unsupported environment read-only and explains it in an in-app disc
   ).toBe(true);
   expect(text()).toContain("서버가 통제 작업 관찰을 지원하지 않아서");
   expect(mocks.navigate).not.toHaveBeenCalled();
+  // Escape closes the disclosure and leaves focus on its opener (the panel holds nothing focusable).
+  act(() =>
+    renderer.root
+      .find((node) => node.type === "button" && node.props["aria-expanded"] !== undefined)
+      .props.onKeyDown({ key: "Escape" }),
+  );
+  expect(text()).not.toContain("서버가 통제 작업 관찰을 지원하지 않아서");
 });
