@@ -53,7 +53,7 @@ export function CommandPaletteContent({
         {inputLabel ? (
           <label
             htmlFor={inputId}
-            className="block px-[calc(var(--command-shell-inset)+0.75rem)] pt-2.5 font-medium text-muted-foreground text-xs"
+            className="block px-[calc(var(--command-shell-inset)+0.75rem)] pt-2.5 text-muted-foreground text-sm"
           >
             {inputLabel}
           </label>

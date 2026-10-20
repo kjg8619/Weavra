@@ -1058,8 +1058,8 @@ const ComposerInputHelp = memo(function ComposerInputHelp(props: { onClosed: () 
           <Button
             type="button"
             variant="ghost"
-            size="xs"
-            className="h-6 gap-1 px-1.5 text-muted-foreground text-xs hover:text-foreground"
+            size="sm"
+            className="h-8 gap-1.5 px-3 font-normal text-muted-foreground text-sm hover:text-foreground sm:h-8"
           />
         }
       >
@@ -6936,7 +6936,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <span
                       id={composerLabelId}
-                      className="cursor-text font-medium text-muted-foreground text-xs"
+                      className="cursor-text text-muted-foreground text-sm"
                       onClick={() => composerEditorRef.current?.focusAtEnd()}
                     >
                       메시지
