@@ -607,13 +607,13 @@ function RightPanelEmptyState(props: {
       aria-label="패널 열기"
       data-surface-launcher-keys={availableActions.map((action) => action.shortcut).join("")}
       className={cn(
-        "flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-6 pt-6 outline-none",
+        "flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-6 pt-6 outline-none",
         // The panel topbar sits above this container; matching bottom padding
         // keeps the list centered against the full panel, not the leftover.
         "pb-[calc(var(--workspace-topbar-height)+--spacing(6))]",
       )}
     >
-      <div className="w-full max-w-xs">
+      <div className="my-auto w-full max-w-xs">
         <h3 className="mb-3 text-center font-medium text-foreground text-sm">패널 열기</h3>
         <div role="menu" aria-label="패널 열기" className="flex flex-col gap-0.5">
           {actions.map((action) =>
