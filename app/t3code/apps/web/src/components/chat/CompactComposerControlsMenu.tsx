@@ -80,7 +80,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
             props.onRuntimeModeChange(value as RuntimeMode);
           }}
         >
-          <MenuRadioItem value="approval-required">승인 후 실행</MenuRadioItem>
+          <MenuRadioItem value="approval-required">승인 필요</MenuRadioItem>
           <MenuRadioItem value="auto-accept-edits">편집 자동 승인</MenuRadioItem>
           <MenuRadioItem value="auto">자동</MenuRadioItem>
           <MenuRadioItem value="full-access">전체 접근</MenuRadioItem>

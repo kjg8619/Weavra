@@ -25,11 +25,29 @@ import {
   MenuPopup,
   MenuRadioGroup,
   MenuRadioItem,
+  MenuRadioItemIndicator,
   MenuSeparator,
   MenuTrigger,
 } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+
+/**
+ * The project the draft targets, matched by its scoped (environment + project)
+ * identity. Display names are not identities: two same-named projects on
+ * different machines resolve to the group that holds the exact ref.
+ */
+export function findActiveProjectGroup<
+  Group extends { readonly memberProjectRefs: ReadonlyArray<ScopedProjectRef> },
+>(groups: ReadonlyArray<Group>, activeProjectRef: ScopedProjectRef | null): Group | null {
+  if (activeProjectRef === null) return null;
+  const activeKey = scopedProjectKey(activeProjectRef);
+  return (
+    groups.find((group) =>
+      group.memberProjectRefs.some((projectRef) => scopedProjectKey(projectRef) === activeKey),
+    ) ?? null
+  );
+}
 
 interface DraftHeroHeadlineProps {
   readonly draftId: DraftId | null;
@@ -117,14 +135,7 @@ export function DraftHeroHeadline({
     () => new Map(projectPickerEntries.map((entry) => [entry.group.projectKey, entry] as const)),
     [projectPickerEntries],
   );
-  const activeProjectGroup =
-    activeProjectRef === null
-      ? null
-      : (projectGroups.find((group) =>
-          group.memberProjectRefs.some(
-            (projectRef) => scopedProjectKey(projectRef) === scopedProjectKey(activeProjectRef),
-          ),
-        ) ?? null);
+  const activeProjectGroup = findActiveProjectGroup(projectGroups, activeProjectRef);
   const activeProjectKey = activeProjectGroup?.projectKey ?? "";
   const activeProjectDisplayName = activeProjectGroup?.displayName ?? activeProjectTitle;
   const hasResolvedProject = activeProjectTitle !== null;
@@ -194,7 +205,7 @@ export function DraftHeroHeadline({
                 key={group.projectKey}
                 value={group.projectKey}
                 closeOnClick
-                className="[&>span:last-child]:flex [&>span:last-child]:min-w-0 [&>span:last-child]:items-center [&>span:last-child]:gap-2"
+                className="data-checked:font-medium [&>span:last-child]:flex [&>span:last-child]:min-w-0 [&>span:last-child]:items-center [&>span:last-child]:gap-2"
               >
                 <ProjectFavicon project={group} className="size-4 shrink-0" />
                 <Tooltip>
@@ -212,6 +223,8 @@ export function DraftHeroHeadline({
                     machineByEnvironmentId={environmentMachineById}
                   />
                 ) : null}
+                {/* The current project carries a visible check, not only the selection wash. */}
+                <MenuRadioItemIndicator className="ms-auto" />
               </MenuRadioItem>
             );
           })}
