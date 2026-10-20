@@ -558,7 +558,7 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
           }}
         >
           <SelectTrigger
-            className="w-full min-w-0 border-foreground/60 py-2 text-foreground focus-visible:border-foreground focus-visible:ring-foreground sm:w-48 [&_[data-slot=select-icon]_svg]:opacity-100"
+            className="w-full min-w-0 border-foreground/60 py-2 text-foreground after:absolute after:-inset-px after:rounded-none after:content-[''] focus-visible:border-foreground focus-visible:ring-foreground sm:w-48 [&_[data-slot=select-icon]_svg]:opacity-100"
             aria-label="Open links in"
           >
             <SelectValue className="overflow-visible whitespace-normal text-clip break-keep text-pretty">
