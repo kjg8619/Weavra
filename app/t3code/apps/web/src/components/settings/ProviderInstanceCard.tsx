@@ -586,6 +586,9 @@ export function ProviderInstanceCard({
       <>
         {statusDotNode}
         <span>{summary.headline}</span>
+        {isAuthenticated && authLabel ? (
+          <span className="min-w-0 [overflow-wrap:anywhere]">· {authLabel}</span>
+        ) : null}
       </>
     );
   if (mode === "list") {
