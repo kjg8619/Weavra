@@ -561,6 +561,10 @@ export function countInActiveDialog(page, text) {
     .count();
 }
 
+export function savedActionIsVisible(page) {
+  return page.getByRole("button", { name: "Run HIG saved action", exact: true }).isVisible();
+}
+
 export function deliverScenarioEvent(sockets, method, value) {
   let delivered = 0;
   for (const entry of sockets) {
@@ -576,7 +580,7 @@ export function deliverScenarioEvent(sockets, method, value) {
 }
 
 export async function runScenarios(context) {
-  const { freezeCaptureServerFrame } = await import("./seed.mjs");
+  const { freezeCaptureServerFrame, registerSeededThread, seed } = await import("./seed.mjs");
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
   const { executeCheck, sha256, bounded } = await import("./assert.mjs");
@@ -625,6 +629,28 @@ export async function runScenarios(context) {
     await route.fulfill({ response, json: body });
   });
   const sockets = [];
+  const fixtureRequests = new Map();
+  let fixtureRequestId = 900000;
+  async function dispatchFixtureCommand(command) {
+    const entry = sockets.findLast((entry) => !entry.closed);
+    if (!entry) throw new Error("No active isolated fixture RPC connection");
+    const id = String(fixtureRequestId++);
+    const pending = Promise.withResolvers();
+    fixtureRequests.set(id, pending);
+    entry.server.send(
+      JSON.stringify({
+        _tag: "Request",
+        id,
+        tag: "orchestration.dispatchCommand",
+        payload: command,
+        headers: [],
+      }),
+    );
+    const exit = await bounded(pending.promise, "Fixture thread creation receipt");
+    if (exit._tag !== "Success")
+      throw new Error(`Fixture creation failed: ${JSON.stringify(exit)}`);
+    return exit.value;
+  }
   await page.routeWebSocket("**/*", (socket) => {
     const server = socket.connectToServer();
     const methods = new Map();
@@ -760,6 +786,12 @@ export async function runScenarios(context) {
       const decoded = JSON.parse(String(message));
       const frames = Array.isArray(decoded) ? decoded : [decoded];
       for (let frame of frames) {
+        const fixture = fixtureRequests.get(String(frame.requestId));
+        if (fixture && frame._tag === "Exit") {
+          fixtureRequests.delete(String(frame.requestId));
+          fixture.resolve(frame.exit);
+          continue;
+        }
         frame = freezeCaptureServerFrame(frame, methods.get(frame.requestId));
         if (providerFixture && methods.get(frame.requestId) === "server.getConfig")
           if (frame.exit?._tag === "Success") frame.exit.value.providers = providerFixture;
@@ -1390,7 +1422,14 @@ export async function runScenarios(context) {
     await frame(variant);
     observations.push({ requests: fixture.requests });
   }
-  async function filesPanel() {
+  async function filesPanel({ fresh = false } = {}) {
+    if (fresh) {
+      // These checks install their Files replies after the per-check reload, but the app
+      // restores an open Files surface on reload and lists the folder before the replies
+      // exist. Reload once they do, so the listing observed is the one the check controls.
+      await act("reload with Files replies installed", () => page.reload());
+      await home();
+    }
     await openPanel("파일");
     await page.getByRole("button", { name: "Refresh workspace files", exact: true }).waitFor();
   }
@@ -2785,15 +2824,29 @@ export async function runScenarios(context) {
       await home();
       const attach = page.getByRole("button", { name: "파일 첨부", exact: true });
       await attach.focus();
-      const chooser = page.waitForEvent("filechooser");
-      await act("keyboard opens attachment chooser", () => page.keyboard.press("Enter"));
-      await (
-        await chooser
-      ).setFiles({
-        name: "hig-keyboard.txt",
-        mimeType: "text/plain",
-        buffer: Buffer.from("HIG keyboard attachment"),
-      });
+      // Playwright turns file-chooser interception on without awaiting it, so a quick
+      // keyboard activation can reach the native dialog first. Enable it and wait for the
+      // acknowledgement before pressing Enter, then answer the chooser that opened.
+      const chooserSession = await page.context().newCDPSession(page);
+      try {
+        await chooserSession.send("Page.enable");
+        await chooserSession.send("Page.setInterceptFileChooserDialog", { enabled: true });
+        const opened = new Promise((resolve) =>
+          chooserSession.once("Page.fileChooserOpened", resolve),
+        );
+        await act("keyboard opens attachment chooser", () => page.keyboard.press("Enter"));
+        const chooser = await bounded(opened, "keyboard attachment chooser", 15_000);
+        const file = path.join(context.isolation.home, "hig-keyboard.txt");
+        await fs.writeFile(file, "HIG keyboard attachment");
+        await chooserSession.send("DOM.setFileInputFiles", {
+          files: [file],
+          backendNodeId: chooser.backendNodeId,
+        });
+      } finally {
+        await chooserSession.send("Page.setInterceptFileChooserDialog", { enabled: false });
+        await chooserSession.detach();
+      }
+      await page.getByText("hig-keyboard.txt", { exact: true }).first().waitFor();
       assert(
         "keyboard file appears in draft",
         (await page.getByText("hig-keyboard.txt", { exact: true }).count()) > 0,
@@ -2823,7 +2876,7 @@ export async function runScenarios(context) {
       });
       replies.set("projects.listEntries", () => pending);
       try {
-        await filesPanel();
+        await filesPanel({ fresh: true });
         await observedText(
           assert,
           '[aria-label="baseline-project files"]',
@@ -2839,7 +2892,7 @@ export async function runScenarios(context) {
         _tag: "Success",
         value: { entries: [], truncated: false },
       }));
-      await filesPanel();
+      await filesPanel({ fresh: true });
       await settle();
       await observedText(assert, '[aria-label="baseline-project files"]', "files-empty", (text) =>
         /비어|파일이 없|No files/.test(text),
@@ -2854,7 +2907,7 @@ export async function runScenarios(context) {
         _tag: "Success",
         value: { entries: [], truncated: false },
       }));
-      await filesPanel();
+      await filesPanel({ fresh: true });
       const input = page.getByPlaceholder("Search files", { exact: true });
       await input.fill("absent-query");
       await observedText(
@@ -2864,12 +2917,10 @@ export async function runScenarios(context) {
         (text) => /검색 결과|일치|No results|No matches/.test(text),
       );
       await input.fill("");
-      await page.getByText("visible.txt", { exact: true }).waitFor();
-      assert(
-        "clearing search restores actual entries",
-        await page.getByText("visible.txt", { exact: true }).isVisible(),
-        true,
-      );
+      // Tree rows split the name into stem and extension elements, so match the row's role.
+      const restored = page.getByRole("treeitem", { name: "visible.txt", exact: true });
+      await restored.waitFor();
+      assert("clearing search restores actual entries", await restored.isVisible(), true);
     },
     "09/files-error": async (assert) => {
       replies.set("projects.listEntries", () => ({
@@ -2885,7 +2936,7 @@ export async function runScenarios(context) {
           },
         ],
       }));
-      await filesPanel();
+      await filesPanel({ fresh: true });
       await observedText(
         assert,
         '[aria-label="baseline-project files"]',
@@ -2907,13 +2958,13 @@ export async function runScenarios(context) {
           },
         };
       });
-      await filesPanel();
+      await filesPanel({ fresh: true });
       await settle();
       const before = calls;
       await act("refresh actual Files request", () =>
         page.getByRole("button", { name: "Refresh workspace files", exact: true }).click(),
       );
-      await page.getByText("refreshed.txt", { exact: true }).waitFor();
+      await page.getByRole("treeitem", { name: "refreshed.txt", exact: true }).waitFor();
       assert("refresh reached data boundary", calls > before, true);
     },
     "09/pane-isolation": async (assert) => {
@@ -3009,6 +3060,8 @@ export async function runScenarios(context) {
       await home();
       const trigger = page.getByRole("button", { name: "프로젝트 변경", exact: true });
       await act("open current project selector", () => trigger.click());
+      // The popup mounts after the click resolves; count only once the menu is open.
+      await page.getByRole("menu", { name: "프로젝트 변경", exact: true }).waitFor();
       const selected = page.locator('[role="menuitemradio"][aria-checked="true"]');
       assert("one checked current project", await selected.count(), 1);
       assert(
@@ -3364,6 +3417,7 @@ export async function runScenarios(context) {
     "17/empty-archive-route": async (assert) => {
       await settings("archive");
       const destination = page.getByRole("button", { name: /대화.*돌아|대화 목록|대화로/ });
+      await destination.waitFor({ state: "visible" });
       assert("archive has direct next action", await destination.count(), 1);
       await unchangedRequests(assert, () => destination.click());
       assert(
@@ -3378,7 +3432,11 @@ export async function runScenarios(context) {
       const route = await page.evaluate(() => location.hash);
       const editor = await unique('[data-testid="composer-editor"]');
       await editor.fill("HIG archive return draft");
-      await settings("archive");
+      await act("open archive from the selected conversation", async () => {
+        await click("button", "settings");
+        await click("button", "archive");
+      });
+      await settle();
       const destination = page.getByRole("button", { name: /대화.*돌아|대화 목록|대화로/ });
       await act("return from empty archive", () => destination.click());
       assert(
@@ -3949,7 +4007,7 @@ export async function runScenarios(context) {
       await page.locator('[data-slot="dialog-popup"]').waitFor({ state: "hidden" });
       assert(
         "saved action visible",
-        await page.getByRole("button", { name: "HIG saved action", exact: true }).isVisible(),
+        await savedActionIsVisible(page),
         true,
       );
       assert("save does not dispatch model", packet.counters.model, 0);
@@ -4064,6 +4122,11 @@ export async function runScenarios(context) {
     },
     "17/archive-restore": async (assert) => {
       await home();
+      observations.push(
+        await registerSeededThread(dispatchFixtureCommand, context.isolation, "baseline-code"),
+      );
+      seed(context.isolation);
+      await page.reload();
       await thread("03 Code blocks");
       await act("archive exact disposable thread", () => nativeMenu("대화 보관"));
       const confirmation = page.getByRole("alertdialog");

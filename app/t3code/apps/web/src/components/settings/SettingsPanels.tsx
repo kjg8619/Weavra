@@ -2,7 +2,7 @@ import { SettingsGroup } from "./SettingsGroup";
 import { Spinner } from "~/components/ui/spinner";
 import { NotificationSettings } from "./NotificationSettings";
 import { ArchiveIcon, ArchiveX, CheckIcon, ChevronRightIcon, SettingsIcon } from "lucide-react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useCanGoBack, useNavigate, useRouter } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -3003,6 +3003,9 @@ export function GeneralSettingsPanel() {
 }
 
 export function ArchivedThreadsPanel() {
+  const router = useRouter();
+  const canGoBack = useCanGoBack();
+  const navigate = useNavigate();
   const { scope } = useSettingsScope();
   const { unarchiveThread, confirmAndDeleteThread } = useThreadActions();
   const {
@@ -3119,6 +3122,7 @@ export function ArchivedThreadsPanel() {
           title={searchableSetting("archive").title}
         >
           <SettingsRow
+            className="[&_p]:break-keep [&_p]:text-sm [&_p]:text-pretty [&_p]:text-muted-foreground"
             title={
               <span className="inline-flex items-center gap-2">
                 {isLoadingArchive ? (
@@ -3136,7 +3140,26 @@ export function ArchivedThreadsPanel() {
             description={
               isLoadingArchive
                 ? "Checking connected environments."
-                : (archiveError ?? "Archived threads will appear here.")
+                : (archiveError ??
+                  "대화 목록에서 대화의 작업 메뉴를 열고 ‘대화 보관’을 선택하면 여기에 표시돼요.")
+            }
+            control={
+              !isLoadingArchive && !archiveError ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-auto min-h-9 border-muted-foreground whitespace-normal break-keep px-3 py-2 text-sm text-pretty transition-[opacity,transform] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:ring-0 focus-visible:ring-offset-0 [&:active:not([aria-haspopup])]:scale-100"
+                  onClick={() => {
+                    if (canGoBack) {
+                      router.history.back();
+                    } else {
+                      void navigate({ to: "/" });
+                    }
+                  }}
+                >
+                  대화 목록으로 돌아가기
+                </Button>
+              ) : undefined
             }
           />
         </SettingsSection>

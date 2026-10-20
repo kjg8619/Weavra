@@ -9,6 +9,39 @@ export const CAPTURE_SETTINGS = {
   usageLimitSources: {},
 };
 
+// Projection fixtures are readable, but lifecycle commands use the event-derived
+// command model. Register only the disposable thread a lifecycle scenario owns.
+export async function registerSeededThread(dispatch, isolation, threadId) {
+  assertProfile(isolation.base, isolation.home, isolation.workspace, isolation.app);
+  const db = new Database(NodePath.join(isolation.app, "userdata/state.sqlite"), {
+    readonly: true,
+  });
+  let thread;
+  try {
+    thread = db.query("SELECT * FROM projection_threads WHERE thread_id = ?").get(threadId);
+  } finally {
+    db.close();
+  }
+  if (!thread) throw new Error(`Missing isolated fixture thread: ${threadId}`);
+  const result = await dispatch({
+    type: "thread.create",
+    commandId: `hig-register-${threadId}`,
+    threadId,
+    projectId: thread.project_id,
+    title: thread.title,
+    modelSelection: JSON.parse(thread.model_selection_json),
+    runtimeMode: thread.runtime_mode,
+    interactionMode: thread.interaction_mode,
+    branch: thread.branch,
+    worktreePath: thread.worktree_path,
+    createdAt: thread.created_at,
+    historyImport: true,
+  });
+  if (!Number.isInteger(result.sequence))
+    throw new Error(`Fixture registration failed: ${JSON.stringify(result)}`);
+  return { threadId, ...result };
+}
+
 export function prepareCaptureProfile(isolation) {
   const { base, home, workspace, app } = isolation;
   assertProfile(base, home, workspace, app);
