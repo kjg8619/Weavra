@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "selection": "14",
+  "revision": "ea0454badeeadcbda6b210ca22b1402acdd49ed1",
+  "asarSha256": "a0666e14491077a2f8eca990bd2da2ba37ac9d8db33781c557d35c4cb4ad9f7c",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "9b6e94870cca736303e7b6c328af5aebbe39b5dc87ce30eb059a6aa59c670db7",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T16:13:16.216Z",
+  "checks": [
+    {
+      "caseId": "14",
+      "checkId": "selected-destination-visible",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "full destination visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "one selected option",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "trigger and selection agree",
+          "actual": "기본 브라우저",
+          "expected": "기본 브라우저"
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/selected-destination-visible/result.png",
+          "sha256": "508e7bec36f2aede0876cb34dbf827adff9eed930ce7913e33e1dc4273ce884e"
+        },
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/selected-destination-visible/result.ax.json",
+          "sha256": "7b876c8c5f4f2a208b5a8ad78ef9ff1f1fda79882a67816e26f81319c8af6ca4"
+        },
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/selected-destination-visible/observations.json",
+          "sha256": "8c79041f7b92e61718cbd7a7ec57fabeefea5346ee7f56983273f6a83f594033"
+        }
+      ]
+    },
+    {
+      "caseId": "14",
+      "checkId": "long-destination",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "destination options present",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "long destination preserved",
+          "actual": "기본 브라우저",
+          "expected": "기본 브라우저"
+        },
+        {
+          "label": "long destination not clipped",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/long-destination/result.png",
+          "sha256": "3041c4b81f5cd08ab4b3bfa63dc53eba79dbbfadb8e7ddb365a8091960120ce6"
+        },
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/long-destination/result.ax.json",
+          "sha256": "20aebe0794ed9556d9a8a93399d657b169dabfd1ab446e42432d2e4686d2481f"
+        },
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/long-destination/observations.json",
+          "sha256": "48dc1ebf7a114f29c90d582077498197ba8b63f83566a75ff96c206936ec3cc2"
+        }
+      ]
+    },
+    {
+      "caseId": "14",
+      "checkId": "selection-preserved",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "focus-only leaves saved selection intact",
+          "actual": "기본 브라우저",
+          "expected": "기본 브라우저"
+        },
+        {
+          "label": "selection persists across reload",
+          "actual": "기본 브라우저",
+          "expected": "기본 브라우저"
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/selection-preserved/result.png",
+          "sha256": "50bdb6209d874bf5aeb8b0214b4e2399e911309fceb09209d809ad13784871af"
+        },
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/selection-preserved/result.ax.json",
+          "sha256": "8f9f14374cb1da40f163bfbd70156cbd56575c65990f49b17b3688802011d170"
+        },
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/selection-preserved/observations.json",
+          "sha256": "834e9e1704ff2d6a99b29c88faa6af8230033d60164009d63fff438f896384fe"
+        }
+      ]
+    },
+    {
+      "caseId": "14",
+      "checkId": "keyboard-disclosure",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "keyboard exposes options",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "keyboard focus returns",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/keyboard-disclosure/result.png",
+          "sha256": "52055a8ef747c5ba55db1d57ffa8e04e281d761ffa660101b25fa543c28e34a0"
+        },
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/keyboard-disclosure/result.ax.json",
+          "sha256": "1ed625dd67c4c1e2417dc6ece6252af69d0ce9a2952d9b608a405d3edfbd16a0"
+        },
+        {
+          "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/scenarios/14/keyboard-disclosure/observations.json",
+          "sha256": "69664b4bb916f3affa06fa8573c601ccc12a07a3cec02e9ace6f4231af6f3329"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T16:14:12.487Z",
+  "capture": {
+    "file": "run-fa2114b7-1946-48c6-8886-21ef2bee6983/capture-manifest.json",
+    "sha256": "722bf6a1a35b125aca7269a9eac3bb58ec65197705574a507b405ca01e8110ac"
+  }
+}
