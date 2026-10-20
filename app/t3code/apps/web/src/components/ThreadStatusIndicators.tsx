@@ -463,6 +463,11 @@ export function ThreadStatusLabel({
   );
 }
 
+/** Joins the last two words with a no-break space so a wrapped line never ends in a lone short word. */
+function keepTailTogether(text: string): string {
+  return text.replace(/ (\S{1,2})$/, "\u00a0$1");
+}
+
 export function ThreadStatusDetails({ status }: { status: ThreadStatusPill }) {
   const activity = status.activityProgress
     ? `${status.activityLabel} · ${status.activityProgress}`
@@ -475,7 +480,9 @@ export function ThreadStatusDetails({ status }: { status: ThreadStatusPill }) {
   if (!activity && !observation) return null;
   return (
     <span className="flex min-w-0 flex-col text-sm leading-5">
-      {activity ? <span className="min-w-0 break-words text-foreground">{activity}</span> : null}
+      {activity ? (
+        <span className="min-w-0 break-keep text-foreground">{keepTailTogether(activity)}</span>
+      ) : null}
       {observation ? (
         <span className="min-w-0 break-words text-foreground">{observation}</span>
       ) : null}

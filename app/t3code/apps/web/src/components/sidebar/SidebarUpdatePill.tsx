@@ -27,7 +27,7 @@ function SidebarUpdateArchitectureWarningContent() {
 
 export function SidebarUpdatePill() {
   return isElectron ? (
-    <SidebarMenuItem>
+    <SidebarMenuItem className="max-w-full min-w-0">
       <Tooltip>
         <TooltipTrigger
           render={<span tabIndex={0} className="px-2 text-xs break-keep text-muted-foreground" />}
