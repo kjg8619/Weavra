@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
+import { EventEmitter } from "node:events";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -12,7 +13,7 @@ import {
   readCompletedCopy,
   resolveShellBaseline,
   awaitFocusLoss,
-  enterRendererBackground,
+  takeWindowFocus,
   recordScenarioArtifact,
   createRpcLedger,
   countInActiveDialog,
@@ -205,40 +206,87 @@ describe("renderer focus loss", () => {
   });
 });
 
-describe("renderer background state", () => {
-  class FakeDocument extends EventTarget {
-    hasFocus() {
-      return true;
+describe("app window focus loss", () => {
+  // A stand-in for BrowserWindow: one key window per "app", and focusing another
+  // window of the app takes key status from the current one.
+  class FakeWindow extends EventEmitter {
+    static key: FakeWindow | null = null;
+    static created = 0;
+    constructor(
+      readonly options: { title?: string } = {},
+      readonly ignoresBlur = false,
+    ) {
+      super();
+      if (options.title) FakeWindow.created++;
     }
+    isFocused() {
+      return FakeWindow.key === this;
+    }
+    blur() {
+      if (this.ignoresBlur || !this.isFocused()) return;
+      FakeWindow.key = null;
+      this.emit("blur");
+    }
+    focus() {
+      const previous = FakeWindow.key;
+      FakeWindow.key = this;
+      if (previous && previous !== this) previous.emit("blur");
+    }
+    webViewFocused = true;
+    blurWebView() {
+      this.webViewFocused = false;
+    }
+    async loadURL() {}
+    show() {}
   }
-  const renderer = () => Object.assign(new EventTarget(), { document: new FakeDocument() });
+  const reset = () => {
+    FakeWindow.key = null;
+    FakeWindow.created = 0;
+    (globalThis as { __higFocusSink?: unknown }).__higFocusSink = undefined;
+  };
 
-  test("drops document focus and fires the blur the product listens for", async () => {
-    const target = renderer();
-    const blurred = new Promise<void>((resolve) =>
-      target.addEventListener("blur", () => resolve(), { once: true }),
-    );
-    enterRendererBackground(target);
-    await expect(
-      awaitFocusLoss(blurred, async () => target.document.hasFocus(), 1_000),
-    ).resolves.toBeUndefined();
+  test("a focused window that accepts blur loses focus without a second window", async () => {
+    reset();
+    const main = new FakeWindow();
+    main.focus();
+    expect(await takeWindowFocus(main, 1_000)).toEqual({ before: true, sink: false, after: false });
+    expect(FakeWindow.created).toBe(0);
+    expect(main.webViewFocused).toBe(false);
   });
-  test("restoring returns real focus and fires focus", () => {
-    const target = renderer() as ReturnType<typeof renderer> & { __higRestoreForeground?: () => void };
-    let focused = 0;
-    target.addEventListener("focus", () => focused++);
-    enterRendererBackground(target);
-    target.__higRestoreForeground!();
-    expect(target.document.hasFocus()).toBe(true);
-    expect(Object.getOwnPropertyDescriptor(target.document, "hasFocus")).toBeUndefined();
-    expect(target.__higRestoreForeground).toBeUndefined();
-    expect(focused).toBe(1);
+  test("a window still key after blur loses focus to a second window of the same app", async () => {
+    reset();
+    class StubbornWindow extends FakeWindow {
+      constructor(options: { title?: string } = {}) {
+        super(options, true);
+      }
+    }
+    const main = new StubbornWindow();
+    main.focus();
+    expect(await takeWindowFocus(main, 1_000)).toEqual({ before: true, sink: true, after: false });
+    expect(FakeWindow.created).toBe(1);
+    expect(main.webViewFocused).toBe(false);
   });
-  test("without the background state a focused document still fails the focus-loss wait", async () => {
-    const target = renderer();
-    await expect(
-      awaitFocusLoss(Promise.resolve(), async () => target.document.hasFocus(), 1_000),
-    ).rejects.toThrow("still reports document focus");
+  test("a window that never became key, because another app is frontmost, still has its web view blurred", async () => {
+    reset();
+    const main = new FakeWindow();
+    expect(await takeWindowFocus(main, 1_000)).toEqual({ before: false, sink: false, after: false });
+    expect(FakeWindow.created).toBe(0);
+    expect(main.webViewFocused).toBe(false);
+  });
+  test("a window that keeps focus is reported, so the check fails instead of passing", async () => {
+    reset();
+    class KeyWindow extends FakeWindow {
+      constructor(options: { title?: string } = {}) {
+        super(options, true);
+      }
+      override focus() {
+        if (this.options.title) return; // the second window never becomes key
+        super.focus();
+      }
+    }
+    const main = new KeyWindow();
+    main.focus();
+    expect((await takeWindowFocus(main, 1)).after).toBe(true);
   });
 });
 
