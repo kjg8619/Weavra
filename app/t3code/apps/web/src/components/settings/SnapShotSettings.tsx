@@ -57,10 +57,10 @@ import {
 } from "./SnapShotSetupDialog.logic";
 
 const soundOptionRowClassName =
-  "grid grid-cols-[1fr_auto] rounded-sm has-data-checked:bg-foreground/[0.08]";
+  "grid grid-cols-[1fr_auto] gap-2 rounded-sm has-data-checked:bg-foreground/[0.08]";
 const soundOptionItemClassName = "data-checked:bg-transparent";
 const soundPreviewClassName =
-  "relative min-h-9 w-9 justify-center border border-foreground/70 px-0 text-foreground";
+  "relative min-h-9 w-9 justify-center border border-foreground/70 px-0 text-foreground after:absolute after:inset-0 after:rounded-none sm:min-h-9 [&>svg]:text-foreground [&>svg]:opacity-100";
 const captureSwitchClassName =
   "relative h-9 w-16 border border-foreground/70 [--thumb-size:--spacing(8)] data-disabled:opacity-100 sm:[--thumb-size:--spacing(8)]";
 
@@ -374,7 +374,7 @@ export function SnapShotSettings() {
   };
 
   return (
-    <SettingsPageContainer className="[&_h2]:break-keep [&_h2]:text-pretty [&_h2]:text-foreground [&_h3]:break-keep [&_h3]:text-pretty [&_h3]:opacity-100 [&_p]:break-keep [&_p]:text-pretty [&_p]:text-sm [&_p]:text-foreground [&_p]:opacity-100 [&_[data-slot=settings-row]_.pt-0\.5]:text-sm [&_[data-slot=settings-row]_.pt-0\.5]:text-foreground [&_button:not([role=switch])]:min-h-8 [&_button:not([role=switch])]:border-foreground/70 [&_button:not([role=switch])]:px-3 [&_button:not([role=switch])]:text-sm [&_button:disabled]:opacity-100 [&_button]:focus-visible:ring-foreground">
+    <SettingsPageContainer className="[&_h2]:break-keep [&_h2]:text-pretty [&_h2]:text-foreground [&_h3]:break-keep [&_h3]:text-pretty [&_h3]:opacity-100 [&_p]:break-keep [&_p]:text-pretty [&_p]:text-sm [&_p]:text-foreground [&_p]:opacity-100 [&_[data-slot=settings-row]_.pt-0\.5]:text-sm [&_[data-slot=settings-row]_.pt-0\.5]:text-foreground [&_button:not([role=switch])]:min-h-8 [&_button:not([role=switch])]:border-foreground/70 [&_button:not([role=switch])]:px-3 [&_button:not([role=switch])]:text-sm [&_button:not([role=switch])]:text-foreground [&_button:not([role=switch])]:[--control-icon-color:currentColor] [&_button:disabled]:opacity-100 [&_button]:focus-visible:ring-foreground [&_kbd]:text-foreground">
       <SettingsSection id="snap-shot" title="활성 창 캡처">
         <SettingsUnavailableGroup message={unavailableMessage}>
           <SettingsRow
@@ -519,11 +519,25 @@ export function SnapShotSettings() {
                           "Click"
                         )}
                       </span>
-                      <ChevronDownIcon className="-me-1 size-3 shrink-0" />
+                      <ChevronDownIcon className="-me-1 size-3 shrink-0 text-foreground" />
                     </MenuTrigger>
                     <MenuPopup
                       align="end"
-                      className="text-sm text-foreground [&_[role=menuitemradio]]:min-h-8 [&_[role=menuitemradio]]:text-foreground [&_[role=menuitemradio]]:focus-visible:ring-foreground"
+                      className="text-sm text-foreground [&_[role=menuitemradio]]:min-h-8 [&_[role=menuitemradio]]:px-3 [&_[role=menuitemradio]]:text-foreground [&_[role^=menuitem]]:focus-visible:outline-2 [&_[role^=menuitem]]:focus-visible:-outline-offset-2 [&_[role^=menuitem]]:focus-visible:outline-foreground"
+                      onKeyDownCapture={(event) => {
+                        if (event.key !== "Tab") return;
+                        const items = Array.from(
+                          event.currentTarget.querySelectorAll<HTMLElement>(
+                            '[role="menuitem"], [role="menuitemradio"]',
+                          ),
+                        );
+                        const current = items.findIndex((item) => item === document.activeElement);
+                        const next =
+                          (current + (event.shiftKey ? -1 : 1) + items.length) % items.length;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        items[next]?.focus();
+                      }}
                     >
                       <MenuRadioGroup
                         onValueChange={(value) =>
