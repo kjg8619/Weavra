@@ -38,7 +38,13 @@ import {
   selectedCases,
   validateCheckCoverage,
 } from "./assert.mjs";
-import { assertProfile, seed, prepareCaptureProfile, freezeCaptureServerFrame } from "./seed.mjs";
+import {
+  assertProfile,
+  seed,
+  registerSeededThread,
+  prepareCaptureProfile,
+  freezeCaptureServerFrame,
+} from "./seed.mjs";
 
 describe("capture network notice isolation", () => {
   const liveProvider = {
@@ -803,6 +809,66 @@ describe("state-bound capture evidence", () => {
   test("rejects a thread title without its visible rename input", () => {
     const observation = { text: "03 Code blocks", renameTitle: [] };
     expect(() => validateVisibleState("45", observation)).toThrow("Wrong visible rename editor");
+  });
+  test("registers only the selected projection fixture through thread creation", async () => {
+    const base = await NodeFSP.realpath(await NodeFSP.mkdtemp("/tmp/weavra-hig-"));
+    const isolation = {
+      base,
+      home: `${base}/home`,
+      workspace: `${base}/workspace`,
+      app: `${base}/app`,
+    };
+    for (const directory of [isolation.home, isolation.workspace, `${isolation.app}/userdata`])
+      await NodeFSP.mkdir(directory, { recursive: true });
+    const db = new Database(`${isolation.app}/userdata/state.sqlite`);
+    const commands: unknown[] = [];
+    try {
+      db.run(`CREATE TABLE projection_threads
+        (thread_id TEXT,project_id TEXT,title TEXT,model_selection_json TEXT,runtime_mode TEXT,
+         interaction_mode TEXT,branch TEXT,worktree_path TEXT,created_at TEXT)`);
+      db.query("INSERT INTO projection_threads VALUES (?,?,?,?,?,?,?,?,?)").run(
+        "selected",
+        "project-b",
+        "Selected fixture",
+        '{"instanceId":"codex","model":"fixture-model"}',
+        "approval-required",
+        "default",
+        null,
+        null,
+        "2026-10-20T00:00:00.000Z",
+      );
+      const receipt = await registerSeededThread(
+        async (command: unknown) => {
+          commands.push(command);
+          return { sequence: 7 };
+        },
+        isolation,
+        "selected",
+      );
+      expect(commands).toEqual([
+        {
+          type: "thread.create",
+          commandId: "hig-register-selected",
+          threadId: "selected",
+          projectId: "project-b",
+          title: "Selected fixture",
+          modelSelection: { instanceId: "codex", model: "fixture-model" },
+          runtimeMode: "approval-required",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          createdAt: "2026-10-20T00:00:00.000Z",
+          historyImport: true,
+        },
+      ]);
+      expect(receipt).toEqual({ threadId: "selected", sequence: 7 });
+      expect(db.query("SELECT count(*) AS count FROM projection_threads").get()).toEqual({
+        count: 1,
+      });
+    } finally {
+      db.close();
+      await NodeFSP.rm(base, { recursive: true });
+    }
   });
   test("seeds an existing isolated database without dispatching a turn", async () => {
     const base = await NodeFSP.realpath(await NodeFSP.mkdtemp("/tmp/weavra-hig-"));
