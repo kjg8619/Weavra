@@ -258,7 +258,7 @@ function IconStat({
       <div
         className={cn(
           "mt-2.5 truncate font-mono text-2xl font-semibold tracking-[-0.05em] tabular-nums text-foreground",
-          tone === "warning" && "text-amber-600 dark:text-amber-300",
+          tone === "warning" && "text-amber-700 dark:text-amber-300",
           tone === "danger" && "text-destructive",
         )}
       >
@@ -1186,7 +1186,7 @@ export function ResourceTelemetryDiagnostics({
                   value={String(snapshot.health.inaccessibleProcessCount)}
                   valueClassName={
                     snapshot.health.inaccessibleProcessCount > 0
-                      ? "text-amber-600 dark:text-amber-300"
+                      ? "text-amber-700 dark:text-amber-300"
                       : undefined
                   }
                 />

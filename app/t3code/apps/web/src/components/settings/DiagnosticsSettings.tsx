@@ -121,7 +121,7 @@ function StatBlock({
       <div
         className={cn(
           "mt-1 truncate font-mono text-lg font-semibold tabular-nums text-foreground",
-          tone === "warning" && "text-amber-600 dark:text-amber-400",
+          tone === "warning" && "text-amber-700 dark:text-amber-400",
           tone === "danger" && "text-destructive",
         )}
       >
@@ -1115,7 +1115,7 @@ export function DiagnosticsSettingsPanel() {
                 className={cn(
                   "flex items-start gap-2",
                   traceDiagnosticsPartialFailure
-                    ? "text-amber-600 dark:text-amber-400"
+                    ? "text-amber-700 dark:text-amber-400"
                     : "text-destructive",
                 )}
               >
