@@ -94,6 +94,10 @@ function FileSearchField(props: {
   );
 }
 
+// 14px, normal weight, whole-word Korean wrapping; buttons are 32px high with 12px side padding.
+const FILES_STATE_TEXT = "break-keep text-pretty text-sm font-normal leading-relaxed";
+const FILES_STATE_BUTTON = "h-8 px-3 text-sm font-normal sm:h-8 sm:text-sm";
+
 export type FileBrowserBodyState =
   | { readonly kind: "loading" }
   | { readonly kind: "error"; readonly message: string }
@@ -580,34 +584,52 @@ export default function FileBrowserPanel({
         className="flex min-h-0 flex-1 flex-col"
       >
         {bodyState.kind === "loading" ? (
-          <div role="status" className="px-3 py-2 text-xs text-muted-foreground">
+          <div role="status" className={`px-3 py-2 text-muted-foreground ${FILES_STATE_TEXT}`}>
             파일을 불러오는 중이에요…
           </div>
         ) : bodyState.kind === "error" ? (
-          <div role="alert" className="flex flex-col items-start gap-2 p-4 text-xs leading-relaxed">
-            <p className="font-medium text-destructive">파일 목록을 불러오지 못했어요.</p>
+          <div role="alert" className={`flex flex-col items-start gap-2 p-4 ${FILES_STATE_TEXT}`}>
+            <p className="text-destructive-foreground">파일 목록을 불러오지 못했어요.</p>
             <p className="text-muted-foreground">{bodyState.message}</p>
-            <Button type="button" size="xs" variant="outline" onClick={handleRefresh}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={FILES_STATE_BUTTON}
+              onClick={handleRefresh}
+            >
               다시 시도
             </Button>
           </div>
         ) : bodyState.kind === "empty" ? (
-          <div className="flex flex-col items-start gap-2 p-4 text-xs leading-relaxed">
+          <div className={`flex flex-col items-start gap-2 p-4 ${FILES_STATE_TEXT}`}>
             <p className="text-foreground">이 폴더는 비어 있어요.</p>
             <p className="text-muted-foreground">파일을 추가했다면 새로 고침으로 다시 읽어요.</p>
-            <Button type="button" size="xs" variant="outline" onClick={handleRefresh}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={FILES_STATE_BUTTON}
+              onClick={handleRefresh}
+            >
               새로 고침
             </Button>
           </div>
         ) : bodyState.kind === "no-results" ? (
-          <div className="flex flex-col items-start gap-2 p-4 text-xs leading-relaxed">
+          <div className={`flex flex-col items-start gap-2 p-4 ${FILES_STATE_TEXT}`}>
             <p className="text-foreground">'{bodyState.query}'와 일치하는 파일이 없어요.</p>
             {bodyState.searching ? (
               <p role="status" className="text-muted-foreground">
                 프로젝트 전체에서 더 찾는 중이에요…
               </p>
             ) : null}
-            <Button type="button" size="xs" variant="outline" onClick={closeSearch}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={FILES_STATE_BUTTON}
+              onClick={closeSearch}
+            >
               검색 지우기
             </Button>
           </div>
