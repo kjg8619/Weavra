@@ -374,7 +374,7 @@ export function SnapShotSettings() {
   };
 
   return (
-    <SettingsPageContainer className="[&_h2]:break-keep [&_h2]:text-pretty [&_h2]:text-foreground [&_h3]:break-keep [&_h3]:text-pretty [&_h3]:opacity-100 [&_p]:break-keep [&_p]:text-pretty [&_p]:text-sm [&_p]:text-foreground [&_p]:opacity-100 [&_[data-slot=settings-row]_.pt-0\.5]:text-sm [&_[data-slot=settings-row]_.pt-0\.5]:text-foreground [&_button:not([role=switch])]:min-h-8 [&_button:not([role=switch])]:border-foreground/70 [&_button:not([role=switch])]:px-3 [&_button:not([role=switch])]:text-sm [&_button:not([role=switch])]:text-foreground [&_button:not([role=switch])]:[--control-icon-color:currentColor] [&_button:disabled]:opacity-100 [&_button]:focus-visible:ring-foreground [&_kbd]:text-foreground">
+    <SettingsPageContainer className="[&_h2]:break-keep [&_h2]:text-pretty [&_h2]:text-foreground [&_h3]:break-keep [&_h3]:text-pretty [&_h3]:opacity-100 [&_p]:break-keep [&_p]:text-pretty [&_p]:text-sm [&_p]:text-foreground [&_p]:opacity-100 [&_[data-slot=settings-row]_.pt-0\.5]:text-sm [&_[data-slot=settings-row]_.pt-0\.5]:text-foreground [&_button:not([role=switch])]:min-h-8 [&_button:not([role=switch])]:border-foreground/70 [&_button:not([role=switch])]:px-3 [&_button:not([role=switch])]:text-sm [&_button:not([role=switch])]:text-foreground [&_button:not([role=switch])]:[--control-icon-color:currentColor] [&_button:disabled]:opacity-100 [&_button]:focus-visible:ring-foreground [&_button]:after:absolute [&_button]:after:inset-0 [&_button]:after:rounded-none [&_kbd]:text-foreground">
       <SettingsSection id="snap-shot" title="활성 창 캡처">
         <SettingsUnavailableGroup message={unavailableMessage}>
           <SettingsRow
@@ -505,7 +505,10 @@ export function SnapShotSettings() {
                   <Menu>
                     <MenuTrigger
                       aria-label={"Snapshot sound: " + soundLabel}
-                      className={cn(selectTriggerVariants({ size: "sm" }), "w-auto min-w-0")}
+                      className={cn(
+                        selectTriggerVariants({ size: "sm" }),
+                        "relative w-auto min-w-0",
+                      )}
                       disabled={!captureAvailable}
                     >
                       <span className="flex-1 text-left">
