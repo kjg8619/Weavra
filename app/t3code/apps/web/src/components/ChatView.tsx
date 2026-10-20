@@ -597,10 +597,12 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
                   else props.onChoose(suggestion, "insert");
                 }}
               >
-                <span className="font-medium text-foreground">{suggestion.label}</span>
+                <span className="break-keep font-medium text-foreground text-pretty">
+                  {suggestion.label}
+                </span>
                 <span
                   id={reasonId}
-                  className="font-normal text-muted-foreground text-sm leading-5 group-hover:text-accent-foreground"
+                  className="break-keep font-normal text-muted-foreground text-pretty text-sm leading-5 group-hover:text-accent-foreground"
                 >
                   {suggestion.reason}
                 </span>
@@ -648,7 +650,7 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
           </Button>
         </div>
       ) : null}
-      <p className="mt-2 font-normal text-muted-foreground text-sm leading-5">
+      <p className="mt-2 break-keep font-normal text-muted-foreground text-pretty text-sm leading-5">
         제안은 작성기에만 넣고 보내지 않아요. 실행 모드 {mode.label}: {scope}
         {mode.description}
       </p>
@@ -10567,7 +10569,7 @@ export default function ChatView(props: ChatViewProps) {
               data-chat-composer-overlay="true"
               className={
                 isDraftHeroState
-                  ? "pointer-events-none absolute inset-0 z-(--layer-sticky) flex items-center"
+                  ? "absolute inset-0 z-(--layer-sticky) min-h-0 overflow-y-auto"
                   : isControlledTaskDocked
                     ? "relative z-(--layer-sticky) shrink-0 pt-1.5 sm:pt-2"
                     : "pointer-events-none absolute inset-x-0 bottom-0 z-(--layer-sticky) pt-1.5 sm:pt-2"
@@ -10578,15 +10580,19 @@ export default function ChatView(props: ChatViewProps) {
                 className={cn(
                   "w-full ps-[calc(env(safe-area-inset-left)+0.75rem)] pe-[calc(env(safe-area-inset-right)+0.75rem)] sm:ps-[calc(env(safe-area-inset-left)+1.25rem)] sm:pe-[calc(env(safe-area-inset-right)+1.25rem)]",
                   isControlledTaskDocked && "pointer-events-auto",
-                  isDraftHeroState && "pointer-events-none",
+                  isDraftHeroState && "pointer-events-none h-full",
                 )}
               >
                 <div
                   data-chat-composer-stack="true"
-                  className="group/composer-stack pointer-events-auto relative z-(--layer-raised-content) mx-auto w-full max-w-3xl"
+                  className={cn(
+                    "group/composer-stack pointer-events-auto relative z-(--layer-raised-content) mx-auto w-full max-w-3xl",
+                    isDraftHeroState &&
+                      "grid h-full grid-rows-[minmax(min-content,1fr)_auto_minmax(0,1fr)]",
+                  )}
                 >
                   {isDraftHeroState ? (
-                    <div className="absolute inset-x-0 bottom-full z-(--layer-content)">
+                    <div className="relative z-(--layer-content) self-end">
                       <div
                         className="pb-8 group-has-data-[composer-shoulder-tab]/composer-stack:pb-4"
                         style={
