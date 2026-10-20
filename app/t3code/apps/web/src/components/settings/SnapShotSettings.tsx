@@ -59,7 +59,10 @@ import {
 const soundOptionRowClassName =
   "grid grid-cols-[1fr_auto] rounded-sm has-data-checked:bg-foreground/[0.08]";
 const soundOptionItemClassName = "data-checked:bg-transparent";
-const soundPreviewClassName = "min-h-7 w-7 justify-center px-0";
+const soundPreviewClassName =
+  "relative min-h-9 w-9 justify-center border border-foreground/70 px-0 text-foreground";
+const captureSwitchClassName =
+  "relative h-9 w-16 border border-foreground/70 [--thumb-size:--spacing(8)] data-disabled:opacity-100 sm:[--thumb-size:--spacing(8)]";
 
 function captureSettingsError(title: string, error: unknown) {
   return { title, message: error instanceof Error ? error.message : "Try again." };
@@ -371,11 +374,12 @@ export function SnapShotSettings() {
   };
 
   return (
-    <SettingsPageContainer>
-      <SettingsSection id="snap-shot" title="SnapShots">
+    <SettingsPageContainer className="[&_h2]:break-keep [&_h2]:text-pretty [&_h2]:text-foreground [&_h3]:break-keep [&_h3]:text-pretty [&_h3]:opacity-100 [&_p]:break-keep [&_p]:text-pretty [&_p]:text-sm [&_p]:text-foreground [&_p]:opacity-100 [&_[data-slot=settings-row]_.pt-0\.5]:text-sm [&_[data-slot=settings-row]_.pt-0\.5]:text-foreground [&_button:not([role=switch])]:min-h-8 [&_button:not([role=switch])]:border-foreground/70 [&_button:not([role=switch])]:px-3 [&_button:not([role=switch])]:text-sm [&_button:disabled]:opacity-100 [&_button]:focus-visible:ring-foreground">
+      <SettingsSection id="snap-shot" title="활성 창 캡처">
         <SettingsUnavailableGroup message={unavailableMessage}>
           <SettingsRow
             {...searchableSetting("snap-shot-enabled")}
+            title="대화 초안에 첨부"
             description={snapShotDescription(state)}
             status={
               bridge
@@ -398,6 +402,8 @@ export function SnapShotSettings() {
                   </Button>
                 ) : null}
                 <Switch
+                  className={captureSwitchClassName}
+                  data-icon-control=""
                   checked={settings.snapShotEnabled || Boolean(wizard)}
                   disabled={!captureAvailable || setupBusy}
                   aria-label="Enable snapshots"
@@ -418,6 +424,8 @@ export function SnapShotSettings() {
                 status={snapShotAccessibilityUnavailableMessage(state)}
                 control={
                   <Switch
+                    className={captureSwitchClassName}
+                    data-icon-control=""
                     checked={
                       !snapShotAccessibilityUnavailableMessage(state) &&
                       settings.snapShotIncludeAccessibility
@@ -500,20 +508,23 @@ export function SnapShotSettings() {
                       className={cn(selectTriggerVariants({ size: "sm" }), "w-auto min-w-0")}
                       disabled={!captureAvailable}
                     >
-                      <span className="min-w-0 flex-1 truncate text-left">
+                      <span className="flex-1 text-left">
                         {soundSelection === "off" ? (
                           "Off"
                         ) : soundSelection === "soft-pop" ? (
                           <>
-                            Whoosh <span className="text-muted-foreground">(Default)</span>
+                            Whoosh <span>(Default)</span>
                           </>
                         ) : (
                           "Click"
                         )}
                       </span>
-                      <ChevronDownIcon className="-me-1 size-3 shrink-0 opacity-50" />
+                      <ChevronDownIcon className="-me-1 size-3 shrink-0" />
                     </MenuTrigger>
-                    <MenuPopup align="end">
+                    <MenuPopup
+                      align="end"
+                      className="text-sm text-foreground [&_[role=menuitemradio]]:min-h-8 [&_[role=menuitemradio]]:text-foreground [&_[role=menuitemradio]]:focus-visible:ring-foreground"
+                    >
                       <MenuRadioGroup
                         onValueChange={(value) =>
                           void save(snapShotSoundPatch(value as SnapShotSoundSelection))
@@ -529,9 +540,10 @@ export function SnapShotSettings() {
                             closeOnClick
                             value="soft-pop"
                           >
-                            Whoosh <span className="text-muted-foreground">(Default)</span>
+                            Whoosh <span>(Default)</span>
                           </MenuRadioItem>
                           <MenuItem
+                            data-icon-control=""
                             aria-label="Play Whoosh"
                             className={soundPreviewClassName}
                             closeOnClick={false}
@@ -549,6 +561,7 @@ export function SnapShotSettings() {
                             Click
                           </MenuRadioItem>
                           <MenuItem
+                            data-icon-control=""
                             aria-label="Play Click"
                             className={soundPreviewClassName}
                             closeOnClick={false}
@@ -568,6 +581,8 @@ export function SnapShotSettings() {
                 status={feedbackUnavailable}
                 control={
                   <Switch
+                    className={captureSwitchClassName}
+                    data-icon-control=""
                     checked={!feedbackUnavailable && settings.snapShotFlash}
                     disabled={!captureAvailable || Boolean(feedbackUnavailable)}
                     aria-label="Flash captured window"
@@ -581,6 +596,8 @@ export function SnapShotSettings() {
                 status={feedbackUnavailable}
                 control={
                   <Switch
+                    className={captureSwitchClassName}
+                    data-icon-control=""
                     checked={!feedbackUnavailable && settings.snapShotAnimations}
                     disabled={!captureAvailable || Boolean(feedbackUnavailable)}
                     aria-label="Animate snapshots"
