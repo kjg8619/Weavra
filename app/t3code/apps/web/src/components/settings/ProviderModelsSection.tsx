@@ -608,7 +608,7 @@ export function ProviderModelsSection({
       {driverKind === "antigravity" ? null : isAdding ? (
         <div
           ref={addFormRef}
-          className="mt-3 flex flex-col gap-2"
+          className="mt-3 flex scroll-m-4 flex-col gap-2 [&_input]:scroll-my-4"
           onFocusCapture={() => addFormRef.current?.scrollIntoView({ block: "nearest" })}
         >
           <label
