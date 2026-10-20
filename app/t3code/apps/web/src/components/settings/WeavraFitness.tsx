@@ -224,7 +224,10 @@ export function WeavraFitness({
             aria-controls={helpId}
             onClick={() => setHelpOpen((value) => !value)}
             onKeyDown={(event) => {
-              if (event.key === "Escape" && helpOpen) setHelpOpen(false);
+              // Escape closes the open disclosure first; once closed it keeps its normal meaning.
+              if (event.key !== "Escape" || !helpOpen) return;
+              event.stopPropagation();
+              setHelpOpen(false);
             }}
           >
             읽기 전용 안내

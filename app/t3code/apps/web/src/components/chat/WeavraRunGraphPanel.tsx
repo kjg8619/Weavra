@@ -264,7 +264,10 @@ function UnsupportedGraphHelp() {
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
         onKeyDown={(event) => {
-          if (event.key === "Escape" && open) setOpen(false);
+          // Escape closes the open disclosure first; once closed it keeps its normal meaning.
+          if (event.key !== "Escape" || !open) return;
+          event.stopPropagation();
+          setOpen(false);
         }}
       >
         이 환경에서 볼 수 없는 이유
