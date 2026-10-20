@@ -259,7 +259,7 @@ function IconStat({
         className={cn(
           "mt-2.5 truncate font-mono text-2xl font-semibold tracking-[-0.05em] tabular-nums text-foreground",
           tone === "warning" && "text-amber-700 dark:text-amber-300",
-          tone === "danger" && "text-destructive",
+          tone === "danger" && "text-destructive-foreground",
         )}
       >
         {value}
