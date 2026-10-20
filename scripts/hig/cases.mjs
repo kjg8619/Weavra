@@ -438,6 +438,46 @@ export function resolveShellBaseline({ streamSnapshot, httpSnapshot, synchronize
   return snapshot;
 }
 
+// Takes focus away from the app's own BrowserWindow inside the app under test. A key
+// window is blurred, and if it is still key a second window of the same app is made key.
+// The web view is then blurred through Electron as well: a window that never became key
+// (another app or Weavra instance was frontmost) can still hold renderer focus, and no
+// OS change reaches it. Runs in the Electron main process via BrowserWindow evaluate,
+// so it is self-contained. Resolves with the observed states.
+/** @param {any} window */
+export async function takeWindowFocus(window, timeoutMs = 10_000) {
+  const before = window.isFocused();
+  if (!before) {
+    window.blurWebView();
+    return { before, sink: false, after: false };
+  }
+  const lost = new Promise((resolve) => window.once("blur", resolve));
+  window.blur();
+  let sink = false;
+  if (window.isFocused()) {
+    const BrowserWindow = window.constructor;
+    const other = new BrowserWindow({ width: 320, height: 200, show: false, title: "hig-focus-sink" });
+    globalThis.__higFocusSink = other;
+    await other.loadURL("about:blank");
+    other.show();
+    other.focus();
+    sink = true;
+  }
+  let timer;
+  await Promise.race([lost, new Promise((resolve) => (timer = setTimeout(resolve, timeoutMs)))]);
+  clearTimeout(timer);
+  window.blurWebView();
+  return { before, sink, after: window.isFocused() };
+}
+
+// Each scenario check owns its artifact names. A second capture under the same name
+// would overwrite the first and leave a stale hash in the receipt, so it fails here.
+export function recordScenarioArtifact(artifacts, file, sha256) {
+  if (artifacts.some((artifact) => artifact.file === file))
+    throw new Error(`Scenario artifact name collision: ${file}`);
+  artifacts.push({ file, sha256 });
+}
+
 // Resolves once the renderer reports a real blur and document focus is gone.
 export async function awaitFocusLoss(blurred, readHasFocus, timeoutMs = 10_000) {
   const { bounded } = await import("./assert.mjs");
@@ -560,6 +600,7 @@ export async function runScenarios(context) {
   let wire = null;
   let responseTransform = null;
   let providerFixture = null;
+  let focusEmulation = null;
   const replies = new Map();
   let requests = [];
   let liveConfig = null;
@@ -567,7 +608,6 @@ export async function runScenarios(context) {
   const streamSamples = new Map();
   const shellState = { synchronized: false, events: [], http: null };
   const rpc = createRpcLedger();
-  let focusEmulation = null;
   await page.route(
     (url) => url.pathname.endsWith("/api/orchestration/shell"),
     async (route) => {
@@ -778,9 +818,9 @@ export async function runScenarios(context) {
   });
   async function save(file, bytes) {
     const relative = `scenarios/${current}/${file}`;
+    recordScenarioArtifact(artifacts, relative, sha256(bytes));
     await fs.mkdir(path.dirname(path.join(output, relative)), { recursive: true });
     await fs.writeFile(path.join(output, relative), bytes);
-    artifacts.push({ file: relative, sha256: sha256(bytes) });
   }
   async function frame(label) {
     await save(`${label}.png`, await page.screenshot({ scale: "css" }));
@@ -907,9 +947,9 @@ export async function runScenarios(context) {
     await frame(label);
     return geometry[0];
   }
-  async function iconTargets(assert, label) {
-    const controls = await sample(`${label}: icon targets`, () =>
-      [...document.querySelectorAll("button[data-icon-control]")]
+  async function iconTargets(assert, label, selector = "button[data-icon-control]") {
+    const controls = await sample(`${label}: icon targets`, (selector) =>
+      [...document.querySelectorAll(selector)]
         .filter((node) => node.checkVisibility({ opacityProperty: true, visibilityProperty: true }))
         .map((node) => {
           const rect = node.getBoundingClientRect();
@@ -932,6 +972,7 @@ export async function runScenarios(context) {
             }),
           };
         }),
+      selector,
     );
     for (const control of controls) {
       assert(
@@ -941,6 +982,7 @@ export async function runScenarios(context) {
       );
       assertIconTargetHits(assert, `${label}: ${control.name}`, control);
     }
+    return controls;
   }
   async function motionProperties(assert, label, selector, reduced = false) {
     await page.locator(selector).waitFor({ state: "attached" });
@@ -1496,7 +1538,7 @@ export async function runScenarios(context) {
     deliverScenarioEvent(sockets, method, value);
     observations.push({ authority: "SYNTHETIC_SUBSCRIPTION_EVENT", method, value });
   }
-  async function providerEvent(status = "error", update = false, progress = false) {
+  async function providerEvent(status = "error", update = false, progress = false, setup = null) {
     if (!liveConfig?.providers?.length) throw new Error("No live provider inventory for event");
     const providers = structuredClone(liveConfig.providers);
     const codex = providers.find((provider) => provider.instanceId === "codex");
@@ -1510,6 +1552,7 @@ export async function runScenarios(context) {
       message: status === "ready" ? "HIG fixture ready" : "HIG fixture requires codex login",
       checkedAt: new Date().toISOString(),
     });
+    if (setup) codex.setup = setup;
     if (update)
       codex.versionAdvisory = {
         status: "behind_latest",
@@ -1573,25 +1616,22 @@ export async function runScenarios(context) {
       await context.win.evaluate((window) => window.focus());
       await page.waitForFunction(() => document.hasFocus());
     } else {
-      // Playwright emulates page focus, so document.hasFocus() never drops and no
-      // blur fires. Turn emulation off for this check, then focus a separate
-      // window so the renderer really loses OS focus.
+      // Playwright's page session emulates focus, so document.hasFocus() would stay true
+      // whatever the window does. Release emulation for this check, take OS focus away
+      // from the app window itself, then wait for the renderer to report the real loss.
       focusEmulation = await page.context().newCDPSession(page);
       await focusEmulation.send("Emulation.setFocusEmulationEnabled", { enabled: false });
-      await context.application.evaluate(async ({ BrowserWindow }) => {
-        // A window focused before it has loaded and shown is ignored by macOS.
-        const sink = new BrowserWindow({ width: 320, height: 200, show: false, title: "hig-focus-sink" });
-        globalThis.__higFocusSink = sink;
-        await sink.loadURL("about:blank");
-        const focused = new Promise((resolve) => sink.once("focus", resolve));
-        sink.show();
-        sink.focus();
-        await focused;
-      });
-      await awaitFocusLoss(
-        page.waitForFunction(() => !document.hasFocus(), null, { timeout: 0 }),
-        () => page.evaluate(() => document.hasFocus()),
+      const blurred = page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            if (!document.hasFocus()) resolve(undefined);
+            else addEventListener("blur", () => resolve(undefined), { once: true });
+          }),
       );
+      const windowFocus = await context.win.evaluate(takeWindowFocus, 10_000);
+      observations.push({ windowFocus });
+      if (windowFocus.after) throw new Error("App window still has OS focus after blur");
+      await awaitFocusLoss(blurred, () => page.evaluate(() => document.hasFocus()));
     }
     const snapshot = resolveShellBaseline({
       streamSnapshot: streamSamples.get("orchestration.subscribeShell")?.snapshot,
@@ -2436,7 +2476,8 @@ export async function runScenarios(context) {
     "04/auth-error": async (assert) => {
       await home();
       await thread("01 Conversation");
-      await providerEvent("error");
+      // A provider that reports it can authenticate, so the product owes a recovery control.
+      await providerEvent("error", false, false, { canAuthenticate: true, canInstall: false });
       await page
         .getByText("HIG fixture requires codex login", { exact: true })
         .filter({ visible: true })
@@ -2455,7 +2496,39 @@ export async function runScenarios(context) {
         geometry.parentPositions.some((p) => p === "absolute" || p === "fixed"),
         false,
       );
-      assert("auth cause has independent recovery", /login|설정|로그인/.test(geometry.text), true);
+      // The recovery is the alert's own control, not words in the error message.
+      const alert = page
+        .locator('[role="alert"]')
+        .filter({ hasText: "HIG fixture requires codex login" });
+      const recovery = alert.getByRole("button", { name: "공급자 설정 열기", exact: true });
+      assert(
+        "auth cause has one recovery control",
+        await recovery.filter({ visible: true }).count(),
+        1,
+      );
+      assert("auth recovery control is enabled", await recovery.isEnabled(), true);
+      await frame("auth-recovery");
+      const before = requests.length;
+      await act("open provider setup from auth error", () => recovery.click());
+      const route = await bounded(
+        page
+          .waitForFunction(
+            () =>
+              location.hash.startsWith("#/settings/providers") &&
+              new URLSearchParams(location.hash.split("?")[1] ?? "").get("instanceId"),
+            null,
+            { timeout: 0 },
+          )
+          .then((handle) => handle.jsonValue()),
+        "provider setup route from auth recovery",
+        10_000,
+      );
+      assert("auth recovery opens this provider's setup", route, "codex");
+      assert(
+        "opening recovery does not start sign-in by itself",
+        requests.slice(before).some((r) => /auth.*start|login/i.test(r.method)),
+        false,
+      );
     },
     "04/turn-error": async (assert) => {
       await home();
@@ -2499,6 +2572,21 @@ export async function runScenarios(context) {
         true,
       );
       await frame("independent-causes");
+      // Each cause's dismiss is a touched icon control: >=36x36 at every desktop width.
+      for (const [width, height] of [
+        [840, 620],
+        [1280, 800],
+        [1920, 1080],
+      ]) {
+        await context.resize(width, height);
+        await settle();
+        const dismiss = await iconTargets(
+          assert,
+          `dismiss-${width}`,
+          '[role="alert"] button[aria-label$="닫기"]',
+        );
+        assert(`dismiss-${width}: one dismiss per cause`, dismiss.length, 2);
+      }
     },
     "04/event-deduplication": async (assert) => {
       await home();
@@ -2542,7 +2630,11 @@ export async function runScenarios(context) {
     "04/unfocused-single-notice": async (assert) => {
       try {
         const event = await notificationFixture(false);
-        await page.waitForFunction(() => globalThis.higNotifications.length > 0);
+        await bounded(
+          page.waitForFunction(() => globalThis.higNotifications.length > 0, null, { timeout: 0 }),
+          "desktop notice for unfocused completion",
+          10_000,
+        );
         emit("orchestration.subscribeShell", event);
         await settle();
         const notices = await page.evaluate(() => globalThis.higNotifications);
@@ -2554,7 +2646,7 @@ export async function runScenarios(context) {
           true,
         );
       } finally {
-        await context.application.evaluate(() => {
+        await context.win.evaluate(() => {
           globalThis.__higFocusSink?.destroy();
           globalThis.__higFocusSink = null;
         });
@@ -2563,7 +2655,10 @@ export async function runScenarios(context) {
           await focusEmulation.detach();
           focusEmulation = null;
         }
-        await context.win.evaluate((window) => window.focus());
+        await context.win.evaluate((window) => {
+          window.focusOnWebView();
+          window.focus();
+        });
       }
     },
     "04/modal-update-suppression": async (assert) => {
@@ -3001,7 +3096,7 @@ export async function runScenarios(context) {
       );
     },
     "06/footer-wrap": async (assert) => {
-      await bothSidebars(assert, async () => {
+      await bothSidebars(assert, async (_sidebar, legacy) => {
         for (const [width, height] of [
           [840, 620],
           [1280, 800],
@@ -3039,7 +3134,7 @@ export async function runScenarios(context) {
             ),
             true,
           );
-          await frame(`footer-${width}`);
+          await frame(`footer-${legacy ? "legacy" : "current"}-${width}`);
         }
       });
     },

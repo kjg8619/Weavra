@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
+import { EventEmitter } from "node:events";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -12,6 +13,8 @@ import {
   readCompletedCopy,
   resolveShellBaseline,
   awaitFocusLoss,
+  takeWindowFocus,
+  recordScenarioArtifact,
   createRpcLedger,
   countInActiveDialog,
   COMMAND_DIALOG_POPUP,
@@ -200,6 +203,109 @@ describe("renderer focus loss", () => {
     await expect(awaitFocusLoss(Promise.resolve(), async () => true, 1_000)).rejects.toThrow(
       "still reports document focus",
     );
+  });
+});
+
+describe("app window focus loss", () => {
+  // A stand-in for BrowserWindow: one key window per "app", and focusing another
+  // window of the app takes key status from the current one.
+  class FakeWindow extends EventEmitter {
+    static key: FakeWindow | null = null;
+    static created = 0;
+    constructor(
+      readonly options: { title?: string } = {},
+      readonly ignoresBlur = false,
+    ) {
+      super();
+      if (options.title) FakeWindow.created++;
+    }
+    isFocused() {
+      return FakeWindow.key === this;
+    }
+    blur() {
+      if (this.ignoresBlur || !this.isFocused()) return;
+      FakeWindow.key = null;
+      this.emit("blur");
+    }
+    focus() {
+      const previous = FakeWindow.key;
+      FakeWindow.key = this;
+      if (previous && previous !== this) previous.emit("blur");
+    }
+    webViewFocused = true;
+    blurWebView() {
+      this.webViewFocused = false;
+    }
+    async loadURL() {}
+    show() {}
+  }
+  const reset = () => {
+    FakeWindow.key = null;
+    FakeWindow.created = 0;
+    (globalThis as { __higFocusSink?: unknown }).__higFocusSink = undefined;
+  };
+
+  test("a focused window that accepts blur loses focus without a second window", async () => {
+    reset();
+    const main = new FakeWindow();
+    main.focus();
+    expect(await takeWindowFocus(main, 1_000)).toEqual({ before: true, sink: false, after: false });
+    expect(FakeWindow.created).toBe(0);
+    expect(main.webViewFocused).toBe(false);
+  });
+  test("a window still key after blur loses focus to a second window of the same app", async () => {
+    reset();
+    class StubbornWindow extends FakeWindow {
+      constructor(options: { title?: string } = {}) {
+        super(options, true);
+      }
+    }
+    const main = new StubbornWindow();
+    main.focus();
+    expect(await takeWindowFocus(main, 1_000)).toEqual({ before: true, sink: true, after: false });
+    expect(FakeWindow.created).toBe(1);
+    expect(main.webViewFocused).toBe(false);
+  });
+  test("a window that never became key, because another app is frontmost, still has its web view blurred", async () => {
+    reset();
+    const main = new FakeWindow();
+    expect(await takeWindowFocus(main, 1_000)).toEqual({ before: false, sink: false, after: false });
+    expect(FakeWindow.created).toBe(0);
+    expect(main.webViewFocused).toBe(false);
+  });
+  test("a window that keeps focus is reported, so the check fails instead of passing", async () => {
+    reset();
+    class KeyWindow extends FakeWindow {
+      constructor(options: { title?: string } = {}) {
+        super(options, true);
+      }
+      override focus() {
+        if (this.options.title) return; // the second window never becomes key
+        super.focus();
+      }
+    }
+    const main = new KeyWindow();
+    main.focus();
+    expect((await takeWindowFocus(main, 1)).after).toBe(true);
+  });
+});
+
+describe("scenario artifact names", () => {
+  test("a second capture under the same name in one check fails immediately", () => {
+    const artifacts: Array<{ file: string; sha256: string }> = [];
+    recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-current-840.png", "a");
+    expect(() =>
+      recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-current-840.png", "b"),
+    ).toThrow("Scenario artifact name collision");
+    expect(artifacts).toEqual([
+      { file: "scenarios/06/footer-wrap/footer-current-840.png", sha256: "a" },
+    ]);
+  });
+  test("variant-specific names coexist", () => {
+    const artifacts: Array<{ file: string; sha256: string }> = [];
+    recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-current-840.png", "a");
+    recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-legacy-840.png", "b");
+    expect(artifacts.length).toBe(2);
   });
 });
 
