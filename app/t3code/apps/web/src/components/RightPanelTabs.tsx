@@ -316,14 +316,8 @@ export function surfaceShortcutTargetsTypingContext(
   );
 }
 
-function DisabledReasonTooltip(props: { reason: string; trigger: ReactElement }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger render={props.trigger} />
-      <TooltipPopup side="top">{props.reason}</TooltipPopup>
-    </Tooltip>
-  );
-}
+// 14px, normal weight; keep-all wraps Korean at word boundaries and pretty avoids a lone last syllable.
+const DOCK_REASON_TEXT = "break-keep text-pretty text-sm font-normal leading-5";
 
 function UnavailableLauncherRow(props: {
   icon: ReactNode;
@@ -345,7 +339,7 @@ function UnavailableLauncherRow(props: {
         <span className="min-w-0 flex-1 truncate">{props.label}</span>
         <Kbd>{props.shortcut}</Kbd>
       </span>
-      <span id={reasonId} className="ps-6.5 text-muted-foreground text-xs leading-4">
+      <span id={reasonId} className={cn("ps-6.5 text-muted-foreground", DOCK_REASON_TEXT)}>
         {props.reason}
       </span>
     </div>
@@ -372,14 +366,17 @@ function SurfaceMenuItem(props: {
       {props.children}
       <MenuShortcut>{props.shortcut}</MenuShortcut>
       {showReason ? (
-        <span id={reasonId} className="basis-full ps-6 text-muted-foreground text-xs leading-4">
+        <span
+          id={reasonId}
+          className={cn("basis-full ps-6 text-muted-foreground", DOCK_REASON_TEXT)}
+        >
           {props.disabledReason}
         </span>
       ) : null}
     </MenuItem>
   );
-  if (props.available || !props.disabledReason) return item;
-  return <DisabledReasonTooltip reason={props.disabledReason} trigger={item} />;
+  // The reason is printed inside the row, so a hover tooltip would only repeat it.
+  return item;
 }
 
 /**
@@ -610,13 +607,13 @@ function RightPanelEmptyState(props: {
       aria-label="패널 열기"
       data-surface-launcher-keys={availableActions.map((action) => action.shortcut).join("")}
       className={cn(
-        "flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-6 pt-6 outline-none",
+        "flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-6 pt-6 outline-none",
         // The panel topbar sits above this container; matching bottom padding
         // keeps the list centered against the full panel, not the leftover.
         "pb-[calc(var(--workspace-topbar-height)+--spacing(6))]",
       )}
     >
-      <div className="w-full max-w-xs">
+      <div className="my-auto w-full max-w-xs">
         <h3 className="mb-3 text-center font-medium text-foreground text-sm">패널 열기</h3>
         <div role="menu" aria-label="패널 열기" className="flex flex-col gap-0.5">
           {actions.map((action) =>
@@ -1066,6 +1063,18 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     },
   ] as const;
 
+  // Escape closes the menu; focus goes back to the opener on every open.
+  const addSurfaceTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const handleAddSurfaceMenuOpenChange = (
+    open: boolean,
+    eventDetails: { readonly reason: string },
+  ) => {
+    setAddSurfaceMenuOpen(open);
+    if (!open && eventDetails.reason === "escape-key") {
+      requestAnimationFrame(() => addSurfaceTriggerRef.current?.focus());
+    }
+  };
+
   const handleAddSurfaceMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const action = surfaceShortcutActionForKey(addSurfaceActions, event.nativeEvent);
     if (!action) return;
@@ -1384,10 +1393,11 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
               );
             })}
             {props.surfaces.length > 0 ? (
-              <Menu open={addSurfaceMenuOpen} onOpenChange={setAddSurfaceMenuOpen}>
+              <Menu open={addSurfaceMenuOpen} onOpenChange={handleAddSurfaceMenuOpenChange}>
                 <MenuTrigger
                   render={
                     <Button
+                      ref={addSurfaceTriggerRef}
                       aria-label="패널 추가"
                       className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
                       size="icon-xs"
@@ -1401,7 +1411,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   align="start"
                   side="bottom"
                   sideOffset={6}
-                  className="min-w-44"
+                  className="min-w-44 max-w-72"
                   onKeyDownCapture={handleAddSurfaceMenuKeyDown}
                 >
                   {addSurfaceActions.map((action) => {

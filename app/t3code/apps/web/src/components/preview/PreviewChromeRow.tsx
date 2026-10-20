@@ -117,7 +117,7 @@ export function PreviewChromeRow({
     <div className="relative">
       <form
         onSubmit={submit}
-        className="flex h-10 min-h-10 shrink-0 items-center gap-1 border-b border-border/60 bg-background px-2 in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:border-b-transparent"
+        className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-1 gap-y-2 border-b border-border/60 bg-background px-2 py-0.5 in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:border-b-transparent"
         data-surface-subheader
       >
         <div className="flex items-center gap-0.5" role="group" aria-label="Navigation">
@@ -179,12 +179,12 @@ export function PreviewChromeRow({
 
         {leadingActions}
 
-        <InputGroup variant="ghost" className="group/address h-9 min-w-0 flex-1">
+        <InputGroup variant="ghost" className="group/address mx-1 h-9 min-w-52 flex-[1_1_13rem]">
           {/* A visible name that stays while a URL is typed; the placeholder does not. */}
           <InputGroupAddon>
             <label
               htmlFor={addressInputId}
-              className="shrink-0 whitespace-nowrap text-muted-foreground text-xs"
+              className="shrink-0 whitespace-nowrap text-muted-foreground text-sm"
             >
               주소
             </label>
