@@ -37,7 +37,7 @@ import {
   type PreviewViewportSetting,
 } from "@t3tools/contracts";
 import { PREVIEW_VIEWPORT_PRESETS } from "@t3tools/shared/previewViewport";
-import { MoreVertical, Plus as PlusIcon } from "lucide-react";
+import { CheckIcon, MoreVertical, Plus as PlusIcon, Undo2Icon } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 import { ScreenRotationIcon } from "~/browser/ScreenRotationIcon";
@@ -531,13 +531,20 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
   return (
     <SettingsRow
       {...searchableSetting("browser-link-target")}
-      description="Where links in the chat and terminal open. Hold ⌘ or Ctrl while clicking a link to open it in your default browser either way."
+      className="break-keep text-pretty [&_h3+span]:size-9 [&_p]:text-sm [&_p]:text-foreground"
+      description="대화와 터미널의 링크를 열 위치예요. ⌘ 또는 Ctrl을 누른 채 클릭하면 선택과 관계없이 기본 브라우저로 열어요."
       resetAction={
         !disabled && linkTarget !== DEFAULT_BROWSER_LINK_TARGET ? (
-          <SettingResetButton
-            label="link target"
+          <Button
+            data-icon-control
+            size="icon"
+            variant="outline"
+            className="border-foreground/60 text-foreground"
+            aria-label="Reset link target to default"
             onClick={() => updateSettings({ browserLinkTarget: DEFAULT_BROWSER_LINK_TARGET })}
-          />
+          >
+            <Undo2Icon />
+          </Button>
         ) : null
       }
       control={
@@ -550,13 +557,25 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
             }
           }}
         >
-          <SelectTrigger size="sm" className="w-full min-w-0 sm:w-48" aria-label="Open links in">
-            <SelectValue>{LINK_TARGET_LABELS[linkTarget]}</SelectValue>
+          <SelectTrigger
+            className="w-full min-w-0 border-foreground/60 py-2 text-foreground sm:w-48 [&_[data-slot=select-icon]_svg]:opacity-100"
+            aria-label="Open links in"
+          >
+            <SelectValue className="overflow-visible whitespace-normal text-clip break-keep text-pretty">
+              {LINK_TARGET_LABELS[linkTarget]}
+            </SelectValue>
           </SelectTrigger>
-          <SelectPopup align="end" alignItemWithTrigger={false}>
+          <SelectPopup align="end" alignItemWithTrigger={false} className="text-foreground">
             {(Object.keys(LINK_TARGET_LABELS) as ReadonlyArray<BrowserLinkTarget>).map((target) => (
-              <SelectItem hideIndicator key={target} value={target}>
-                {LINK_TARGET_LABELS[target]}
+              <SelectItem
+                key={target}
+                value={target}
+                className="min-h-9 px-3 py-2 break-keep text-pretty sm:min-h-9"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  {LINK_TARGET_LABELS[target]}
+                  {linkTarget === target ? <CheckIcon className="size-4" /> : null}
+                </span>
               </SelectItem>
             ))}
           </SelectPopup>
