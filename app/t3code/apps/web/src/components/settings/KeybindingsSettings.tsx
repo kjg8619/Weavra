@@ -656,7 +656,7 @@ function WhenExpressionBuilder({
 
   if (rawOnly) {
     return (
-      <div className="w-[min(34rem,calc(100vw-4rem))] space-y-2 text-sm text-foreground">
+      <div className="w-full min-w-0 space-y-2 text-sm text-foreground">
         <label className="flex flex-col gap-2">
           조건 원문
           <Input
