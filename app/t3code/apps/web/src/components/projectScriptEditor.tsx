@@ -10,6 +10,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import {
   BugIcon,
+  CheckIcon,
   FlaskConicalIcon,
   HammerIcon,
   ListChecksIcon,
@@ -167,6 +168,9 @@ export function ProjectScriptEditorDialog({
   const [previewUrl, setPreviewUrl] = useState("");
   const [autoOpenPreview, setAutoOpenPreview] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [commandError, setCommandError] = useState<string | null>(null);
+  const commandRef = useRef<HTMLTextAreaElement>(null);
+  const iconTriggerRef = useRef<HTMLButtonElement>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [savingRequest, setSavingRequest] = useState<ProjectScriptEditorRequest | null>(null);
   const pendingSubmissionRef = useRef<{ request: ProjectScriptEditorRequest } | null>(null);
@@ -198,6 +202,7 @@ export function ProjectScriptEditorDialog({
     setPreviewUrl(request.initial.previewUrl ?? "");
     setAutoOpenPreview(request.initial.autoOpenPreview);
     setValidationError(request.error ?? null);
+    setCommandError(null);
     setSavingRequest(null);
   }, [request]);
 
@@ -225,16 +230,14 @@ export function ProjectScriptEditorDialog({
     if (!request || pendingSubmissionRef.current !== null) return;
     const trimmedName = name.trim();
     const trimmedCommand = command.trim();
-    if (trimmedName.length === 0) {
-      setValidationError("Name is required.");
-      return;
-    }
+    setValidationError(trimmedName.length === 0 ? "Name is required." : null);
+    setCommandError(trimmedCommand.length === 0 ? "실행할 명령을 입력해 주세요." : null);
     if (trimmedCommand.length === 0) {
-      setValidationError("Command is required.");
+      commandRef.current?.focus();
       return;
     }
+    if (trimmedName.length === 0) return;
 
-    setValidationError(null);
     let payload: NewProjectScriptInput;
     try {
       const scriptIdForValidation =
@@ -300,10 +303,10 @@ export function ProjectScriptEditorDialog({
           }
         }}
       >
-        <DialogPopup>
+        <DialogPopup className="break-keep text-pretty">
           <DialogHeader>
             <DialogTitle>{isEditing ? "Edit Action" : "Add Action"}</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-foreground">
               Actions are project-scoped commands you can run from the top bar or keybindings.
             </DialogDescription>
           </DialogHeader>
@@ -319,14 +322,16 @@ export function ProjectScriptEditorDialog({
                           <Button
                             type="button"
                             variant="outline"
-                            className="size-9 shrink-0 hover:bg-popover active:bg-popover data-pressed:bg-popover data-pressed:shadow-xs/5 data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] dark:border-transparent dark:bg-white/[0.035] dark:data-pressed:before:shadow-none"
+                            className="size-9 shrink-0 border-foreground/60! hover:bg-popover active:bg-popover data-pressed:bg-popover data-pressed:shadow-xs/5 data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] dark:bg-white/[0.035] dark:data-pressed:before:shadow-none"
                             aria-label="Choose icon"
+                            data-icon-control=""
+                            ref={iconTriggerRef}
                           />
                         }
                       >
                         <ScriptIcon icon={icon} className="size-4.5" />
                       </PopoverTrigger>
-                      <PopoverPopup align="start">
+                      <PopoverPopup align="start" finalFocus={iconTriggerRef}>
                         <div className="grid grid-cols-3 gap-2">
                           {SCRIPT_ICONS.map((entry) => {
                             const isSelected = entry.id === icon;
@@ -334,10 +339,11 @@ export function ProjectScriptEditorDialog({
                               <button
                                 key={entry.id}
                                 type="button"
-                                className={`relative flex flex-col items-center gap-2 rounded-md border px-2 py-2 text-xs dark:border-transparent ${
+                                aria-pressed={isSelected}
+                                className={`relative flex min-h-9 flex-col items-center gap-2 rounded-md border border-foreground/60 px-3 py-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 ${
                                   isSelected
-                                    ? "border-primary/70 bg-primary/10 dark:ring-1 dark:ring-primary/30"
-                                    : "border-border/70 hover:bg-accent/60 dark:bg-white/[0.035]"
+                                    ? "bg-primary/10"
+                                    : "hover:bg-accent/60 dark:bg-white/[0.035]"
                                 }`}
                                 onClick={() => {
                                   setIcon(entry.id);
@@ -346,6 +352,12 @@ export function ProjectScriptEditorDialog({
                               >
                                 <ScriptIcon icon={entry.id} className="size-4" />
                                 <span>{entry.label}</span>
+                                {isSelected && (
+                                  <CheckIcon
+                                    aria-hidden
+                                    className="absolute right-1 top-1 size-3.5 text-foreground"
+                                  />
+                                )}
                               </button>
                             );
                           })}
@@ -370,19 +382,48 @@ export function ProjectScriptEditorDialog({
                     readOnly
                     onKeyDown={captureKeybinding}
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-foreground">
                     Press a shortcut. Use <code>Backspace</code> to clear. Shortcuts are
                     environment-wide. Projects using the same action share its shortcut.
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="script-command">Command</Label>
+                  <Label htmlFor="script-command">
+                    Command <span className="font-normal text-foreground">(필수)</span>
+                  </Label>
+                  <p
+                    id="script-command-hint"
+                    className="break-keep text-pretty text-sm text-foreground"
+                  >
+                    명령을 입력한 뒤 저장하세요. 저장만으로 실행되지는 않아요.
+                  </p>
                   <Textarea
                     id="script-command"
+                    className="border-foreground/60! has-aria-invalid:border-destructive-foreground! has-focus-visible:ring-ring! has-focus-visible:has-aria-invalid:ring-destructive-foreground!"
                     placeholder="bun test"
                     value={command}
-                    onChange={(event) => setCommand(event.target.value)}
+                    ref={commandRef}
+                    aria-required="true"
+                    aria-invalid={commandError !== null}
+                    aria-describedby={
+                      commandError
+                        ? "script-command-hint script-command-error"
+                        : "script-command-hint"
+                    }
+                    onChange={(event) => {
+                      setCommand(event.target.value);
+                      if (event.target.value.trim().length > 0) setCommandError(null);
+                    }}
                   />
+                  {commandError && (
+                    <p
+                      id="script-command-error"
+                      className="break-keep text-pretty text-sm text-destructive-foreground"
+                      role="alert"
+                    >
+                      {commandError}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="script-preview-url">Preview URL (optional)</Label>
@@ -392,7 +433,7 @@ export function ProjectScriptEditorDialog({
                     value={previewUrl}
                     onChange={(event) => setPreviewUrl(event.target.value)}
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-foreground">
                     Open this URL in the in-app preview when this action runs.
                   </p>
                 </div>
@@ -403,11 +444,7 @@ export function ProjectScriptEditorDialog({
                     onCheckedChange={(checked) => setRunOnWorktreeCreate(Boolean(checked))}
                   />
                 </label>
-                <label
-                  className={`flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035] ${
-                    runOnWorktreeCreate ? "" : "opacity-60"
-                  }`}
-                >
+                <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm text-foreground dark:border-transparent dark:bg-white/[0.035]">
                   <span>Wait for it to finish before the agent starts</span>
                   <Switch
                     checked={waitForSetup}
@@ -415,11 +452,7 @@ export function ProjectScriptEditorDialog({
                     onCheckedChange={(checked) => setWaitForSetup(Boolean(checked))}
                   />
                 </label>
-                <label
-                  className={`flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035] ${
-                    previewUrl.trim().length === 0 ? "opacity-60" : ""
-                  }`}
-                >
+                <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm text-foreground dark:border-transparent dark:bg-white/[0.035]">
                   <span>Open preview automatically when this action runs</span>
                   <Switch
                     checked={autoOpenPreview}
@@ -427,7 +460,9 @@ export function ProjectScriptEditorDialog({
                     onCheckedChange={(checked) => setAutoOpenPreview(Boolean(checked))}
                   />
                 </label>
-                {validationError && <p className="text-sm text-destructive">{validationError}</p>}
+                {validationError && (
+                  <p className="text-sm text-destructive-foreground">{validationError}</p>
+                )}
               </fieldset>
             </form>
           </DialogPanel>
@@ -436,17 +471,27 @@ export function ProjectScriptEditorDialog({
               <Button
                 type="button"
                 variant="destructive-outline"
-                className="mr-auto"
+                className="mr-auto min-h-8 border-destructive-foreground! px-3 active:scale-100!"
                 disabled={isSaving}
                 onClick={() => setDeleteConfirmOpen(true)}
               >
                 Delete
               </Button>
             )}
-            <Button type="button" variant="outline" onClick={close}>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-8 border-foreground/60! px-3 active:scale-100!"
+              onClick={close}
+            >
               Cancel
             </Button>
-            <Button form={formId} type="submit" disabled={isSaving}>
+            <Button
+              form={formId}
+              type="submit"
+              className="min-h-8 px-3 hover:bg-primary! active:scale-100! data-pressed:bg-primary! disabled:opacity-100"
+              disabled={isSaving}
+            >
               {isSaving ? "Saving…" : isEditing ? "Save changes" : "Save action"}
             </Button>
           </DialogFooter>
