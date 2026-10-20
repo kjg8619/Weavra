@@ -23,6 +23,7 @@ import {
 } from "react";
 import {
   type KeybindingCommand,
+  type KeybindingShortcut,
   type KeybindingWhenNode,
   type ServerRemoveKeybindingInput,
   type ServerUpsertKeybindingInput,
@@ -58,6 +59,7 @@ import {
   isKnownWhenVariable,
   keybindingConflictLabels,
   keybindingFromKeyboardEvent,
+  shortcutToKeybindingParts,
   parseWhenExpressionDraft,
   type KeybindingCommandOption,
   type KeybindingRow,
@@ -72,10 +74,10 @@ import { keybindingSearchAnchorId, searchableSetting } from "./settingsSearch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useAtomCommand } from "../../state/use-atom-command";
 
-function KeybindingPill({ value }: { value: string }) {
-  // Keys dedupe repeated parts; a literal "+" in a shortcut splits into empty strings.
+function KeybindingPill({ value }: { value: KeybindingShortcut }) {
+  // Keep literal keys separate from the input format's "+" separators.
   const seenParts = new Map<string, number>();
-  const parts = value.split("+").map((part) => {
+  const parts = shortcutToKeybindingParts(value).map((part) => {
     const seen = seenParts.get(part) ?? 0;
     seenParts.set(part, seen + 1);
     return { part, key: seen === 0 ? part : `${part}-${seen}` };
@@ -900,7 +902,7 @@ function KeybindingKeyControl({
             pillClassName,
           )}
         >
-          <KeybindingPill value={row.key} />
+          <KeybindingPill value={row.binding.shortcut} />
         </button>
       ) : (
         <Input

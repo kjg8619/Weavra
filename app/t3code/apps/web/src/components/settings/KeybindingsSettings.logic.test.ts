@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { ResolvedKeybindingsConfig } from "@t3tools/contracts";
+import type { KeybindingShortcut, ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import {
   DEFAULT_RESOLVED_KEYBINDINGS,
   parseKeybindingWhenExpression,
@@ -16,6 +16,7 @@ import {
   keybindingFromKeyboardEvent,
   parseWhenExpressionDraft,
   shortcutToKeybindingInput,
+  shortcutToKeybindingParts,
   unknownWhenVariables,
   whenAstToExpression,
   whenAstToKoreanExplanation,
@@ -24,6 +25,20 @@ import {
 } from "./KeybindingsSettings.logic";
 
 describe("KeybindingsSettings.logic", () => {
+  it.each([true, false])("keeps a literal plus key as one cap with mod=%s", (modKey) => {
+    const shortcut: KeybindingShortcut = {
+      key: "+",
+      modKey,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+    };
+    const parts = shortcutToKeybindingParts(shortcut);
+    expect(parts).toEqual(modKey ? ["mod", "+"] : ["+"]);
+    expect(shortcutToKeybindingInput(shortcut)).toBe(modKey ? "mod++" : "+");
+  });
+
   it("covers every builtin condition identifier with presentation metadata", () => {
     expect(new Set(Object.keys(WHEN_VARIABLE_LABELS))).toEqual(new Set(buildWhenVariableOptions()));
   });
