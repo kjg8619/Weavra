@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { layoutWeavraRunGraph, type WeavraRunGraph } from "./weavraRunGraphLayout";
+import { GRAPH_CARD, layoutWeavraRunGraph, type WeavraRunGraph } from "./weavraRunGraphLayout";
 
 const graph = (nodes: WeavraRunGraph["nodes"], edges: WeavraRunGraph["edges"]): WeavraRunGraph =>
   ({ runId: "run", stateRevision: 1, status: "RUNNING", nodes, edges }) as WeavraRunGraph;
@@ -111,5 +111,36 @@ describe("layoutWeavraRunGraph", () => {
       1000,
     );
     expect(cards.map((card) => card.node.id)).toEqual(["m"]);
+  });
+
+  it("keeps cards and column headers apart at every panel width", () => {
+    const steps = ["test", "implement", "self-check", "review", "complete"] as const;
+    const nodes = steps.flatMap((stepId): WeavraRunGraph["nodes"] => [
+      { id: `${stepId}:1`, kind: "agent", status: "passed", stepId, attempt: 1 },
+      { id: `${stepId}:2`, kind: "agent", status: "running", stepId, attempt: 2 },
+    ]);
+    const overlap = (
+      a: { x: number; y: number; w: number; h: number },
+      b: { x: number; y: number; w: number; h: number },
+    ) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    for (const available of [320, 600, 1000, Number.POSITIVE_INFINITY]) {
+      const { cards, columns } = layoutWeavraRunGraph(graph(nodes, []), available);
+      const boxes = [
+        ...cards.map((card) => ({
+          x: card.x,
+          y: card.y,
+          w: GRAPH_CARD.width,
+          h: GRAPH_CARD.height,
+        })),
+        ...columns.map((column) => ({
+          x: column.x,
+          y: column.y,
+          w: GRAPH_CARD.width,
+          h: GRAPH_CARD.header,
+        })),
+      ];
+      for (const [index, box] of boxes.entries())
+        for (const other of boxes.slice(index + 1)) expect(overlap(box, other)).toBe(false);
+    }
   });
 });
