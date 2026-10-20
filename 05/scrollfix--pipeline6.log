@@ -1,0 +1,32 @@
+AFTER=ea54d52aa5762ce67309d74dcb02ef220fcdb9e2 DIRTY=       0
+STEP focused-tests EXIT=0
+   Duration  1.29s (transform 1.47s, setup 126ms, import 3.00s, tests 54ms, environment 0ms)
+
+STEP build-after EXIT=0
+    '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-05/after/package/builder-debug.yml'
+  ]
+AFTER_ASAR=f9c1b7dde4b9cde90f9be166e1adfe0150e6dfd9d038534aea7b30261697d6d5
+GATE clear
+STEP capture-after EXIT=0
+CAPTURE matrix/1920x1080/light/48/end-default.png
+DONE 152 PNGs; product findings retained
+STEP diff EXIT=0
+DIFF matrix/1920x1080/light/48/top-default.png
+DIFF matrix/1920x1080/light/48/end-default.png
+GATE clear
+STEP accept-scenarios-01 EXIT=0
+  }
+}
+STEP verify-packet-01 EXIT=0
+  "receiptSha256": "a83bac3b8b0f8dd8d182850bcc151721b3cacfe5606fadfeca8e247f0b26cd36"
+}
+STEP diff-check-01 EXIT=0
+GATE clear
+STEP accept-scenarios-02 EXIT=0
+  }
+}
+STEP verify-packet-02 EXIT=0
+  "receiptSha256": "aea7bfd020b6b9676e41bc478d95d00115e9ef8c5bf55dfc3643d72b8df96dab"
+}
+STEP diff-check-02 EXIT=0
+PIPELINE_DONE
