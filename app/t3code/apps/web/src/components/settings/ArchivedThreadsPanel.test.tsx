@@ -82,12 +82,13 @@ import { ArchivedThreadsPanel } from "./SettingsPanels";
 const environmentId = EnvironmentId.make("remote");
 const projectId = ProjectId.make("project-a");
 const timestamp = "2026-10-20T00:00:00.000Z";
+const decodeSnapshot = Schema.decodeUnknownSync(OrchestrationShellSnapshot);
 let renderer: ReactTestRenderer | undefined;
 
 function snapshot(ids: readonly string[]): ArchivedSnapshotEntry {
   return {
     environmentId,
-    snapshot: Schema.decodeUnknownSync(OrchestrationShellSnapshot)({
+    snapshot: decodeSnapshot({
       snapshotSequence: 1,
       updatedAt: timestamp,
       projects: [
