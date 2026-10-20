@@ -18,6 +18,8 @@ import {
   environmentGroupsWithUpdates,
   firstFailedProviderUpdateMessage,
   firstRejectedProviderUpdateMessage,
+  getProviderManualUpdateResultView,
+  getProviderUpdateAvailabilitySummary,
   getProviderUpdateInitialToastView,
   getProviderUpdateProgressToastView,
   getProviderUpdateRejectedToastView,
@@ -1036,5 +1038,76 @@ describe("provider update launch notification logic", () => {
         }),
       ).toMatchObject({ kind: "idle", text: "Codex" });
     });
+  });
+});
+
+describe("Providers settings update status", () => {
+  it("keeps update availability discoverable in Providers", () => {
+    expect(
+      getProviderUpdateAvailabilitySummary([
+        provider({ driver: driver("codex"), version: "1.0.0", latestVersion: "2.0.0" }),
+        provider({ driver: driver("claudeAgent"), advisoryStatus: "current" }),
+      ]),
+    ).toBe("공급자 업데이트를 쓸 수 있어요: Codex v1.0.0 → v2.0.0");
+  });
+
+  it("has nothing to announce when every provider is current", () => {
+    expect(
+      getProviderUpdateAvailabilitySummary([
+        provider({ driver: driver("codex"), advisoryStatus: "current" }),
+      ]),
+    ).toBeNull();
+  });
+
+  it("shows no manual result before the user starts an update", () => {
+    expect(
+      getProviderManualUpdateResultView({
+        provider: provider({ driver: driver("codex") }),
+        startFailure: null,
+      }),
+    ).toBeNull();
+    expect(
+      getProviderManualUpdateResultView({
+        provider: provider({
+          driver: driver("codex"),
+          updateState: {
+            status: "idle",
+            startedAt: null,
+            finishedAt: null,
+            message: null,
+            output: null,
+          },
+        }),
+        startFailure: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("reports a command that could not start in place", () => {
+    expect(
+      getProviderManualUpdateResultView({
+        provider: provider({ driver: driver("codex") }),
+        startFailure: "spawn npm ENOENT",
+      }),
+    ).toMatchObject({ phase: "failed", type: "error", description: "spawn npm ENOENT" });
+  });
+
+  it("reports the provider's live update outcome in place", () => {
+    expect(
+      getProviderManualUpdateResultView({
+        provider: provider({
+          driver: driver("codex"),
+          advisoryStatus: "current",
+          updateState: {
+            status: "succeeded",
+            startedAt: checkedAt,
+            finishedAt: laterCheckedAt,
+            message: null,
+            output: null,
+          },
+        }),
+        startFailure: null,
+      }),
+    ).toMatchObject({ phase: "succeeded", type: "success" });
   });
 });
