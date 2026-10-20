@@ -300,10 +300,10 @@ function DiscoveryItemRow({
                 size="icon-xs"
                 variant="outline"
                 data-icon-control
-                className="border-foreground/70 text-foreground focus-visible:ring-2 focus-visible:ring-foreground"
+                className="scroll-m-2 border-foreground/70 text-foreground focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-foreground focus-visible:outline-offset-2"
                 onClick={() => setIsExpanded((open) => !open)}
                 aria-expanded={isExpanded}
-                aria-label={`${item.label} 설정 안내`}
+                aria-label={auth ? `${item.label} 설정 안내` : `Toggle ${item.label} details`}
               >
                 <ChevronDownIcon
                   className={cn("size-3.5 transition-transform", isExpanded && "rotate-180")}
@@ -519,7 +519,8 @@ export function SourceControlSettingsPanel() {
           input: {},
         }),
   );
-  const result = discovery.data ?? EMPTY_DISCOVERY_RESULT;
+  const result =
+    discovery.error === null ? (discovery.data ?? EMPTY_DISCOVERY_RESULT) : EMPTY_DISCOVERY_RESULT;
   const hasVersionControlSystems = result.versionControlSystems.length > 0;
   const hasDiscoveryItems = hasVersionControlSystems || result.sourceControlProviders.length > 0;
   const isInitialScanPending = discovery.isPending && discovery.data === null;
@@ -534,7 +535,7 @@ export function SourceControlSettingsPanel() {
             size="icon-xs"
             variant="outline"
             data-icon-control
-            className="border-foreground/70 text-foreground disabled:opacity-100 focus-visible:ring-2 focus-visible:ring-foreground"
+            className="scroll-m-2 border-foreground/70 text-foreground disabled:opacity-100 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-foreground focus-visible:outline-offset-2"
             onClick={handleScan}
             disabled={discovery.isPending}
             aria-label="Rescan server environment"

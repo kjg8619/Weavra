@@ -154,7 +154,10 @@ describe("source-control discovery axes", () => {
 
   it("does not reuse successful axes after failed discovery and allows an explicit rescan", async () => {
     await renderDiscovery(provider({ auth: { ...provider().auth, status: "authenticated" } }));
-    const root = await renderDiscovery(null, "Synthetic discovery failed");
+    const root = await renderDiscovery(
+      provider({ auth: { ...provider().auth, status: "authenticated" } }),
+      "Synthetic discovery failed",
+    );
     expect(
       root.findAll((node) => node.props["data-source-control-auth"] !== undefined),
     ).toHaveLength(0);
