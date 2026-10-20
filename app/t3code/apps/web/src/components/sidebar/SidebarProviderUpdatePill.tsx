@@ -31,6 +31,13 @@ const PROVIDER_UPDATE_PILL_PROGRESS_STYLES = {
   error: "bg-destructive/14",
 } as const;
 
+const PROVIDER_UPDATE_PILL_LABELS = {
+  loading: "공급자 업데이트 중",
+  success: "공급자 업데이트 완료",
+  warning: "공급자 업데이트 확인 필요",
+  error: "공급자 업데이트 실패",
+} as const;
+
 function latestProviderCheckedAt(
   providers: ReadonlyArray<Pick<ServerProvider, "checkedAt">>,
 ): string | undefined {
@@ -124,10 +131,11 @@ export function SidebarProviderUpdatePill() {
   if (!displayedView) {
     return null;
   }
+  const fullDescription = `${displayedView.title}. ${displayedView.description}`;
 
   return (
     <div
-      className={`group/provider-update relative flex min-h-7 w-full shrink-0 items-center overflow-hidden rounded-lg text-[11px] leading-4 font-medium transform-gpu transition-[translate,opacity] duration-(--motion-surface) ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-opacity ${
+      className={`group/provider-update relative flex min-h-10 w-full shrink-0 items-center overflow-hidden rounded-lg text-sm leading-5 font-medium transform-gpu transition-[translate,opacity] duration-(--motion-surface) ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-opacity ${
         PROVIDER_UPDATE_PILL_STYLES[displayedView.tone]
       } ${
         exitingKey === displayedView.key
@@ -170,8 +178,8 @@ export function SidebarProviderUpdatePill() {
           render={
             <button
               type="button"
-              aria-label={displayedView.description}
-              className="provider-update-main relative z-(--layer-raised-content) flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
+              aria-label={fullDescription}
+              className="provider-update-main relative z-(--layer-raised-content) flex min-h-10 min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
               onClick={openProviderSettings}
             >
               {displayedView.tone === "loading" ? (
@@ -183,18 +191,23 @@ export function SidebarProviderUpdatePill() {
               ) : (
                 <DownloadIcon className="size-3.5 shrink-0" />
               )}
-              <span className="min-w-0 wrap-break-word">{displayedView.title}</span>
+              <span className="min-w-0 break-keep">
+                {PROVIDER_UPDATE_PILL_LABELS[displayedView.tone]}
+              </span>
             </button>
           }
         />
-        <TooltipPopup side="top">{displayedView.description}</TooltipPopup>
+        <TooltipPopup side="top">
+          <span className="block font-medium">{displayedView.title}</span>
+          <span className="block">{displayedView.description}</span>
+        </TooltipPopup>
       </Tooltip>
       {displayedView.dismissible && (
         <Tooltip>
           <TooltipTrigger
             render={
               <Button
-                size="icon-micro"
+                size="icon-lg"
                 variant="ghost"
                 aria-label={ko.providers.dismissUpdateNotice}
                 className="relative z-(--layer-raised-content) mr-1 [--control-icon-color:currentColor] rounded-md text-inherit opacity-70 hover:bg-transparent hover:opacity-100"

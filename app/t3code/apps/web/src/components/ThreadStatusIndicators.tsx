@@ -37,6 +37,8 @@ import {
   type PullRequestGlyphIcon,
 } from "./pullRequest/pullRequestIcons";
 import { resolvePullRequestState } from "./pullRequest/pullRequestPresentation";
+import { ko } from "../i18n/ko";
+import { formatRelativeTimeLabel } from "../timestampFormat";
 
 export interface PrStatusIndicator {
   label: string;
@@ -407,13 +409,23 @@ export function ThreadStatusLabel({
   status: ThreadStatusPill;
   compact?: boolean;
 }) {
+  const activity = status.activityProgress
+    ? `${status.activityLabel} · ${status.activityProgress}`
+    : status.activityLabel;
+  const observation = status.isStale
+    ? `마지막 관측: ${
+        status.lastObservedAt ? formatRelativeTimeLabel(status.lastObservedAt) : ko.common.unknown
+      }`
+    : null;
+  const statusLabel = status.label;
+  const accessibleLabel = [statusLabel, activity, observation].filter(Boolean).join(". ");
   if (compact) {
     return (
       <Tooltip>
         <TooltipTrigger
           render={
             <span
-              aria-label={status.label}
+              aria-label={accessibleLabel}
               className={`inline-flex size-3.5 shrink-0 items-center justify-center ${status.colorClass}`}
             />
           }
@@ -424,7 +436,7 @@ export function ThreadStatusLabel({
             }`}
           />
         </TooltipTrigger>
-        <TooltipPopup side="top">{status.label}</TooltipPopup>
+        <TooltipPopup side="top">{accessibleLabel}</TooltipPopup>
       </Tooltip>
     );
   }
@@ -434,8 +446,8 @@ export function ThreadStatusLabel({
       <TooltipTrigger
         render={
           <span
-            aria-label={status.label}
-            className={`inline-flex items-center gap-1 text-[10px] ${status.colorClass}`}
+            aria-label={accessibleLabel}
+            className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] ${status.colorClass}`}
           />
         }
       >
@@ -444,10 +456,34 @@ export function ThreadStatusLabel({
             status.pulse ? "animate-status-pulse" : ""
           }`}
         />
-        <span className="hidden md:inline">{status.label}</span>
+        <span className="hidden md:inline">{statusLabel}</span>
       </TooltipTrigger>
-      <TooltipPopup side="top">{status.label}</TooltipPopup>
+      <TooltipPopup side="top">{accessibleLabel}</TooltipPopup>
     </Tooltip>
+  );
+}
+
+export function ThreadStatusDetails({ status }: { status: ThreadStatusPill }) {
+  const activity = status.activityProgress
+    ? `${status.activityLabel} · ${status.activityProgress}`
+    : status.activityLabel;
+  const observation = status.isStale
+    ? `마지막 관측: ${
+        status.lastObservedAt ? formatRelativeTimeLabel(status.lastObservedAt) : ko.common.unknown
+      }`
+    : null;
+  if (!activity && !observation) return null;
+  return (
+    <span className="flex min-w-0 flex-col text-sm leading-5">
+      {activity ? (
+        <span className="min-w-0 text-balance break-keep break-words text-foreground">
+          {activity}
+        </span>
+      ) : null}
+      {observation ? (
+        <span className="min-w-0 break-words text-foreground">{observation}</span>
+      ) : null}
+    </span>
   );
 }
 

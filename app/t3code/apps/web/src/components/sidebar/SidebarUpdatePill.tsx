@@ -27,10 +27,10 @@ function SidebarUpdateArchitectureWarningContent() {
 
 export function SidebarUpdatePill() {
   return isElectron ? (
-    <SidebarMenuItem>
+    <SidebarMenuItem className="max-w-full min-w-0">
       <Tooltip>
         <TooltipTrigger
-          render={<span tabIndex={0} className="px-2 text-xs text-muted-foreground" />}
+          render={<span tabIndex={0} className="px-2 text-xs break-keep text-muted-foreground" />}
         >
           업데이트를 사용할 수 없음
         </TooltipTrigger>
