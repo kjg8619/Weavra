@@ -2785,15 +2785,29 @@ export async function runScenarios(context) {
       await home();
       const attach = page.getByRole("button", { name: "파일 첨부", exact: true });
       await attach.focus();
-      const chooser = page.waitForEvent("filechooser");
-      await act("keyboard opens attachment chooser", () => page.keyboard.press("Enter"));
-      await (
-        await chooser
-      ).setFiles({
-        name: "hig-keyboard.txt",
-        mimeType: "text/plain",
-        buffer: Buffer.from("HIG keyboard attachment"),
-      });
+      // Playwright turns file-chooser interception on without awaiting it, so a quick
+      // keyboard activation can reach the native dialog first. Enable it and wait for the
+      // acknowledgement before pressing Enter, then answer the chooser that opened.
+      const chooserSession = await page.context().newCDPSession(page);
+      try {
+        await chooserSession.send("Page.enable");
+        await chooserSession.send("Page.setInterceptFileChooserDialog", { enabled: true });
+        const opened = new Promise((resolve) =>
+          chooserSession.once("Page.fileChooserOpened", resolve),
+        );
+        await act("keyboard opens attachment chooser", () => page.keyboard.press("Enter"));
+        const chooser = await bounded(opened, "keyboard attachment chooser", 15_000);
+        const file = path.join(context.isolation.home, "hig-keyboard.txt");
+        await fs.writeFile(file, "HIG keyboard attachment");
+        await chooserSession.send("DOM.setFileInputFiles", {
+          files: [file],
+          backendNodeId: chooser.backendNodeId,
+        });
+      } finally {
+        await chooserSession.send("Page.setInterceptFileChooserDialog", { enabled: false });
+        await chooserSession.detach();
+      }
+      await page.getByText("hig-keyboard.txt", { exact: true }).first().waitFor();
       assert(
         "keyboard file appears in draft",
         (await page.getByText("hig-keyboard.txt", { exact: true }).count()) > 0,
