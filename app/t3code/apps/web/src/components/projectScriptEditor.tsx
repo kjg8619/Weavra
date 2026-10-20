@@ -230,17 +230,13 @@ export function ProjectScriptEditorDialog({
     if (!request || pendingSubmissionRef.current !== null) return;
     const trimmedName = name.trim();
     const trimmedCommand = command.trim();
-    setValidationError(null);
-    setCommandError(null);
-    if (trimmedName.length === 0) {
-      setValidationError("Name is required.");
-      return;
-    }
+    setValidationError(trimmedName.length === 0 ? "Name is required." : null);
+    setCommandError(trimmedCommand.length === 0 ? "실행할 명령을 입력해 주세요." : null);
     if (trimmedCommand.length === 0) {
-      setCommandError("실행할 명령을 입력해 주세요.");
       commandRef.current?.focus();
       return;
     }
+    if (trimmedName.length === 0) return;
 
     let payload: NewProjectScriptInput;
     try {

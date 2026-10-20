@@ -255,6 +255,18 @@ describe("project action editor save lifecycle", () => {
 });
 
 describe("project action command validation", () => {
+  it("marks the command invalid when the untouched new form is submitted", async () => {
+    open({ scriptId: null, initial: EMPTY_PROJECT_SCRIPT_INPUT });
+
+    await act(async () => {
+      await submit();
+    });
+
+    expect(commandField().props["aria-invalid"]).toBe(true);
+    expect(renderer!.root.findByProps({ id: "script-command-error" })).toBeDefined();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it.each(["", " \t\n "])(
     "blocks saving a %s command with an associated field error",
     async (value) => {
