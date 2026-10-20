@@ -3148,7 +3148,7 @@ export function ArchivedThreadsPanel() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-auto min-h-9 whitespace-normal break-keep px-3 py-2 text-sm text-pretty transition-[opacity,transform] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:ring-0 focus-visible:ring-offset-0 [&:active:not([aria-haspopup])]:scale-100"
+                  className="h-auto min-h-9 border-muted-foreground whitespace-normal break-keep px-3 py-2 text-sm text-pretty transition-[opacity,transform] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:ring-0 focus-visible:ring-offset-0 [&:active:not([aria-haspopup])]:scale-100"
                   onClick={() => {
                     if (canGoBack) {
                       router.history.back();
