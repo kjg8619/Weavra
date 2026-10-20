@@ -15,7 +15,7 @@ import {
   type ThreadPullRequestBadge,
 } from "@t3tools/shared/threadPullRequests";
 import { FolderGit2Icon, TerminalIcon } from "lucide-react";
-import { useMemo, type MouseEvent, type ReactNode } from "react";
+import { useMemo, type MouseEvent } from "react";
 import { buttonVariants, InlineButton } from "./ui/button";
 import { cn } from "../lib/utils";
 import { useEnvironment, usePrimaryEnvironmentId } from "../state/environments";
@@ -463,17 +463,6 @@ export function ThreadStatusLabel({
   );
 }
 
-/** Keeps the last two words on one line so a wrapped line never ends in a lone short word. */
-function keepTailTogether(text: string): ReactNode {
-  const match = /^(.*\S) (\S+ \S{1,2})$/.exec(text);
-  if (!match) return text;
-  return (
-    <>
-      {match[1]} <span className="whitespace-nowrap">{match[2]}</span>
-    </>
-  );
-}
-
 export function ThreadStatusDetails({ status }: { status: ThreadStatusPill }) {
   const activity = status.activityProgress
     ? `${status.activityLabel} · ${status.activityProgress}`
@@ -487,7 +476,9 @@ export function ThreadStatusDetails({ status }: { status: ThreadStatusPill }) {
   return (
     <span className="flex min-w-0 flex-col text-sm leading-5">
       {activity ? (
-        <span className="min-w-0 break-keep text-foreground">{keepTailTogether(activity)}</span>
+        <span className="min-w-0 text-balance break-keep break-words text-foreground">
+          {activity}
+        </span>
       ) : null}
       {observation ? (
         <span className="min-w-0 break-words text-foreground">{observation}</span>
