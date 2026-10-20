@@ -80,20 +80,35 @@ export function whenAstToKoreanExplanation(node: KeybindingWhenNode | undefined)
   if (!node) return "항상";
   switch (node.type) {
     case "identifier":
-      if (node.name === "terminalFocus") return "터미널에 포커스";
-      if (node.name === "terminalOpen") return "터미널이 열려있음";
-      if (node.name === "isWeb") return "웹";
-      if (node.name === "isDesktop") return "데스크톱";
+      if (node.name === "terminalFocus") return "터미널에 입력 초점이 있음";
+      if (node.name === "terminalOpen") return "터미널이 열려 있음";
+      if (node.name === "modelPickerOpen") return "모델 선택기가 열려 있음";
+      if (node.name === "isWeb") return "웹에서 사용 중";
+      if (node.name === "isDesktop") return "데스크톱 앱에서 사용 중";
       if (node.name === "true") return "항상";
-      if (node.name === "false") return "사용 안 함";
-      return `조건: ${node.name}`;
+      if (node.name === "false") return "항상 거짓";
+      return `사용자 정의 조건 ‘${node.name}’ (고급 조건에서 원문 확인)`;
     case "not":
-      return `아닌 ${whenAstToKoreanExplanation(node.node)}`;
+      return `(${whenAstToKoreanExplanation(node.node)})이 아님`;
     case "and":
-      return `${whenAstToKoreanExplanation(node.left)} 그리고 ${whenAstToKoreanExplanation(node.right)}`;
+      return `(${whenAstToKoreanExplanation(node.left)}) 그리고 (${whenAstToKoreanExplanation(node.right)})`;
     case "or":
-      return `${whenAstToKoreanExplanation(node.left)} 또는 ${whenAstToKoreanExplanation(node.right)}`;
+      return `(${whenAstToKoreanExplanation(node.left)}) 또는 (${whenAstToKoreanExplanation(node.right)})`;
   }
+}
+
+/** Presentation only: keep every editable binding, grouped by command and the exact condition AST. */
+export function groupKeybindingRows(
+  rows: ReadonlyArray<KeybindingRow>,
+): ReadonlyArray<ReadonlyArray<KeybindingRow>> {
+  const groups = new Map<string, KeybindingRow[]>();
+  for (const row of rows) {
+    const key = JSON.stringify([row.command, row.binding.whenAst ?? null]);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+  return [...groups.values()];
 }
 
 export function whenNodeRemoveLabel(node: KeybindingWhenNode, depth: number): string {
