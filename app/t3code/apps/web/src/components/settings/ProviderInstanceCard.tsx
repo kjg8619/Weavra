@@ -597,18 +597,13 @@ export function ProviderInstanceCard({
           selected ? "bg-muted/45" : "hover:bg-muted/25",
         )}
       >
-        <div
-          className={cn(
-            "pointer-events-none relative flex min-w-0 flex-1 items-start gap-3 rounded-md text-left transition-opacity",
-          )}
+        <button
+          type="button"
+          className="flex min-h-9 min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-md text-left outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground"
+          onClick={onSelect}
+          aria-label={`Select ${displayName}`}
+          aria-pressed={selected}
         >
-          <button
-            type="button"
-            className="pointer-events-auto absolute inset-0 cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            onClick={onSelect}
-            aria-label={`Select ${displayName}`}
-            aria-pressed={selected}
-          />
           {titleIconNode}
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-2">
@@ -623,33 +618,6 @@ export function ProviderInstanceCard({
                   {versionLabel}
                 </code>
               ) : null}
-              {versionAdvisory ? (
-                updateCommand ? (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          type="button"
-                          size="icon-micro"
-                          variant="ghost-muted"
-                          className="pointer-events-auto relative shrink-0"
-                          aria-label={`Copy ${displayName} update command`}
-                          onClick={() =>
-                            copyToClipboard(updateCommand, { providerName: displayName })
-                          }
-                        >
-                          <ArrowUpCircleIcon className="size-3.5" />
-                        </Button>
-                      }
-                    />
-                    <TooltipPopup side="top">Copy update command</TooltipPopup>
-                  </Tooltip>
-                ) : (
-                  <span role="img" aria-label="Update available" className="inline-flex shrink-0">
-                    <ArrowUpCircleIcon className="size-3.5 text-muted-foreground" />
-                  </span>
-                )
-              ) : null}
             </span>
             <span className="mt-0.5 flex items-start gap-1.5 text-sm leading-normal text-muted-foreground">
               {statusDotNode ? (
@@ -658,7 +626,33 @@ export function ProviderInstanceCard({
               <span className="break-keep text-pretty">{summary.headline}</span>
             </span>
           </span>
-        </div>
+        </button>
+        {versionAdvisory ? (
+          updateCommand ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    data-icon-control
+                    type="button"
+                    size="icon-micro"
+                    variant="ghost-muted"
+                    className="shrink-0"
+                    aria-label={`Copy ${displayName} update command`}
+                    onClick={() => copyToClipboard(updateCommand, { providerName: displayName })}
+                  >
+                    <ArrowUpCircleIcon className="size-3.5" />
+                  </Button>
+                }
+              />
+              <TooltipPopup side="top">Copy update command</TooltipPopup>
+            </Tooltip>
+          ) : (
+            <span role="img" aria-label="Update available" className="inline-flex shrink-0">
+              <ArrowUpCircleIcon className="size-3.5 text-muted-foreground" />
+            </span>
+          )
+        ) : null}
         <span className="flex h-5 shrink-0 items-center">
           <Switch
             checked={enabled}
