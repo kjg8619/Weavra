@@ -1,5 +1,6 @@
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
+  DEFAULT_SERVER_SETTINGS,
   type AssetCreateUrlInput,
   type AssetCreateUrlResult,
   type ChatFileAttachment,
@@ -12,6 +13,7 @@ import {
   type ProviderInteractionMode,
   ProviderDriverKind,
   type ProviderInstanceId,
+  type RuntimeMode,
   type ServerProvider,
   type ScopedProjectRef,
   type ScopedThreadRef,
@@ -33,6 +35,7 @@ import {
 } from "@t3tools/client-runtime/codex-artifact-templates";
 import {
   type ChatMessage,
+  DEFAULT_RUNTIME_MODE,
   isImageAttachment,
   type SessionPhase,
   type Thread,
@@ -1399,4 +1402,81 @@ export function restorePlanFollowUpComposer(input: {
     prompt: input.snapshot.prompt,
     detectTrigger: true,
   });
+}
+
+export interface FirstRequestSuggestion {
+  readonly id: "map-project" | "how-to-run" | "recent-changes";
+  readonly label: string;
+  readonly prompt: string;
+  /** Why this request fits, stated only from what the app has observed. */
+  readonly reason: string;
+}
+
+/**
+ * Read-only first requests for an empty conversation. Nothing here claims a
+ * framework or language: without observed metadata the requests ask the agent
+ * to inspect. The Git request appears only when the checkout is known to be a
+ * repository.
+ */
+export function buildFirstRequestSuggestions(input: {
+  readonly isGitRepository: boolean | undefined;
+}): ReadonlyArray<FirstRequestSuggestion> {
+  const suggestions: FirstRequestSuggestion[] = [
+    {
+      id: "map-project",
+      label: "프로젝트 구조 살펴보기",
+      prompt:
+        "이 프로젝트의 폴더 구조를 살펴보고 주요 부분의 역할을 요약해 주세요. 파일은 바꾸지 마세요.",
+      reason: "파일을 읽기만 해서, 처음 보는 프로젝트를 안전하게 파악할 수 있어요.",
+    },
+    {
+      id: "how-to-run",
+      label: "실행 방법 찾기",
+      prompt:
+        "README와 설정 파일을 읽고 이 프로젝트를 빌드하고 테스트하는 방법을 알려 주세요. 명령은 실행하지 마세요.",
+      reason: "명령을 실행하지 않고 문서와 설정에서 방법만 찾아요.",
+    },
+  ];
+  if (input.isGitRepository === true) {
+    suggestions.push({
+      id: "recent-changes",
+      label: "최근 변경 이해하기",
+      prompt: "최근 Git 커밋을 읽고 무엇이 왜 바뀌었는지 설명해 주세요. 파일은 바꾸지 마세요.",
+      reason: "이 폴더는 Git 저장소로 확인돼서 변경 기록을 읽을 수 있어요.",
+    });
+  }
+  return suggestions;
+}
+
+export type SuggestionInsertMode = "insert" | "append" | "replace";
+
+/**
+ * The draft after choosing a suggestion. An empty draft simply receives the
+ * request. Unsent text is never dropped implicitly: the caller asks the user to
+ * append or replace, and only an explicit replace discards it.
+ */
+export function applyFirstRequestSuggestion(
+  currentPrompt: string,
+  suggestionPrompt: string,
+  mode: SuggestionInsertMode,
+): string {
+  if (currentPrompt.trim().length === 0 || mode === "replace") return suggestionPrompt;
+  if (mode === "insert") throw new Error("A non-empty draft needs an explicit append or replace");
+  return `${currentPrompt.trimEnd()}\n\n${suggestionPrompt}`;
+}
+
+/**
+ * The execution mode a fresh draft starts in. A project override or an
+ * environment value other than the settings' built-in default is a choice the
+ * user made and is kept, full access included. The built-in default itself is
+ * not a choice, so an untouched profile starts in approval-required. Saved
+ * draft choices and existing threads are resolved before this fallback.
+ */
+export function resolveFreshDraftRuntimeMode(input: {
+  readonly configured: RuntimeMode;
+  readonly source: "environment" | "project";
+}): RuntimeMode {
+  const chosen =
+    input.source === "project" || input.configured !== DEFAULT_SERVER_SETTINGS.defaultRuntimeMode;
+  return chosen ? input.configured : DEFAULT_RUNTIME_MODE;
 }

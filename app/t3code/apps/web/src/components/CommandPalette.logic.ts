@@ -137,6 +137,8 @@ export interface CommandPaletteItem {
   readonly timestamp?: string;
   readonly icon: ReactNode;
   readonly disabled?: boolean;
+  /** DOM id for the description, so a disabled row can reference its reason. */
+  readonly descriptionId?: string;
   /** Optional content rendered inline before the title text. */
   readonly titleLeadingContent?: ReactNode;
   /** Optional content rendered inline after the title text (before the timestamp). */
@@ -150,6 +152,74 @@ export interface CommandPaletteActionItem extends CommandPaletteItem {
   readonly kind: "action";
   readonly keepOpen?: boolean;
   readonly run: () => Promise<void>;
+}
+
+export type ProjectImportAvailability =
+  | { readonly status: "ready" }
+  | {
+      readonly status: "not-installed" | "unauthenticated" | "unknown" | "unsupported";
+      readonly reason: string;
+    };
+
+/** Ready sources first, then ones a setup step can fix, then permanently unsupported ones. */
+export function projectImportAvailabilityRank(availability: ProjectImportAvailability): number {
+  if (availability.status === "ready") return 0;
+  return availability.status === "unsupported" ? 2 : 1;
+}
+
+export const PROJECT_IMPORT_SETUP_DESTINATION = {
+  to: "/settings/source-control",
+} as const;
+
+export function buildProjectImportSourceActions(input: {
+  readonly environmentId: EnvironmentId;
+  readonly source: string;
+  readonly label: string;
+  readonly title: string;
+  readonly description: string;
+  readonly availability: ProjectImportAvailability;
+  readonly icon: ReactNode;
+  readonly runImport: () => Promise<void>;
+  readonly runSetup: () => Promise<void>;
+}): {
+  readonly importAction: CommandPaletteActionItem;
+  readonly setupAction: CommandPaletteActionItem | null;
+} {
+  const isReady = input.availability.status === "ready";
+  const reason = isReady ? null : input.availability.reason;
+  const importAction: CommandPaletteActionItem = {
+    kind: "action",
+    value: `action:add-project:${input.environmentId}:${input.source}${isReady ? "" : ":not-ready"}`,
+    searchTerms: ["clone", "remote", "repository", "repo", "git", input.label],
+    title: input.title,
+    description: reason ?? input.description,
+    disabled: !isReady,
+    ...(isReady
+      ? {}
+      : { descriptionId: `add-project-${input.environmentId}-${input.source}-reason` }),
+    icon: input.icon,
+    keepOpen: isReady,
+    run: async () => {
+      if (isReady) await input.runImport();
+    },
+  };
+
+  if (input.availability.status === "ready" || input.availability.status === "unsupported") {
+    return { importAction, setupAction: null };
+  }
+
+  return {
+    importAction,
+    setupAction: {
+      kind: "action",
+      value: `action:add-project:${input.environmentId}:${input.source}:setup`,
+      searchTerms: ["setup", "settings", "source control", input.label],
+      title: `${input.label} 설정 열기`,
+      description: reason ?? "",
+      icon: input.icon,
+      run: input.runSetup,
+    },
+  };
 }
 
 export interface CommandPaletteSubmenuItem extends CommandPaletteItem {

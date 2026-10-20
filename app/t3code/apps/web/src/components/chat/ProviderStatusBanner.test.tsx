@@ -8,6 +8,7 @@ import {
   ProviderStatusBanner,
   shouldShowProviderStatusBanner,
 } from "./ProviderStatusBanner";
+import { getThreadErrorBannerKey, shouldShowThreadErrorBanner } from "./ThreadErrorBanner";
 
 function warningProvider(): ServerProvider {
   return {
@@ -62,6 +63,52 @@ describe("ProviderStatusBanner", () => {
     expect(
       shouldShowProviderStatusBanner({ ...status, driver: ProviderDriverKind.make("codex") }, null),
     ).toBe(true);
+  });
+
+  it("shows an auth-only failure with its own recovery key", () => {
+    const status: ServerProvider = {
+      ...warningProvider(),
+      status: "error",
+      auth: { status: "unauthenticated" },
+      message: "Codex requires login",
+    };
+
+    expect(shouldShowProviderStatusBanner(status, null)).toBe(true);
+    expect(shouldShowThreadErrorBanner("env:thread-a", null, false)).toBe(false);
+  });
+
+  it("keeps an auth failure and a turn failure independent", () => {
+    const status: ServerProvider = {
+      ...warningProvider(),
+      status: "error",
+      auth: { status: "unauthenticated" },
+      message: "Provider unavailable",
+    };
+    const turnKey = getThreadErrorBannerKey("env:thread-a", "Provider unavailable");
+
+    expect(getProviderStatusBannerKey(status)).not.toBe(turnKey);
+    // Dismissing the turn failure must not hide the provider cause, and vice versa.
+    expect(shouldShowProviderStatusBanner(status, turnKey)).toBe(true);
+    expect(shouldShowThreadErrorBanner("env:thread-a", "Provider unavailable", false)).toBe(true);
+  });
+
+  it("treats the same provider event repeated as one cause", () => {
+    const first = warningProvider();
+    const repeated = { ...warningProvider(), checkedAt: "2026-07-23T12:05:00.000Z" };
+
+    expect(getProviderStatusBannerKey(repeated)).toBe(getProviderStatusBannerKey(first));
+    expect(shouldShowProviderStatusBanner(repeated, getProviderStatusBannerKey(first))).toBe(false);
+  });
+
+  it("keeps equal messages from distinct provider instances separate", () => {
+    const work = warningProvider();
+    const personal = {
+      ...warningProvider(),
+      instanceId: ProviderInstanceId.make("codex_personal"),
+    };
+
+    expect(getProviderStatusBannerKey(personal)).not.toBe(getProviderStatusBannerKey(work));
+    expect(shouldShowProviderStatusBanner(personal, getProviderStatusBannerKey(work))).toBe(true);
   });
 
   it("stays hidden after its current warning is dismissed", () => {

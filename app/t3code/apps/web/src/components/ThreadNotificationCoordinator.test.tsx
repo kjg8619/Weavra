@@ -130,13 +130,14 @@ afterEach(async () => {
 });
 
 describe("thread notifications", () => {
-  it("alerts once with system alerts off and opens the completed thread", async () => {
+  it("alerts once with system alerts off and opens the thread that needs input", async () => {
     await render();
-    await complete();
+    state.input = true;
+    await render();
     await render();
     expect(state.add).toHaveBeenCalledTimes(1);
     const toast = state.add.mock.calls[0]?.[0];
-    expect(toast?.title).toBe("Thread completed");
+    expect(toast?.title).toBe("Input needed");
     expect(toast?.description).toBe("Fix the login form");
     toast?.actionProps.onClick();
     expect(state.close).toHaveBeenCalledWith("toast-1");
@@ -217,8 +218,29 @@ describe("thread notifications", () => {
   it("compares the environment as well as the thread", async () => {
     state.active = { environmentId: "env-2", threadId: "thread-1" };
     await render();
-    await complete();
+    state.input = true;
+    await render();
     expect(state.add).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows no popup for a background completion while the app is focused", async () => {
+    state.mode = "notifications";
+    await render();
+    await complete();
+    await render();
+    expect(state.add).not.toHaveBeenCalled();
+    expect(state.notification).not.toHaveBeenCalled();
+  });
+
+  it("emits one desktop notice per unfocused completion event", async () => {
+    state.mode = "notifications";
+    state.focused = false;
+    await render();
+    await complete();
+    await render();
+    await render();
+    expect(state.notification).toHaveBeenCalledTimes(1);
+    expect(state.add).not.toHaveBeenCalled();
   });
 
   it("does not replay completed threads on first load or reconnect", async () => {
@@ -230,12 +252,12 @@ describe("thread notifications", () => {
     expect(state.add).not.toHaveBeenCalled();
   });
 
-  it("keeps sound but replaces the system popup when showing a toast", async () => {
+  it("keeps the completion sound without any popup while focused", async () => {
     state.mode = "notifications-and-sound";
     await render();
     await complete();
     expect(state.sound).toHaveBeenCalledWith("completion", expect.any(Function));
-    expect(state.add).toHaveBeenCalledTimes(1);
+    expect(state.add).not.toHaveBeenCalled();
     expect(state.notification).not.toHaveBeenCalled();
   });
 

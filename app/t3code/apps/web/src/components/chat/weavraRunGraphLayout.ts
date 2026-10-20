@@ -4,12 +4,16 @@ export type WeavraRunGraph = NonNullable<WeavraSnapshotEnvelope["data"]["graph"]
 type GraphNode = WeavraRunGraph["nodes"][number];
 type GraphEdge = WeavraRunGraph["edges"][number];
 
+/**
+ * Card text is 14px (W-15), so the card holds a name line, a status line and
+ * up to two wrapped lines; the column header may wrap to two lines.
+ */
 export const GRAPH_CARD = {
-  width: 168,
-  height: 72,
+  width: 232,
+  height: 104,
   columnGap: 40,
   rowGap: 16,
-  header: 24,
+  header: 44,
   bandGap: 28,
 } as const;
 

@@ -66,6 +66,26 @@ describe("ThreadErrorBanner", () => {
     ).toBe(false);
   });
 
+  it("shows a turn-only failure without a provider cause", () => {
+    const bannerKey = getThreadErrorBannerKey("env:thread-f", "Turn failed: tool crashed");
+
+    expect(
+      shouldShowThreadErrorBanner(
+        "env:thread-f",
+        "Turn failed: tool crashed",
+        isThreadErrorBannerDismissedForSession(bannerKey),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps equal errors in different environments separate", () => {
+    dismissThreadErrorBannerForSession(getThreadErrorBannerKey("env-a:thread-g", "Aborted"));
+    const otherEnvironmentKey = getThreadErrorBannerKey("env-b:thread-g", "Aborted");
+
+    expect(otherEnvironmentKey).not.toBe(getThreadErrorBannerKey("env-a:thread-g", "Aborted"));
+    expect(isThreadErrorBannerDismissedForSession(otherEnvironmentKey)).toBe(false);
+  });
+
   it("never shows a null error", () => {
     expect(shouldShowThreadErrorBanner("env:thread-e", null, false)).toBe(false);
   });

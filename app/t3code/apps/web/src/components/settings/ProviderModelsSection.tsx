@@ -599,36 +599,51 @@ export function ProviderModelsSection({
       </div>
 
       {driverKind === "antigravity" ? null : isAdding ? (
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <Input
-            id={`provider-instance-${instanceId}-custom-model`}
-            size="sm"
-            autoFocus
-            value={input}
-            onChange={(event) => {
-              setInput(event.target.value);
-              if (error) setError(null);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
+        <div className="mt-3 flex flex-col gap-1">
+          <label
+            htmlFor={`provider-instance-${instanceId}-custom-model`}
+            className="text-foreground text-sm"
+          >
+            모델 ID
+          </label>
+          <p
+            id={`provider-instance-${instanceId}-custom-model-hint`}
+            className="text-muted-foreground text-sm"
+          >
+            공급자에 그대로 전달할 모델 이름이에요. 공급자 문서에 적힌 ID를 입력해 주세요.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              id={`provider-instance-${instanceId}-custom-model`}
+              aria-describedby={`provider-instance-${instanceId}-custom-model-hint`}
+              size="sm"
+              autoFocus
+              value={input}
+              onChange={(event) => {
+                setInput(event.target.value);
+                if (error) setError(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  cancelAdd();
+                  return;
+                }
+                if (event.key !== "Enter") return;
                 event.preventDefault();
-                cancelAdd();
-                return;
-              }
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              handleAdd();
-            }}
-            placeholder={driverKind ? CUSTOM_MODEL_PLACEHOLDER_BY_KIND[driverKind] : "model-slug"}
-            spellCheck={false}
-          />
-          <div className="flex shrink-0 gap-2">
-            <Button size="sm" variant="outline" onClick={handleAdd}>
-              Add
-            </Button>
-            <Button size="sm" variant="ghost" onClick={cancelAdd}>
-              Cancel
-            </Button>
+                handleAdd();
+              }}
+              placeholder={driverKind ? CUSTOM_MODEL_PLACEHOLDER_BY_KIND[driverKind] : "model-slug"}
+              spellCheck={false}
+            />
+            <div className="flex shrink-0 gap-2">
+              <Button size="default" variant="outline" onClick={handleAdd}>
+                Add
+              </Button>
+              <Button size="default" variant="ghost" onClick={cancelAdd}>
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}

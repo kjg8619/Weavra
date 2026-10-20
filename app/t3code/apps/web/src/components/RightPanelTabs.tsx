@@ -36,6 +36,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -132,6 +133,8 @@ interface RightPanelTabsProps {
   pullRequestStatusSeeds?: Readonly<Record<string, PullRequestTabStatusSeed>>;
   /** Running + waiting subagents; badges the Agents card in the empty state. */
   liveAgentCount: number;
+  /** Concrete prerequisite reasons for unavailable Git/PR destinations. */
+  destinationReasons?: DockDestinationReasons | undefined;
   children: ReactNode;
 }
 
@@ -185,6 +188,44 @@ const SURFACE_UNAVAILABLE_HINTS = {
   agents: "대화에서 쓸 수 있어요.",
   device: "대화에서 쓸 수 있어요.",
 } as const;
+
+export type DockDestinationReasons = Partial<
+  Record<"diff" | "pullRequest" | "pullRequests", string>
+>;
+
+/**
+ * Why each Git/PR destination is unavailable, stated from the same facts that
+ * decide its availability. One missing prerequisite names itself; a satisfied
+ * one never appears as a reason. Unknown facts are not reported as missing.
+ */
+export function resolveDockDestinationReasons(input: {
+  readonly isServerThread: boolean;
+  readonly isGitRepository: boolean | undefined;
+  readonly hasUpstream: boolean | undefined;
+  readonly supportsPullRequests: boolean;
+  readonly hasBranchPullRequest: boolean;
+  readonly supportsThreadPullRequests: boolean;
+  readonly linkedPullRequestCount: number;
+}): DockDestinationReasons {
+  const reasons: { -readonly [K in keyof DockDestinationReasons]: string } = {};
+  if (!input.isServerThread)
+    reasons.diff = "메시지를 보내 대화를 시작하면 변경 사항을 볼 수 있어요.";
+  else if (input.isGitRepository === false) reasons.diff = "이 폴더는 Git 저장소가 아니에요.";
+  if (!input.supportsPullRequests) reasons.pullRequest = "이 환경은 PR을 지원하지 않아요.";
+  else if (input.isGitRepository === false)
+    reasons.pullRequest = "이 폴더는 Git 저장소가 아니라서 PR이 없어요.";
+  else if (input.hasUpstream === false && !input.hasBranchPullRequest)
+    reasons.pullRequest =
+      "이 branch는 원격에 올라가 있지 않아요. push한 뒤 PR이 생기면 열 수 있어요.";
+  else if (!input.hasBranchPullRequest) reasons.pullRequest = "이 branch에는 아직 PR이 없어요.";
+  if (!input.isServerThread)
+    reasons.pullRequests = "메시지를 보내 대화를 시작하면 연결된 PR을 볼 수 있어요.";
+  else if (!input.supportsThreadPullRequests)
+    reasons.pullRequests = "이 환경은 대화에 PR을 연결하지 않아요.";
+  else if (input.linkedPullRequestCount === 0)
+    reasons.pullRequests = "이 대화에 연결된 PR이 없어요.";
+  return reasons;
+}
 
 type TabContextMenuAction =
   | "rename"
@@ -275,12 +316,33 @@ export function surfaceShortcutTargetsTypingContext(
   );
 }
 
-function DisabledReasonTooltip(props: { reason: string; trigger: ReactElement }) {
+// 14px, normal weight; keep-all wraps Korean at word boundaries and pretty avoids a lone last syllable.
+const DOCK_REASON_TEXT = "break-keep text-pretty text-sm font-normal leading-5";
+
+function UnavailableLauncherRow(props: {
+  icon: ReactNode;
+  label: string;
+  shortcut: string;
+  reason: string;
+}) {
+  const reasonId = useId();
   return (
-    <Tooltip>
-      <TooltipTrigger render={props.trigger} />
-      <TooltipPopup side="top">{props.reason}</TooltipPopup>
-    </Tooltip>
+    <div
+      role="menuitem"
+      tabIndex={0}
+      aria-disabled="true"
+      aria-describedby={reasonId}
+      className="flex w-full cursor-default flex-col rounded-[var(--control-radius)] px-2.5 py-1.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <span className="flex items-center gap-2.5 text-muted-foreground">
+        {props.icon}
+        <span className="min-w-0 flex-1 truncate">{props.label}</span>
+        <Kbd>{props.shortcut}</Kbd>
+      </span>
+      <span id={reasonId} className={cn("ps-6.5 text-muted-foreground", DOCK_REASON_TEXT)}>
+        {props.reason}
+      </span>
+    </div>
   );
 }
 
@@ -291,19 +353,30 @@ function SurfaceMenuItem(props: {
   onClick: () => void;
   children: ReactNode;
 }) {
+  const reasonId = useId();
+  const showReason = !props.available && Boolean(props.disabledReason);
   const item = (
     <MenuItem
-      className={!props.available ? "data-disabled:pointer-events-auto" : undefined}
+      className={!props.available ? "data-disabled:pointer-events-auto flex-wrap" : undefined}
       onClick={props.onClick}
       disabled={!props.available}
       aria-keyshortcuts={props.shortcut}
+      {...(showReason ? { "aria-describedby": reasonId } : {})}
     >
       {props.children}
       <MenuShortcut>{props.shortcut}</MenuShortcut>
+      {showReason ? (
+        <span
+          id={reasonId}
+          className={cn("basis-full ps-6 text-muted-foreground", DOCK_REASON_TEXT)}
+        >
+          {props.disabledReason}
+        </span>
+      ) : null}
     </MenuItem>
   );
-  if (props.available || !props.disabledReason) return item;
-  return <DisabledReasonTooltip reason={props.disabledReason} trigger={item} />;
+  // The reason is printed inside the row, so a hover tooltip would only repeat it.
+  return item;
 }
 
 /**
@@ -335,6 +408,7 @@ function RightPanelEmptyState(props: {
   agentsAvailable: boolean;
   deviceAvailable: boolean;
   liveAgentCount: number;
+  destinationReasons?: DockDestinationReasons | undefined;
 }) {
   // -1 means no highlight: it only appears on hover or arrow use.
   const [highlight, setHighlight] = useState(-1);
@@ -372,7 +446,7 @@ function RightPanelEmptyState(props: {
       icon: FileDiff,
       shortcut: "D",
       available: props.diffAvailable,
-      disabledReason: SURFACE_UNAVAILABLE_HINTS.diff,
+      disabledReason: props.destinationReasons?.diff ?? SURFACE_UNAVAILABLE_HINTS.diff,
       onClick: props.onAddDiff,
       badgeCount: 0,
     },
@@ -381,7 +455,8 @@ function RightPanelEmptyState(props: {
       icon: PullRequestGlyph.pullRequest,
       shortcut: "P",
       available: props.pullRequestAvailable,
-      disabledReason: SURFACE_UNAVAILABLE_HINTS.pullRequest,
+      disabledReason:
+        props.destinationReasons?.pullRequest ?? SURFACE_UNAVAILABLE_HINTS.pullRequest,
       onClick: props.onAddPullRequest,
       badgeCount: 0,
     },
@@ -390,7 +465,8 @@ function RightPanelEmptyState(props: {
       icon: PullRequestGlyph.link,
       shortcut: "L",
       available: props.pullRequestsAvailable,
-      disabledReason: SURFACE_UNAVAILABLE_HINTS.pullRequests,
+      disabledReason:
+        props.destinationReasons?.pullRequests ?? SURFACE_UNAVAILABLE_HINTS.pullRequests,
       onClick: props.onAddPullRequests,
       badgeCount: 0,
     },
@@ -531,15 +607,15 @@ function RightPanelEmptyState(props: {
       aria-label="패널 열기"
       data-surface-launcher-keys={availableActions.map((action) => action.shortcut).join("")}
       className={cn(
-        "flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-6 pt-6 outline-none",
+        "flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-6 pt-6 outline-none",
         // The panel topbar sits above this container; matching bottom padding
         // keeps the list centered against the full panel, not the leftover.
         "pb-[calc(var(--workspace-topbar-height)+--spacing(6))]",
       )}
     >
-      <div className="w-full max-w-xs">
+      <div className="my-auto w-full max-w-xs">
         <h3 className="mb-3 text-center font-medium text-foreground text-sm">패널 열기</h3>
-        <div className="flex flex-col gap-0.5">
+        <div role="menu" aria-label="패널 열기" className="flex flex-col gap-0.5">
           {actions.map((action) =>
             action.available ? (
               // The row is itself a button, so the profile chooser sits beside
@@ -558,6 +634,7 @@ function RightPanelEmptyState(props: {
               >
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={action.onClick}
                   className={cn(
                     "flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-[var(--control-radius)] px-2.5 text-left text-sm transition-colors group-hover:bg-accent/60",
@@ -613,20 +690,14 @@ function RightPanelEmptyState(props: {
                 ) : null}
               </div>
             ) : (
-              <DisabledReasonTooltip
+              // Unavailable rows stay in place and focusable so the reason can be read;
+              // they have no action, so neither click nor Enter can open them.
+              <UnavailableLauncherRow
                 key={action.label}
+                icon={actionIcon(action, "size-4")}
+                label={action.label}
+                shortcut={action.shortcut}
                 reason={action.disabledReason}
-                trigger={
-                  <div
-                    tabIndex={0}
-                    aria-disabled="true"
-                    className="flex h-8 w-full cursor-default items-center gap-2.5 rounded-[var(--control-radius)] px-2.5 text-left text-sm opacity-50"
-                  >
-                    {actionIcon(action, "size-4")}
-                    <span className="min-w-0 flex-1 truncate">{action.label}</span>
-                    <Kbd>{action.shortcut}</Kbd>
-                  </div>
-                }
               />
             ),
           )}
@@ -930,7 +1001,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       icon: FileDiff,
       shortcut: "D",
       available: props.diffAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.diff,
+      disabledReason: props.destinationReasons?.diff ?? SURFACE_DISABLED_REASONS.diff,
       onClick: props.onAddDiff,
     },
     {
@@ -938,7 +1009,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       icon: PullRequestGlyph.pullRequest,
       shortcut: "P",
       available: props.pullRequestAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.pullRequest,
+      disabledReason: props.destinationReasons?.pullRequest ?? SURFACE_DISABLED_REASONS.pullRequest,
       onClick: props.onAddPullRequest,
     },
     {
@@ -946,7 +1017,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       icon: PullRequestGlyph.link,
       shortcut: "L",
       available: props.pullRequestsAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.pullRequests,
+      disabledReason:
+        props.destinationReasons?.pullRequests ?? SURFACE_DISABLED_REASONS.pullRequests,
       onClick: props.onAddPullRequests,
     },
     {
@@ -990,6 +1062,18 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddDevice,
     },
   ] as const;
+
+  // Escape closes the menu; focus goes back to the opener on every open.
+  const addSurfaceTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const handleAddSurfaceMenuOpenChange = (
+    open: boolean,
+    eventDetails: { readonly reason: string },
+  ) => {
+    setAddSurfaceMenuOpen(open);
+    if (!open && eventDetails.reason === "escape-key") {
+      requestAnimationFrame(() => addSurfaceTriggerRef.current?.focus());
+    }
+  };
 
   const handleAddSurfaceMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const action = surfaceShortcutActionForKey(addSurfaceActions, event.nativeEvent);
@@ -1309,10 +1393,11 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
               );
             })}
             {props.surfaces.length > 0 ? (
-              <Menu open={addSurfaceMenuOpen} onOpenChange={setAddSurfaceMenuOpen}>
+              <Menu open={addSurfaceMenuOpen} onOpenChange={handleAddSurfaceMenuOpenChange}>
                 <MenuTrigger
                   render={
                     <Button
+                      ref={addSurfaceTriggerRef}
                       aria-label="패널 추가"
                       className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
                       size="icon-xs"
@@ -1326,7 +1411,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   align="start"
                   side="bottom"
                   sideOffset={6}
-                  className="min-w-44"
+                  className="min-w-44 max-w-72"
                   onKeyDownCapture={handleAddSurfaceMenuKeyDown}
                 >
                   {addSurfaceActions.map((action) => {
@@ -1474,6 +1559,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             agentsAvailable={props.agentsAvailable}
             deviceAvailable={props.deviceAvailable}
             liveAgentCount={props.liveAgentCount}
+            destinationReasons={props.destinationReasons}
           />
         ) : (
           props.children

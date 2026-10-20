@@ -40,6 +40,7 @@ import * as Schema from "effect/Schema";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { connectionAtomRuntime } from "../../connection/runtime";
+import { writeTextToClipboard } from "../../hooks/useCopyToClipboard";
 import { requestConfirmDialog } from "../../confirmDialog";
 import { useEnvironment } from "../../state/environments";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -210,10 +211,12 @@ export function WeavraControls({
   environmentId,
   projectId,
   workspaceRoot,
+  projectName,
 }: {
   environmentId: EnvironmentId;
   projectId: ProjectId;
   workspaceRoot: string;
+  projectName?: string;
 }) {
   const observationResult = useAtomValue(
     observations.stateAtom(environmentId, projectId, workspaceRoot),
@@ -222,6 +225,8 @@ export function WeavraControls({
   const environment = useEnvironment(environmentId);
   const invoke = useAtomCommand(command, { reportFailure: false, reportDefect: false });
   const [goal, setGoal] = useState("");
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [copyStatus, setCopyStatus] = useState("");
   const [recipeId, setRecipeId] = useState("");
   const [recipeInputs, setRecipeInputs] = useState("{}");
   const [criteria, setCriteria] = useState("");
@@ -391,7 +396,35 @@ export function WeavraControls({
     !runActive &&
     state?.snapshot.status.writerPresent === true &&
     state.ownedRunId !== run.runId;
-  const canPrepareWorkflow = canPrepare || ((foreignActiveRun || staleWriter) && !submitting);
+  const prepareSupported =
+    observation?.capabilities?.commands.includes("workflow.prepare") === true;
+  const canPrepareWorkflow =
+    prepareSupported && (canPrepare || ((foreignActiveRun || staleWriter) && !submitting));
+  const prepareReason =
+    view?.support === "unsupported"
+      ? "이 연결은 Runtime 워크플로 제어를 지원하지 않아요. 읽기 전용 관찰을 이용해 주세요."
+      : environment?.connection.phase !== "connected"
+        ? "환경 연결이 끊겼어요. 다시 연결하고 최신 공식 스냅샷을 확인해 주세요."
+        : !fresh
+          ? "최신 제어 정보를 확인할 수 없어요. 연결·제어 권한을 확인하고 새 공식 스냅샷을 기다려 주세요."
+          : !prepareSupported
+            ? "이 Runtime은 워크플로 준비 기능을 제공하지 않아요. 지원되는 Runtime 연결을 확인해 주세요."
+            : submitting
+              ? "현재 요청의 결과를 기다리고 있어요. 중복 요청을 보내지 않아요."
+              : !canPrepareWorkflow
+                ? "현재 Run이나 쓰기 잠금이 있어 준비할 수 없어요. 공식 상태를 확인해 주세요."
+                : !goal.trim()
+                  ? "워크플로 목표를 입력해 주세요."
+                  : "Runtime에 계획 미리보기를 요청해요. 준비는 로컬 저장·승인·실행이 아니며, 확인 후 시작하기 전에는 실행하지 않아요.";
+  const diagnostics = [
+    ["연결 주소", environment?.displayUrl ?? "확인 안 됨"],
+    ["환경 ID", environmentId],
+    ["프로젝트 ID", projectId],
+    ["작업 공간 전체 경로", workspaceRoot],
+    ["제어 관찰 상태", observation?.status ?? "확인 안 됨"],
+    ["연결 오류", observation?.errorCode ?? "확인 안 됨"],
+    ["Runtime 소유 프로세스", "확인 안 됨"],
+  ];
   // V0.8B Planner: it exists only when the Runtime advertises it beside the COMPLEX editor it fills.
   const plannerExposed =
     complexSupported && observation?.capabilities?.plannerContractVersion === 1;
@@ -923,18 +956,55 @@ export function WeavraControls({
             {fresh ? "제어 연결됨" : "제어할 수 없음"}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {view?.support === "unsupported"
-            ? "이 환경은 워크플로 제어를 제공하지 않아요. 신뢰하는 서버에서 T3_WEAVRA_CONTROL=1을 설정해야 사용할 수 있어요. 읽기 전용 관찰은 계속 사용할 수 있어요."
-            : "제어하려면 orchestration:operate 권한과 최신 공식 스냅샷이 필요해요. 위험·범위·검사·작업 계약·Policy·승인 사용·완료 판정은 Runtime/Kernel이 담당해요."}
-        </p>
-        {!fresh && (
-          <p className="text-xs text-muted-foreground">
-            연결이 끊겼거나 지원하지 않거나 정보가 오래되면 제어를 비활성화해요. 재연결 후 실행할
-            작업을 대기열에 넣지 않아요.
-            {observation?.errorCode ? ` 연결 오류: ${observation.errorCode}.` : ""}
+        <div className="space-y-2 text-sm">
+          <p className="break-words font-medium">
+            {environment?.label ?? "연결 이름 확인 안 됨"} ·{" "}
+            {projectName ?? workspaceRoot.split(/[\\/]/).findLast(Boolean) ?? "프로젝트"}
           </p>
-        )}
+          <p className="text-muted-foreground">
+            Runtime은 작업을 준비하고 Kernel은 검증·완료를 판단해요. 연결이 끊겨도 작업을 자동으로
+            재개하거나 요청을 대기열에 넣지 않아요.
+          </p>
+          <Button
+            size="default"
+            variant="outline"
+            aria-expanded={diagnosticsOpen}
+            onClick={() => setDiagnosticsOpen(!diagnosticsOpen)}
+          >
+            연결 진단 정보
+          </Button>
+          {diagnosticsOpen && (
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                {diagnostics.map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="mt-1 select-text break-all font-mono">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <Button
+                size="default"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await writeTextToClipboard(
+                      diagnostics.map(([label, value]) => `${label}: ${value}`).join("\n"),
+                      "Runtime 진단",
+                    );
+                    setCopyStatus("진단 정보를 복사했어요.");
+                  } catch (error) {
+                    if (!(error instanceof Error)) throw error;
+                    setCopyStatus("복사하지 못했어요. 진단 정보를 선택해 복사해 주세요.");
+                  }
+                }}
+              >
+                진단 정보 복사
+              </Button>
+              <p role="status">{copyStatus}</p>
+            </div>
+          )}
+        </div>
         <CapabilityInventory
           view={view?.capabilityInventory}
           connected={fresh}
@@ -1541,7 +1611,17 @@ export function WeavraControls({
               )}
             </section>
           )}
-          <Button size="sm" type="submit" disabled={!canPrepareWorkflow || !goal.trim()}>
+          <p id="weavra-prepare-reason" className="text-sm text-muted-foreground">
+            {prepareReason}
+          </p>
+          <Button
+            size="default"
+            type="submit"
+            variant={canPrepareWorkflow && goal.trim() ? "default" : "outline"}
+            className="disabled:bg-muted disabled:text-foreground disabled:opacity-100"
+            aria-describedby="weavra-prepare-reason"
+            disabled={!canPrepareWorkflow || !goal.trim()}
+          >
             {preview ? "계획 미리보기 새로고침" : "워크플로 준비"}
           </Button>
         </form>

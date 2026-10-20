@@ -307,36 +307,49 @@ function ConnectionStep({
         <fieldset className="mt-5 space-y-2">
           <legend className="sr-only">설정할 컴퓨터</legend>
           {directEnvironments.map((environment) => (
-            <label
+            <div
               key={environment.environmentId}
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-3 py-3"
+              className="rounded-lg border border-border bg-background px-3 py-3"
             >
-              <Checkbox
-                checked={selectedIds.has(environment.environmentId)}
-                onCheckedChange={(checked) => {
-                  const next = new Set(selectedIds);
-                  if (checked) next.add(environment.environmentId);
-                  else next.delete(environment.environmentId);
-                  onSelectionChange(next);
-                }}
-              />
-              <MonitorIcon className="size-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 text-sm font-medium break-words">
-                    {environment.label}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {environment.connection.phase === "connected" ? "연결됨" : "연결 중…"}
+              <label className="flex cursor-pointer items-center gap-3">
+                <Checkbox
+                  checked={selectedIds.has(environment.environmentId)}
+                  onCheckedChange={(checked) => {
+                    const next = new Set(selectedIds);
+                    if (checked) next.add(environment.environmentId);
+                    else next.delete(environment.environmentId);
+                    onSelectionChange(next);
+                  }}
+                />
+                <MonitorIcon className="size-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 text-sm font-medium break-words">
+                      {environment.label}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {environment.connection.phase === "connected" ? "연결됨" : "연결 중…"}
+                    </span>
                   </span>
                 </span>
-                {environment.displayUrl ? (
-                  <span className="mt-0.5 block text-xs break-all text-muted-foreground">
-                    {environment.displayUrl}
-                  </span>
-                ) : null}
-              </span>
-            </label>
+              </label>
+              <details className="mt-2 text-sm">
+                <summary className="cursor-pointer rounded-sm py-2 text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">
+                  연결 진단 정보
+                </summary>
+                <dl className="space-y-2 pt-2">
+                  {[
+                    ["연결 주소", environment.displayUrl ?? "확인 안 됨"],
+                    ["환경 ID", environment.environmentId],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-w-0">
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="select-text break-all font-mono">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </details>
+            </div>
           ))}
         </fieldset>
       ) : null}

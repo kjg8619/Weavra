@@ -9,7 +9,7 @@ import type {
   WeavraFitnessSummary,
 } from "@t3tools/contracts";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { connectionAtomRuntime } from "../../connection/runtime";
 import { useEnvironment } from "../../state/environments";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -24,7 +24,7 @@ const groups = ["correctness", "contract", "tools", "reliability", "efficiency"]
 
 function Evidence({ run }: { run: WeavraFitnessSummary }) {
   return (
-    <div className="space-y-2 text-xs text-muted-foreground">
+    <div className="space-y-2 text-sm text-muted-foreground">
       <p>
         보정 상태: <span className="font-mono">{run.calibration ?? "확인 안 됨"}</span>
       </p>
@@ -43,7 +43,7 @@ function Evidence({ run }: { run: WeavraFitnessSummary }) {
         <details>
           <summary className="cursor-pointer">검증 사례 결과</summary>
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-left text-xs" aria-label={`검증 사례 결과: ${run.id}`}>
+            <table className="w-full text-left text-sm" aria-label={`검증 사례 결과: ${run.id}`}>
               <thead className="text-muted-foreground">
                 <tr>
                   <th scope="col" className="py-2 pr-4">
@@ -109,7 +109,7 @@ function Evidence({ run }: { run: WeavraFitnessSummary }) {
 function Target({ run }: { run: WeavraFitnessSummary }) {
   return (
     <div className="min-w-0 space-y-2">
-      <p className="break-all font-mono text-xs">
+      <p className="break-all font-mono text-sm">
         {run.target.provider} / {run.target.model}
       </p>
       <div className="flex flex-wrap gap-2">
@@ -117,7 +117,7 @@ function Target({ run }: { run: WeavraFitnessSummary }) {
         <Badge variant="secondary">{weavraLabel(run.status)}</Badge>
       </div>
       <Evidence run={run} />
-      <details className="text-xs text-muted-foreground">
+      <details className="text-sm text-muted-foreground">
         <summary className="cursor-pointer">정확한 대상 식별 정보</summary>
         <dl className="mt-2 space-y-2">
           {Object.entries(run.target).map(([key, text]) => (
@@ -148,8 +148,23 @@ export function WeavraFitness({
   const [right, setRight] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
-    "기존 기록만 읽어요. 이 화면에서 평가나 모델 호출을 시작할 수 없어요.",
+    "기존 기록만 읽어요. 평가나 모델 호출은 이 화면에서 시작하지 않고, 별도로 명시적인 승인을 받아 실행해야 해요.",
   );
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpId = useId();
+  const helpOpener = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!helpOpen) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setHelpOpen(false);
+      requestAnimationFrame(() => helpOpener.current?.focus());
+    };
+    document.addEventListener("keydown", dismiss, { capture: true });
+    return () => document.removeEventListener("keydown", dismiss, { capture: true });
+  }, [helpOpen]);
   const lifecycle = useRef({ connected: false, active: false });
   const pending = useRef(false);
   useEffect(() => {
@@ -192,18 +207,18 @@ export function WeavraFitness({
   };
   return (
     <SettingsSection id="weavra-fitness" title="프로바이더 적합성 · 읽기 전용">
-      <SettingsGroup divided={false} className="space-y-5 p-4">
+      <SettingsGroup divided={false} className="space-y-5 p-4 break-keep text-pretty">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-medium">순위가 아닌 계약 준수 증거</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               기록마다 하나의 프로바이더·모델·endpoint·검증 환경을 나타내요.
             </p>
           </div>
           <Button
-            size="sm"
             variant="outline"
             disabled={!connected || busy}
+            className="h-auto min-h-8 max-w-full border-muted-foreground whitespace-normal break-keep text-pretty"
             onClick={() => {
               void read({ projectId, command: "list" });
             }}
@@ -211,14 +226,42 @@ export function WeavraFitness({
             기록 불러오기
           </Button>
         </div>
-        <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
+        <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
           {!connected
             ? "연결이 끊겼어요. 표시된 기록은 과거 정보이니 다시 연결한 뒤 새로고침해 주세요."
             : message}
         </p>
+        <div>
+          <Button
+            ref={helpOpener}
+            variant="outline"
+            aria-expanded={helpOpen}
+            className="h-auto min-h-8 max-w-full border-muted-foreground whitespace-normal break-keep text-pretty"
+            aria-controls={helpId}
+            onClick={() => setHelpOpen((value) => !value)}
+          >
+            읽기 전용 안내
+          </Button>
+          {helpOpen ? (
+            <div id={helpId} className="mt-2 space-y-2 text-sm text-muted-foreground">
+              <p>
+                기록은 이 화면 밖에서 따로 실행한 적합성 평가가 남긴 것이에요. 이 화면은 만들어진
+                기록을 읽고 비교할 뿐이에요.
+              </p>
+              <p>
+                위의 ‘기록 불러오기’가 이 프로젝트의 기록 목록을 읽어요. 읽기만 하고 아무것도
+                실행하거나 바꾸지 않아요.
+              </p>
+              <p>
+                평가를 새로 하려면 모델 호출이 들어가므로 별도로 명시적인 승인을 받은 뒤 이 앱
+                밖에서 직접 실행해야 해요. 이 화면에는 평가 버튼이 없어요.
+              </p>
+            </div>
+          ) : null}
+        </div>
         {history && (
           <>
-            <div className="border-l-2 border-border pl-3 text-xs">
+            <div className="border-l-2 border-border pl-3 text-sm">
               <p className="font-mono">
                 현재 검증 사례 집합: {history.corpusRevision} · {history.fixtures.length} 개 검증
                 사례
@@ -229,13 +272,14 @@ export function WeavraFitness({
             </div>
             {history.runs.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                이 프로젝트의 적합성 기록이 없어요. 별도의 명시적 CLI 실행으로 증거를 수집할 수
-                있어요.
+                이 프로젝트에는 읽을 적합성 기록이 아직 없어요. 기록은 이 화면 밖에서 별도의
+                명시적인 CLI 실행으로 수집해요. 평가에는 모델 호출이 들어가므로 별도로 승인을 받아야
+                하고, 실행이 끝난 뒤에 위의 ‘기록 불러오기’로 읽을 수 있어요.
               </p>
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs" aria-label="프로바이더 적합성 기록">
+                  <table className="w-full text-left text-sm" aria-label="프로바이더 적합성 기록">
                     <thead className="text-muted-foreground">
                       <tr>
                         <th scope="col" className="py-2 pr-4">
@@ -281,7 +325,7 @@ export function WeavraFitness({
                   {(["A", "B"] as const).map((side) => (
                     <label
                       key={side}
-                      className="min-w-0 flex-1 space-y-1 text-xs text-muted-foreground"
+                      className="min-w-0 flex-1 space-y-1 text-sm text-muted-foreground"
                     >
                       <span>기록 {side}</span>
                       <select
@@ -304,7 +348,6 @@ export function WeavraFitness({
                     </label>
                   ))}
                   <Button
-                    size="sm"
                     variant="outline"
                     disabled={!connected || busy || !left || !right || left === right}
                     onClick={() => {
@@ -336,7 +379,7 @@ export function WeavraFitness({
               <Target run={comparison.left} />
               <Target run={comparison.right} />
             </div>
-            <table className="w-full text-left text-xs" aria-label="프로바이더 적합성 측정값 비교">
+            <table className="w-full text-left text-sm" aria-label="프로바이더 적합성 측정값 비교">
               <thead className="text-muted-foreground">
                 <tr>
                   <th scope="col" className="py-2">
@@ -369,10 +412,10 @@ export function WeavraFitness({
             </table>
           </div>
         )}
-        <p className="text-xs text-muted-foreground">
-          미확인은 0이 아니에요. 통제된 검토·수정과 모의 검사는 실제 모델 오류율을 뜻하지 않아요.
-          비용·HTTP 시도 횟수·상위 backend 식별 정보는 알 수 없을 수 있어요. 프롬프트·추론·인증
-          정보·도구 기록은 전송하지 않아요.
+        <p className="text-sm text-muted-foreground">
+          미확인은 0이 아니에요. 통제된 검토와 수정, 모의 검사는 실제 모델 오류율을 뜻하지 않아요.
+          비용, HTTP 시도 횟수, 상위 backend 식별 정보는 알 수 없을 수 있어요. 프롬프트, 추론, 인증
+          정보, 도구 기록은 전송하지 않아요.
         </p>
       </SettingsGroup>
     </SettingsSection>

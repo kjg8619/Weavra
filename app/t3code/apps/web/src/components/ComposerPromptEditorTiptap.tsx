@@ -124,6 +124,8 @@ export interface ComposerPromptEditorProps {
   skills: ReadonlyArray<ServerProviderSkill>;
   disabled: boolean;
   placeholder: string;
+  /** Id of the visible label that names the editable node. */
+  labelledBy?: string;
   containerClassName?: string;
   className?: string;
   placeholderClassName?: string;
@@ -573,6 +575,7 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
     skills,
     disabled,
     placeholder,
+    labelledBy,
     containerClassName,
     className,
     placeholderClassName,
@@ -795,6 +798,7 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
           "data-testid": "composer-editor",
           "data-composer-rich-text": richText ? "true" : "false",
           "aria-placeholder": placeholder,
+          ...(labelledBy ? { "aria-labelledby": labelledBy } : {}),
         },
         handleKeyDown: (view, event) => {
           if (

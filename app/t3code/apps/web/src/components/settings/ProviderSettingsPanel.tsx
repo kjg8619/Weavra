@@ -55,10 +55,13 @@ import {
   connectionPhasePingClassName,
 } from "../ConnectionStatusDot";
 import {
+  getProviderManualUpdateResultView,
+  getProviderUpdateAvailabilitySummary,
   isProviderSettingsUpdateCandidate,
   isProviderUpdateActive,
   type ProviderSettingsUpdateCandidate,
 } from "../ProviderUpdateLaunchNotification.logic";
+import { ProviderUpdateEnvironmentsStatus } from "../ProviderUpdateLaunchNotification";
 import { Button } from "../ui/button";
 import {
   Empty,
@@ -78,7 +81,6 @@ import {
 import { ScrollArea } from "../ui/scroll-area";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { stackedThreadToast, toastManager } from "../ui/toast";
 import { AddProviderInstanceDialog } from "./AddProviderInstanceDialog";
 import { ExpandableText } from "./ExpandableText";
 import { ProviderInstanceCard } from "./ProviderInstanceCard";
@@ -589,6 +591,9 @@ export function EnvironmentProviderSettings({
   const [updatingProviderInstanceIds, setUpdatingProviderInstanceIds] = useState<
     ReadonlySet<ProviderInstanceId>
   >(() => new Set());
+  const [updateStartFailures, setUpdateStartFailures] = useState<
+    ReadonlyMap<ProviderInstanceId, string>
+  >(() => new Map());
   const refreshingRef = useRef(false);
   const updatingInstanceIdsRef = useRef<Set<ProviderInstanceId>>(new Set());
 
@@ -657,6 +662,12 @@ export function EnvironmentProviderSettings({
       }
       updatingInstanceIdsRef.current.add(candidate.instanceId);
       setUpdatingProviderInstanceIds((previous) => new Set(previous).add(candidate.instanceId));
+      setUpdateStartFailures((previous) => {
+        if (!previous.has(candidate.instanceId)) return previous;
+        const next = new Map(previous);
+        next.delete(candidate.instanceId);
+        return next;
+      });
 
       const result = await updateProvider({
         environmentId,
@@ -667,16 +678,11 @@ export function EnvironmentProviderSettings({
       });
       if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: `Could not update ${PROVIDER_DISPLAY_NAMES[candidate.driver] ?? candidate.driver}`,
-            description:
-              error instanceof Error
-                ? error.message
-                : "The provider update command could not be started.",
-          }),
-        );
+        const message =
+          error instanceof Error
+            ? error.message
+            : `${PROVIDER_DISPLAY_NAMES[candidate.driver] ?? candidate.driver} 업데이트 명령을 시작하지 못했어요.`;
+        setUpdateStartFailures((previous) => new Map(previous).set(candidate.instanceId, message));
       }
       updatingInstanceIdsRef.current.delete(candidate.instanceId);
       setUpdatingProviderInstanceIds((previous) => {
@@ -790,6 +796,15 @@ export function EnvironmentProviderSettings({
   const selectedRow =
     rows.find((row) => row.instanceId === selectedInstanceId) ??
     (targetInstanceMissing ? null : (rows[0] ?? null));
+  const updateAvailabilitySummary = getProviderUpdateAvailabilitySummary(serverProviders);
+  const selectedUpdateResult = selectedRow
+    ? getProviderManualUpdateResultView({
+        provider: serverProviders.find(
+          (provider) => provider.instanceId === selectedRow.instanceId,
+        ),
+        startFailure: updateStartFailures.get(selectedRow.instanceId) ?? null,
+      })
+    : null;
 
   const updateProviderInstance = (
     row: InstanceRow,
@@ -1040,6 +1055,15 @@ export function EnvironmentProviderSettings({
             )}
           </div>
         </div>
+        {updateAvailabilitySummary ? (
+          <p
+            className="mx-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm text-foreground sm:mx-4"
+            data-provider-update-availability="true"
+          >
+            {updateAvailabilitySummary}
+          </p>
+        ) : null}
+        <ProviderUpdateEnvironmentsStatus />
         {readOnly ? (
           <SettingsGroup divided={false} className="overflow-hidden">
             <SettingsRow
@@ -1070,7 +1094,28 @@ export function EnvironmentProviderSettings({
           <div className="min-w-0 @min-[48rem]/providers:min-h-0">
             {selectedRow ? (
               <ScrollArea scrollFade chainVerticalScroll className="@min-[48rem]/providers:h-full">
-                <div className="space-y-6 p-4">{renderProviderInstance(selectedRow, "editor")}</div>
+                <div className="space-y-6 p-4">
+                  {renderProviderInstance(selectedRow, "editor")}
+                  {selectedUpdateResult ? (
+                    <div
+                      role="status"
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-sm",
+                        selectedUpdateResult.type === "error"
+                          ? "border-destructive/32 text-destructive-foreground"
+                          : selectedUpdateResult.type === "warning"
+                            ? "border-warning/32"
+                            : "border-border/70",
+                      )}
+                      data-provider-update-result={selectedUpdateResult.phase}
+                    >
+                      <p className="font-medium">{selectedUpdateResult.title}</p>
+                      <p className="whitespace-pre-wrap text-muted-foreground">
+                        {selectedUpdateResult.description}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               </ScrollArea>
             ) : (
               <div className="p-6 text-sm text-muted-foreground">

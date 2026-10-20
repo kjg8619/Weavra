@@ -1,22 +1,153 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { ResolvedKeybindingsConfig } from "@t3tools/contracts";
-import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
+import type { KeybindingShortcut, ResolvedKeybindingsConfig } from "@t3tools/contracts";
+import {
+  DEFAULT_RESOLVED_KEYBINDINGS,
+  parseKeybindingWhenExpression,
+} from "@t3tools/shared/keybindings";
 
+import { resolveShortcutCommand } from "../../keybindings";
 import {
   buildKeybindingRows,
   buildKeybindingCommandOptions,
   buildWhenVariableOptions,
   commandLabel,
+  groupKeybindingRows,
   keybindingConflictLabels,
   keybindingFromKeyboardEvent,
   parseWhenExpressionDraft,
   shortcutToKeybindingInput,
+  shortcutToKeybindingParts,
   unknownWhenVariables,
   whenAstToExpression,
+  whenAstToKoreanExplanation,
   whenNodeRemoveLabel,
+  WHEN_VARIABLE_LABELS,
 } from "./KeybindingsSettings.logic";
 
 describe("KeybindingsSettings.logic", () => {
+  it.each([true, false])("keeps a literal plus key as one cap with mod=%s", (modKey) => {
+    const shortcut: KeybindingShortcut = {
+      key: "+",
+      modKey,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+    };
+    const parts = shortcutToKeybindingParts(shortcut);
+    expect(parts).toEqual(modKey ? ["mod", "+"] : ["+"]);
+    expect(shortcutToKeybindingInput(shortcut)).toBe(modKey ? "mod++" : "+");
+  });
+
+  it("covers every builtin condition identifier with presentation metadata", () => {
+    expect(new Set(Object.keys(WHEN_VARIABLE_LABELS))).toEqual(new Set(buildWhenVariableOptions()));
+  });
+
+  it.each(["toString", "constructor", "__proto__"])(
+    "keeps the custom condition %s renderable without inherited metadata",
+    (name) => {
+      const parsed = parseWhenExpressionDraft(name);
+      if (!parsed.ok) throw new Error("Custom identifier did not parse");
+      const explanation = whenAstToKoreanExplanation(parsed.value);
+      expect(unknownWhenVariables(parsed.value)).toEqual([name]);
+      expect(typeof explanation).toBe("string");
+    },
+  );
+
+  it("groups default aliases without dropping any editable binding or changing its AST", () => {
+    const rows = buildKeybindingRows(DEFAULT_RESOLVED_KEYBINDINGS, "");
+
+    const groups = groupKeybindingRows(rows);
+
+    expect(groups.flat()).toHaveLength(DEFAULT_RESOLVED_KEYBINDINGS.length);
+    expect(new Set(groups.flat().map((row) => row.id))).toEqual(new Set(rows.map((row) => row.id)));
+    for (const group of groups) {
+      expect(new Set(group.map((row) => row.command)).size).toBe(1);
+      expect(new Set(group.map((row) => JSON.stringify(row.binding.whenAst))).size).toBe(1);
+      for (const row of group) {
+        expect(row.binding).toBe(DEFAULT_RESOLVED_KEYBINDINGS.find((b) => b === row.binding));
+        expect(parseWhenExpressionDraft(row.when)).toEqual({
+          ok: true,
+          value: row.binding.whenAst,
+        });
+      }
+    }
+    const chatAliases = groups.find((group) => group[0]?.command === "chat.new");
+    expect(chatAliases?.map((row) => row.key).toSorted()).toEqual(["mod+n", "mod+shift+o"]);
+    expect(groups.find((group) => group[0]?.command === "chat.newLocal")).not.toBe(chatAliases);
+  });
+
+  it("keeps distinct applicability and custom variables in independently editable groups", () => {
+    const binding = DEFAULT_RESOLVED_KEYBINDINGS.find((b) => b.command === "chat.new");
+    expect(binding).toBeDefined();
+    if (!binding) throw new Error("Missing chat.new default binding");
+    const customAst = parseKeybindingWhenExpression("customModeActive || !terminalFocus");
+    if (!customAst) throw new Error("Custom expression did not parse");
+    const rows = buildKeybindingRows([binding, { ...binding, whenAst: customAst }], "");
+
+    const groups = groupKeybindingRows(rows);
+
+    expect(groups).toHaveLength(2);
+    expect(groups.flat().map((row) => row.binding.whenAst)).toContain(customAst);
+    expect(unknownWhenVariables(customAst)).toEqual(["customModeActive"]);
+    expect(parseWhenExpressionDraft(whenAstToExpression(customAst))).toEqual({
+      ok: true,
+      value: customAst,
+    });
+  });
+
+  it.each([
+    "!(terminalFocus || (terminalOpen && modelPickerOpen))",
+    "(terminalFocus || terminalOpen) && !modelPickerOpen",
+    "terminalFocus || (terminalOpen && !modelPickerOpen)",
+    "customModeActive && (isDesktop || !isWeb)",
+    "true && !false",
+    "previewFocus && previewOpen",
+    "!(previewFocus || !terminalFocus)",
+  ])("preserves resolver outcomes after serializing the displayed AST for %s", (expression) => {
+    const ast = parseKeybindingWhenExpression(expression);
+    if (!ast) throw new Error("Fixture expression did not parse");
+    const parsed = parseWhenExpressionDraft(whenAstToExpression(ast));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error("Serialized expression did not parse");
+    const shortcut = DEFAULT_RESOLVED_KEYBINDINGS[0]?.shortcut;
+    expect(shortcut).toBeDefined();
+    if (!shortcut) throw new Error("Missing default shortcut");
+    const names = [
+      "terminalFocus",
+      "terminalOpen",
+      "modelPickerOpen",
+      "previewFocus",
+      "previewOpen",
+      "customModeActive",
+      "isDesktop",
+      "isWeb",
+    ];
+    const event = {
+      key: shortcut.key,
+      code: "",
+      metaKey: shortcut.modKey || shortcut.metaKey,
+      ctrlKey: shortcut.ctrlKey,
+      altKey: shortcut.altKey,
+      shiftKey: shortcut.shiftKey,
+    };
+
+    for (let bits = 0; bits < 2 ** names.length; bits++) {
+      const context = Object.fromEntries(names.map((name, i) => [name, Boolean(bits & (1 << i))]));
+      const options = { platform: "MacIntel", context };
+      expect(
+        resolveShortcutCommand(
+          event,
+          [{ command: "chat.new", shortcut, whenAst: parsed.value }],
+          options,
+        ),
+      ).toBe(
+        resolveShortcutCommand(event, [{ command: "chat.new", shortcut, whenAst: ast }], options),
+      );
+    }
+    expect(parsed.value).toEqual(ast);
+  });
+
   it("lists composer, provider, and pull request commands with editable defaults", () => {
     const rows = buildKeybindingRows(DEFAULT_RESOLVED_KEYBINDINGS, "");
     for (const command of [

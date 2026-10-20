@@ -34,11 +34,25 @@ export type KeybindingCommandOption = KeybindingCommand;
 const CORE_WHEN_VARIABLES = [
   "terminalFocus",
   "terminalOpen",
+  "previewFocus",
+  "previewOpen",
   "isWeb",
   "isDesktop",
   "true",
   "false",
 ] as const;
+
+export const WHEN_VARIABLE_LABELS: Readonly<Record<string, string>> = {
+  terminalFocus: "터미널에 입력 초점이 있음",
+  terminalOpen: "터미널이 열려 있음",
+  previewFocus: "브라우저 패널에 키보드 초점이 있음",
+  previewOpen: "브라우저 패널이 열려 있음",
+  modelPickerOpen: "모델 선택기가 열려 있음",
+  isWeb: "웹에서 사용 중",
+  isDesktop: "데스크톱 앱에서 사용 중",
+  true: "항상",
+  false: "항상 거짓",
+};
 
 const DEFAULT_WHEN_VARIABLES = new Set<string>(CORE_WHEN_VARIABLES);
 for (const binding of DEFAULT_RESOLVED_KEYBINDINGS) {
@@ -51,7 +65,7 @@ export const DEFAULT_WHEN_VARIABLE =
   ) ?? "terminalFocus";
 const KNOWN_WHEN_VARIABLES = new Set(DEFAULT_WHEN_VARIABLES);
 
-export function shortcutToKeybindingInput(shortcut: KeybindingShortcut): string {
+export function shortcutToKeybindingParts(shortcut: KeybindingShortcut): ReadonlyArray<string> {
   const parts: string[] = [];
   if (shortcut.modKey) parts.push("mod");
   if (shortcut.metaKey) parts.push("meta");
@@ -59,7 +73,11 @@ export function shortcutToKeybindingInput(shortcut: KeybindingShortcut): string 
   if (shortcut.altKey) parts.push("alt");
   if (shortcut.shiftKey) parts.push("shift");
   parts.push(shortcut.key === " " ? "space" : shortcut.key === "escape" ? "esc" : shortcut.key);
-  return parts.join("+");
+  return parts;
+}
+
+export function shortcutToKeybindingInput(shortcut: KeybindingShortcut): string {
+  return shortcutToKeybindingParts(shortcut).join("+");
 }
 
 export function whenAstToExpression(node: KeybindingWhenNode | undefined): string {
@@ -74,6 +92,38 @@ export function whenAstToExpression(node: KeybindingWhenNode | undefined): strin
     case "or":
       return `${wrapWhenExpression(node.left)} || ${wrapWhenExpression(node.right)}`;
   }
+}
+
+export function whenAstToKoreanExplanation(node: KeybindingWhenNode | undefined): string {
+  if (!node) return "항상";
+  switch (node.type) {
+    case "identifier": {
+      const label = Object.hasOwn(WHEN_VARIABLE_LABELS, node.name)
+        ? WHEN_VARIABLE_LABELS[node.name]
+        : undefined;
+      return label ?? `사용자 정의 조건 ‘${node.name}’ (고급 조건에서 원문 확인)`;
+    }
+    case "not":
+      return `(${whenAstToKoreanExplanation(node.node)})이 아님`;
+    case "and":
+      return `(${whenAstToKoreanExplanation(node.left)}) 그리고 (${whenAstToKoreanExplanation(node.right)})`;
+    case "or":
+      return `(${whenAstToKoreanExplanation(node.left)}) 또는 (${whenAstToKoreanExplanation(node.right)})`;
+  }
+}
+
+/** Presentation only: keep every editable binding, grouped by command and the exact condition AST. */
+export function groupKeybindingRows(
+  rows: ReadonlyArray<KeybindingRow>,
+): ReadonlyArray<ReadonlyArray<KeybindingRow>> {
+  const groups = new Map<string, KeybindingRow[]>();
+  for (const row of rows) {
+    const key = JSON.stringify([row.command, row.binding.whenAst ?? null]);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+  return [...groups.values()];
 }
 
 export function whenNodeRemoveLabel(node: KeybindingWhenNode, depth: number): string {

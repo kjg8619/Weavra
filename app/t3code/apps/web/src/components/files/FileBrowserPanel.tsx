@@ -94,6 +94,43 @@ function FileSearchField(props: {
   );
 }
 
+// 14px, normal weight, whole-word Korean wrapping; buttons are 32px high with 12px side padding.
+const FILES_STATE_TEXT = "break-keep text-pretty text-sm font-normal leading-relaxed";
+const FILES_STATE_BUTTON = "h-8 px-3 text-sm font-normal sm:h-8 sm:text-sm";
+
+export type FileBrowserBodyState =
+  | { readonly kind: "loading" }
+  | { readonly kind: "error"; readonly message: string }
+  | { readonly kind: "empty" }
+  | { readonly kind: "no-results"; readonly query: string; readonly searching: boolean }
+  | { readonly kind: "ready" };
+
+/**
+ * What the Files body shows instead of a blank tree. A failure is always an
+ * error, never an empty folder; a search that matched nothing is distinct from
+ * a folder that has nothing in it.
+ */
+export function resolveFileBrowserBodyState(input: {
+  readonly ready: boolean;
+  readonly error: string | null;
+  readonly query: string;
+  readonly searchPending: boolean;
+  readonly entryPaths: ReadonlyArray<string>;
+  readonly searchMatchCount: number;
+}): FileBrowserBodyState {
+  if (input.error) return { kind: "error", message: input.error };
+  if (!input.ready) return { kind: "loading" };
+  const query = input.query.trim();
+  if (query) {
+    const needle = query.toLowerCase();
+    const localMatch = input.entryPaths.some((path) => path.toLowerCase().includes(needle));
+    if (localMatch || input.searchMatchCount > 0) return { kind: "ready" };
+    // Nothing loaded matches; a project-wide search may still be running.
+    return { kind: "no-results", query, searching: input.searchPending };
+  }
+  return input.entryPaths.length === 0 ? { kind: "empty" } : { kind: "ready" };
+}
+
 export default function FileBrowserPanel({
   environmentId,
   cwd,
@@ -132,6 +169,14 @@ export default function FileBrowserPanel({
     }
     return [...result.values()];
   }, [directoryEntries, pathSearch.entries, pathSearch.isPending, query]);
+  const bodyState = resolveFileBrowserBodyState({
+    ready,
+    error: error ?? pathSearch.error ?? null,
+    query,
+    searchPending: pathSearch.isPending,
+    entryPaths: directoryEntries.map((entry) => entry.path),
+    searchMatchCount: pathSearch.entries.length,
+  });
   const entryKinds = useMemo(
     () => new Map(entries.map((entry) => [entry.path, entry.kind] as const)),
     [entries],
@@ -528,31 +573,74 @@ export default function FileBrowserPanel({
           </Tooltip>
         ) : null}
       </div>
-      {error || pathSearch.error ? (
-        <button
-          type="button"
-          onClick={handleRefresh}
-          className="p-4 text-left text-xs leading-relaxed text-destructive"
-        >
-          {error ?? pathSearch.error} Click to retry.
-        </button>
-      ) : null}
       {query.trim() && pathSearch.truncated && !pathSearch.isPending ? (
         <div className="px-3 py-1 text-xs text-muted-foreground">
           More matches available. Refine your search.
         </div>
       ) : null}
-      {(isPending || pathSearch.isPending) && (
-        <div role="status" className="px-3 py-1 text-xs text-muted-foreground">
-          Loading files…
-        </div>
-      )}
-      <FileTree
-        model={model}
+      <div
+        role="region"
         aria-label={`${projectName} files`}
-        className="min-h-0 flex-1 overflow-hidden"
-        style={pierreTreeStyle(resolvedTheme)}
-      />
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        {bodyState.kind === "loading" ? (
+          <div role="status" className={`px-3 py-2 text-muted-foreground ${FILES_STATE_TEXT}`}>
+            파일을 불러오는 중이에요…
+          </div>
+        ) : bodyState.kind === "error" ? (
+          <div role="alert" className={`flex flex-col items-start gap-2 p-4 ${FILES_STATE_TEXT}`}>
+            <p className="text-destructive-foreground">파일 목록을 불러오지 못했어요.</p>
+            <p className="text-muted-foreground">{bodyState.message}</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={FILES_STATE_BUTTON}
+              onClick={handleRefresh}
+            >
+              다시 시도
+            </Button>
+          </div>
+        ) : bodyState.kind === "empty" ? (
+          <div className={`flex flex-col items-start gap-2 p-4 ${FILES_STATE_TEXT}`}>
+            <p className="text-foreground">이 폴더는 비어 있어요.</p>
+            <p className="text-muted-foreground">파일을 추가했다면 새로 고침으로 다시 읽어요.</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={FILES_STATE_BUTTON}
+              onClick={handleRefresh}
+            >
+              새로 고침
+            </Button>
+          </div>
+        ) : bodyState.kind === "no-results" ? (
+          <div className={`flex flex-col items-start gap-2 p-4 ${FILES_STATE_TEXT}`}>
+            <p className="text-foreground">'{bodyState.query}'와 일치하는 파일이 없어요.</p>
+            {bodyState.searching ? (
+              <p role="status" className="text-muted-foreground">
+                프로젝트 전체에서 더 찾는 중이에요…
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={FILES_STATE_BUTTON}
+              onClick={closeSearch}
+            >
+              검색 지우기
+            </Button>
+          </div>
+        ) : null}
+        <FileTree
+          model={model}
+          aria-label={`${projectName} file tree`}
+          className="min-h-0 flex-1 overflow-hidden"
+          style={pierreTreeStyle(resolvedTheme)}
+        />
+      </div>
     </div>
   );
 }
