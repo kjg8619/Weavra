@@ -117,7 +117,7 @@ export function PreviewChromeRow({
     <div className="relative">
       <form
         onSubmit={submit}
-        className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-1 gap-y-1 border-b border-border/60 bg-background px-2 py-0.5 in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:border-b-transparent"
+        className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-1 gap-y-2 border-b border-border/60 bg-background px-2 py-0.5 in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:border-b-transparent"
         data-surface-subheader
       >
         <div className="flex items-center gap-0.5" role="group" aria-label="Navigation">
