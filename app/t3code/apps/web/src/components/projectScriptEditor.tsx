@@ -470,7 +470,7 @@ export function ProjectScriptEditorDialog({
               <Button
                 type="button"
                 variant="destructive-outline"
-                className="mr-auto min-h-8 px-3 active:scale-100"
+                className="mr-auto min-h-8 px-3 active:scale-100!"
                 disabled={isSaving}
                 onClick={() => setDeleteConfirmOpen(true)}
               >
@@ -480,7 +480,7 @@ export function ProjectScriptEditorDialog({
             <Button
               type="button"
               variant="outline"
-              className="min-h-8 px-3 active:scale-100"
+              className="min-h-8 px-3 active:scale-100!"
               onClick={close}
             >
               Cancel
@@ -488,7 +488,7 @@ export function ProjectScriptEditorDialog({
             <Button
               form={formId}
               type="submit"
-              className="min-h-8 px-3 active:scale-100 disabled:opacity-100"
+              className="min-h-8 px-3 hover:bg-primary! active:scale-100! data-pressed:bg-primary! disabled:opacity-100"
               disabled={isSaving}
             >
               {isSaving ? "Saving…" : isEditing ? "Save changes" : "Save action"}
