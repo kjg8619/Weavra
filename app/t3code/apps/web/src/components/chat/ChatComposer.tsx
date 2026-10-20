@@ -1059,7 +1059,7 @@ const ComposerInputHelp = memo(function ComposerInputHelp(props: { onClosed: () 
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 gap-1.5 px-3 text-muted-foreground text-sm hover:text-foreground sm:h-8"
+            className="h-8 gap-1.5 px-3 font-normal text-muted-foreground text-sm hover:text-foreground sm:h-8"
           />
         }
       >

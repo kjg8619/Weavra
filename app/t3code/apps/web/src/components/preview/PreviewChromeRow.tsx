@@ -179,7 +179,7 @@ export function PreviewChromeRow({
 
         {leadingActions}
 
-        <InputGroup variant="ghost" className="group/address mx-1 h-9 min-w-40 flex-[1_1_10rem]">
+        <InputGroup variant="ghost" className="group/address mx-1 h-9 min-w-52 flex-[1_1_13rem]">
           {/* A visible name that stays while a URL is typed; the placeholder does not. */}
           <InputGroupAddon>
             <label
