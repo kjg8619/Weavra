@@ -1390,7 +1390,14 @@ export async function runScenarios(context) {
     await frame(variant);
     observations.push({ requests: fixture.requests });
   }
-  async function filesPanel() {
+  async function filesPanel({ fresh = false } = {}) {
+    if (fresh) {
+      // These checks install their Files replies after the per-check reload, but the app
+      // restores an open Files surface on reload and lists the folder before the replies
+      // exist. Reload once they do, so the listing observed is the one the check controls.
+      await act("reload with Files replies installed", () => page.reload());
+      await home();
+    }
     await openPanel("파일");
     await page.getByRole("button", { name: "Refresh workspace files", exact: true }).waitFor();
   }
@@ -2837,7 +2844,7 @@ export async function runScenarios(context) {
       });
       replies.set("projects.listEntries", () => pending);
       try {
-        await filesPanel();
+        await filesPanel({ fresh: true });
         await observedText(
           assert,
           '[aria-label="baseline-project files"]',
@@ -2853,7 +2860,7 @@ export async function runScenarios(context) {
         _tag: "Success",
         value: { entries: [], truncated: false },
       }));
-      await filesPanel();
+      await filesPanel({ fresh: true });
       await settle();
       await observedText(assert, '[aria-label="baseline-project files"]', "files-empty", (text) =>
         /비어|파일이 없|No files/.test(text),
@@ -2868,7 +2875,7 @@ export async function runScenarios(context) {
         _tag: "Success",
         value: { entries: [], truncated: false },
       }));
-      await filesPanel();
+      await filesPanel({ fresh: true });
       const input = page.getByPlaceholder("Search files", { exact: true });
       await input.fill("absent-query");
       await observedText(
@@ -2878,12 +2885,10 @@ export async function runScenarios(context) {
         (text) => /검색 결과|일치|No results|No matches/.test(text),
       );
       await input.fill("");
-      await page.getByText("visible.txt", { exact: true }).waitFor();
-      assert(
-        "clearing search restores actual entries",
-        await page.getByText("visible.txt", { exact: true }).isVisible(),
-        true,
-      );
+      // Tree rows split the name into stem and extension elements, so match the row's role.
+      const restored = page.getByRole("treeitem", { name: "visible.txt", exact: true });
+      await restored.waitFor();
+      assert("clearing search restores actual entries", await restored.isVisible(), true);
     },
     "09/files-error": async (assert) => {
       replies.set("projects.listEntries", () => ({
@@ -2899,7 +2904,7 @@ export async function runScenarios(context) {
           },
         ],
       }));
-      await filesPanel();
+      await filesPanel({ fresh: true });
       await observedText(
         assert,
         '[aria-label="baseline-project files"]',
@@ -2921,13 +2926,13 @@ export async function runScenarios(context) {
           },
         };
       });
-      await filesPanel();
+      await filesPanel({ fresh: true });
       await settle();
       const before = calls;
       await act("refresh actual Files request", () =>
         page.getByRole("button", { name: "Refresh workspace files", exact: true }).click(),
       );
-      await page.getByText("refreshed.txt", { exact: true }).waitFor();
+      await page.getByRole("treeitem", { name: "refreshed.txt", exact: true }).waitFor();
       assert("refresh reached data boundary", calls > before, true);
     },
     "09/pane-isolation": async (assert) => {
