@@ -580,7 +580,7 @@ export function deliverScenarioEvent(sockets, method, value) {
 }
 
 export async function runScenarios(context) {
-  const { freezeCaptureServerFrame } = await import("./seed.mjs");
+  const { freezeCaptureServerFrame, registerSeededThread, seed } = await import("./seed.mjs");
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
   const { executeCheck, sha256, bounded } = await import("./assert.mjs");
@@ -629,6 +629,28 @@ export async function runScenarios(context) {
     await route.fulfill({ response, json: body });
   });
   const sockets = [];
+  const fixtureRequests = new Map();
+  let fixtureRequestId = 900000;
+  async function dispatchFixtureCommand(command) {
+    const entry = sockets.findLast((entry) => !entry.closed);
+    if (!entry) throw new Error("No active isolated fixture RPC connection");
+    const id = String(fixtureRequestId++);
+    const pending = Promise.withResolvers();
+    fixtureRequests.set(id, pending);
+    entry.server.send(
+      JSON.stringify({
+        _tag: "Request",
+        id,
+        tag: "orchestration.dispatchCommand",
+        payload: command,
+        headers: [],
+      }),
+    );
+    const exit = await bounded(pending.promise, "Fixture thread creation receipt");
+    if (exit._tag !== "Success")
+      throw new Error(`Fixture creation failed: ${JSON.stringify(exit)}`);
+    return exit.value;
+  }
   await page.routeWebSocket("**/*", (socket) => {
     const server = socket.connectToServer();
     const methods = new Map();
@@ -764,6 +786,12 @@ export async function runScenarios(context) {
       const decoded = JSON.parse(String(message));
       const frames = Array.isArray(decoded) ? decoded : [decoded];
       for (let frame of frames) {
+        const fixture = fixtureRequests.get(String(frame.requestId));
+        if (fixture && frame._tag === "Exit") {
+          fixtureRequests.delete(String(frame.requestId));
+          fixture.resolve(frame.exit);
+          continue;
+        }
         frame = freezeCaptureServerFrame(frame, methods.get(frame.requestId));
         if (providerFixture && methods.get(frame.requestId) === "server.getConfig")
           if (frame.exit?._tag === "Success") frame.exit.value.providers = providerFixture;
@@ -4093,6 +4121,11 @@ export async function runScenarios(context) {
     },
     "17/archive-restore": async (assert) => {
       await home();
+      observations.push(
+        await registerSeededThread(dispatchFixtureCommand, context.isolation, "baseline-code"),
+      );
+      seed(context.isolation);
+      await page.reload();
       await thread("03 Code blocks");
       await act("archive exact disposable thread", () => nativeMenu("대화 보관"));
       const confirmation = page.getByRole("alertdialog");
