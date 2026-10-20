@@ -581,7 +581,7 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
   if (props.suggestions.length === 0) return null;
   return (
     <section aria-label="첫 요청 제안" className="pointer-events-auto mx-auto w-full max-w-3xl">
-      <ul className="grid gap-2 sm:grid-cols-3">
+      <ul className="grid gap-2 sm:auto-cols-fr sm:grid-flow-col">
         {props.suggestions.map((suggestion) => {
           const reasonId = `${idPrefix}-${suggestion.id}`;
           return (
