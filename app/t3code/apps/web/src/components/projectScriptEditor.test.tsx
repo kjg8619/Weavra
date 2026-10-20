@@ -276,7 +276,7 @@ describe("project action command validation", () => {
   it("saves a valid command once through the form submission boundary", async () => {
     onSubmit.mockResolvedValue(AsyncResult.success(undefined));
     open(request("build"));
-    changeCommand("bun test");
+    changeCommand(" \n bun test \t ");
 
     await act(async () => {
       await submit();
