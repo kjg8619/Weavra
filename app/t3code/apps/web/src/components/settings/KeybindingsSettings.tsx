@@ -44,7 +44,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Kbd, KbdGroup } from "../ui/kbd";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Toggle } from "../ui/toggle";
 import { toastManager } from "../ui/toast";
@@ -668,7 +668,7 @@ function WhenExpressionBuilder({
           />
         </label>
         {parseError ? (
-          <p role="alert" className="break-keep text-pretty text-sm text-destructive">
+          <p role="alert" className="break-keep text-pretty text-sm text-destructive-foreground">
             변수와 !, &amp;&amp;, ||, 괄호를 사용하세요.
           </p>
         ) : null}
@@ -936,7 +936,7 @@ function WhenClauseControl({
   onValidityChange: (valid: boolean) => void;
 }) {
   return (
-    <Popover>
+    <Popover modal="trap-focus">
       <PopoverTrigger
         render={
           <Button
@@ -955,6 +955,7 @@ function WhenClauseControl({
         sideOffset={6}
         className="max-w-[calc(100vw-2rem)]"
         viewportClassName="overflow-y-auto"
+        aria-label="고급 조건"
       >
         <p className="mb-3 break-keep text-pretty text-sm font-normal text-foreground">
           {whenAstToKoreanExplanation(value)}. 조건을 바꾸려면 원문을 편집한 뒤 저장하세요.
@@ -969,6 +970,16 @@ function WhenClauseControl({
           onChange={onChange}
           onValidityChange={onValidityChange}
         />
+        <PopoverClose
+          render={
+            <Button
+              variant="outline"
+              className="mt-3 min-h-9 border-foreground/70 px-3 text-sm text-foreground"
+            />
+          }
+        >
+          닫기
+        </PopoverClose>
       </PopoverContent>
     </Popover>
   );
@@ -1105,10 +1116,16 @@ function KeybindingSettingsRow({
       className="group/row rounded-none"
       title={<KeybindingRowTitle row={row} />}
       description={
-        <div className="break-keep text-pretty text-sm font-normal text-foreground">
-          {whenAstToKoreanExplanation(row.binding.whenAst)}
-          {aliases.length > 1 ? <p>같은 동작을 실행하는 단축키 {aliases.length}개</p> : null}
-        </div>
+        <>
+          <span className="block break-keep text-pretty text-sm font-normal text-foreground">
+            {whenAstToKoreanExplanation(row.binding.whenAst)}
+          </span>
+          {aliases.length > 1 ? (
+            <span className="block break-keep text-pretty text-sm font-normal text-foreground">
+              같은 동작을 실행하는 단축키 {aliases.length}개
+            </span>
+          ) : null}
+        </>
       }
       control={
         <div className="flex flex-col items-end gap-2">
