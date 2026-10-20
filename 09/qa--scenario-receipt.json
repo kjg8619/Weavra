@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "selection": "09",
+  "revision": "929971d80340e13da519146edfc3685001165ae1",
+  "asarSha256": "51945ce5426a776ee49a31f59b2f391f3cb93794ec3f1b51f54860e390bb3117",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "b5c3b2c9734412ba6ad468dcbd4302d815eefb72bc76bb70048989b9f8d6c7c8",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T04:31:17.794Z",
+  "checks": [
+    {
+      "caseId": "09",
+      "checkId": "locked-destination-reason",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "unavailable destinations retained",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disabled destination has associated reason",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reason is present and readable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disabled destination has associated reason",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reason is present and readable",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "disabled destination has associated reason",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "reason is present and readable",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/locked-destination-reason/result.png",
+          "sha256": "f8a743cbcb89421a41c60026c7e2d0c869a762d667a77156c7dfb4f64692421e"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/locked-destination-reason/result.ax.json",
+          "sha256": "f6b13269091001b19beb63e4837eadfd5b18d44c6e607365c2cdd65873ac6507"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/locked-destination-reason/observations.json",
+          "sha256": "0b7a84dcaefe714a0530ad5f4d6c45bb260835a4fad370f06f2dae290fde52ea"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "files-loading",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "files-loading: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "files-loading",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-loading/files-loading.png",
+          "sha256": "39d5c486c0fbf2e85ecae74e55fec4402d2b46b66d182db5718892cd46eec8f1"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-loading/files-loading.ax.json",
+          "sha256": "df4d1221b8da2aa76653792bad88fd9ec462ee624b7539e8ff12a5f67d47bae6"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-loading/result.png",
+          "sha256": "25dc6a324dbfbc13f258a11e9585a82bea280b81984e445df0a4620abd7ddd12"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-loading/result.ax.json",
+          "sha256": "07d37534e4d28d6fc1620c7bfa46348f01683863c942032298d7d47dcd01dece"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-loading/observations.json",
+          "sha256": "1b45e3fa3b9560fa86eb8d7fe66d7085c97ba7db7afd61500dfdda0bf2081bf0"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "files-empty",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "files-empty: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "files-empty",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-empty/files-empty.png",
+          "sha256": "78aba0bb586f23c0e069c69cb4408681890257fcf5cbd041c0762d2fc2cf8d94"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-empty/files-empty.ax.json",
+          "sha256": "3f46a16b112a175e16eead32445243fc8617f838b146b1653dd9f870dede8e8e"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-empty/result.png",
+          "sha256": "78aba0bb586f23c0e069c69cb4408681890257fcf5cbd041c0762d2fc2cf8d94"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-empty/result.ax.json",
+          "sha256": "3f46a16b112a175e16eead32445243fc8617f838b146b1653dd9f870dede8e8e"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-empty/observations.json",
+          "sha256": "d1012e16a657c0344b368a85fb6db34b603315301c24aed1e0ab14b138707d77"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "files-no-results",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "files-no-results: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "files-no-results",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "clearing search restores actual entries",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-no-results/files-no-results.png",
+          "sha256": "18a18e04b596cabed5465f9ec807011831436b88971d70dc27b1f1d78f73a9fa"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-no-results/files-no-results.ax.json",
+          "sha256": "e8526b5d2c1446ea5a8f5fd22399d591690c5384743e79afd2bcfeccba62fc41"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-no-results/result.png",
+          "sha256": "85808252321eb80c40ca01a9e0f799bf7d68a5eb2a754e0c868c777ddfcb58af"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-no-results/result.ax.json",
+          "sha256": "0f23e8be265e9d376d42e953558ea140c64528a4a32b7655062132a430d66363"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-no-results/observations.json",
+          "sha256": "2dbe741d3ee83435a92ea0de7f36929e77152fe103b6ece840ab69ba56f8b75f"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "files-error",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "files-error: visible body",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "files-error",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-error/files-error.png",
+          "sha256": "bfc2f2cc1db5e5540927666814f7c8e3004880f4304ac685d894df5cf5d8fe07"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-error/files-error.ax.json",
+          "sha256": "ed2f14dd565c29ec1dfb343bcc039aa10fdf23a9c2a26b23458c9135dab7808f"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-error/result.png",
+          "sha256": "bfc2f2cc1db5e5540927666814f7c8e3004880f4304ac685d894df5cf5d8fe07"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-error/result.ax.json",
+          "sha256": "ed2f14dd565c29ec1dfb343bcc039aa10fdf23a9c2a26b23458c9135dab7808f"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/files-error/observations.json",
+          "sha256": "310a540acc9cf65db48ac51b82707effcd253fc715ab277cea1b9a6e6590706a"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "refresh",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "refresh reached data boundary",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/refresh/result.png",
+          "sha256": "6654ec0b883c2b917861119bfb48ae3aaf00c8e2f2cfa1f168bd138755345060"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/refresh/result.ax.json",
+          "sha256": "72a77b339153a4f08aac24f447884ec3e60062495a580b0e8518dcfc9cdcdffe"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/refresh/observations.json",
+          "sha256": "cfd3925b63bae71fe6940954cb0f319cba76c61aebf5ff5d94a009758206f403"
+        }
+      ]
+    },
+    {
+      "caseId": "09",
+      "checkId": "pane-isolation",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "Files query does not filter conversation",
+          "actual": [
+            "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "printf 'local fixture only\\n'\n"
+          ],
+          "expected": [
+            "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "printf 'local fixture only\\n'\n"
+          ]
+        },
+        {
+          "label": "selected thread unchanged",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/pane-isolation/result.png",
+          "sha256": "ee1b95da84a8abe1a24bfba7965087a4ee43fd36c41ac14345240bdc14244f14"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/pane-isolation/result.ax.json",
+          "sha256": "85b14853987e38eb212f3bf5399e580239f6621025875cdc46a2a7d0b977a5ba"
+        },
+        {
+          "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/scenarios/09/pane-isolation/observations.json",
+          "sha256": "0b7a84dcaefe714a0530ad5f4d6c45bb260835a4fad370f06f2dae290fde52ea"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T04:32:19.745Z",
+  "capture": {
+    "file": "run-ad847c9d-b36c-4da1-8dae-e5e690fed315/capture-manifest.json",
+    "sha256": "29afef0e2800bf1a5000340b546ba1083b57e7aff7069dc954adb9935881e0b8"
+  }
+}
