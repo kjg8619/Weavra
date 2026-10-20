@@ -20,15 +20,28 @@ const provider: ServerProvider = {
 describe("getProviderSummary", () => {
   it("keeps account metadata and long diagnostics out of the structured headline", () => {
     const message = "Synthetic CLI diagnostic\n".repeat(80);
-    const summary = getProviderSummary({
-      ...provider,
-      auth: { status: "authenticated", label: "account-".repeat(80) },
-      message,
-    });
+    const summary = getProviderSummary(
+      {
+        ...provider,
+        auth: { status: "authenticated", label: "account-".repeat(80) },
+        message,
+      },
+      { concise: true },
+    );
     expect(summary.headline).toBe(
-      getProviderSummary({ ...provider, auth: { status: "authenticated" } }).headline,
+      getProviderSummary({ ...provider, auth: { status: "authenticated" } }, { concise: true })
+        .headline,
     );
     expect(summary.detail).toBe(message);
+  });
+
+  it("preserves the account metadata for consumers that do not request a concise status", () => {
+    const label = "synthetic-account-type";
+    const summary = getProviderSummary({
+      ...provider,
+      auth: { status: "authenticated", label },
+    });
+    expect(summary.headline.endsWith(label)).toBe(true);
   });
 
   it("reports ready providers with unknown authentication as available", () => {
