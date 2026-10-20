@@ -4,7 +4,7 @@
       "file": "archives/1280x800/light/100-empty.png",
       "supplemental": true,
       "beforeSha256": "612be4d58440db8edfecf37b47296e532644893a91e3d93d586a958a2aa53b9d",
-      "afterSha256": "c7c7efdd1750fd07dec7aab5ac5ba1dcfa52eb52610b7e85c949a49a1e5e0db4",
+      "afterSha256": "19038bfd42db123cc4131e74f811da282d733eaa3afb2c320724b8e5ad3d8dfb",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -84,7 +84,7 @@
       "file": "archives/1280x800/light/returned-list.png",
       "supplemental": true,
       "beforeSha256": "08b658ef539784416a48ace1cc4b5858602b90ae5b8f7b8c5d9d0f533a831748",
-      "afterSha256": "229d18a891b1f2dcd62893ebc466b3b4820a754f358fab66e1ec7079867a83a8",
+      "afterSha256": "c3895bbb352ecdd93a5a71e9660cdddd0816190aade8a063d0b5be57f56d0ee8",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -97,8 +97,8 @@
           "height": 800
         },
         "totalPixels": 1024000,
-        "diffPixels": 227265,
-        "diffRatio": 0.2219,
+        "diffPixels": 227442,
+        "diffRatio": 0.2221,
         "similarityScore": 78,
         "alphaChannelIntact": true,
         "hotspots": [
@@ -371,16 +371,25 @@
             "width": 160,
             "height": 100,
             "diffRatio": 0.0598
+          },
+          {
+            "gridX": 1,
+            "gridY": 5,
+            "x": 160,
+            "y": 500,
+            "width": 160,
+            "height": 100,
+            "diffRatio": 0.0111
           }
         ],
-        "summary": "78/100 similarity; 227265/1024000 pixels differ; 30 hotspot region(s)."
+        "summary": "78/100 similarity; 227442/1024000 pixels differ; 31 hotspot region(s)."
       }
     },
     {
       "file": "archives/1280x800/light/archive-action-path.png",
       "supplemental": true,
       "beforeSha256": "08b658ef539784416a48ace1cc4b5858602b90ae5b8f7b8c5d9d0f533a831748",
-      "afterSha256": "229d18a891b1f2dcd62893ebc466b3b4820a754f358fab66e1ec7079867a83a8",
+      "afterSha256": "b5be71e0f2902eadd3f8d986b9bd63cdce3e5bb90861f2b4d9e42917c97ef650",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -393,8 +402,8 @@
           "height": 800
         },
         "totalPixels": 1024000,
-        "diffPixels": 227265,
-        "diffRatio": 0.2219,
+        "diffPixels": 227442,
+        "diffRatio": 0.2221,
         "similarityScore": 78,
         "alphaChannelIntact": true,
         "hotspots": [
@@ -667,16 +676,25 @@
             "width": 160,
             "height": 100,
             "diffRatio": 0.0598
+          },
+          {
+            "gridX": 1,
+            "gridY": 5,
+            "x": 160,
+            "y": 500,
+            "width": 160,
+            "height": 100,
+            "diffRatio": 0.0111
           }
         ],
-        "summary": "78/100 similarity; 227265/1024000 pixels differ; 30 hotspot region(s)."
+        "summary": "78/100 similarity; 227442/1024000 pixels differ; 31 hotspot region(s)."
       }
     },
     {
       "file": "archives/1920x1080/light/100-empty.png",
       "supplemental": true,
       "beforeSha256": "2362d6f87ca5efbd44ac17317ba903c15e986c9208d09169f5dc9df44272ab11",
-      "afterSha256": "a6e705115bfd58208a30fd289c46c72011b5381caab1ec179dc4e562478b528c",
+      "afterSha256": "8130f5c5a55624bbabe565fc52f521383a041bacdfd1d5590eb99bb86da4cfaa",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -765,7 +783,7 @@
       "file": "archives/1920x1080/light/returned-list.png",
       "supplemental": true,
       "beforeSha256": "e07f5d87b5bfdc059a42ad677239e2267aa40c8336d05e0fe06d4ca90b3e99cb",
-      "afterSha256": "e07f5d87b5bfdc059a42ad677239e2267aa40c8336d05e0fe06d4ca90b3e99cb",
+      "afterSha256": "bbb812c699aa5a5daf0c58f41acaffdd6ad8e3a6b5294184b2a069e5e95f16a5",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -778,19 +796,29 @@
           "height": 1080
         },
         "totalPixels": 2073600,
-        "diffPixels": 0,
-        "diffRatio": 0,
+        "diffPixels": 177,
+        "diffRatio": 0.0001,
         "similarityScore": 100,
         "alphaChannelIntact": true,
-        "hotspots": [],
-        "summary": "100/100 similarity; 0/2073600 pixels differ."
+        "hotspots": [
+          {
+            "gridX": 0,
+            "gridY": 3,
+            "x": 0,
+            "y": 405,
+            "width": 240,
+            "height": 135,
+            "diffRatio": 0.0055
+          }
+        ],
+        "summary": "100/100 similarity; 177/2073600 pixels differ; 1 hotspot region(s)."
       }
     },
     {
       "file": "archives/1920x1080/light/archive-action-path.png",
       "supplemental": true,
       "beforeSha256": "e393a504f993559239bd5eaa5ae7fe1f99e16bc7ad503be7a29dce50c415c50d",
-      "afterSha256": "e393a504f993559239bd5eaa5ae7fe1f99e16bc7ad503be7a29dce50c415c50d",
+      "afterSha256": "5e7b194be2c52d32fedcec6f990e75b81cf62474579aa4600b9de380e5d5a732",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -803,19 +831,29 @@
           "height": 1080
         },
         "totalPixels": 2073600,
-        "diffPixels": 0,
-        "diffRatio": 0,
+        "diffPixels": 177,
+        "diffRatio": 0.0001,
         "similarityScore": 100,
         "alphaChannelIntact": true,
-        "hotspots": [],
-        "summary": "100/100 similarity; 0/2073600 pixels differ."
+        "hotspots": [
+          {
+            "gridX": 0,
+            "gridY": 3,
+            "x": 0,
+            "y": 405,
+            "width": 240,
+            "height": 135,
+            "diffRatio": 0.0055
+          }
+        ],
+        "summary": "100/100 similarity; 177/2073600 pixels differ; 1 hotspot region(s)."
       }
     },
     {
       "file": "archives/1280x800/dark/100-empty.png",
       "supplemental": true,
       "beforeSha256": "ca89bba8dd068513e4f03f12fa36f37a072a58180e35ab89a592f3c90dabc07e",
-      "afterSha256": "5f4ae9ab1cefe4604fdb260a272a59a030f592eb805596a5110f4c0701c0b011",
+      "afterSha256": "b11ce7fa7064cd588ea89a4326af639edfa8eb5ae2c9ff8a58fbab6ee09448ab",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -828,7 +866,7 @@
           "height": 800
         },
         "totalPixels": 1024000,
-        "diffPixels": 11253,
+        "diffPixels": 11255,
         "diffRatio": 0.011,
         "similarityScore": 99,
         "alphaChannelIntact": true,
@@ -840,7 +878,7 @@
             "y": 100,
             "width": 160,
             "height": 100,
-            "diffRatio": 0.2535
+            "diffRatio": 0.2536
           },
           {
             "gridX": 7,
@@ -888,14 +926,14 @@
             "diffRatio": 0.03
           }
         ],
-        "summary": "99/100 similarity; 11253/1024000 pixels differ; 6 hotspot region(s)."
+        "summary": "99/100 similarity; 11255/1024000 pixels differ; 6 hotspot region(s)."
       }
     },
     {
       "file": "archives/1280x800/dark/returned-list.png",
       "supplemental": true,
       "beforeSha256": "71826d6926df2ded0846bdd0d26e06e545edc71434963d5866d13d36596a9370",
-      "afterSha256": "d0b0db28dfaae55cbea0ba8a9d4daf5e9be7adc2e80f43bbced76d2a62d43b2d",
+      "afterSha256": "47999217c86688b594298ad0428cc3b65842ad62d772f1dea3f674f5aeed3a40",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -908,8 +946,8 @@
           "height": 800
         },
         "totalPixels": 1024000,
-        "diffPixels": 224292,
-        "diffRatio": 0.219,
+        "diffPixels": 224469,
+        "diffRatio": 0.2192,
         "similarityScore": 78,
         "alphaChannelIntact": true,
         "hotspots": [
@@ -1182,16 +1220,25 @@
             "width": 160,
             "height": 100,
             "diffRatio": 0.0564
+          },
+          {
+            "gridX": 1,
+            "gridY": 5,
+            "x": 160,
+            "y": 500,
+            "width": 160,
+            "height": 100,
+            "diffRatio": 0.0111
           }
         ],
-        "summary": "78/100 similarity; 224292/1024000 pixels differ; 30 hotspot region(s)."
+        "summary": "78/100 similarity; 224469/1024000 pixels differ; 31 hotspot region(s)."
       }
     },
     {
       "file": "archives/1280x800/dark/archive-action-path.png",
       "supplemental": true,
       "beforeSha256": "71826d6926df2ded0846bdd0d26e06e545edc71434963d5866d13d36596a9370",
-      "afterSha256": "d0b0db28dfaae55cbea0ba8a9d4daf5e9be7adc2e80f43bbced76d2a62d43b2d",
+      "afterSha256": "8c7b78463312505fb44ea2e6036a8286aa1cf55a8f2d6c0eae01e5aec7ef2086",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -1204,8 +1251,8 @@
           "height": 800
         },
         "totalPixels": 1024000,
-        "diffPixels": 224292,
-        "diffRatio": 0.219,
+        "diffPixels": 224469,
+        "diffRatio": 0.2192,
         "similarityScore": 78,
         "alphaChannelIntact": true,
         "hotspots": [
@@ -1478,16 +1525,25 @@
             "width": 160,
             "height": 100,
             "diffRatio": 0.0564
+          },
+          {
+            "gridX": 1,
+            "gridY": 5,
+            "x": 160,
+            "y": 500,
+            "width": 160,
+            "height": 100,
+            "diffRatio": 0.0111
           }
         ],
-        "summary": "78/100 similarity; 224292/1024000 pixels differ; 30 hotspot region(s)."
+        "summary": "78/100 similarity; 224469/1024000 pixels differ; 31 hotspot region(s)."
       }
     },
     {
       "file": "archives/1920x1080/dark/100-empty.png",
       "supplemental": true,
       "beforeSha256": "6f369e1610542cb17d328bb814aa08fbbf56bae6847c0b9aee2dfbc9b0be97d2",
-      "afterSha256": "f51cff5924a88ced9b29caf58393962ced65c31adf7750d20f3b733a55684194",
+      "afterSha256": "294c61ac0500c373532999140051a7b49a16aff4bb5c7dcc4f3634365ca86c3a",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -1500,7 +1556,7 @@
           "height": 1080
         },
         "totalPixels": 2073600,
-        "diffPixels": 11253,
+        "diffPixels": 11255,
         "diffRatio": 0.0054,
         "similarityScore": 99,
         "alphaChannelIntact": true,
@@ -1512,7 +1568,7 @@
             "y": 135,
             "width": 240,
             "height": 135,
-            "diffRatio": 0.1236
+            "diffRatio": 0.1237
           },
           {
             "gridX": 3,
@@ -1569,14 +1625,14 @@
             "diffRatio": 0.0048
           }
         ],
-        "summary": "99/100 similarity; 11253/2073600 pixels differ; 7 hotspot region(s)."
+        "summary": "99/100 similarity; 11255/2073600 pixels differ; 7 hotspot region(s)."
       }
     },
     {
       "file": "archives/1920x1080/dark/returned-list.png",
       "supplemental": true,
       "beforeSha256": "7699938d002a1972922df687c203548a5b0a2dfd44b93e5aed2470c830ed6966",
-      "afterSha256": "7699938d002a1972922df687c203548a5b0a2dfd44b93e5aed2470c830ed6966",
+      "afterSha256": "28d141109e1873d9c5a9806264f9f03dee81654c7ef56c1cd379dae7252989bf",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -1589,19 +1645,29 @@
           "height": 1080
         },
         "totalPixels": 2073600,
-        "diffPixels": 0,
-        "diffRatio": 0,
+        "diffPixels": 177,
+        "diffRatio": 0.0001,
         "similarityScore": 100,
         "alphaChannelIntact": true,
-        "hotspots": [],
-        "summary": "100/100 similarity; 0/2073600 pixels differ."
+        "hotspots": [
+          {
+            "gridX": 0,
+            "gridY": 3,
+            "x": 0,
+            "y": 405,
+            "width": 240,
+            "height": 135,
+            "diffRatio": 0.0055
+          }
+        ],
+        "summary": "100/100 similarity; 177/2073600 pixels differ; 1 hotspot region(s)."
       }
     },
     {
       "file": "archives/1920x1080/dark/archive-action-path.png",
       "supplemental": true,
       "beforeSha256": "3833e2a301f329834caa916d554e33bfc94ee3d3377eb9de44e4a697f993ef93",
-      "afterSha256": "3833e2a301f329834caa916d554e33bfc94ee3d3377eb9de44e4a697f993ef93",
+      "afterSha256": "daa36a25b1490a74f2819fc6c8d0e59f519466e93f33c77306afa50f0ba55266",
       "result": {
         "command": "image-diff",
         "dimensionsMatch": true,
@@ -1614,12 +1680,22 @@
           "height": 1080
         },
         "totalPixels": 2073600,
-        "diffPixels": 0,
-        "diffRatio": 0,
+        "diffPixels": 177,
+        "diffRatio": 0.0001,
         "similarityScore": 100,
         "alphaChannelIntact": true,
-        "hotspots": [],
-        "summary": "100/100 similarity; 0/2073600 pixels differ."
+        "hotspots": [
+          {
+            "gridX": 0,
+            "gridY": 3,
+            "x": 0,
+            "y": 405,
+            "width": 240,
+            "height": 135,
+            "diffRatio": 0.0055
+          }
+        ],
+        "summary": "100/100 similarity; 177/2073600 pixels differ; 1 hotspot region(s)."
       }
     },
     {

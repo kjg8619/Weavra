@@ -23,6 +23,11 @@ const summary = {
   minimumTextContrast: Math.min(...[...controls, ...text].map((row) => row.contrast)),
   minimumFocusContrast: Math.min(...focus.map((row) => row.ringContrast)),
   minimumFocusWidth: Math.min(...focus.map((row) => row.outlineWidth)),
+  minimumBorderContrast: Math.min(...controls.map((row) => row.edgeContrast)),
+  borderMatrix: controls.filter((row) => row.state === "empty").map((row) => ({
+    theme: row.mode, width: row.size[0], height: row.size[1], textPercent: row.scale,
+    border: row.border, outside: row.outside, ratio: row.edgeContrast,
+  })),
   hitMisses: controls.flatMap((row) => row.hits).filter((hit) => !hit).length,
   overlaps: geometry.flatMap((row) => row.overlaps).length,
   orphanOrMidWord: text.filter((row) => row.orphan || row.midWord).length,

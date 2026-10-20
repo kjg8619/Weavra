@@ -11,7 +11,7 @@ assert.equal(before.failures.length,0);assert.equal(after.failures.length,0);
 assert.equal(before.closed,true);assert.equal(after.closed,true);
 assert.equal(before.screenshots.length,16);assert.equal(after.screenshots.length,18);
 assert.equal(before.revision,"878a9162cd8ce64b39c36531d772cdbd3885b658");
-assert.equal(after.revision,"621cf6d77608171a21260c8a810f76bc99af06c8");
+assert.equal(after.revision,"c4e04c655ec393a0641dbafbfa204d9580b992bb");
 const pairs=[];
 for(const b of before.screenshots) {
   const a=after.screenshots.find(s=>s.file===b.file);assert.ok(a);

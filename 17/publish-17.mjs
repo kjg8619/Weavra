@@ -79,13 +79,18 @@ if (mode === "stage") {
     "source-checks.json", "supplemental/pairs.json", "supplemental/before/manifest.json", "supplemental/after/manifest.json",
     "qa-round-01/scenario-receipt.json", "repeat-01/pr-17/acceptance-verdict.json",
     "logs/parent-lint.log", "logs/accent-stripes.log", "tools/measure-17.mjs", "tools/preload-app-gate.mjs",
-    "tools/gate.sh", "tools/summarize-measure.mjs", "tools/diff-archives.mjs", "pipeline-17.sh", "publish-17.mjs"])
+    "tools/gate.sh", "tools/summarize-measure.mjs", "tools/diff-archives.mjs", "pipeline-17.sh", "publish-17.mjs",
+    "tools/measure-17-fix1.mjs", "pipeline-17-fix1.sh", "pipeline-17-fix1.log",
+    "logs/measure-fix1.log", "logs/accept-fix1.log", "logs/verify-fix1.log"])
     await fs.copyFile(join(root, f), join(out, f.replaceAll("/", "--")));
   for (const round of ["qa", "qa-round-01"]) {
     const receipt = await json(`${round}/scenario-receipt.json`);
     await fs.copyFile(join(root, round, receipt.capture.file),
       join(out, `${round}--scenario-capture-manifest.json`));
   }
+  await fs.copyFile(
+    "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-17-fix1-measure/border-matrix.json",
+    join(out, "fix1--border-matrix.json"));
   await fs.writeFile(join(out, "publication-index.json"),
     JSON.stringify({ images: images.map(({ source, ...i }) => i) }, null, 2));
   await fs.writeFile(join(out, "image-table.md"), gallery(pairs, images));

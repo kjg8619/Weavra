@@ -1,9 +1,10 @@
 # Todo 17 packaged self-measurement
 
-Head: `621cf6d77608171a21260c8a810f76bc99af06c8`.
-app.asar: `03e50bae86b90a75e9965e29f082ae35d19ecc38e2801cfab47b74bf67e9b1bf`.
+Head: `c4e04c655ec393a0641dbafbfa204d9580b992bb`.
+app.asar: `a105ea3eb3dbec59468fb7342aebc56a091943d0a4b5c7743d80c52b7cf2e26f`.
 Receipt: `measure/qa-measure.json`; summary: `measure-summary.json`.
-Script: `tools/measure-17.mjs`; log: `logs/measure.log`.
+Fix1 script: `tools/measure-17-fix1.mjs`; log: `logs/measure-fix1.log`.
+The original JSON is saved under `pr-17-fix1-measure/qa-measure.json`.
 
 243 rows, 62 PNGs, failures 0. Light/dark; 840x620, 1280x800 and
 1920x1080 CSS viewports; 100%/150% text. Actual packaged renderer, computed
@@ -20,7 +21,7 @@ isolated profiles. The original installed app is not the captured build.
 | e | PASS: 12 direct return activations preserve exact environment/conversation route and unsent draft; 24 Escape returns retain draft and restore composer focus. |
 | f | PASS: all measured in-flow sections are inside the viewport; scroll origin 0; no horizontal overflow. No modal is introduced. |
 | g | PASS: 12 Tab/Escape sequences close the existing topmost sidebar tooltip first, then leave Settings on the next Escape; exact context and composer focus return. The tooltip is identified by actual data-slot=tooltip-popup markup, not an absent role. |
-| h | PASS: painted solid 2px focus outline >=3.04339:1. No new icon-only control or essential icon boundary is added. |
+| h | PASS fix1: button border 4.78645:1 light and 4.98894:1 dark at all three sizes and both text scales; solid 2px focus outline >=3.04339:1. The twelve-combination matrix is in measure-summary.json. The call site uses border-muted-foreground; the shared Button is unchanged. |
 | i | PASS: measured required explanation/action text has no ellipsis or horizontal clipping. |
 | j | PASS: unintended painted intersections with header/message/composer regions 0. |
 
