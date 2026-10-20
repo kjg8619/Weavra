@@ -591,14 +591,17 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
                 data-suggestion={suggestion.id}
                 aria-describedby={reasonId}
                 aria-expanded={props.hasDraftText ? pending?.id === suggestion.id : undefined}
-                className="flex min-h-11 w-full flex-col items-start gap-0.5 rounded-lg border border-border bg-background/80 px-3 py-2 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex min-h-11 w-full flex-col items-start gap-0.5 rounded-lg border border-border bg-background/80 px-3 py-2 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => {
                   if (props.hasDraftText) setPending(suggestion);
                   else props.onChoose(suggestion, "insert");
                 }}
               >
                 <span className="font-medium text-foreground">{suggestion.label}</span>
-                <span id={reasonId} className="text-muted-foreground text-xs leading-4">
+                <span
+                  id={reasonId}
+                  className="font-normal text-muted-foreground text-sm leading-5 group-hover:text-accent-foreground"
+                >
                   {suggestion.reason}
                 </span>
               </button>
@@ -616,6 +619,7 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
           <Button
             size="sm"
             variant="outline"
+            className="h-8 px-3 sm:h-8"
             onClick={() => {
               props.onChoose(pending, "append");
               setPending(null);
@@ -626,6 +630,7 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
           <Button
             size="sm"
             variant="outline"
+            className="h-8 px-3 sm:h-8"
             onClick={() => {
               props.onChoose(pending, "replace");
               setPending(null);
@@ -633,12 +638,17 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
           >
             제안으로 바꾸기
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setPending(null)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 px-3 sm:h-8"
+            onClick={() => setPending(null)}
+          >
             취소
           </Button>
         </div>
       ) : null}
-      <p className="mt-2 text-muted-foreground text-xs leading-4">
+      <p className="mt-2 font-normal text-muted-foreground text-sm leading-5">
         제안은 작성기에만 넣고 보내지 않아요. 실행 모드 {mode.label}: {scope}
         {mode.description}
       </p>
