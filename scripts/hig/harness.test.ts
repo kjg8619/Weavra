@@ -12,6 +12,8 @@ import {
   readCompletedCopy,
   resolveShellBaseline,
   awaitFocusLoss,
+  enterRendererBackground,
+  recordScenarioArtifact,
   createRpcLedger,
   countInActiveDialog,
   COMMAND_DIALOG_POPUP,
@@ -200,6 +202,62 @@ describe("renderer focus loss", () => {
     await expect(awaitFocusLoss(Promise.resolve(), async () => true, 1_000)).rejects.toThrow(
       "still reports document focus",
     );
+  });
+});
+
+describe("renderer background state", () => {
+  class FakeDocument extends EventTarget {
+    hasFocus() {
+      return true;
+    }
+  }
+  const renderer = () => Object.assign(new EventTarget(), { document: new FakeDocument() });
+
+  test("drops document focus and fires the blur the product listens for", async () => {
+    const target = renderer();
+    const blurred = new Promise<void>((resolve) =>
+      target.addEventListener("blur", () => resolve(), { once: true }),
+    );
+    enterRendererBackground(target);
+    await expect(
+      awaitFocusLoss(blurred, async () => target.document.hasFocus(), 1_000),
+    ).resolves.toBeUndefined();
+  });
+  test("restoring returns real focus and fires focus", () => {
+    const target = renderer() as ReturnType<typeof renderer> & { __higRestoreForeground?: () => void };
+    let focused = 0;
+    target.addEventListener("focus", () => focused++);
+    enterRendererBackground(target);
+    target.__higRestoreForeground!();
+    expect(target.document.hasFocus()).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(target.document, "hasFocus")).toBeUndefined();
+    expect(target.__higRestoreForeground).toBeUndefined();
+    expect(focused).toBe(1);
+  });
+  test("without the background state a focused document still fails the focus-loss wait", async () => {
+    const target = renderer();
+    await expect(
+      awaitFocusLoss(Promise.resolve(), async () => target.document.hasFocus(), 1_000),
+    ).rejects.toThrow("still reports document focus");
+  });
+});
+
+describe("scenario artifact names", () => {
+  test("a second capture under the same name in one check fails immediately", () => {
+    const artifacts: Array<{ file: string; sha256: string }> = [];
+    recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-current-840.png", "a");
+    expect(() =>
+      recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-current-840.png", "b"),
+    ).toThrow("Scenario artifact name collision");
+    expect(artifacts).toEqual([
+      { file: "scenarios/06/footer-wrap/footer-current-840.png", sha256: "a" },
+    ]);
+  });
+  test("variant-specific names coexist", () => {
+    const artifacts: Array<{ file: string; sha256: string }> = [];
+    recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-current-840.png", "a");
+    recordScenarioArtifact(artifacts, "scenarios/06/footer-wrap/footer-legacy-840.png", "b");
+    expect(artifacts.length).toBe(2);
   });
 });
 
