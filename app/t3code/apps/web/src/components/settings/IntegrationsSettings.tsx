@@ -568,7 +568,7 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
           <SelectPopup
             align="end"
             alignItemWithTrigger={false}
-            className="text-foreground [&_[role=option]]:focus-visible:outline-2 [&_[role=option]]:focus-visible:-outline-offset-2 [&_[role=option]]:focus-visible:outline-foreground"
+            className="text-foreground [&_[role=option]]:focus-visible:outline-solid [&_[role=option]]:focus-visible:outline-2 [&_[role=option]]:focus-visible:-outline-offset-2 [&_[role=option]]:focus-visible:outline-foreground"
             onKeyDownCapture={(event) => {
               if (event.key !== "Tab") return;
               const items = Array.from(
