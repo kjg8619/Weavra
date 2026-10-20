@@ -2,6 +2,24 @@ import type { AdvertisedEndpoint, DesktopBridge, DesktopWslState } from "@t3tool
 
 type WslEnableBridge = Pick<DesktopBridge, "setWslBackendEnabled" | "setWslDistro" | "setWslOnly">;
 
+export function resolveConnectionActions(input: {
+  readonly hostConnected: boolean;
+  readonly hostAccessAllowed: boolean;
+  readonly sshSupported: boolean;
+}) {
+  // Opening this client's pairing draft neither changes the current host nor
+  // grants access to the destination. Pairing is still required on submission.
+  return {
+    canOpenDraft: true,
+    canUseSsh: input.sshSupported,
+    hostAccess: !input.hostConnected
+      ? ("disconnected" as const)
+      : input.hostAccessAllowed
+        ? ("available" as const)
+        : ("permission-required" as const),
+  };
+}
+
 /**
  * A QR code encoding a loopback URL makes the scanning device dial itself, so
  * loopback endpoints stay copyable from the endpoint menu but are never

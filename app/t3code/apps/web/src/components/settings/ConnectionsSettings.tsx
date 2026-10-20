@@ -58,6 +58,7 @@ import {
   applyWslEnableSelection,
   isQrShareableEndpoint,
   isWslSettingsRowVisible,
+  resolveConnectionActions,
   selectQrEndpointOption,
 } from "./ConnectionsSettings.logic";
 import {
@@ -1774,19 +1775,28 @@ function CloudLinkRow({ canManageRelay }: { readonly canManageRelay: boolean }) 
   return hasCloudPublicConfig() ? <ConfiguredCloudLinkRow canManageRelay={canManageRelay} /> : null;
 }
 
-function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnabled?: boolean }) {
+type ConnectionActions = ReturnType<typeof resolveConnectionActions>;
+
+function EmptyRemoteEnvironments({ actions }: { readonly actions: ConnectionActions }) {
   return (
     <Empty className="min-h-52">
       <EmptyMedia variant="icon">
         <ChevronsLeftRightEllipsisIcon />
       </EmptyMedia>
       <EmptyHeader>
-        <EmptyTitle>No saved remote environments</EmptyTitle>
-        <EmptyDescription>
-          {cloudEnabled
-            ? "Click “Add environment” to pair another environment, or connect one from T3 Connect."
-            : "Click “Add environment” to pair another environment."}
+        <EmptyTitle>저장된 원격 환경이 없어요</EmptyTitle>
+        <EmptyDescription className="text-sm text-foreground [word-break:keep-all] [text-wrap:pretty]">
+          {actions.canOpenDraft
+            ? "Add environment에서 이 기기에 저장할 연결 정보를 입력하세요. 같은 네트워크나 Tailscale의 호스트 주소와 페어링 코드가 필요해요. 창을 여는 것만으로 연결되거나 호스트 설정이 바뀌지 않아요."
+            : null}
         </EmptyDescription>
+        {actions.hostAccess !== "available" ? (
+          <p className="text-sm text-foreground [word-break:keep-all] [text-wrap:pretty]">
+            {actions.hostAccess === "disconnected"
+              ? "현재 호스트에 연결되지 않아 호스트 접근 관리는 사용할 수 없어요. 연결 정보를 입력하거나 현재 호스트에 다시 연결하세요."
+              : "현재 호스트의 접근 관리는 access:write 권한이 필요해요. 호스트 관리자에게 요청하세요. 다른 환경의 연결 정보는 입력할 수 있어요."}
+          </p>
+        ) : null}
       </EmptyHeader>
     </Empty>
   );
@@ -1795,18 +1805,20 @@ function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnable
 function CloudRemoteEnvironmentRows({
   primaryEnvironmentId,
   savedEnvironments,
+  actions,
 }: {
   readonly primaryEnvironmentId: EnvironmentId | null;
   readonly savedEnvironments: ReadonlyArray<EnvironmentPresentation>;
+  readonly actions: ConnectionActions;
 }) {
   return hasCloudPublicConfig() ? (
     <CloudEnvironmentConnectRows
       primaryEnvironmentId={primaryEnvironmentId}
       savedEnvironments={savedEnvironments}
-      empty={<EmptyRemoteEnvironments />}
+      empty={<EmptyRemoteEnvironments actions={actions} />}
     />
   ) : savedEnvironments.length === 0 ? (
-    <EmptyRemoteEnvironments cloudEnabled={false} />
+    <EmptyRemoteEnvironments actions={actions} />
   ) : null;
 }
 
@@ -2009,6 +2021,11 @@ export function ConnectionsSettings() {
   const canManageLocalBackend =
     !isLocalEnvironmentDisabled() &&
     (currentSessionScopes?.includes(AuthAccessWriteScope) ?? false);
+  const connectionActions = resolveConnectionActions({
+    hostConnected: primaryEnvironment?.connection.phase === "connected",
+    hostAccessAllowed: canManageLocalBackend,
+    sshSupported: desktopBridge !== undefined,
+  });
   const canManageRelay = currentSessionScopes?.includes(AuthRelayWriteScope) ?? false;
   const authAccessChanges = useEnvironmentQuery(
     canManageLocalBackend && primaryEnvironmentId !== null
@@ -3681,7 +3698,7 @@ export function ConnectionsSettings() {
         {...searchableSetting("remote-environments")}
         title="Environments"
         headerAction={
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             {savedServerUpdateTargets.length > 0 ? (
               <ServerUpdatesAction
                 targets={savedServerUpdateTargets}
@@ -3704,12 +3721,12 @@ export function ConnectionsSettings() {
                     <DialogTrigger
                       render={
                         <Button
-                          size="xs"
-                          variant="ghost"
-                          className="font-normal text-muted-foreground/60 hover:text-muted-foreground"
+                          variant="outline"
+                          className="min-h-9 border-foreground/60 px-3 text-sm text-foreground transition-[opacity,transform] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-foreground focus-visible:outline-offset-2"
                           aria-label="Add environment"
+                          disabled={!connectionActions.canOpenDraft}
                         >
-                          <PlusIcon className="size-3" />
+                          <PlusIcon aria-hidden className="size-4" />
                           <span>Add environment</span>
                         </Button>
                       }
@@ -3721,7 +3738,11 @@ export function ConnectionsSettings() {
               <DialogPopup className="max-h-[80dvh] sm:max-w-3xl">
                 <DialogHeader>
                   <DialogTitle>Add Environment</DialogTitle>
-                  <DialogDescription>Pair another environment to this client.</DialogDescription>
+                  <DialogDescription className="text-sm text-foreground [word-break:keep-all] [text-wrap:pretty]">
+                    이 기기에 저장할 연결 정보를 입력하세요. 같은 네트워크나 Tailscale의 호스트
+                    주소와 페어링 코드로 연결해요. 추가하기 전에는 호스트 설정이나 권한이 바뀌지
+                    않아요.
+                  </DialogDescription>
                 </DialogHeader>
                 <DialogPanel>
                   <div className="space-y-4">
@@ -3732,7 +3753,7 @@ export function ConnectionsSettings() {
                         description: "Enter a backend host and pairing code.",
                         icon: <ChevronsLeftRightEllipsisIcon aria-hidden className="size-4" />,
                       })}
-                      {desktopBridge
+                      {connectionActions.canUseSsh
                         ? renderConnectionModeCard({
                             mode: "ssh",
                             title: "SSH",
@@ -3764,6 +3785,7 @@ export function ConnectionsSettings() {
         <CloudRemoteEnvironmentRows
           primaryEnvironmentId={primaryEnvironmentId}
           savedEnvironments={savedEnvironments}
+          actions={connectionActions}
         />
       </SettingsSection>
       <LoadBalancingSettings environments={loadBalancingEnvironments} />
