@@ -300,7 +300,7 @@ function DiscoveryItemRow({
                 size="icon-xs"
                 variant="outline"
                 data-icon-control
-                className="text-foreground ring-1 ring-foreground/70 focus-visible:ring-2 focus-visible:ring-foreground"
+                className="border-foreground/70 text-foreground focus-visible:ring-2 focus-visible:ring-foreground"
                 onClick={() => setIsExpanded((open) => !open)}
                 aria-expanded={isExpanded}
                 aria-label={`${item.label} 설정 안내`}
@@ -534,7 +534,7 @@ export function SourceControlSettingsPanel() {
             size="icon-xs"
             variant="outline"
             data-icon-control
-            className="text-foreground ring-1 ring-foreground/70 disabled:opacity-100 focus-visible:ring-2 focus-visible:ring-foreground"
+            className="border-foreground/70 text-foreground disabled:opacity-100 focus-visible:ring-2 focus-visible:ring-foreground"
             onClick={handleScan}
             disabled={discovery.isPending}
             aria-label="Rescan server environment"
