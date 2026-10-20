@@ -13,8 +13,9 @@ import { act, StrictMode, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-const { listBrowserImportSources } = vi.hoisted(() => ({
+const { listBrowserImportSources, updatePrimarySettings } = vi.hoisted(() => ({
   listBrowserImportSources: vi.fn().mockResolvedValue([]),
+  updatePrimarySettings: vi.fn(),
 }));
 
 vi.mock("../preview/previewBridge", () => ({
@@ -33,7 +34,7 @@ vi.mock("../../hooks/useSettings", async (importOriginal) => ({
   useClientSettingsHydrated: () => true,
   usePrimarySettingsAvailable: () => true,
   usePrimarySettings: () => DEFAULT_UNIFIED_SETTINGS,
-  useUpdatePrimarySettings: () => vi.fn(),
+  useUpdatePrimarySettings: () => updatePrimarySettings,
 }));
 vi.mock("./settingsLayout", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./settingsLayout")>()),
@@ -63,6 +64,7 @@ let renderer: ReactTestRenderer | undefined;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   listBrowserImportSources.mockClear();
+  updatePrimarySettings.mockClear();
 });
 
 afterEach(async () => {
@@ -103,6 +105,24 @@ describe("Integrations browser discovery", () => {
       .map((node) => node.props.id)
       .filter(Boolean);
     expect(sections.indexOf("devices")).toBeGreaterThan(sections.indexOf("browser"));
+  });
+});
+
+describe("browser link destination", () => {
+  it("updates only the selected browser link destination", async () => {
+    await openSettings();
+
+    const trigger = renderer!.root.find((node) => node.props["aria-label"] === "Open links in");
+
+    let select = trigger.parent;
+    while (select && typeof select.props.onValueChange !== "function") {
+      select = select.parent;
+    }
+    expect(select).not.toBeNull();
+    expect(select!.props.value).toBe("system");
+
+    await act(() => select!.props.onValueChange("app"));
+    expect(updatePrimarySettings).toHaveBeenCalledExactlyOnceWith({ browserLinkTarget: "app" });
   });
 });
 
