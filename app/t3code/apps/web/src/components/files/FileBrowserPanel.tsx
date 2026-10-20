@@ -10,7 +10,6 @@ import { ChevronsDownUpIcon, ChevronsUpDownIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "~/components/ui/button";
-import { cn } from "~/lib/utils";
 import { InputGroup, InputGroupInput } from "~/components/ui/input-group";
 import { toastManager } from "~/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
@@ -616,7 +615,7 @@ export default function FileBrowserPanel({
         <FileTree
           model={model}
           aria-label={`${projectName} file tree`}
-          className={cn("min-h-0 flex-1 overflow-hidden", bodyState.kind !== "ready" && "hidden")}
+          className="min-h-0 flex-1 overflow-hidden"
           style={pierreTreeStyle(resolvedTheme)}
         />
       </div>
