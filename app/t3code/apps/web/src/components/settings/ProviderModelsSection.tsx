@@ -602,17 +602,17 @@ export function ProviderModelsSection({
         <div className="mt-3 flex flex-col gap-1">
           <label
             htmlFor={`provider-instance-${instanceId}-custom-model`}
-            className="font-medium text-foreground text-xs"
+            className="text-foreground text-sm"
           >
             모델 ID
           </label>
           <p
             id={`provider-instance-${instanceId}-custom-model-hint`}
-            className="text-muted-foreground text-xs"
+            className="text-muted-foreground text-sm"
           >
             공급자에 그대로 전달할 모델 이름이에요. 공급자 문서에 적힌 ID를 입력해 주세요.
           </p>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Input
               id={`provider-instance-${instanceId}-custom-model`}
               aria-describedby={`provider-instance-${instanceId}-custom-model-hint`}
@@ -637,10 +637,10 @@ export function ProviderModelsSection({
               spellCheck={false}
             />
             <div className="flex shrink-0 gap-2">
-              <Button size="sm" variant="outline" onClick={handleAdd}>
+              <Button size="default" variant="outline" onClick={handleAdd}>
                 Add
               </Button>
-              <Button size="sm" variant="ghost" onClick={cancelAdd}>
+              <Button size="default" variant="ghost" onClick={cancelAdd}>
                 Cancel
               </Button>
             </div>
