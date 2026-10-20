@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "selection": "04",
-  "revision": "c2251921f6f27e30f150d5b1e75f2fc7478baac0",
-  "asarSha256": "cf5065c3b11fb8819883bde6f8e05ded75c971db70a127f6ccfeaa97eb70a638",
+  "revision": "686c8ea80c5e6e0121a9fc5c44de38774339f067",
+  "asarSha256": "021ccac8368ffb1b64be2cfeb00ad3d85556c82dd0ec88ee2a62333f1f07e42e",
   "sources": {
     "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
-    "cases.mjs": "03f0b129fa8de9c15c8bf74b9daa357e2ea37ee17e68a030a0617fbad7e8cf85",
+    "cases.mjs": "870dc5bb24f2f8fedf1399f20f400a63080758f127ea7dbff92bab020e74a92f",
     "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
     "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
   },
-  "startedAt": "2026-10-20T00:14:01.020Z",
+  "startedAt": "2026-10-20T01:51:13.663Z",
   "checks": [
     {
       "caseId": "04",
@@ -22,23 +22,46 @@
           "expected": false
         },
         {
-          "label": "auth cause has independent recovery",
+          "label": "auth cause has one recovery control",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "auth recovery control is enabled",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "auth recovery opens this provider's setup",
+          "actual": "codex",
+          "expected": "codex"
+        },
+        {
+          "label": "opening recovery does not start sign-in by itself",
+          "actual": false,
+          "expected": false
         }
       ],
       "artifacts": [
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/auth-error/result.png",
-          "sha256": "3f8a62454adb513ae14c2602380cf7688b8bd0b80a3d2270aee7f91245d72c1c"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/auth-error/auth-recovery.png",
+          "sha256": "e1b3111cce2c4c51d302a53663b388552fa1bfd624fe73f3449f97c2b794a090"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/auth-error/result.ax.json",
-          "sha256": "c67ad819b711e0776156f166b60a1b613ac9221001461ab4757737c82943d7cc"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/auth-error/auth-recovery.ax.json",
+          "sha256": "2736748081d1892978c2567d3a6e1435c2150f3cc0c806cbadd28372aaa52383"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/auth-error/observations.json",
-          "sha256": "766f37e1f6db93541298c13eb8d9708fde92abc5a95f5aaca159aaa38cd0482f"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/auth-error/result.png",
+          "sha256": "86e2a1cbdbd01c82bb85fb606e94a100c8b370f5638bcf9e26aefd8138e92be3"
+        },
+        {
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/auth-error/result.ax.json",
+          "sha256": "b6cb0d8029c9e0dacaf235b08639b7a524477fb999931ff8dab5dd339c9aa057"
+        },
+        {
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/auth-error/observations.json",
+          "sha256": "8aa796913bf62c6d5171b3a9bf4d1d7699b327a315c6f30363be78f513b30e7e"
         }
       ]
     },
@@ -60,16 +83,16 @@
       ],
       "artifacts": [
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/turn-error/result.png",
-          "sha256": "9f36b099d51ecf75095bed2bf8bfcf8e534106b7f103494796ce36937b5a97e6"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/turn-error/result.png",
+          "sha256": "744365da4e3d4f8a31fbf42cc183cf1397c11b564df69b7cf0f15e7ac26963b3"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/turn-error/result.ax.json",
-          "sha256": "dff3ae9494ec23152c87c93c860015034f9c364119c072cead1c7250fd0e51dc"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/turn-error/result.ax.json",
+          "sha256": "b69c469f133cff84e663eed1967f18274f8be6226594c1467ad7e4202c6977d0"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/turn-error/observations.json",
-          "sha256": "47d15afc7b6ab16e7183f94e82c61fe29295bf9377ad12b834bf94417c5fc810"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/turn-error/observations.json",
+          "sha256": "bfa3c770b3440e48571aa65a595bc319085d2cd55bfb3e1b42113cb304d0a415"
         }
       ]
     },
@@ -87,28 +110,175 @@
           "label": "turn cause independently retained",
           "actual": true,
           "expected": true
+        },
+        {
+          "label": "dismiss-840: Codex 공급자 오류 닫기 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dismiss-840: Codex 공급자 오류 닫기: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "dismiss-840: 오류 닫기 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dismiss-840: 오류 닫기: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "dismiss-840: one dismiss per cause",
+          "actual": 2,
+          "expected": 2
+        },
+        {
+          "label": "dismiss-1280: Codex 공급자 오류 닫기 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dismiss-1280: Codex 공급자 오류 닫기: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "dismiss-1280: 오류 닫기 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dismiss-1280: 오류 닫기: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "dismiss-1280: one dismiss per cause",
+          "actual": 2,
+          "expected": 2
+        },
+        {
+          "label": "dismiss-1920: Codex 공급자 오류 닫기 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dismiss-1920: Codex 공급자 오류 닫기: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "dismiss-1920: 오류 닫기 >=36x36 (disabled=false)",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "dismiss-1920: 오류 닫기: five icon hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "dismiss-1920: one dismiss per cause",
+          "actual": 2,
+          "expected": 2
         }
       ],
       "artifacts": [
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/independent-causes/independent-causes.png",
-          "sha256": "5bfc3e8b9a723e50490bb2eae666aacbcdac2992319e723beb7f3e20713ab070"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/independent-causes/independent-causes.png",
+          "sha256": "7d1113b15d05e30cc293976a5ccf692832175e1782849e4e0c449004462fda65"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/independent-causes/independent-causes.ax.json",
-          "sha256": "de97ad2d26c9514293f1f2c121d810171ee8cdb36ef34374f862d05431eec3cb"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/independent-causes/independent-causes.ax.json",
+          "sha256": "d9b4ba355b754f2fb77168fcc3d4a202bf703fa12ac72ad865e1bfee0c6d5924"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/independent-causes/result.png",
-          "sha256": "5bfc3e8b9a723e50490bb2eae666aacbcdac2992319e723beb7f3e20713ab070"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/independent-causes/result.png",
+          "sha256": "7d1113b15d05e30cc293976a5ccf692832175e1782849e4e0c449004462fda65"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/independent-causes/result.ax.json",
-          "sha256": "de97ad2d26c9514293f1f2c121d810171ee8cdb36ef34374f862d05431eec3cb"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/independent-causes/result.ax.json",
+          "sha256": "a6ac030df2b1afeab812ad7193e625aa949290265e5ec041410582312967a990"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/independent-causes/observations.json",
-          "sha256": "ba86e1e770fb6efc8fab67623bed8c93e44fb9010fc30936a9255da3a598230d"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/independent-causes/observations.json",
+          "sha256": "b69fcad0593ed426ca395ccd3aa9dc165e17bb7a70f72ada88f0cac626cbdd3a"
         }
       ]
     },
@@ -130,16 +300,16 @@
       ],
       "artifacts": [
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/event-deduplication/result.png",
-          "sha256": "d1fa7d24b11d1876ad0a2c1f587f8f912adb6264b7334f5d199cb2a2ab14d0f6"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/event-deduplication/result.png",
+          "sha256": "e5c90a29d94fe7e89d28bee24f5143f2f7f2391b1329fa2fd83a9e245298311b"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/event-deduplication/result.ax.json",
-          "sha256": "8c971ac97c80b518d81855b715a3b86285c6674cae608d0610cbcdf4c3c366ae"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/event-deduplication/result.ax.json",
+          "sha256": "dc6a761a5e75b3baf77d5f1a9c4ee603755fb0cda132a28a1c7ca5fa1c2d165d"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/event-deduplication/observations.json",
-          "sha256": "6c69c9d87d9edc6fea25ae8a2fb4abae434af7c0831f8cd438be3212cc0c0b6f"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/event-deduplication/observations.json",
+          "sha256": "537c49aeef2e39502a3b523adb8f1a0c1c5a5f3b4e719a78331985b33303b607"
         }
       ]
     },
@@ -161,16 +331,16 @@
       ],
       "artifacts": [
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/focused-completion/result.png",
-          "sha256": "fc1419c9e6ec7ff9422a6f12a893c6c620009a4bbf58bf68700401e5cf3784d8"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/focused-completion/result.png",
+          "sha256": "fdb7523b5f0009452dd757b6b7252021800d8624b377265044e9d2de3b85cb68"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/focused-completion/result.ax.json",
-          "sha256": "a6cae86c56723d3c037db5a5e85950fe6c7d0280e0f738490d7d1af748ec482f"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/focused-completion/result.ax.json",
+          "sha256": "15efcb1030d9e4a3fa3d2aaf44c5b43dfa582967c138b86605cbed635536eb33"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/focused-completion/observations.json",
-          "sha256": "1a3d1654f3c72c852e29b719979307102f5a3c059b990be5120d4d3f9e461df6"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/focused-completion/observations.json",
+          "sha256": "cc0d44bec01b16a0c2a7b0c826dd8e6037790b54aad451de194e498f2903079d"
         }
       ]
     },
@@ -192,16 +362,16 @@
       ],
       "artifacts": [
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/unfocused-single-notice/result.png",
-          "sha256": "b449bfca2161810b5e15ff389c910d794d571c398c33a5414f872ce658f4a89b"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/unfocused-single-notice/result.png",
+          "sha256": "30576d42d29ac13cfe345c50c3c5df9fd28f02b8b5361a89f449405eabf84e1b"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/unfocused-single-notice/result.ax.json",
-          "sha256": "f96154fcf4df34573b5df01d438833e5915c5c77ec225868941e02eaf24f3320"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/unfocused-single-notice/result.ax.json",
+          "sha256": "11cddc93264f4b97ddda50180c5c1e2d5b65ee1553bd16f168171c50f9e613dc"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/unfocused-single-notice/observations.json",
-          "sha256": "b5ef9443581297ff6cfd93c75c3767b245b13ec39cd37eb5bcc5ea087e845ebf"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/unfocused-single-notice/observations.json",
+          "sha256": "69993d64e5d1afef01f7200ff4f533ad562f7b107323d96c2ee7ffb97eb427ff"
         }
       ]
     },
@@ -223,24 +393,24 @@
       ],
       "artifacts": [
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/modal-update-suppression/update-during-modal.png",
-          "sha256": "655b19f0d26151d2517b5dae2477f42aa3d005c7e9a2cea7d3fa9a6924eeb6d9"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/modal-update-suppression/update-during-modal.png",
+          "sha256": "459c25796ba0df44c22f0481ceef711049dd52c28b34739d05c4825b116e198c"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/modal-update-suppression/update-during-modal.ax.json",
-          "sha256": "36fed9cae33cfebcd38ff92ac91cd23c43f856ab027b367157c46c7cdbce93d4"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/modal-update-suppression/update-during-modal.ax.json",
+          "sha256": "54abb5cfae6fb246ff1ed4107a5036dd330dee7b617149fa3e1006456d183a76"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/modal-update-suppression/result.png",
-          "sha256": "655b19f0d26151d2517b5dae2477f42aa3d005c7e9a2cea7d3fa9a6924eeb6d9"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/modal-update-suppression/result.png",
+          "sha256": "459c25796ba0df44c22f0481ceef711049dd52c28b34739d05c4825b116e198c"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/modal-update-suppression/result.ax.json",
-          "sha256": "36fed9cae33cfebcd38ff92ac91cd23c43f856ab027b367157c46c7cdbce93d4"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/modal-update-suppression/result.ax.json",
+          "sha256": "54abb5cfae6fb246ff1ed4107a5036dd330dee7b617149fa3e1006456d183a76"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/modal-update-suppression/observations.json",
-          "sha256": "f1d59b45c1ee56d2c6a6af01f15901b0b6024d9a5965987d015f0224f28af9f6"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/modal-update-suppression/observations.json",
+          "sha256": "e629ba011d2a1a42366077df45fd390f41b265bde252bd938929c93d1bd0f9df"
         }
       ]
     },
@@ -267,16 +437,16 @@
       ],
       "artifacts": [
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/no-replay/result.png",
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/no-replay/result.png",
           "sha256": "bde596c7cabaac6e120effa3dcfa00c128f4c72ae8bb635d3ff485206255ac77"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/no-replay/result.ax.json",
-          "sha256": "3c8d3449472a4eeb9b73d71f6a4eb729bf0c86758f37df57f011d5d095aadb0f"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/no-replay/result.ax.json",
+          "sha256": "0636f979f19caa92602d92be5ae0513000c20b97a6d7c1bc224898568da6bcea"
         },
         {
-          "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/scenarios/04/no-replay/observations.json",
-          "sha256": "4567af83bc9eede5f96e871e5fabb06c3682f70410906942c5fb9358cd4013f5"
+          "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/scenarios/04/no-replay/observations.json",
+          "sha256": "b3446936686796f6853f929f01b10f9a8bea4a18ae1bdb253f1b404b7c9232ec"
         }
       ]
     }
@@ -289,9 +459,9 @@
     "runtimeMutation": 0,
     "blockedOutbound": 0
   },
-  "completedAt": "2026-10-20T00:15:05.203Z",
+  "completedAt": "2026-10-20T01:52:18.685Z",
   "capture": {
-    "file": "run-0c2d44ca-93e4-46e0-838a-fc6da85bce80/capture-manifest.json",
-    "sha256": "33ad748154fa4020ca92f551236f2d48cc4f0890ac41558be0e9a9b7e8d04246"
+    "file": "run-258a3fb3-dd24-4425-9bbf-c5f2cd234641/capture-manifest.json",
+    "sha256": "c3d264e7101e34917a87768d5173ec43f7a7db0ebef1f2976156947fb8c298b8"
   }
 }
