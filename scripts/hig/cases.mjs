@@ -438,22 +438,36 @@ export function resolveShellBaseline({ streamSnapshot, httpSnapshot, synchronize
   return snapshot;
 }
 
-// Puts the renderer in the state of an app whose window is not focused, the state the
-// product reads through document.hasFocus() and window blur/focus events. It changes
-// no OS focus, so other apps or Weavra instances being frontmost cannot alter the
-// outcome. Self-contained so it can run inside the renderer via page.evaluate.
-/** @param {any} [target] */
-export function enterRendererBackground(target = globalThis) {
-  const doc = target.document;
-  const own = Object.getOwnPropertyDescriptor(doc, "hasFocus");
-  Object.defineProperty(doc, "hasFocus", { configurable: true, value: () => false });
-  target.__higRestoreForeground = () => {
-    if (own) Object.defineProperty(doc, "hasFocus", own);
-    else delete doc.hasFocus;
-    delete target.__higRestoreForeground;
-    target.dispatchEvent(new Event("focus"));
-  };
-  target.dispatchEvent(new Event("blur"));
+// Takes focus away from the app's own BrowserWindow inside the app under test. A key
+// window is blurred, and if it is still key a second window of the same app is made key.
+// The web view is then blurred through Electron as well: a window that never became key
+// (another app or Weavra instance was frontmost) can still hold renderer focus, and no
+// OS change reaches it. Runs in the Electron main process via BrowserWindow evaluate,
+// so it is self-contained. Resolves with the observed states.
+/** @param {any} window */
+export async function takeWindowFocus(window, timeoutMs = 10_000) {
+  const before = window.isFocused();
+  if (!before) {
+    window.blurWebView();
+    return { before, sink: false, after: false };
+  }
+  const lost = new Promise((resolve) => window.once("blur", resolve));
+  window.blur();
+  let sink = false;
+  if (window.isFocused()) {
+    const BrowserWindow = window.constructor;
+    const other = new BrowserWindow({ width: 320, height: 200, show: false, title: "hig-focus-sink" });
+    globalThis.__higFocusSink = other;
+    await other.loadURL("about:blank");
+    other.show();
+    other.focus();
+    sink = true;
+  }
+  let timer;
+  await Promise.race([lost, new Promise((resolve) => (timer = setTimeout(resolve, timeoutMs)))]);
+  clearTimeout(timer);
+  window.blurWebView();
+  return { before, sink, after: window.isFocused() };
 }
 
 // Each scenario check owns its artifact names. A second capture under the same name
@@ -586,6 +600,7 @@ export async function runScenarios(context) {
   let wire = null;
   let responseTransform = null;
   let providerFixture = null;
+  let focusEmulation = null;
   const replies = new Map();
   let requests = [];
   let liveConfig = null;
@@ -1601,13 +1616,21 @@ export async function runScenarios(context) {
       await context.win.evaluate((window) => window.focus());
       await page.waitForFunction(() => document.hasFocus());
     } else {
-      // Real OS focus belongs to whichever app is frontmost, so another Weavra
-      // instance could keep or steal it. Put only this renderer in the unfocused
-      // state the product reads, then confirm the product-visible state changed.
+      // Playwright's page session emulates focus, so document.hasFocus() would stay true
+      // whatever the window does. Release emulation for this check, take OS focus away
+      // from the app window itself, then wait for the renderer to report the real loss.
+      focusEmulation = await page.context().newCDPSession(page);
+      await focusEmulation.send("Emulation.setFocusEmulationEnabled", { enabled: false });
       const blurred = page.evaluate(
-        () => new Promise((resolve) => addEventListener("blur", () => resolve(), { once: true })),
+        () =>
+          new Promise((resolve) => {
+            if (!document.hasFocus()) resolve(undefined);
+            else addEventListener("blur", () => resolve(undefined), { once: true });
+          }),
       );
-      await page.evaluate(enterRendererBackground);
+      const windowFocus = await context.win.evaluate(takeWindowFocus, 10_000);
+      observations.push({ windowFocus });
+      if (windowFocus.after) throw new Error("App window still has OS focus after blur");
       await awaitFocusLoss(blurred, () => page.evaluate(() => document.hasFocus()));
     }
     const snapshot = resolveShellBaseline({
@@ -2623,7 +2646,19 @@ export async function runScenarios(context) {
           true,
         );
       } finally {
-        await page.evaluate(() => globalThis.__higRestoreForeground?.());
+        await context.win.evaluate(() => {
+          globalThis.__higFocusSink?.destroy();
+          globalThis.__higFocusSink = null;
+        });
+        if (focusEmulation) {
+          await focusEmulation.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+          await focusEmulation.detach();
+          focusEmulation = null;
+        }
+        await context.win.evaluate((window) => {
+          window.focusOnWebView();
+          window.focus();
+        });
       }
     },
     "04/modal-update-suppression": async (assert) => {
