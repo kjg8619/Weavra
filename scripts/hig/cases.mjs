@@ -3403,7 +3403,11 @@ export async function runScenarios(context) {
       const route = await page.evaluate(() => location.hash);
       const editor = await unique('[data-testid="composer-editor"]');
       await editor.fill("HIG archive return draft");
-      await settings("archive");
+      await act("open archive from the selected conversation", async () => {
+        await click("button", "settings");
+        await click("button", "archive");
+      });
+      await settle();
       const destination = page.getByRole("button", { name: /대화.*돌아|대화 목록|대화로/ });
       await act("return from empty archive", () => destination.click());
       assert(
