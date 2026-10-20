@@ -140,6 +140,7 @@ import {
   browseInputEndPaddingClass,
   buildBrowseGroups,
   buildCommandPaletteProjectMetadata,
+  buildProjectImportSourceActions,
   buildProjectActionItems,
   buildRootGroups,
   buildThreadActionItems,
@@ -154,6 +155,9 @@ import {
   getCommandPaletteInputPlaceholder,
   getCommandPaletteMode,
   ITEM_ICON_CLASS,
+  PROJECT_IMPORT_SETUP_DESTINATION,
+  projectImportAvailabilityRank,
+  type ProjectImportAvailability,
   RECENT_THREAD_LIMIT,
   reduceCommandPaletteUiState,
   type SearchOverlayMode,
@@ -382,34 +386,32 @@ function sortAddProjectProviderSources(
   readinessBySource: AddProjectRemoteSourceReadiness,
 ): ReadonlyArray<AddProjectRemoteProviderKind> {
   return REMOTE_PROJECT_PROVIDER_SOURCES.toSorted((left, right) => {
-    const leftReady = readinessBySource[left].ready;
-    const rightReady = readinessBySource[right].ready;
-    if (leftReady !== rightReady) {
-      return leftReady ? -1 : 1;
+    const rankDifference =
+      projectImportAvailabilityRank(readinessBySource[left]) -
+      projectImportAvailabilityRank(readinessBySource[right]);
+    if (rankDifference !== 0) {
+      return rankDifference;
     }
     return remoteProjectSourceLabel(left).localeCompare(remoteProjectSourceLabel(right));
   });
 }
 
-type AddProjectRemoteSourceReadiness = Record<
-  AddProjectRemoteSource,
-  { readonly ready: boolean; readonly hint: string | null }
->;
+type AddProjectRemoteSourceReadiness = Record<AddProjectRemoteSource, ProjectImportAvailability>;
 
 function buildAddProjectRemoteSourceReadiness(
   discovery: SourceControlDiscoveryResult | null,
 ): AddProjectRemoteSourceReadiness {
-  const unavailable = {
-    ready: false,
-    hint: "Git 공급자 상태를 확인할 수 없어요. 설정 > 소스 제어를 열고 다시 검색하세요.",
+  const unknown = {
+    status: "unknown",
+    reason: "Git 공급자 상태를 확인할 수 없어요.",
   } as const;
   const defaultReadiness: AddProjectRemoteSourceReadiness = {
-    url: { ready: true, hint: null },
-    github: unavailable,
-    gitlab: unavailable,
-    forgejo: unavailable,
-    bitbucket: unavailable,
-    "azure-devops": unavailable,
+    url: { status: "ready" },
+    github: unknown,
+    gitlab: unknown,
+    forgejo: unknown,
+    bitbucket: unknown,
+    "azure-devops": unknown,
   };
 
   if (!discovery) {
@@ -426,23 +428,35 @@ function buildAddProjectRemoteSourceReadiness(
     if (!kind) continue;
     const provider = providerByKind.get(kind);
     if (!provider) {
-      readiness[source] = unavailable;
+      readiness[source] = {
+        status: "unsupported",
+        reason: `${remoteProjectSourceLabel(source)} 연동은 이 환경에서 지원되지 않아요. Git URL로 가져올 수 있어요.`,
+      };
       continue;
     }
     if (provider.status !== "available") {
-      readiness[source] = { ready: false, hint: provider.installHint };
+      readiness[source] = { status: "not-installed", reason: provider.installHint };
       continue;
     }
     if (provider.auth.status === "unauthenticated") {
       readiness[source] = {
-        ready: false,
-        hint:
+        status: "unauthenticated",
+        reason:
           Option.getOrNull(provider.auth.detail) ??
-          `${provider.label} is not authenticated. Open Settings -> Source Control for setup guidance.`,
+          `${provider.label} 로그인이 필요해요. 설정 > 소스 제어에서 안내를 확인하세요.`,
       };
       continue;
     }
-    readiness[source] = { ready: true, hint: null };
+    if (provider.auth.status === "unknown") {
+      readiness[source] = {
+        status: "unknown",
+        reason:
+          Option.getOrNull(provider.auth.detail) ??
+          `${provider.label} 인증 상태를 확인할 수 없어요. 설정 > 소스 제어에서 다시 검색하세요.`,
+      };
+      continue;
+    }
+    readiness[source] = { status: "ready" };
   }
 
   return readiness;
@@ -1484,7 +1498,7 @@ function OpenCommandPaletteDialog(props: {
 
   const openSourceControlSettings = useCallback(() => {
     setOpen(false);
-    void navigate({ to: "/settings/source-control" });
+    void navigate(PROJECT_IMPORT_SETUP_DESTINATION);
   }, [navigate, setOpen]);
 
   const buildAddProjectSourceGroups = useCallback(
@@ -1514,65 +1528,45 @@ function OpenCommandPaletteDialog(props: {
 
       for (const source of orderedSources) {
         const label = remoteProjectSourceLabel(source);
-        const title = source === "url" ? "Git URL" : `${label} 저장소`;
         const description =
           source === "url"
             ? "원격 URL에서 복제"
             : `${label} ${remoteProjectSourcePathHint(source)} 복제`;
         const readiness = readinessBySource[source];
-        const disabledHint = readiness.hint;
-
-        const titleTrailingContent = readiness.ready ? undefined : (
-          <span className="ml-auto">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    className="h-5 rounded-[.25rem] px-1.5 text-[10px] text-warning-foreground"
-                    onClick={() => {
-                      openSourceControlSettings();
-                    }}
-                  >
-                    설정 필요
-                  </Button>
-                }
-              />
-              <TooltipPopup align="end" side="left">
-                {disabledHint ?? "설정 > 소스 제어에서 연결을 구성하세요."}
-              </TooltipPopup>
-            </Tooltip>
-          </span>
-        );
-
-        if (!readiness.ready) {
-          sourceItems.push({
-            kind: "action",
-            value: `action:add-project:${environmentId}:${source}:not-ready`,
-            searchTerms: ["clone", "remote", "repository", "repo", "git", label, "setup required"],
-            title,
-            description,
-            disabled: true,
-            icon: remoteProjectSourceIcon(source, ITEM_ICON_CLASS),
-            ...(titleTrailingContent ? { titleTrailingContent } : {}),
-            run: async () => {},
-          });
+        const actions = buildProjectImportSourceActions({
+          environmentId,
+          source,
+          label,
+          title: source === "url" ? label : `${label} 저장소`,
+          description,
+          availability: readiness,
+          icon: remoteProjectSourceIcon(source, ITEM_ICON_CLASS),
+          runImport: async () => startAddProjectClone(environmentId, source),
+          runSetup: async () => openSourceControlSettings(),
+        });
+        if (!actions.setupAction) {
+          sourceItems.push(actions.importAction);
           continue;
         }
 
         sourceItems.push({
-          kind: "action",
-          value: `action:add-project:${environmentId}:${source}`,
-          searchTerms: ["clone", "remote", "repository", "repo", "git", label],
-          title,
-          description,
-          icon: remoteProjectSourceIcon(source, ITEM_ICON_CLASS),
-          ...(titleTrailingContent ? { titleTrailingContent } : {}),
-          keepOpen: true,
-          run: async () => {
-            startAddProjectClone(environmentId, source);
-          },
+          ...actions.importAction,
+          description: (
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-foreground">
+              <span className="text-foreground">{actions.importAction.description}</span>
+              <Button
+                variant="link"
+                size="default"
+                className="h-8 px-2.5 text-foreground underline"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void actions.setupAction?.run();
+                }}
+              >
+                {actions.setupAction.title}
+              </Button>
+            </span>
+          ),
         });
       }
 
