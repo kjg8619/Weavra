@@ -94,7 +94,7 @@ function StatBlock({
 }) {
   return (
     <div className="min-w-0 border-border/60 px-4 py-3 sm:px-5">
-      <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+      <div className="flex min-w-0 items-center gap-1.5 text-sm font-medium uppercase tracking-[0.08em] text-muted-foreground">
         <span className="min-w-0 truncate">{label}</span>
         {tooltip ? (
           <Tooltip>
@@ -102,7 +102,7 @@ function StatBlock({
               render={
                 <button
                   type="button"
-                  className="cursor-pointer inline-flex size-3.5 shrink-0 items-center justify-center rounded-sm text-muted-foreground/60 hover:text-foreground"
+                  className="cursor-pointer inline-flex size-3.5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
                   aria-label={`${label} details`}
                 >
                   <InfoIcon className="size-3" />
@@ -111,7 +111,7 @@ function StatBlock({
             />
             <TooltipPopup
               side="top"
-              className="max-w-[min(300px,calc(100vw-2rem))] whitespace-normal text-left text-[11px] leading-relaxed text-wrap"
+              className="max-w-[min(300px,calc(100vw-2rem))] whitespace-normal text-left text-sm leading-relaxed text-wrap"
             >
               {tooltip}
             </TooltipPopup>
@@ -121,8 +121,8 @@ function StatBlock({
       <div
         className={cn(
           "mt-1 truncate font-mono text-lg font-semibold tabular-nums text-foreground",
-          tone === "warning" && "text-amber-600 dark:text-amber-400",
-          tone === "danger" && "text-destructive",
+          tone === "warning" && "text-amber-700 dark:text-amber-400",
+          tone === "danger" && "text-destructive-foreground",
         )}
       >
         {value}
@@ -156,7 +156,7 @@ function StatsGrid({ children }: { children: ReactNode }) {
 }
 
 function EmptyRows({ label }: { label: string }) {
-  return <div className="px-4 py-4 text-xs text-muted-foreground sm:px-5">{label}</div>;
+  return <div className="px-4 py-4 text-sm text-muted-foreground sm:px-5">{label}</div>;
 }
 
 function DiagnosticsTable({
@@ -178,7 +178,7 @@ function DiagnosticsTable({
       className="w-full max-w-full rounded-none"
     >
       <table
-        className={cn("w-full text-left text-xs", minTableWidth, columnWidths && "table-fixed")}
+        className={cn("w-full text-left text-sm", minTableWidth, columnWidths && "table-fixed")}
       >
         {columnWidths ? (
           <colgroup>
@@ -187,7 +187,7 @@ function DiagnosticsTable({
             ))}
           </colgroup>
         ) : null}
-        <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.08em] text-muted-foreground/70">
+        <thead className="border-b border-border/60 text-sm uppercase tracking-[0.08em] text-muted-foreground">
           <tr>
             {headers.map((header, index) => (
               <th
@@ -219,14 +219,14 @@ function TraceIdCell({ traceId }: { traceId: string }) {
       <Tooltip>
         <TooltipTrigger
           render={
-            <span className="min-w-0 flex-1 truncate font-mono text-[11px]">
+            <span className="min-w-0 flex-1 truncate font-mono text-sm">
               {shortenTraceId(traceId)}
             </span>
           }
         />
         <TooltipPopup
           side="top"
-          className="max-w-[min(520px,calc(100vw-2rem))] break-all font-mono text-[11px]"
+          className="max-w-[min(520px,calc(100vw-2rem))] break-all font-mono text-sm"
         >
           {traceId}
         </TooltipPopup>
@@ -301,7 +301,7 @@ function ProcessNameCell({
         />
         <TooltipPopup
           side="top"
-          className="max-w-[min(440px,calc(100vw-2rem))] whitespace-normal break-words text-left font-mono text-[11px] leading-relaxed text-wrap"
+          className="max-w-[min(440px,calc(100vw-2rem))] whitespace-normal break-words text-left font-mono text-sm leading-relaxed text-wrap"
         >
           {process.command}
         </TooltipPopup>
@@ -360,7 +360,7 @@ function ProcessDiagnosticsTable({
       hideScrollbars
       className="max-h-[min(64vh,44rem)] w-full max-w-full rounded-none border-t border-border/60"
     >
-      <table className="w-full min-w-[1040px] table-fixed text-left text-xs">
+      <table className="w-full min-w-[1040px] table-fixed text-left text-sm">
         <colgroup>
           <col className="w-[24%]" />
           <col className="w-[8%]" />
@@ -370,7 +370,7 @@ function ProcessDiagnosticsTable({
           <col className="w-[11%]" />
           <col className="w-[6%]" />
         </colgroup>
-        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-[11px] uppercase tracking-[0.08em] text-muted-foreground/70">
+        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm uppercase tracking-[0.08em] text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-semibold sm:pl-5">Name</th>
             <th className="px-3 py-2 text-right font-semibold">CPU</th>
@@ -384,7 +384,7 @@ function ProcessDiagnosticsTable({
         <tbody className="divide-y divide-border/50">
           {visibleProcesses.length === 0 ? (
             <tr>
-              <td colSpan={7} className="px-4 py-4 text-xs text-muted-foreground sm:px-5">
+              <td colSpan={7} className="px-4 py-4 text-sm text-muted-foreground sm:px-5">
                 {emptyLabel ?? "No live descendant processes found."}
               </td>
             </tr>
@@ -411,7 +411,7 @@ function ProcessDiagnosticsTable({
                   />
                   <TooltipPopup
                     side="top"
-                    className="max-w-[min(440px,calc(100vw-2rem))] whitespace-normal break-words text-left font-mono text-[11px] leading-relaxed text-wrap"
+                    className="max-w-[min(440px,calc(100vw-2rem))] whitespace-normal break-words text-left font-mono text-sm leading-relaxed text-wrap"
                   >
                     {process.command}
                   </TooltipPopup>
@@ -484,7 +484,7 @@ function ResourceHistoryProcessNameCell({
         />
         <TooltipPopup
           side="top"
-          className="max-w-[min(440px,calc(100vw-2rem))] whitespace-normal break-words text-left font-mono text-[11px] leading-relaxed text-wrap"
+          className="max-w-[min(440px,calc(100vw-2rem))] whitespace-normal break-words text-left font-mono text-sm leading-relaxed text-wrap"
         >
           {process.command}
         </TooltipPopup>
@@ -589,7 +589,7 @@ function ProcessResourceHistoryTable({
       hideScrollbars
       className="max-h-[min(64vh,44rem)] w-full max-w-full border-t border-border/60"
     >
-      <table className="w-full min-w-[980px] table-fixed text-left text-xs">
+      <table className="w-full min-w-[980px] table-fixed text-left text-sm">
         <colgroup>
           <col className="w-[24%]" />
           <col className="w-[10%]" />
@@ -600,7 +600,7 @@ function ProcessResourceHistoryTable({
           <col className="w-[16%]" />
           <col className="w-[10%]" />
         </colgroup>
-        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-[11px] uppercase tracking-[0.08em] text-muted-foreground/70">
+        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm uppercase tracking-[0.08em] text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-semibold sm:pl-5">Process</th>
             <th className="px-3 py-2 text-right font-semibold">CPU Time</th>
@@ -615,7 +615,7 @@ function ProcessResourceHistoryTable({
         <tbody className="divide-y divide-border/50">
           {processes.length === 0 ? (
             <tr>
-              <td colSpan={8} className="px-4 py-4 text-xs text-muted-foreground sm:px-5">
+              <td colSpan={8} className="px-4 py-4 text-sm text-muted-foreground sm:px-5">
                 {emptyLabel}
               </td>
             </tr>
@@ -654,7 +654,7 @@ function ProcessResourceHistoryTable({
                   />
                   <TooltipPopup
                     side="top"
-                    className="max-w-[min(440px,calc(100vw-2rem))] whitespace-normal break-words text-left font-mono text-[11px] leading-relaxed text-wrap"
+                    className="max-w-[min(440px,calc(100vw-2rem))] whitespace-normal break-words text-left font-mono text-sm leading-relaxed text-wrap"
                   >
                     {process.command}
                   </TooltipPopup>
@@ -676,15 +676,15 @@ function DiagnosticsLastChecked({ checkedAt }: { checkedAt: DateTime.Utc | null 
   const relative = getRelativeTimeState(checkedAt ? DateTime.formatIso(checkedAt) : null);
 
   if (relative.status === "missing") {
-    return <span className="text-[11px] text-muted-foreground/50">Checking</span>;
+    return <span className="text-sm text-muted-foreground">Checking</span>;
   }
 
   if (relative.status === "invalid") {
-    return <span className="text-[11px] text-muted-foreground/50">Checked unavailable</span>;
+    return <span className="text-sm text-muted-foreground">Checked unavailable</span>;
   }
 
   return (
-    <span className="text-[11px] text-muted-foreground/60">
+    <span className="text-sm text-muted-foreground">
       {relative.suffix ? (
         <>
           Checked <span className="font-mono tabular-nums">{relative.value}</span> {relative.suffix}
@@ -959,7 +959,7 @@ export function DiagnosticsSettingsPanel() {
           />
         </StatsGrid>
         {processDiagnosticsError || processError ? (
-          <div className="space-y-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-5">
+          <div className="space-y-2 border-t border-border/60 px-4 py-3 text-sm text-muted-foreground sm:px-5">
             {processDiagnosticsError ? (
               <div className="flex items-start gap-2 text-destructive">
                 <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
@@ -1024,7 +1024,7 @@ export function DiagnosticsSettingsPanel() {
           />
         </StatsGrid>
         {processResourceError || resourceError ? (
-          <div className="space-y-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-5">
+          <div className="space-y-2 border-t border-border/60 px-4 py-3 text-sm text-muted-foreground sm:px-5">
             {processResourceError ? (
               <div className="flex items-start gap-2 text-destructive">
                 <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
@@ -1103,7 +1103,7 @@ export function DiagnosticsSettingsPanel() {
           />
         </StatsGrid>
         {openLogsDirectoryError || traceDiagnosticsError || error ? (
-          <div className="space-y-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-5">
+          <div className="space-y-2 border-t border-border/60 px-4 py-3 text-sm text-muted-foreground sm:px-5">
             {openLogsDirectoryError ? (
               <div className="flex items-start gap-2 text-destructive">
                 <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
@@ -1115,7 +1115,7 @@ export function DiagnosticsSettingsPanel() {
                 className={cn(
                   "flex items-start gap-2",
                   traceDiagnosticsPartialFailure
-                    ? "text-amber-600 dark:text-amber-400"
+                    ? "text-amber-700 dark:text-amber-400"
                     : "text-destructive",
                 )}
               >
@@ -1142,7 +1142,7 @@ export function DiagnosticsSettingsPanel() {
           <DiagnosticsTable headers={["Span", "Cause", "Duration", "Ended"]}>
             {data.latestFailures.map((failure) => (
               <tr key={`${failure.traceId}:${failure.spanId}`}>
-                <td className="px-4 py-3 align-top text-xs font-medium text-foreground first:sm:pl-5">
+                <td className="px-4 py-3 align-top text-sm font-medium text-foreground first:sm:pl-5">
                   {failure.name}
                 </td>
                 <td className="max-w-[360px] px-4 py-3 align-top text-muted-foreground">
@@ -1170,7 +1170,7 @@ export function DiagnosticsSettingsPanel() {
           >
             {data.commonFailures.map((failure) => (
               <tr key={`${failure.name}:${failure.cause}`}>
-                <td className="px-4 py-3 align-top text-xs font-medium text-foreground first:sm:pl-5">
+                <td className="px-4 py-3 align-top text-sm font-medium text-foreground first:sm:pl-5">
                   {failure.name}
                 </td>
                 <td className="px-4 py-3 align-top font-mono tabular-nums">
@@ -1201,7 +1201,7 @@ export function DiagnosticsSettingsPanel() {
           >
             {data.slowestSpans.map((span) => (
               <tr key={`${span.traceId}:${span.spanId}`}>
-                <td className="px-4 py-3 align-top text-xs font-medium text-foreground first:sm:pl-5">
+                <td className="px-4 py-3 align-top text-sm font-medium text-foreground first:sm:pl-5">
                   {span.name}
                 </td>
                 <td className="px-4 py-3 align-top font-mono tabular-nums">
@@ -1229,7 +1229,7 @@ export function DiagnosticsSettingsPanel() {
             hideScrollbars
             className="w-full max-w-full rounded-none"
           >
-            <table className="w-full min-w-[920px] table-fixed text-left text-xs">
+            <table className="w-full min-w-[920px] table-fixed text-left text-sm">
               <colgroup>
                 <col className="w-[11%]" />
                 <col className="w-[9%]" />
@@ -1237,7 +1237,7 @@ export function DiagnosticsSettingsPanel() {
                 <col className="w-[26%]" />
                 <col className="w-[30%]" />
               </colgroup>
-              <thead className="border-b border-border/60 text-[11px] uppercase tracking-[0.08em] text-muted-foreground/70">
+              <thead className="border-b border-border/60 text-sm uppercase tracking-[0.08em] text-muted-foreground">
                 <tr>
                   <th className="whitespace-nowrap px-4 py-2.5 font-semibold sm:pl-5">Time</th>
                   <th className="whitespace-nowrap px-4 py-2.5 font-semibold">Level</th>
@@ -1256,7 +1256,7 @@ export function DiagnosticsSettingsPanel() {
                       {formatRelativeNoWrap(event.seenAt)}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <span className="inline-flex rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium uppercase text-foreground/80">
+                      <span className="inline-flex rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium uppercase text-foreground/80">
                         {event.level}
                       </span>
                     </td>
@@ -1294,7 +1294,7 @@ export function DiagnosticsSettingsPanel() {
           >
             {data.topSpansByCount.map((span) => (
               <tr key={span.name}>
-                <td className="px-4 py-3 align-top text-xs font-medium text-foreground first:sm:pl-5">
+                <td className="px-4 py-3 align-top text-sm font-medium text-foreground first:sm:pl-5">
                   {span.name}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 align-top font-mono tabular-nums">

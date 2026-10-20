@@ -83,6 +83,16 @@ function saveButton() {
   return renderer!.root.findAllByType("button").find((button) => button.props.type === "submit")!;
 }
 
+function commandField() {
+  return renderer!.root.findByProps({ id: "script-command" });
+}
+
+function changeCommand(value: string) {
+  act(() => {
+    commandField().props.onChange({ target: { value } });
+  });
+}
+
 function deferredSave() {
   let resolve!: (result: ProjectScriptActionResult) => void;
   let reject!: (error: Error) => void;
@@ -241,5 +251,91 @@ describe("project action editor save lifecycle", () => {
       await completion;
     });
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("project action command validation", () => {
+  it("marks the command invalid when the untouched new form is submitted", async () => {
+    open({ scriptId: null, initial: EMPTY_PROJECT_SCRIPT_INPUT });
+
+    await act(async () => {
+      await submit();
+    });
+
+    expect(commandField().props["aria-invalid"]).toBe(true);
+    expect(renderer!.root.findByProps({ id: "script-command-error" })).toBeDefined();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it.each(["", " \t\n "])(
+    "blocks saving a %s command with an associated field error",
+    async (value) => {
+      open(request("build"));
+      changeCommand(value);
+
+      await act(async () => {
+        await submit();
+      });
+
+      expect(commandField().props["aria-required"]).toBe("true");
+      expect(commandField().props["aria-invalid"]).toBe(true);
+      expect(commandField().props["aria-describedby"].split(" ")).toContain("script-command-error");
+      expect(renderer!.root.findByProps({ id: "script-command-error" })).toBeDefined();
+      expect(onSubmit).not.toHaveBeenCalled();
+    },
+  );
+
+  it("saves a valid command once through the form submission boundary", async () => {
+    onSubmit.mockResolvedValue(AsyncResult.success(undefined));
+    open(request("build"));
+    changeCommand(" \n bun test \t ");
+
+    await act(async () => {
+      await submit();
+    });
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0]?.[1].command).toBe("bun test");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the command error after correction and saves once", async () => {
+    onSubmit.mockResolvedValue(AsyncResult.success(undefined));
+    open(request("build"));
+    changeCommand("  ");
+
+    await act(async () => {
+      await submit();
+    });
+    expect(commandField().props["aria-invalid"]).toBe(true);
+
+    changeCommand("bun test");
+    expect(commandField().props["aria-invalid"]).toBe(false);
+    expect(renderer!.root.findAllByProps({ id: "script-command-error" })).toHaveLength(0);
+
+    await act(async () => {
+      await submit();
+    });
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0]?.[1].command).toBe("bun test");
+  });
+
+  it("cancels edited settings without saving or running the action", () => {
+    open(request("build"));
+    changeCommand("replacement-command");
+    const cancel = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Cancel"))!;
+
+    act(() => {
+      cancel.props.onClick();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+    open(request("build"));
+    expect(commandField().props.value).toBe("run-build");
   });
 });

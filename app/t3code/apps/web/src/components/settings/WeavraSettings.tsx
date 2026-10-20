@@ -1,9 +1,11 @@
 import { weavraLabel } from "../weavraLabels";
 import { useAtomValue } from "@effect/atom-react";
+import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentId, ProjectId, WeavraObservation } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { useEnvironment } from "../../state/environments";
+import { useProject } from "../../state/entities";
 import { observations } from "../../state/weavraObservations";
 import { Badge } from "../ui/badge";
 import { SettingsGroup } from "./SettingsGroup";
@@ -45,6 +47,7 @@ export function WeavraSettings({
 }) {
   const result = useAtomValue(observations.stateAtom(environmentId, projectId, workspaceRoot));
   const environment = useEnvironment(environmentId);
+  const project = useProject(scopeProjectRef(environmentId, projectId));
   const view = Option.getOrUndefined(AsyncResult.value(result));
   const connected = environment?.connection.phase === "connected";
   const observation = view?.observation;
@@ -61,6 +64,7 @@ export function WeavraSettings({
         environmentId={environmentId}
         projectId={projectId}
         workspaceRoot={workspaceRoot}
+        {...(project ? { projectName: project.title } : {})}
       />
       <SettingsSection id="weavra-overview" title="Weavra · 읽기 전용">
         <SettingsGroup divided={false} className="space-y-5 p-4">
@@ -90,42 +94,49 @@ export function WeavraSettings({
               </p>
             )}
           </div>
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-            {[
-              ["환경", environment?.label],
-              [
-                "마지막 공식 관찰",
-                observation?.observedAt ? new Date(observation.observedAt).toLocaleString() : null,
-              ],
-              ["Runtime 버전", observation?.runtimeVersion],
-              ["bridge 프로토콜", snapshot?.protocolVersion],
-              ["Run", run?.runId],
-              ["저장된 상태", run?.status],
-              ["단계", run?.phase],
-              ["워크플로 / 위험도", run ? `${run.workflow} / ${run.risk}` : null],
-              ["실행 방식", run?.executionMode],
-              [
-                "현재 단계",
-                run?.currentStep ? `${run.currentStep.stepId} #${run.currentStep.attempt}` : null,
-              ],
-              ["활성 에이전트(저장된 값)", run?.activeAgentCount],
-              [
-                "Run / 프로젝트 revision",
-                snapshot
-                  ? `${unknown(snapshot.stateRevision)} / ${unknown(snapshot.projectRevision)}`
-                  : null,
-              ],
-              ["코드 revision", run?.codeRevision],
-              ["마지막 이벤트 번호", snapshot?.eventId],
-              ["작업 계약 digest", run?.taskContractDigest],
-              ["쓰기 잠금 존재(실행 중임을 뜻하지 않음)", snapshot?.data.status.writerPresent],
-            ].map(([label, value]) => (
-              <div key={String(label)} className="min-w-0">
-                <dt className="text-xs text-muted-foreground">{label}</dt>
-                <dd className="mt-1 break-all font-mono text-xs">{unknown(value)}</dd>
-              </div>
-            ))}
-          </dl>
+          <details className="text-sm">
+            <summary className="cursor-pointer rounded-sm py-2 focus-visible:outline-2 focus-visible:outline-ring">
+              공식 관찰 상세
+            </summary>
+            <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+              {[
+                ["환경", environment?.label],
+                [
+                  "마지막 공식 관찰",
+                  observation?.observedAt
+                    ? new Date(observation.observedAt).toLocaleString()
+                    : null,
+                ],
+                ["Runtime 버전", observation?.runtimeVersion],
+                ["bridge 프로토콜", snapshot?.protocolVersion],
+                ["Run", run?.runId],
+                ["저장된 상태", run?.status],
+                ["단계", run?.phase],
+                ["워크플로 / 위험도", run ? `${run.workflow} / ${run.risk}` : null],
+                ["실행 방식", run?.executionMode],
+                [
+                  "현재 단계",
+                  run?.currentStep ? `${run.currentStep.stepId} #${run.currentStep.attempt}` : null,
+                ],
+                ["활성 에이전트(저장된 값)", run?.activeAgentCount],
+                [
+                  "Run / 프로젝트 revision",
+                  snapshot
+                    ? `${unknown(snapshot.stateRevision)} / ${unknown(snapshot.projectRevision)}`
+                    : null,
+                ],
+                ["코드 revision", run?.codeRevision],
+                ["마지막 이벤트 번호", snapshot?.eventId],
+                ["작업 계약 digest", run?.taskContractDigest],
+                ["쓰기 잠금 존재(실행 중임을 뜻하지 않음)", snapshot?.data.status.writerPresent],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="min-w-0">
+                  <dt className="text-sm text-muted-foreground">{label}</dt>
+                  <dd className="mt-1 select-text break-all font-mono text-sm">{unknown(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
           {snapshot && !run && (
             <p className="text-sm text-muted-foreground">이 checkout에 현재 Weavra Run이 없어요.</p>
           )}

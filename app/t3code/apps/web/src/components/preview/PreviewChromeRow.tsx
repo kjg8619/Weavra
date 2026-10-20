@@ -12,6 +12,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -93,6 +94,7 @@ export function PreviewChromeRow({
   leadingActions,
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const addressInputId = useId();
   const [draft, setDraft] = useState(url);
   const [inputFocused, setInputFocused] = useState(false);
 
@@ -178,10 +180,20 @@ export function PreviewChromeRow({
         {leadingActions}
 
         <InputGroup variant="ghost" className="group/address h-9 min-w-0 flex-1">
+          {/* A visible name that stays while a URL is typed; the placeholder does not. */}
+          <InputGroupAddon>
+            <label
+              htmlFor={addressInputId}
+              className="shrink-0 whitespace-nowrap text-muted-foreground text-xs"
+            >
+              주소
+            </label>
+          </InputGroupAddon>
           <Tooltip>
             <TooltipTrigger
               render={
                 <InputGroupInput
+                  id={addressInputId}
                   ref={inputRef}
                   value={inputFocused ? draft : url}
                   className={cn(

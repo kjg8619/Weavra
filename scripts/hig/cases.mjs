@@ -98,6 +98,9 @@ export const LABELS = {
   local: ["로컬 폴더"],
   cancel: ["Cancel", "취소"],
   settings: ["설정"],
+  threadNotifications: ["Thread notifications"],
+  notificationsOnly: ["Notifications only"],
+  inAppNotifications: ["In-app notifications"],
   general: ["General", "일반"],
   appearance: ["Appearance", "모양"],
   light: ["Light", "라이트"],
@@ -400,6 +403,164 @@ export const CASES = {
 // Scenario code runs only inside the disposable packaged-app capture session.
 // Every check owns its assertion rows and hashed raw observations. A missing
 // executor is an explicit FAIL; it cannot inherit a case/group verdict.
+// Reads the clipboard only after the observed write settles; a write that never
+// completes times out, and each copied `label: value` line yields its exact value.
+export async function readCompletedCopy(written, readText, timeoutMs = 10_000) {
+  const { bounded } = await import("./assert.mjs");
+  await bounded(written, "diagnostic clipboard write completion", timeoutMs);
+  const text = await readText();
+  const values = text.split(/\r?\n/).map((line) => {
+    const at = line.indexOf(": ");
+    return at < 0 ? line : line.slice(at + 2);
+  });
+  return { text, values };
+}
+
+// The shell stream sends `snapshot` only to a client without state. A resumed client
+// loads the authoritative HTTP snapshot and the stream confirms it with `synchronized`;
+// later events apply on top. Anything else is not a settled shell baseline.
+/** @param {{ streamSnapshot?: any, httpSnapshot?: any, synchronized?: boolean, events?: any[] }} input */
+export function resolveShellBaseline({ streamSnapshot, httpSnapshot, synchronized, events = [] }) {
+  const base = streamSnapshot ?? (synchronized ? httpSnapshot : null);
+  if (!base || !Array.isArray(base.threads) || !Number.isInteger(base.snapshotSequence))
+    throw new Error("Missing shell snapshot for completion fixture");
+  const snapshot = structuredClone(base);
+  for (const event of events) {
+    if (!(event.sequence > snapshot.snapshotSequence)) continue;
+    if (event.kind === "thread-upserted") {
+      const at = snapshot.threads.findIndex((row) => row.id === event.thread.id);
+      if (at < 0) snapshot.threads.push(event.thread);
+      else snapshot.threads[at] = event.thread;
+    } else if (event.kind === "thread-removed")
+      snapshot.threads = snapshot.threads.filter((row) => row.id !== event.threadId);
+    snapshot.snapshotSequence = event.sequence;
+  }
+  return snapshot;
+}
+
+// Takes focus away from the app's own BrowserWindow inside the app under test. A key
+// window is blurred, and if it is still key a second window of the same app is made key.
+// The web view is then blurred through Electron as well: a window that never became key
+// (another app or Weavra instance was frontmost) can still hold renderer focus, and no
+// OS change reaches it. Runs in the Electron main process via BrowserWindow evaluate,
+// so it is self-contained. Resolves with the observed states.
+/** @param {any} window */
+export async function takeWindowFocus(window, timeoutMs = 10_000) {
+  const before = window.isFocused();
+  if (!before) {
+    window.blurWebView();
+    return { before, sink: false, after: false };
+  }
+  const lost = new Promise((resolve) => window.once("blur", resolve));
+  window.blur();
+  let sink = false;
+  if (window.isFocused()) {
+    const BrowserWindow = window.constructor;
+    const other = new BrowserWindow({ width: 320, height: 200, show: false, title: "hig-focus-sink" });
+    globalThis.__higFocusSink = other;
+    await other.loadURL("about:blank");
+    other.show();
+    other.focus();
+    sink = true;
+  }
+  let timer;
+  await Promise.race([lost, new Promise((resolve) => (timer = setTimeout(resolve, timeoutMs)))]);
+  clearTimeout(timer);
+  window.blurWebView();
+  return { before, sink, after: window.isFocused() };
+}
+
+// Each scenario check owns its artifact names. A second capture under the same name
+// would overwrite the first and leave a stale hash in the receipt, so it fails here.
+export function recordScenarioArtifact(artifacts, file, sha256) {
+  if (artifacts.some((artifact) => artifact.file === file))
+    throw new Error(`Scenario artifact name collision: ${file}`);
+  artifacts.push({ file, sha256 });
+}
+
+// Resolves once the renderer reports a real blur and document focus is gone.
+export async function awaitFocusLoss(blurred, readHasFocus, timeoutMs = 10_000) {
+  const { bounded } = await import("./assert.mjs");
+  await bounded(blurred, "renderer window blur", timeoutMs);
+  if (await readHasFocus()) throw new Error("Renderer still reports document focus after blur");
+}
+
+// Tracks request/response pairs per RPC method so a check can wait until a
+// query has answered and none is still in flight. Zero requests is not settled.
+export function createRpcLedger() {
+  const pending = new Map();
+  const completed = new Map();
+  const listeners = new Set();
+  const notify = () => {
+    for (const listener of listeners) listener();
+  };
+  const isSettled = (method) =>
+    (completed.get(method) ?? 0) > 0 && ![...pending.values()].includes(method);
+  return {
+    request(key, method) {
+      pending.set(key, method);
+      notify();
+    },
+    cancel(key) {
+      if (pending.delete(key)) notify();
+    },
+    exit(key) {
+      const method = pending.get(key);
+      if (method === undefined) return;
+      pending.delete(key);
+      completed.set(method, (completed.get(method) ?? 0) + 1);
+      notify();
+    },
+    async settled(method, timeoutMs = 15_000) {
+      const { bounded } = await import("./assert.mjs");
+      let listener;
+      try {
+        await bounded(
+          new Promise((resolve) => {
+            listener = () => isSettled(method) && resolve();
+            listeners.add(listener);
+            listener();
+          }),
+          `${method} settled`,
+          timeoutMs,
+        );
+      } finally {
+        listeners.delete(listener);
+      }
+    },
+  };
+}
+
+// Stacked toasts are the viewport's direct children; anchored toasts render as toast-popup.
+export const TOAST_SELECTOR = '[data-slot="toast-viewport"] > *, [data-slot="toast-popup"]';
+
+// Product switches expose their state as aria-checked or as Base UI's
+// data-checked/data-unchecked. Contradictory or missing state is unknown (null).
+export function switchCheckedState({ ariaChecked, dataChecked, dataUnchecked }) {
+  if (ariaChecked === "true" || ariaChecked === "false") return ariaChecked === "true";
+  if (dataChecked !== null && dataUnchecked === null) return true;
+  if (dataUnchecked !== null && dataChecked === null) return false;
+  return null;
+}
+
+// Elements only the requested sidebar implementation renders.
+export const SIDEBAR_VARIANT_MARKERS = {
+  legacy: '[data-testid="new-thread-button"]',
+  current: '[data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]',
+};
+
+export const COMMAND_DIALOG_POPUP = '[data-slot="command-dialog-popup"]';
+
+// Counts visible exact-text matches inside the active command dialog only, so
+// sidebar rows, breadcrumbs and blurred background headings cannot inflate it.
+export function countInActiveDialog(page, text) {
+  return page
+    .locator(COMMAND_DIALOG_POPUP)
+    .getByText(text, { exact: true })
+    .filter({ visible: true })
+    .count();
+}
+
 export function deliverScenarioEvent(sockets, method, value) {
   let delivered = 0;
   for (const entry of sockets) {
@@ -439,11 +600,23 @@ export async function runScenarios(context) {
   let wire = null;
   let responseTransform = null;
   let providerFixture = null;
+  let focusEmulation = null;
   const replies = new Map();
   let requests = [];
   let liveConfig = null;
   let onConfig;
   const streamSamples = new Map();
+  const shellState = { synchronized: false, events: [], http: null };
+  const rpc = createRpcLedger();
+  await page.route(
+    (url) => url.pathname.endsWith("/api/orchestration/shell"),
+    async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      if (response.ok()) shellState.http = structuredClone(body);
+      await route.fulfill({ response, json: body });
+    },
+  );
   await page.route("**/api/auth/session", async (route) => {
     const response = await route.fetch();
     const body = await response.json();
@@ -470,7 +643,10 @@ export async function runScenarios(context) {
       const decoded = JSON.parse(String(message));
       const frames = Array.isArray(decoded) ? decoded : [decoded];
       for (const frame of frames) {
-        if (frame._tag === "Interrupt") methods.delete(frame.requestId);
+        if (frame._tag === "Interrupt") {
+          methods.delete(frame.requestId);
+          rpc.cancel(`${sockets.indexOf(entry)}:${frame.requestId}`);
+        }
         if (frame._tag === "Request") {
           methods.set(frame.id, frame.tag);
           requests.push({ method: frame.tag, command: frame.payload?.request?.type ?? null });
@@ -572,6 +748,11 @@ export async function runScenarios(context) {
             continue;
           }
         }
+        if (frame._tag === "Request") {
+          rpc.request(`${sockets.indexOf(entry)}:${frame.id}`, frame.tag);
+          if (frame.tag === "orchestration.subscribeShell")
+            Object.assign(shellState, { synchronized: false, events: [] });
+        }
         if (!synthetic.has(String(frame.requestId))) server.send(JSON.stringify(frame));
       }
     });
@@ -610,10 +791,17 @@ export async function runScenarios(context) {
         )
           frame.exit.value = config(frame.exit.value);
         const method = methods.get(frame.requestId);
+        if (frame._tag === "Exit") rpc.exit(`${sockets.indexOf(entry)}:${frame.requestId}`);
         if (frame._tag === "Chunk")
           for (const value of frame.values)
-            if (value.kind === "snapshot" || value.type === "snapshot")
+            if (value.kind === "snapshot" || value.type === "snapshot") {
               streamSamples.set(method, structuredClone(value));
+              if (method === "orchestration.subscribeShell") shellState.events = [];
+            } else if (method === "orchestration.subscribeShell") {
+              if (value.kind === "synchronized") shellState.synchronized = true;
+              else if (Number.isInteger(value.sequence))
+                shellState.events.push(structuredClone(value));
+            }
         if (responseTransform && frame._tag === "Chunk")
           frame.values = frame.values.map((value) => responseTransform(method, value));
         if (responseTransform && frame.exit?._tag === "Success")
@@ -630,9 +818,9 @@ export async function runScenarios(context) {
   });
   async function save(file, bytes) {
     const relative = `scenarios/${current}/${file}`;
+    recordScenarioArtifact(artifacts, relative, sha256(bytes));
     await fs.mkdir(path.dirname(path.join(output, relative)), { recursive: true });
     await fs.writeFile(path.join(output, relative), bytes);
-    artifacts.push({ file: relative, sha256: sha256(bytes) });
   }
   async function frame(label) {
     await save(`${label}.png`, await page.screenshot({ scale: "css" }));
@@ -759,9 +947,9 @@ export async function runScenarios(context) {
     await frame(label);
     return geometry[0];
   }
-  async function iconTargets(assert, label) {
-    const controls = await sample(`${label}: icon targets`, () =>
-      [...document.querySelectorAll("button[data-icon-control]")]
+  async function iconTargets(assert, label, selector = "button[data-icon-control]") {
+    const controls = await sample(`${label}: icon targets`, (selector) =>
+      [...document.querySelectorAll(selector)]
         .filter((node) => node.checkVisibility({ opacityProperty: true, visibilityProperty: true }))
         .map((node) => {
           const rect = node.getBoundingClientRect();
@@ -784,6 +972,7 @@ export async function runScenarios(context) {
             }),
           };
         }),
+      selector,
     );
     for (const control of controls) {
       assert(
@@ -793,6 +982,7 @@ export async function runScenarios(context) {
       );
       assertIconTargetHits(assert, `${label}: ${control.name}`, control);
     }
+    return controls;
   }
   async function motionProperties(assert, label, selector, reduced = false) {
     await page.locator(selector).waitFor({ state: "attached" });
@@ -1267,15 +1457,44 @@ export async function runScenarios(context) {
   async function bothSidebars(assert, audit) {
     for (const legacy of [false, true]) {
       await settings("general");
-      await page.locator("#legacy-features").getByRole("button").click();
-      const toggle = page.getByRole("switch", { name: "Sidebar (legacy)", exact: true });
+      const section = page.locator("#legacy-features");
+      const disclosure = section.getByRole("button", { name: "Legacy features", exact: true });
+      if ((await disclosure.getAttribute("aria-expanded")) !== "true") {
+        await act("open Legacy features", () => disclosure.click());
+        await section
+          .getByRole("button", { name: "Legacy features", expanded: true, exact: true })
+          .waitFor();
+      }
+      // The panel animates open; clicking mid-expansion lands pointerup elsewhere.
+      await settle();
+      const toggle = section.getByRole("switch", { name: "Sidebar (legacy)", exact: true });
       await toggle.scrollIntoViewIfNeeded();
-      if ((await toggle.isChecked()) !== legacy) await toggle.click();
-      assert("requested sidebar variant selected", await toggle.isChecked(), legacy);
+      await settle();
+      const toggleState = async () =>
+        switchCheckedState(
+          await toggle.evaluate((node) => ({
+            ariaChecked: node.getAttribute("aria-checked"),
+            dataChecked: node.getAttribute("data-checked"),
+            dataUnchecked: node.getAttribute("data-unchecked"),
+          })),
+        );
+      if ((await toggleState()) !== legacy) await act("switch sidebar variant", () => toggle.click());
+      await toggle
+        .and(
+          page.locator(
+            legacy ? '[aria-checked="true"], [data-checked]' : '[aria-checked="false"], [data-unchecked]',
+          ),
+        )
+        .waitFor();
+      assert("requested sidebar variant selected", await toggleState(), legacy);
       await home();
       await thread("04 Working fixture");
       const sidebar = page.locator('[data-sidebar="sidebar"]');
       await sidebar.waitFor();
+      await sidebar
+        .locator(SIDEBAR_VARIANT_MARKERS[legacy ? "legacy" : "current"])
+        .first()
+        .waitFor();
       await audit(sidebar, legacy);
       await frame(legacy ? "legacy-sidebar" : "current-sidebar");
     }
@@ -1319,7 +1538,7 @@ export async function runScenarios(context) {
     deliverScenarioEvent(sockets, method, value);
     observations.push({ authority: "SYNTHETIC_SUBSCRIPTION_EVENT", method, value });
   }
-  async function providerEvent(status = "error", update = false, progress = false) {
+  async function providerEvent(status = "error", update = false, progress = false, setup = null) {
     if (!liveConfig?.providers?.length) throw new Error("No live provider inventory for event");
     const providers = structuredClone(liveConfig.providers);
     const codex = providers.find((provider) => provider.instanceId === "codex");
@@ -1333,6 +1552,7 @@ export async function runScenarios(context) {
       message: status === "ready" ? "HIG fixture ready" : "HIG fixture requires codex login",
       checkedAt: new Date().toISOString(),
     });
+    if (setup) codex.setup = setup;
     if (update)
       codex.versionAdvisory = {
         status: "behind_latest",
@@ -1362,6 +1582,9 @@ export async function runScenarios(context) {
       globalThis.higNotifications = [];
       globalThis.Notification = class extends EventTarget {
         static permission = "granted";
+        static async requestPermission() {
+          return "granted";
+        }
         constructor(title, options) {
           super();
           this.tag = options.tag;
@@ -1371,15 +1594,55 @@ export async function runScenarios(context) {
         close() {}
       };
     });
+    // Both notification channels default to off, which would make "no popup"
+    // pass vacuously. Turn them on through the product's own settings controls.
+    await settings("general");
+    await act("enable desktop and in-app thread notifications", async () => {
+      await click("combobox", "threadNotifications");
+      await click("option", "notificationsOnly");
+      const inApp = await named(page, "switch", "inAppNotifications");
+      // The product switch exposes its state as data-checked, not aria-checked.
+      if ((await inApp.getAttribute("data-checked")) === null) await inApp.click();
+    });
+    await (await named(page, "combobox", "threadNotifications"))
+      .filter({ hasText: "Notifications only" })
+      .waitFor({ state: "visible" });
+    await page
+      .locator('[role="switch"][aria-label="In-app notifications"][data-checked]')
+      .waitFor({ state: "visible" });
     await home();
     await thread("01 Conversation");
-    await context.win.evaluate(
-      (window, focused) => (focused ? window.focus() : window.blur()),
-      focused,
-    );
-    await page.waitForFunction((focused) => document.hasFocus() === focused, focused);
-    const snapshot = streamSamples.get("orchestration.subscribeShell")?.snapshot;
-    if (!snapshot) throw new Error("Missing shell snapshot for completion fixture");
+    if (focused) {
+      await context.win.evaluate((window) => window.focus());
+      await page.waitForFunction(() => document.hasFocus());
+    } else {
+      // Playwright's page session emulates focus, so document.hasFocus() would stay true
+      // whatever the window does. Release emulation for this check, take OS focus away
+      // from the app window itself, then wait for the renderer to report the real loss.
+      focusEmulation = await page.context().newCDPSession(page);
+      await focusEmulation.send("Emulation.setFocusEmulationEnabled", { enabled: false });
+      const blurred = page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            if (!document.hasFocus()) resolve(undefined);
+            else addEventListener("blur", () => resolve(undefined), { once: true });
+          }),
+      );
+      const windowFocus = await context.win.evaluate(takeWindowFocus, 10_000);
+      observations.push({ windowFocus });
+      if (windowFocus.after) throw new Error("App window still has OS focus after blur");
+      await awaitFocusLoss(blurred, () => page.evaluate(() => document.hasFocus()));
+    }
+    const snapshot = resolveShellBaseline({
+      streamSnapshot: streamSamples.get("orchestration.subscribeShell")?.snapshot,
+      httpSnapshot: shellState.http,
+      synchronized: shellState.synchronized,
+      events: shellState.events,
+    });
+    observations.push({
+      shellBaseline: streamSamples.has("orchestration.subscribeShell") ? "stream-snapshot" : "http-synchronized",
+      snapshotSequence: snapshot.snapshotSequence,
+    });
     const working = structuredClone(snapshot.threads.find((row) => row.id === "baseline-working"));
     if (!working?.latestTurn) throw new Error("Missing running fixture turn");
     const sequence = snapshot.snapshotSequence + 1000;
@@ -2160,14 +2423,33 @@ export async function runScenarios(context) {
       );
       const copy = page.locator("#weavra-controls").getByRole("button", { name: /복사/ });
       assert("diagnostic copy action", (await copy.count()) > 0, true);
+      // Subscribe to the renderer's own clipboard write before clicking; the product writes asynchronously.
+      await page.evaluate(() => {
+        const clipboard = navigator.clipboard;
+        const write = clipboard.writeText.bind(clipboard);
+        globalThis.__higClipboardWrite = new Promise((resolve, reject) => {
+          clipboard.writeText = async (value) => {
+            clipboard.writeText = write;
+            try {
+              await write(value);
+              resolve();
+            } catch (error) {
+              reject(error);
+              throw error;
+            }
+          };
+        });
+      });
+      const written = page.evaluate(() => globalThis.__higClipboardWrite);
       await copy.first().click();
-      const clipboard = await context.application.evaluate(({ clipboard }) => clipboard.readText());
-      assert(
-        "copy preserves exact fixture path",
-        clipboard.includes(context.isolation.workspace),
-        true,
+      const copied = await readCompletedCopy(written, () =>
+        context.application.evaluate(({ clipboard }) => clipboard.readText()),
       );
-      observations.push({ copiedFixturePath: clipboard });
+      const fixturePath = await fs.realpath(
+        path.join(context.isolation.workspace, "baseline-project"),
+      );
+      assert("copy preserves exact fixture path", copied.values.includes(fixturePath), true);
+      observations.push({ copiedFixturePath: copied.text });
     },
     "03/unknown-disclosure": async (assert) => {
       await openProjectSettings();
@@ -2194,7 +2476,8 @@ export async function runScenarios(context) {
     "04/auth-error": async (assert) => {
       await home();
       await thread("01 Conversation");
-      await providerEvent("error");
+      // A provider that reports it can authenticate, so the product owes a recovery control.
+      await providerEvent("error", false, false, { canAuthenticate: true, canInstall: false });
       await page
         .getByText("HIG fixture requires codex login", { exact: true })
         .filter({ visible: true })
@@ -2213,7 +2496,39 @@ export async function runScenarios(context) {
         geometry.parentPositions.some((p) => p === "absolute" || p === "fixed"),
         false,
       );
-      assert("auth cause has independent recovery", /login|설정|로그인/.test(geometry.text), true);
+      // The recovery is the alert's own control, not words in the error message.
+      const alert = page
+        .locator('[role="alert"]')
+        .filter({ hasText: "HIG fixture requires codex login" });
+      const recovery = alert.getByRole("button", { name: "공급자 설정 열기", exact: true });
+      assert(
+        "auth cause has one recovery control",
+        await recovery.filter({ visible: true }).count(),
+        1,
+      );
+      assert("auth recovery control is enabled", await recovery.isEnabled(), true);
+      await frame("auth-recovery");
+      const before = requests.length;
+      await act("open provider setup from auth error", () => recovery.click());
+      const route = await bounded(
+        page
+          .waitForFunction(
+            () =>
+              location.hash.startsWith("#/settings/providers") &&
+              new URLSearchParams(location.hash.split("?")[1] ?? "").get("instanceId"),
+            null,
+            { timeout: 0 },
+          )
+          .then((handle) => handle.jsonValue()),
+        "provider setup route from auth recovery",
+        10_000,
+      );
+      assert("auth recovery opens this provider's setup", route, "codex");
+      assert(
+        "opening recovery does not start sign-in by itself",
+        requests.slice(before).some((r) => /auth.*start|login/i.test(r.method)),
+        false,
+      );
     },
     "04/turn-error": async (assert) => {
       await home();
@@ -2257,6 +2572,21 @@ export async function runScenarios(context) {
         true,
       );
       await frame("independent-causes");
+      // Each cause's dismiss is a touched icon control: >=36x36 at every desktop width.
+      for (const [width, height] of [
+        [840, 620],
+        [1280, 800],
+        [1920, 1080],
+      ]) {
+        await context.resize(width, height);
+        await settle();
+        const dismiss = await iconTargets(
+          assert,
+          `dismiss-${width}`,
+          '[role="alert"] button[aria-label$="닫기"]',
+        );
+        assert(`dismiss-${width}: one dismiss per cause`, dismiss.length, 2);
+      }
     },
     "04/event-deduplication": async (assert) => {
       await home();
@@ -2286,8 +2616,10 @@ export async function runScenarios(context) {
         await page.evaluate(() => globalThis.higNotifications.length),
         0,
       );
-      const notices = await sample("focused notices", () =>
-        [...document.querySelectorAll('[data-slot="toast-root"]')].map((node) => node.textContent),
+      const notices = await sample(
+        "focused notices",
+        (selector) => [...document.querySelectorAll(selector)].map((node) => node.textContent),
+        TOAST_SELECTOR,
       );
       assert(
         "focused background completion stays out of popup",
@@ -2296,19 +2628,38 @@ export async function runScenarios(context) {
       );
     },
     "04/unfocused-single-notice": async (assert) => {
-      const event = await notificationFixture(false);
-      await page.waitForFunction(() => globalThis.higNotifications.length > 0);
-      emit("orchestration.subscribeShell", event);
-      await settle();
-      const notices = await page.evaluate(() => globalThis.higNotifications);
-      observations.push({ notificationBoundary: notices });
-      assert("one notice per unfocused completion event", notices.length, 1);
-      assert(
-        "notice belongs to correct thread",
-        notices[0].tag.endsWith(":baseline-working"),
-        true,
-      );
-      await context.win.evaluate((window) => window.focus());
+      try {
+        const event = await notificationFixture(false);
+        await bounded(
+          page.waitForFunction(() => globalThis.higNotifications.length > 0, null, { timeout: 0 }),
+          "desktop notice for unfocused completion",
+          10_000,
+        );
+        emit("orchestration.subscribeShell", event);
+        await settle();
+        const notices = await page.evaluate(() => globalThis.higNotifications);
+        observations.push({ notificationBoundary: notices });
+        assert("one notice per unfocused completion event", notices.length, 1);
+        assert(
+          "notice belongs to correct thread",
+          notices[0].tag.endsWith(":baseline-working"),
+          true,
+        );
+      } finally {
+        await context.win.evaluate(() => {
+          globalThis.__higFocusSink?.destroy();
+          globalThis.__higFocusSink = null;
+        });
+        if (focusEmulation) {
+          await focusEmulation.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+          await focusEmulation.detach();
+          focusEmulation = null;
+        }
+        await context.win.evaluate((window) => {
+          window.focusOnWebView();
+          window.focus();
+        });
+      }
     },
     "04/modal-update-suppression": async (assert) => {
       await openAction();
@@ -2323,7 +2674,7 @@ export async function runScenarios(context) {
           .evaluate((node) => node.contains(document.activeElement)),
         before,
       );
-      const notices = await page.locator('[data-slot="toast-root"]').allTextContents();
+      const notices = await page.locator(TOAST_SELECTOR).allTextContents();
       assert(
         "routine provider update has no popup",
         notices.some((text) => /update|업데이트/i.test(text)),
@@ -2337,7 +2688,7 @@ export async function runScenarios(context) {
       await page.keyboard.press("Escape");
       await page.locator('[data-slot="dialog-popup"]').waitFor({ state: "hidden" });
       await settle();
-      const notices = await page.locator('[data-slot="toast-root"]').allTextContents();
+      const notices = await page.locator(TOAST_SELECTOR).allTextContents();
       assert(
         "closing modal does not replay suppressed update",
         notices.some((text) => /update|업데이트/i.test(text)),
@@ -2745,7 +3096,7 @@ export async function runScenarios(context) {
       );
     },
     "06/footer-wrap": async (assert) => {
-      await bothSidebars(assert, async () => {
+      await bothSidebars(assert, async (_sidebar, legacy) => {
         for (const [width, height] of [
           [840, 620],
           [1280, 800],
@@ -2783,7 +3134,7 @@ export async function runScenarios(context) {
             ),
             true,
           );
-          await frame(`footer-${width}`);
+          await frame(`footer-${legacy ? "legacy" : "current"}-${width}`);
         }
       });
     },
@@ -2843,6 +3194,9 @@ export async function runScenarios(context) {
       await click("button", "import", page.locator('[data-sidebar="sidebar"]'));
       const disabled = page.locator('[data-slot="command-dialog-popup"] [aria-disabled="true"]');
       assert("unsupported source exists", (await disabled.count()) > 0, true);
+      // Provider readiness arrives from server.discoverSourceControl after the dialog opens.
+      await rpc.settled("server.discoverSourceControl");
+      await settle();
       const before = await page.locator('[data-slot="command-dialog-popup"]').innerText();
       await unchangedRequests(assert, async () => {
         await disabled.first().dispatchEvent("click");
@@ -2866,7 +3220,7 @@ export async function runScenarios(context) {
       await unchangedRequests(assert, () => address.fill(context.isolation.workspace + "/"));
       assert(
         "actual isolated folder is discoverable",
-        await page.getByText("baseline-project", { exact: true }).filter({ visible: true }).count(),
+        await countInActiveDialog(page, "baseline-project"),
         1,
       );
     },

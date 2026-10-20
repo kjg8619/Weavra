@@ -144,14 +144,17 @@ function EnvironmentNotifications({
           hasNotificationSound(getClientSettings().notificationMode),
         );
       }
+      // A completion in a focused app is already visible in the sidebar status; a popup
+      // would only cover active work. Attention events still need an in-app prompt.
       if (
+        kind === "input" &&
         inAppNotificationsEnabled &&
         document.visibilityState === "visible" &&
         document.hasFocus() &&
         (activeEnvironmentId !== environmentId || activeThreadId !== thread.id)
       ) {
         const toastId = toastManager.add({
-          type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
+          type: status === "failed" ? "error" : "warning",
           title,
           description: thread.title,
           data: { hideCopyButton: true },

@@ -929,6 +929,7 @@ function ComposerCommandMenuLayer(props: { anchor: HTMLElement | null; children:
   );
 }
 import { Button } from "../ui/button";
+import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Select, SelectItem, SelectPopup, SelectValue } from "../ui/select";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
@@ -936,6 +937,7 @@ import {
   FileIcon,
   BotIcon,
   CircleAlertIcon,
+  CircleHelpIcon,
   PaperclipIcon,
   PencilRulerIcon,
   PlayIcon,
@@ -1038,6 +1040,45 @@ function useRestingComposerControlsLayout(host: HTMLDivElement | null) {
 
   return { controlsRef, hiddenBlockCount: layout.hiddenCount, controlsVisible: layout.visible };
 }
+
+/**
+ * Keyboard-reachable reference for the composer's inline triggers. It opens
+ * beside the label, never over typed text, and closing it returns focus to the
+ * editor with the draft untouched.
+ */
+const ComposerInputHelp = memo(function ComposerInputHelp(props: { onClosed: () => void }) {
+  return (
+    <Popover
+      onOpenChange={(open) => {
+        if (!open) props.onClosed();
+      }}
+    >
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="h-6 gap-1 px-1.5 text-muted-foreground text-xs hover:text-foreground"
+          />
+        }
+      >
+        <CircleHelpIcon aria-hidden className="size-3.5" />
+        입력 도움말
+      </PopoverTrigger>
+      <PopoverPopup side="top" align="end" className="max-w-72" finalFocus={false}>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+          <dt className="font-mono font-medium">@</dt>
+          <dd>파일이나 폴더를 대화에 붙여요.</dd>
+          <dt className="font-mono font-medium">$</dt>
+          <dd>스킬을 골라 사용해요.</dd>
+          <dt className="font-mono font-medium">/</dt>
+          <dd>명령을 실행해요.</dd>
+        </dl>
+      </PopoverPopup>
+    </Popover>
+  );
+});
 
 const ComposerFooterModeControls = memo(function ComposerFooterModeControls(props: {
   showInteractionModeToggle: boolean;
@@ -2114,6 +2155,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // Refs
   // ------------------------------------------------------------------
   const composerEditorRef = useRef<ComposerPromptEditorHandle>(null);
+  const composerLabelId = useId();
   const pasteAsTextShortcutUntilRef = useRef(0);
   const pastedTextFileNamesRef = useRef<{ targetKey: string; names: Set<string> }>({
     targetKey: "",
@@ -6889,9 +6931,23 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     </DialogPopup>
                   </Dialog>
                 ) : null}
+                {isComposerResting ? null : (
+                  // The editor's visible name. It stays while typing, unlike the placeholder.
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span
+                      id={composerLabelId}
+                      className="cursor-text font-medium text-muted-foreground text-xs"
+                      onClick={() => composerEditorRef.current?.focusAtEnd()}
+                    >
+                      메시지
+                    </span>
+                    <ComposerInputHelp onClosed={() => composerEditorRef.current?.focusAtEnd()} />
+                  </div>
+                )}
                 <ComposerContextActionsContext value={composerContextActions}>
                   <ComposerPromptEditor
                     editorRef={composerEditorRef}
+                    labelledBy={composerLabelId}
                     richTextEnabled={settings.composerRichTextEnabled}
                     value={
                       isComposerApprovalState
@@ -6939,7 +6995,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                 ? "메시지를 보내려면 설정에서 프로바이더를 활성화해 주세요"
                                 : phase === "disconnected"
                                   ? DISCONNECTED_COMPOSER_PLACEHOLDER
-                                  : "무엇이든 물어보세요. @로 파일·폴더를 지정하고, $로 스킬을 사용하거나 /로 명령을 실행하세요"
+                                  : "무엇이든 물어보세요"
                     }
                     disabled={
                       isConnecting ||
