@@ -370,6 +370,7 @@ export function ProviderModelsSection({
                   size="icon-micro"
                   variant="ghost-muted"
                   disabled={!options.canMoveUp}
+                  className="disabled:opacity-100"
                   onClick={() => handleMove(model.slug, -1)}
                   aria-label={`Move ${model.name} up`}
                 />
@@ -387,6 +388,7 @@ export function ProviderModelsSection({
                   size="icon-micro"
                   variant="ghost-muted"
                   disabled={!options.canMoveDown}
+                  className="disabled:opacity-100"
                   onClick={() => handleMove(model.slug, 1)}
                   aria-label={`Move ${model.name} down`}
                 />
