@@ -3417,6 +3417,7 @@ export async function runScenarios(context) {
     "17/empty-archive-route": async (assert) => {
       await settings("archive");
       const destination = page.getByRole("button", { name: /대화.*돌아|대화 목록|대화로/ });
+      await destination.waitFor({ state: "visible" });
       assert("archive has direct next action", await destination.count(), 1);
       await unchangedRequests(assert, () => destination.click());
       assert(
