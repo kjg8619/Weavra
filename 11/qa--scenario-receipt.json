@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "selection": "11",
+  "revision": "95efb02ebfc258c7b4c86bb1529f942a2251990a",
+  "asarSha256": "4b8a13ac1d8079aa3349c37c9f75d0b3029276c2509818dd354031cfc380bfbb",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "9b6e94870cca736303e7b6c328af5aebbe39b5dc87ce30eb059a6aa59c670db7",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "f19dae505ea0430865a4a872c3fc4692cad6c108b751c6a229d1f73a3f52c5b0"
+  },
+  "startedAt": "2026-10-20T08:13:47.721Z",
+  "checks": [
+    {
+      "caseId": "11",
+      "checkId": "empty-command",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "empty command is invalid",
+          "actual": "true",
+          "expected": "true"
+        },
+        {
+          "label": "invalid field retains focus",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "description connected",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/empty-command/result.png",
+          "sha256": "ee837825cc007fed39cb8694fa3dfb1cb862231894f5a85e4168e501fdc6cc22"
+        },
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/empty-command/result.ax.json",
+          "sha256": "ef75efd74b9313bf79cba88d87b5fb82e27a00a49cecfe60cad928731d7ce3af"
+        },
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/empty-command/observations.json",
+          "sha256": "3d2718ad651dcaa67981164c5306664e04051cbec66c0bab842624a7a6f11f16"
+        }
+      ]
+    },
+    {
+      "caseId": "11",
+      "checkId": "whitespace-command",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "whitespace remains invalid",
+          "actual": "true",
+          "expected": "true"
+        },
+        {
+          "label": "dialog not saved",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/whitespace-command/result.png",
+          "sha256": "1ff94da26ed45c70ec20f61c3c23d296ad629413f42aab08f53ec0179f1cbf25"
+        },
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/whitespace-command/result.ax.json",
+          "sha256": "a57e90719cc44afacc3c90aa38e470951867a9c060514c2787ef74b95ab37e1a"
+        },
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/whitespace-command/observations.json",
+          "sha256": "c51977535568d29097e17c6034a3b47535e84e9fa185049b56a8149f489c6e40"
+        }
+      ]
+    },
+    {
+      "caseId": "11",
+      "checkId": "no-save-on-invalid",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "no persistence after invalid submit",
+          "actual": {
+            "scripts_json": "[]"
+          },
+          "expected": {
+            "scripts_json": "[]"
+          }
+        },
+        {
+          "label": "no model dispatch",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/no-save-on-invalid/result.png",
+          "sha256": "2e21835ce5b827bfdd0889086d0fff01b523e729619cfe3627b8d33ffbb0b579"
+        },
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/no-save-on-invalid/result.ax.json",
+          "sha256": "f782435310555a9a3965571d772a1e65e04ab68713a955a8e72018449a6f20f4"
+        },
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/no-save-on-invalid/observations.json",
+          "sha256": "d0ffe5b58d0909d36325276ed761ac6edfd19245c23b88f79ac55f9c928eb6f7"
+        }
+      ]
+    },
+    {
+      "caseId": "11",
+      "checkId": "inline-validation",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "field-specific inline error exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "error immediately below command",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/inline-validation/result.png",
+          "sha256": "074db12762c88d025d754db296b61266dc1a26091f656cb48ac5e8fb5786bba1"
+        },
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/inline-validation/result.ax.json",
+          "sha256": "da509fbacccb9915dcb6d936e48536f1d3c326238a97b113f4ffec98092c0917"
+        },
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/inline-validation/observations.json",
+          "sha256": "e4521d5fce1f93e97c9ae190107518d8205b4a2901e234f4d59cd73e97997026"
+        }
+      ]
+    },
+    {
+      "caseId": "11",
+      "checkId": "valid-action",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "saved action visible",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "save does not dispatch model",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/valid-action/result.png",
+          "sha256": "12a7ed7b72088ebc0d3df7cc713b934c044148ad64e46bef42b5cfa6eeb84acd"
+        },
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/valid-action/result.ax.json",
+          "sha256": "dbc6b5f347923cf657113c2fbc41cd1bbde4033c50b602d8428976f68a7aae09"
+        },
+        {
+          "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/scenarios/11/valid-action/observations.json",
+          "sha256": "685c1a9e0ff753c955ed43a150e8ab466ed7ba51155cdfdffe6ddeec1acbf381"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T08:14:46.391Z",
+  "capture": {
+    "file": "run-74ed44be-01e2-45a2-b0ed-4bf7f696b701/capture-manifest.json",
+    "sha256": "1d3c034df778fe80ae73941047248f5051626e0de23d411d12e8282927c3da9f"
+  }
+}
