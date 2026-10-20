@@ -3009,6 +3009,8 @@ export async function runScenarios(context) {
       await home();
       const trigger = page.getByRole("button", { name: "프로젝트 변경", exact: true });
       await act("open current project selector", () => trigger.click());
+      // The popup mounts after the click resolves; count only once the menu is open.
+      await page.getByRole("menu", { name: "프로젝트 변경", exact: true }).waitFor();
       const selected = page.locator('[role="menuitemradio"][aria-checked="true"]');
       assert("one checked current project", await selected.count(), 1);
       assert(
