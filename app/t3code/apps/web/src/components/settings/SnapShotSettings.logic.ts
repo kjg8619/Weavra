@@ -97,8 +97,8 @@ export function snapShotFeedbackUnavailableMessage(
 
 export function snapShotDescription(state: DesktopSnapShotState | null): string {
   return state?.mode === "portal" && captureSetupBackend(state) === "picker"
-    ? "Automatic capture isn't available here. Choose a window instead."
-    : "Capture a window and attach it to your current draft.";
+    ? "Automatic capture isn't available here. 켜면 직접 고른 창을 캡처해 현재 대화의 초안에 첨부하며, 필요한 권한은 처음 캡처할 때 요청해요."
+    : "켜면 단축키로 활성 창을 캡처해 현재 대화의 초안에 첨부하며, 필요한 권한은 처음 설정할 때 요청해요.";
 }
 
 export function snapShotAccessibilityUnavailableMessage(
