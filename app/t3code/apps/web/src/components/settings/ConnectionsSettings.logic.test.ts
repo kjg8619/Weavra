@@ -4,6 +4,7 @@ import {
   applyWslEnableSelection,
   isQrShareableEndpoint,
   isWslSettingsRowVisible,
+  resolveConnectionActions,
   selectQrEndpointOption,
 } from "./ConnectionsSettings.logic";
 
@@ -15,6 +16,39 @@ const baseWslState: DesktopWslState = {
   distros: [],
   preflightError: null,
 };
+
+describe("resolveConnectionActions", () => {
+  it.each([
+    { hostConnected: true, hostAccessAllowed: true, sshSupported: true, hostAccess: "available" },
+    {
+      hostConnected: true,
+      hostAccessAllowed: false,
+      sshSupported: true,
+      hostAccess: "permission-required",
+    },
+    { hostConnected: true, hostAccessAllowed: true, sshSupported: false, hostAccess: "available" },
+    {
+      hostConnected: false,
+      hostAccessAllowed: true,
+      sshSupported: true,
+      hostAccess: "disconnected",
+    },
+    {
+      hostConnected: false,
+      hostAccessAllowed: false,
+      sshSupported: false,
+      hostAccess: "disconnected",
+    },
+  ])("keeps the local draft independent of host access: $hostAccess", (input) => {
+    const actions = resolveConnectionActions(input);
+
+    expect(actions).toEqual({
+      canOpenDraft: true,
+      canUseSsh: input.sshSupported,
+      hostAccess: input.hostAccess,
+    });
+  });
+});
 
 describe("isWslSettingsRowVisible", () => {
   it("shows the retry row when the WSL state failed to load", () => {
