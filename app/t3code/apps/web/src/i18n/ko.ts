@@ -652,6 +652,13 @@ export const ko = freeze({
     }),
   }),
   projects: freeze({
+    workspaceMode: freeze({
+      newWorktree: "새 작업 트리",
+      currentCheckout: "현재 체크아웃",
+      currentWorktree: "현재 작업 트리",
+      worktree: "작업 트리",
+      localCheckout: "로컬 체크아웃",
+    }),
     add: "프로젝트 추가",
     localFolder: "로컬 폴더",
     openPanel: "패널 열기",

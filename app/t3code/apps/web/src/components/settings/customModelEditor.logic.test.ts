@@ -259,4 +259,19 @@ describe("customModelEditor.logic", () => {
     ).toBe(validation.duplicateChoice(1, "a"));
     expect(validateDraft(draft({ descriptors: [select("effort", [{ id: "a" }])] }))).toBeNull();
   });
+
+  it("adds built-in presets with their original wire labels while the picker shows Korean names", () => {
+    const presets = Object.values(DESCRIPTOR_PRESETS_BY_KIND).flatMap((list) => list ?? []);
+    const display = ko.providers.customModel.presetDisplayLabels;
+    expect(presets.length).toBeGreaterThan(0);
+    for (const preset of presets) {
+      const descriptor = descriptorFromPreset(preset);
+      expect(descriptor.label).toBe(preset.label);
+      expect(descriptor.choices.map((choice) => choice.label)).toEqual(
+        (preset.choices ?? []).map((choice) => choice.label),
+      );
+      expect(Object.hasOwn(display, preset.label), preset.label).toBe(true);
+      expect(display[preset.label]).not.toBe(preset.label);
+    }
+  });
 });

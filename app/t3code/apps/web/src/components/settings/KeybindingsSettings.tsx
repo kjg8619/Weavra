@@ -36,7 +36,7 @@ import {
 
 import { isElectron } from "../../env";
 import { useOpenInPreferredEditor } from "../../editorPreferences";
-import { formatShortcutLabel } from "../../keybindings";
+import { formatShortcutKeyLabel, formatShortcutLabel } from "../../keybindings";
 import { cn } from "../../lib/utils";
 import { serverEnvironment } from "../../state/server";
 import { useSettingsScope } from "./SettingsScopeContext";
@@ -44,6 +44,14 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Kbd, KbdGroup } from "../ui/kbd";
+
+/** Arrow keys read as glyphs on keycaps; other named keys use the shared keycap label. */
+const KEYCAP_SYMBOLS: Readonly<Record<string, string>> = {
+  arrowup: "↑",
+  arrowdown: "↓",
+  arrowleft: "←",
+  arrowright: "→",
+};
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
@@ -102,7 +110,7 @@ function KeybindingPill({ value }: { value: KeybindingShortcut }) {
                   ? "⌃"
                   : part.length === 1
                     ? part.toUpperCase()
-                    : part}
+                    : (KEYCAP_SYMBOLS[part] ?? formatShortcutKeyLabel(part))}
         </Kbd>
       ))}
     </KbdGroup>

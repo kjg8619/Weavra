@@ -19,7 +19,7 @@ export function NoProjectsHero() {
               <EmptyTitle className="text-foreground text-2xl sm:text-3xl">
                 {ko.projects.hero.title}
               </EmptyTitle>
-              <EmptyDescription className="mt-2 text-sm text-muted-foreground/78">
+              <EmptyDescription className="mt-2 text-sm text-muted-foreground">
                 {ko.projects.hero.description}
               </EmptyDescription>
               <div className="mt-6 flex justify-center">

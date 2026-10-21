@@ -440,7 +440,7 @@ function ProcessDiagnosticsTable({
               <td className="px-3 py-2 text-right align-middle font-mono tabular-nums text-muted-foreground">
                 {process.pid}
               </td>
-              <td className="truncate px-3 py-2 align-middle text-muted-foreground">
+              <td className="px-3 py-2 align-middle text-muted-foreground">
                 {formatProcessType(process)}
               </td>
               <td className="p-2 align-middle sm:pr-4">

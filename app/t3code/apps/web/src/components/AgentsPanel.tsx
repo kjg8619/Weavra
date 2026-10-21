@@ -550,7 +550,7 @@ export function AgentsPanel({
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <Bot aria-hidden className="size-6 text-muted-foreground/60" />
         <p className="text-sm font-medium">{ko.devices.agentsPanel.emptyTitle}</p>
-        <p className="max-w-56 text-xs text-muted-foreground">
+        <p className="max-w-56 text-sm text-muted-foreground">
           {ko.devices.agentsPanel.emptyDescription}
         </p>
       </div>
