@@ -140,8 +140,8 @@ export function exactName(scope, role, names, options = {}) {
     .reduce((all, locator) => all.or(locator));
 }
 
-// Lead decision 2026-10-22 on runner-alias-request.md section E. Every [A-Za-z]{3,} segment of an
-// authored label must be one of these exact segments, or part of a listed fixture value.
+// Lead decisions 2026-10-22 (section E) and 2026-10-22c (consolidated request A). Every
+// [A-Za-z]{3,} segment of an authored label must be classified; ordinary English never is.
 // "Kernel" and "Runtime" are allowed only as the proper names of Weavra components.
 export const LOCALE_SEGMENT_CLASSES = {
   "product/brand": [
@@ -156,11 +156,94 @@ export const LOCALE_SEGMENT_CLASSES = {
     "GitHub",
     "GitLab",
     "Bitbucket",
+    "Forgejo",
+    "Gitea",
+    "Google",
+    "Gemini",
+    "MagicDNS",
+    "Xcode",
+    "VoiceOver",
+    "iOS",
+    "Android",
+    "Windows",
+    "Linux",
+    "macOS",
+    "Niri",
+    "Hyprland",
+    "Omarchy",
   ],
+  "built-in theme": ["Grove", "Ocean", "Ember", "Iris"],
   "tool/VCS": ["Git", "Mercurial", "Jujutsu", "Tailscale"],
-  "protocol/format/acronym": ["HTTPS", "URL", "API", "SSH", "WSL", "CLI", "JSON", "QR"],
+  "protocol/format/acronym": [
+    "HTTPS",
+    "HTTP",
+    "URL",
+    "API",
+    "SSH",
+    "WSL",
+    "CLI",
+    "JSON",
+    "QR",
+    "CPU",
+    "GPU",
+    "PID",
+    "RGB",
+    "OTEL",
+    "MCP",
+  ],
   "Weavra component": ["Runtime", "Kernel"],
 };
+// Multi-word names count only as the whole exact phrase.
+export const LOCALE_PHRASE_CLASSES = {
+  "product/brand": [
+    "Azure DevOps",
+    "Vertex AI",
+    "GitHub Copilot",
+    "Claude Code",
+    "T3 Connect",
+    "Tailscale Serve",
+    "Android Studio",
+    "Face ID",
+    "Liquid Glass",
+    "VS Code",
+    "Mac mini",
+  ],
+  "built-in theme": ["T3 Chat"],
+};
+// Custom-model option labels are wire data (customModelEditor.logic.ts presets). They stay
+// English only inside the custom-model editor, as a whole field value.
+export const CUSTOM_MODEL_PRESET_LABELS = [
+  "Reasoning",
+  "Speed",
+  "Low",
+  "Medium",
+  "High",
+  "Extra High",
+  "Max",
+  "Standard",
+  "Fast",
+  "Fast Mode",
+  "Thinking",
+  "Agent",
+  "Build",
+  "Plan",
+];
+// Keycaps count only inside a <kbd> keycap, or as the trailing shortcut chord in the accessible
+// name of a control that renders one. Never in prose.
+export const LOCALE_KEYCAPS = [
+  "Ctrl",
+  "Alt",
+  "Shift",
+  "Cmd",
+  "Enter",
+  "Esc",
+  "Tab",
+  "Space",
+  "Up",
+  "Down",
+  "Left",
+  "Right",
+];
 export const LOCALE_FIXTURE_VALUES = [
   "baseline-project",
   "01 Conversation",
@@ -170,39 +253,162 @@ export const LOCALE_FIXTURE_VALUES = [
   "05 Error fixture",
   "06 Empty thread",
 ];
-const LOCALE_SEGMENT_CLASS = new Map(
-  Object.entries(LOCALE_SEGMENT_CLASSES).flatMap(([kind, segments]) =>
-    segments.map((segment) => [segment, kind]),
-  ),
-);
-const LOCALE_FIXTURE_PATTERN = new RegExp(
-  `(?<![A-Za-z0-9-])(?:${LOCALE_FIXTURE_VALUES.join("|")})(?![A-Za-z0-9-])`,
-  "g",
+const classMap = (classes) =>
+  new Map(
+    Object.entries(classes).flatMap(([kind, values]) => values.map((value) => [value, kind])),
+  );
+const LOCALE_SEGMENT_CLASS = classMap(LOCALE_SEGMENT_CLASSES);
+const LOCALE_PHRASE_CLASS = classMap(LOCALE_PHRASE_CLASSES);
+const LOCALE_KEYCAP = new Set(LOCALE_KEYCAPS);
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const exactValues = (values) =>
+  new RegExp(`(?<![A-Za-z0-9-])(?:${values.map(escapeRegExp).join("|")})(?![A-Za-z0-9-])`, "g");
+const LOCALE_FIXTURE_PATTERN = exactValues(LOCALE_FIXTURE_VALUES);
+const LOCALE_PHRASE_PATTERN = exactValues([...LOCALE_PHRASE_CLASS.keys()]);
+const LOCALE_FILE_TOKEN = /(?<![\w.-])[A-Za-z0-9_-]+\.json(?![\w.-])/g;
+const LOCALE_NAME_CHORD = new RegExp(
+  `(?:: |\\()(?:[⌘⇧⌥⌃] ?|(?:Ctrl|Alt|Shift|Cmd)[+ ])*(?:${LOCALE_KEYCAPS.join("|")}|[A-Z0-9])\\)?$`,
 );
 
-// Classifies each Latin segment of one label; unclassified segments fail the audit.
-export function classifyLocaleText(value) {
+// Data, not authored copy: anchored whole-field patterns, each bound to the field that carries
+// it and to the real source of the value.
+function scopedData(value, context, sources) {
+  const provider = (name) => (sources.providerIds ?? []).includes(name.split("-")[0]);
+  if (context.field === "placeholder") {
+    const command = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.exec(value);
+    if (command && provider(value))
+      return { class: "command placeholder", source: "serverConfig.providers" };
+    const path = /^~\/\.([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?:\/[a-z0-9-]+)*$/.exec(value);
+    if (path && provider(path[1]))
+      return { class: "path placeholder", source: "serverConfig.providers" };
+    if (/^https?:\/\/(?:(?:localhost|127\.0\.0\.1)(?::(?:\d+|\.\.\.))?\/?|\.\.\.)$/.test(value))
+      return { class: "URL placeholder", source: "loopback or elided URL" };
+  }
+  if (
+    context.presetScope &&
+    (context.field === "text" || context.field === "name") &&
+    CUSTOM_MODEL_PRESET_LABELS.includes(value)
+  )
+    return { class: "custom-model option preset", source: "customModelEditor.logic.ts" };
+  if (
+    context.field === "text" &&
+    context.font &&
+    /^[A-Z][A-Za-z]*(?: [A-Z][A-Za-z]*){0,2}$/.test(value)
+  ) {
+    if (context.font.resolvable)
+      return { class: "font family", source: "renderer font resolution" };
+    if (context.font.mac && /^SF (?:Pro|Mono)$/.test(value))
+      return { class: "font family", source: "macOS system font label" };
+  }
+  return null;
+}
+
+// Classifies each Latin segment of one field; unclassified segments fail the audit.
+/**
+ * @param {{ field?: string, control?: boolean, keycap?: boolean, presetScope?: boolean,
+ *   font?: { resolvable: boolean, mac: boolean } | null }} context
+ */
+export function classifyLocaleText(value, context = {}, sources = {}) {
+  const field = context.field ?? "text";
+  const data = scopedData(value, { ...context, field }, sources);
+  if (data) return { segments: [{ segment: value, ...data }], unclassified: [] };
   const segments = [];
-  const rest = value.replace(LOCALE_FIXTURE_PATTERN, (segment) => {
-    segments.push({ segment, class: "fixture value" });
-    return " ";
-  });
-  for (const [segment] of rest.matchAll(/[A-Za-z]{3,}/g))
-    segments.push({ segment, class: LOCALE_SEGMENT_CLASS.get(segment) ?? null });
+  let rest = value;
+  const take = (pattern, classify) => {
+    rest = rest.replace(pattern, (match) => {
+      const kind = classify(match);
+      if (!kind) return match;
+      segments.push({ segment: match, ...kind });
+      return " ";
+    });
+  };
+  if (field !== "keycap") {
+    take(LOCALE_FILE_TOKEN, (token) =>
+      context.control && token === sources.keybindingsFile
+        ? { class: "file name", source: "serverConfig.keybindingsConfigPath" }
+        : null,
+    );
+    take(LOCALE_FIXTURE_PATTERN, () => ({ class: "fixture value", source: "seed.mjs" }));
+    take(LOCALE_PHRASE_PATTERN, (phrase) => ({
+      class: LOCALE_PHRASE_CLASS.get(phrase),
+      source: "lead allowlist",
+    }));
+    if (field === "name" && context.keycap)
+      rest = rest.replace(LOCALE_NAME_CHORD, (chord) => {
+        for (const [segment] of chord.matchAll(/[A-Za-z]{3,}/g))
+          segments.push({ segment, class: "keycap", source: "shortcut chord of a keycap control" });
+        return " ";
+      });
+  }
+  for (const [segment] of rest.matchAll(/[A-Za-z]{3,}/g)) {
+    const kind =
+      field === "keycap"
+        ? LOCALE_KEYCAP.has(segment)
+          ? "keycap"
+          : null
+        : (LOCALE_SEGMENT_CLASS.get(segment) ?? null);
+    segments.push({
+      segment,
+      class: kind,
+      source: kind ? (field === "keycap" ? "kbd element" : "lead allowlist") : null,
+    });
+  }
   return { segments, unclassified: segments.filter((row) => row.class === null) };
 }
 
-export function auditLocaleLabels(labels) {
+// Name patterns whose subject names one row: [English baseline, Korean current].
+export const NAMED_ROW_CONTROLS = {
+  workedFor: [/^Worked for (.+)$/, /^작업 시간 (.+)$/],
+  editWhen: [/^Edit when clause for (.+)$/, /^(.+) 실행 조건 편집$/],
+  sourceDetails: [/^Toggle (.+) details$/, /^(.+) 세부 정보 열기\/닫기$/],
+};
+// One anchored locator pattern per kind; the subject is checked against its row separately.
+export const NAMED_ROW_PATTERNS = {
+  workedFor: /^(?:Worked for |작업 시간 )/,
+  editWhen: /^(?:Edit when clause for .+|.+ 실행 조건 편집)$/,
+  sourceDetails: /^(?:Toggle .* details|.+ 세부 정보 열기\/닫기)$/,
+};
+export function namedRowSubject(kind, name) {
+  for (const pattern of NAMED_ROW_CONTROLS[kind]) {
+    const match = pattern.exec(name ?? "");
+    if (match) return match[1];
+  }
+  return null;
+}
+
+export function localeSources(config) {
+  return {
+    keybindingsFile: config?.keybindingsConfigPath?.split(/[\\/]/).at(-1) ?? null,
+    providerIds: [
+      ...new Set((config?.providers ?? []).flatMap((p) => [p.instanceId, p.driver])),
+    ].filter(Boolean),
+  };
+}
+
+export function auditLocaleLabels(labels, sources = {}) {
   const unclassified = [];
   const exceptions = [];
-  for (const row of labels)
-    for (const value of [row.text, row.name, row.placeholder]) {
+  for (const row of labels) {
+    const context = {
+      control: row.tag === "BUTTON" || row.role === "button",
+      keycap: (row.keycaps?.length ?? 0) > 0,
+      presetScope: row.presetScope === true,
+      font: row.font ?? null,
+    };
+    const fields = [
+      ["text", row.text],
+      ["name", row.name],
+      ["placeholder", row.placeholder],
+      ...(row.keycaps ?? []).map((keycap) => ["keycap", keycap]),
+    ];
+    for (const [field, value] of fields) {
       if (!value) continue;
-      const result = classifyLocaleText(value);
+      const result = classifyLocaleText(value, { ...context, field }, sources);
       if (result.unclassified.length)
-        unclassified.push({ ...row, text: value, segments: result.unclassified });
-      else if (result.segments.length) exceptions.push({ ...row, text: value, ...result });
+        unclassified.push({ ...row, field, text: value, segments: result.unclassified });
+      else if (result.segments.length) exceptions.push({ ...row, field, text: value, ...result });
     }
+  }
   return { unclassified, exceptions };
 }
 
@@ -1271,6 +1477,23 @@ export async function runScenarios(context) {
     exactName(scope, role, names(english), options);
   const byLabel = (english, prefix, suffix) =>
     ariaLabelSelector(names(english), { prefix, suffix });
+  // The keybinding row a when-clause control edits, and whether its name points at that row.
+  async function whenControlRow(control) {
+    const row = await control.evaluate((element) => {
+      const own = element.closest('[data-slot="settings-row"]');
+      let row = own;
+      while (row && !row.id.startsWith("keybinding-")) row = row.previousElementSibling;
+      return {
+        command: row?.id.slice("keybinding-".length),
+        text: `${row?.textContent ?? ""}\n${own?.textContent ?? ""}`,
+      };
+    });
+    const subject = namedRowSubject("editWhen", await control.getAttribute("aria-label"));
+    return {
+      command: row.command,
+      owned: Boolean(row.command) && subject !== null && row.text.includes(subject),
+    };
+  }
   async function unique(selector) {
     const target = page.locator(selector).filter({ visible: true });
     await target.waitFor({ state: "visible" });
@@ -1881,15 +2104,48 @@ export async function runScenarios(context) {
             ...root.querySelectorAll("button,label,h1,h2,h3,h4,[role=status],input,textarea"),
           ])
           .filter((node) => node.checkVisibility())
-          .map((node) => ({
-            tag: node.tagName,
-            text: node.textContent?.trim(),
-            name: node.getAttribute("aria-label"),
-            placeholder: node.getAttribute("placeholder"),
-          })),
+          .map((node) => {
+            // Keycaps are classified on their own; they never count as the label's prose.
+            const prose = node.cloneNode(true);
+            for (const keycap of prose.querySelectorAll("kbd")) keycap.remove();
+            const role = node.getAttribute("role");
+            const text = prose.textContent?.trim();
+            let font = null;
+            if (role === "combobox" && text) {
+              const canvas = document.createElement("canvas").getContext("2d");
+              const width = (family) => {
+                canvas.font = `32px ${family}`;
+                return canvas.measureText("mmmmmmmmmmlliWW@#1").width;
+              };
+              font = {
+                resolvable: ["monospace", "serif", "sans-serif"].some(
+                  (generic) => width(`${JSON.stringify(text)}, ${generic}`) !== width(generic),
+                ),
+                mac: /Mac/.test(navigator.platform),
+              };
+            }
+            return {
+              tag: node.tagName,
+              role,
+              text,
+              name: node.getAttribute("aria-label"),
+              placeholder: node.getAttribute("placeholder"),
+              keycaps: [...node.querySelectorAll("kbd")]
+                .filter((keycap) => !keycap.querySelector("kbd"))
+                .map((keycap) => keycap.textContent.trim())
+                .filter(Boolean),
+              // Inside the custom-model editor, identified by its name input id, not by copy.
+              presetScope: [
+                ...document.querySelectorAll(
+                  'input[id^="provider-instance-"][id$="-custom-model-name"]',
+                ),
+              ].some((input) => input.parentElement?.parentElement?.contains(node)),
+              font,
+            };
+          }),
       selector,
     );
-    const { unclassified, exceptions } = auditLocaleLabels(labels);
+    const { unclassified, exceptions } = auditLocaleLabels(labels, localeSources(liveConfig));
     observations.push({ label, unclassified, exceptions });
     assert(
       `${label}: every authored label is Korean or a classified proper name`,
@@ -2202,7 +2458,7 @@ export async function runScenarios(context) {
       await thread("05 Error fixture");
       const icons = page.locator('[class*="text-tool-error-icon"]').filter({ visible: true });
       if ((await icons.count()) === 0) {
-        const disclosure = page.getByRole("button", { name: /^Worked for / });
+        const disclosure = page.getByRole("button", { name: NAMED_ROW_PATTERNS.workedFor });
         assert("one work disclosure belongs to the error fixture", await disclosure.count(), 1);
         await disclosure.click();
       }
@@ -3867,7 +4123,18 @@ export async function runScenarios(context) {
     "15/no-authentication-side-effect": async (assert) => {
       const before = requests.length;
       await sourceControlVariant(assert, "unauthenticated");
-      for (const button of await page.getByRole("button", { name: /^Toggle .* details$/ }).all()) {
+      const details = await page
+        .getByRole("button", { name: NAMED_ROW_PATTERNS.sourceDetails })
+        .all();
+      assert("source details controls reachable", details.length > 0, true);
+      for (const button of details) {
+        const subject = namedRowSubject("sourceDetails", await button.getAttribute("aria-label"));
+        assert(
+          `details control names a rendered source: ${subject}`,
+          subject !== null &&
+            (await page.locator("main").getByText(subject, { exact: true }).count()) > 0,
+          true,
+        );
         await button.scrollIntoViewIfNeeded();
         await button.click();
       }
@@ -4333,7 +4600,7 @@ export async function runScenarios(context) {
         `${process.env.WEAVRA_CAPTURE_REPO}/app/t3code/packages/shared/src/keybindings.ts`
       );
       const bindings = mergeWithDefaultKeybindings(liveConfig.keybindings);
-      const controls = page.getByRole("button", { name: /^Edit when clause for / });
+      const controls = page.getByRole("button", { name: NAMED_ROW_PATTERNS.editWhen });
       const expected = [
         ...new Set(
           bindings.map((binding) => JSON.stringify([binding.command, binding.whenAst ?? null])),
@@ -4341,11 +4608,8 @@ export async function runScenarios(context) {
       ].sort();
       const actual = [];
       for (const control of await controls.all()) {
-        const command = await control.evaluate((element) => {
-          let row = element.closest('[data-slot="settings-row"]');
-          while (row && !row.id.startsWith("keybinding-")) row = row.previousElementSibling;
-          return row?.id.slice("keybinding-".length);
-        });
+        const { command, owned } = await whenControlRow(control);
+        assert(`when control names its own row: ${command}`, owned, true);
         await control.scrollIntoViewIfNeeded();
         await control.click();
         const expression = byName(page, "textbox", "When expression");
@@ -4421,8 +4685,10 @@ export async function runScenarios(context) {
     "12/no-rebind": async (assert) => {
       await settings("keybindings");
       const before = structuredClone(liveConfig.keybindings);
-      const controls = page.getByRole("button", { name: /^Edit when clause for / });
+      const controls = page.getByRole("button", { name: NAMED_ROW_PATTERNS.editWhen });
       assert("advanced conditions reachable", (await controls.count()) > 0, true);
+      const first = await whenControlRow(controls.first());
+      assert("when control names its own row", first.owned, true);
       await controls.first().click();
       await page.keyboard.press("Escape");
       await page.reload();

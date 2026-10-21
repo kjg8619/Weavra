@@ -40,6 +40,10 @@ import {
   auditLocaleLabels,
   classifyLocaleText,
   panelMenuItem,
+  localeSources,
+  LOCALE_FIXTURE_VALUES,
+  NAMED_ROW_PATTERNS,
+  namedRowSubject,
 } from "./cases.mjs";
 import {
   bounded,
@@ -775,41 +779,177 @@ describe("English-baseline / Korean-current copy aliases", () => {
 });
 
 describe("authored locale audit", () => {
+  const sources = localeSources({
+    keybindingsConfigPath: "/tmp/home/.weavra/keybindings.json",
+    providers: [{ instanceId: "codex", driver: "codex" }],
+  });
+  const row = (fields: Record<string, unknown>) => ({
+    tag: "BUTTON",
+    role: null,
+    text: "",
+    name: null,
+    placeholder: null,
+    keycaps: [],
+    font: null,
+    ...fields,
+  });
+  const audit = (fields: Record<string, unknown>, from = sources) =>
+    auditLocaleLabels([row(fields)], from);
+  const passes = (fields: Record<string, unknown>, from = sources) =>
+    expect(audit(fields, from).unclassified).toEqual([]);
+  const fails = (fields: Record<string, unknown>, from = sources) =>
+    expect(audit(fields, from).unclassified.length).toBeGreaterThan(0);
+
   test("leftover authored English still fails", () => {
-    const { unclassified } = auditLocaleLabels([
-      { tag: "BUTTON", text: "레거시 기능", name: null, placeholder: null },
-      { tag: "LABEL", text: "Sidebar (legacy)", name: null, placeholder: null },
-      { tag: "BUTTON", text: "공급자 추가", name: "Add provider", placeholder: null },
-    ]);
-    expect(unclassified.map((row) => row.text)).toEqual(["Sidebar (legacy)", "Add provider"]);
+    const { unclassified } = auditLocaleLabels(
+      [
+        row({ text: "레거시 기능" }),
+        row({ tag: "LABEL", text: "Sidebar (legacy)" }),
+        row({ text: "공급자 추가", name: "Add provider" }),
+      ],
+      sources,
+    );
+    expect(unclassified.map((r) => r.text)).toEqual(["Sidebar (legacy)", "Add provider"]);
   });
-  test("Korean labels keep only classified Latin segments", () => {
-    const { unclassified, exceptions } = auditLocaleLabels([
-      { tag: "LABEL", text: "Tailscale HTTPS 사용", name: null, placeholder: null },
-      { tag: "H2", text: "Codex 로그인 필요", name: null, placeholder: null },
-      { tag: "BUTTON", text: "", name: "03 Code blocks 대화 작업", placeholder: null },
-      { tag: "H3", text: "Weavra Runtime", name: null, placeholder: null },
-    ]);
+  test("Korean labels keep only classified Latin segments, recorded with class and source", () => {
+    const { unclassified, exceptions } = auditLocaleLabels(
+      [
+        row({ tag: "LABEL", text: "Tailscale HTTPS 사용" }),
+        row({ tag: "H2", text: "Codex 로그인 필요" }),
+        row({ name: "03 Code blocks 대화 작업" }),
+        row({ tag: "H3", text: "Weavra Runtime" }),
+        row({ name: "T3 Chat 테마 사용" }),
+        row({ name: "Azure DevOps 설정 안내" }),
+        row({ text: "CPU 사용량 Ember 복제 macOS" }),
+      ],
+      sources,
+    );
     expect(unclassified).toEqual([]);
-    expect(exceptions.flatMap((row) => row.segments)).toEqual([
-      { segment: "Tailscale", class: "tool/VCS" },
-      { segment: "HTTPS", class: "protocol/format/acronym" },
-      { segment: "Codex", class: "product/brand" },
-      { segment: "03 Code blocks", class: "fixture value" },
-      { segment: "Weavra", class: "product/brand" },
-      { segment: "Runtime", class: "Weavra component" },
+    expect(exceptions.flatMap((r) => r.segments)).toEqual([
+      { segment: "Tailscale", class: "tool/VCS", source: "lead allowlist" },
+      { segment: "HTTPS", class: "protocol/format/acronym", source: "lead allowlist" },
+      { segment: "Codex", class: "product/brand", source: "lead allowlist" },
+      { segment: "03 Code blocks", class: "fixture value", source: "seed.mjs" },
+      { segment: "Weavra", class: "product/brand", source: "lead allowlist" },
+      { segment: "Runtime", class: "Weavra component", source: "lead allowlist" },
+      { segment: "T3 Chat", class: "built-in theme", source: "lead allowlist" },
+      { segment: "Azure DevOps", class: "product/brand", source: "lead allowlist" },
+      { segment: "CPU", class: "protocol/format/acronym", source: "lead allowlist" },
+      { segment: "Ember", class: "built-in theme", source: "lead allowlist" },
+      { segment: "macOS", class: "product/brand", source: "lead allowlist" },
     ]);
   });
-  test("a generic English word beside Korean fails, with no case or substring loosening", () => {
-    for (const value of [
-      "Run 그래프",
-      "Settings 열기",
-      "codex 로그인",
-      "Codexes",
-      "Code blocks",
-      "xbaseline-project",
-    ])
-      expect(classifyLocaleText(value).unclassified.length).toBeGreaterThan(0);
+  test("plain English words fail in every field and context", () => {
+    const context = {
+      role: "combobox",
+      keycaps: ["Enter"],
+      font: { resolvable: false, mac: true },
+    };
+    for (const word of ["Settings", "Save", "Run", "Open", "Delete", "Run 그래프", "Serve 시작"]) {
+      fails({ ...context, text: word });
+      fails({ ...context, name: word });
+      fails({ ...context, placeholder: word });
+      fails({ keycaps: [word] });
+    }
+    for (const value of ["Chat 테마", "Vertex 설정", "Codexes", "codex 로그인", "Code blocks"])
+      fails({ text: value });
+  });
+  test("keycaps count only inside a keycap or a keycap control's trailing chord", () => {
+    passes({ text: "대기 메시지 반영", keycaps: ["⇧", "⌘", "Enter"] });
+    passes({ name: "대화: 대기 메시지 반영 단축키 편집: ⇧⌘Enter", keycaps: ["Enter"] });
+    passes({ name: "추가 (Ctrl Enter)", keycaps: ["Ctrl", "Enter"] });
+    fails({ text: "Enter 키를 눌러 보내요" });
+    fails({ text: "Enter 키를 눌러 보내요", keycaps: ["Enter"] });
+    fails({ name: "단축키 편집: ⇧⌘Enter" });
+    fails({ name: "Enter 키로 보내기", keycaps: ["Enter"] });
+    fails({ keycaps: ["enter"] });
+    fails({ keycaps: ["arrowdown"] });
+  });
+  test("data is accepted only in its own field and only when its source agrees", () => {
+    passes({ tag: "INPUT", placeholder: "codex" });
+    passes({ tag: "INPUT", placeholder: "~/.codex-t3/personal" });
+    passes({ tag: "INPUT", placeholder: "http://127.0.0.1:4096" });
+    passes({ tag: "INPUT", placeholder: "https://..." });
+    passes({ name: "keybindings.json 열기" });
+    passes({ role: "combobox", text: "Menlo", font: { resolvable: true, mac: true } });
+    passes({ role: "combobox", text: "SF Pro", font: { resolvable: false, mac: true } });
+    // Source disagrees.
+    fails({ tag: "INPUT", placeholder: "codex" }, localeSources({ providers: [] }));
+    fails({ tag: "INPUT", placeholder: "~/.gemini" });
+    fails({ name: "settings.json 열기" });
+    fails({ role: "combobox", text: "SF Pro", font: { resolvable: false, mac: false } });
+    fails({ role: "combobox", text: "Default", font: { resolvable: false, mac: true } });
+    // Pattern-shaped token outside its scoped field.
+    fails({ text: "codex" });
+    fails({ name: "~/.codex" });
+    fails({ text: "http://127.0.0.1:4096" });
+    fails({ tag: "H2", text: "keybindings.json" });
+    fails({ text: "Menlo" });
+    fails({ tag: "INPUT", placeholder: "my-project-id" });
+    fails({ tag: "INPUT", placeholder: "https://example.com" });
+  });
+  test("fixture text in composite rows matches seeded values exactly", async () => {
+    passes({ tag: "DIV", role: "button", text: "작업 중\n04 Working fixture\n3분 전" });
+    fails({ tag: "DIV", role: "button", text: "04 Working fixtures\n3분 전" });
+    fails({ tag: "DIV", role: "button", text: "01 Conversation\n3d ago" });
+    const seedSource = await NodeFSP.readFile(new URL("./seed.mjs", import.meta.url), "utf8");
+    for (const value of LOCALE_FIXTURE_VALUES) expect(seedSource).toContain(`"${value}"`);
+  });
+  test("late lead additions pass only as exact names or phrases", () => {
+    passes({ text: "RGB 색상 OTEL 내보내기 Niri Hyprland Omarchy" });
+    passes({ name: "VS Code에서 열기" });
+    passes({ text: "Mac mini 호스트" });
+    passes({ tag: "H3", text: "활성 MCP" });
+    fails({ text: "활성 Mcp" });
+    fails({ text: "Code 열기" });
+    fails({ text: "mini 모드" });
+  });
+  test("custom-model preset labels pass only inside the custom-model editor", () => {
+    passes({ text: "Reasoning", presetScope: true });
+    passes({ text: "Extra High", presetScope: true });
+    passes({ tag: "SPAN", text: "Fast Mode", presetScope: true });
+    fails({ text: "Reasoning" });
+    fails({ text: "Plan" });
+    fails({ text: "Reasoning effort", presetScope: true });
+    fails({ text: "Settings", presetScope: true });
+    fails({ tag: "INPUT", placeholder: "Low", presetScope: true });
+  });
+  test("every runner literal naming Run is an English baseline alias row", async () => {
+    const english = new Set(COPY_ALIASES.map(([name]) => name));
+    for (const file of ["cases.mjs", "capture.mjs", "assert.mjs"]) {
+      const source = await NodeFSP.readFile(new URL(`./${file}`, import.meta.url), "utf8");
+      for (const [literal] of source.matchAll(/"[^"\n]*\bRun\b[^"\n]*"/g))
+        expect(english.has(literal.slice(1, -1))).toBe(true);
+    }
+  });
+});
+
+describe("named row controls", () => {
+  test("Worked for disclosure matches either anchored form", () => {
+    for (const name of ["Worked for 1ms", "작업 시간 1ms"])
+      expect(NAMED_ROW_PATTERNS.workedFor.test(name)).toBe(true);
+    for (const name of ["작업시간 1ms", "Worked 1ms", "총 작업 시간 1ms", "worked for 1ms"])
+      expect(NAMED_ROW_PATTERNS.workedFor.test(name)).toBe(false);
+  });
+  test("when-clause controls resolve to the command they name", () => {
+    expect(namedRowSubject("editWhen", "Edit when clause for Chat: send")).toBe("Chat: send");
+    expect(namedRowSubject("editWhen", "대화: 보내기 실행 조건 편집")).toBe("대화: 보내기");
+    expect(NAMED_ROW_PATTERNS.editWhen.test("대화: 보내기 실행 조건 편집")).toBe(true);
+    for (const name of ["실행 조건 편집", "대화: 보내기 실행 조건 편집하기", "Edit when clause"]) {
+      expect(NAMED_ROW_PATTERNS.editWhen.test(name)).toBe(false);
+      expect(namedRowSubject("editWhen", name)).toBe(null);
+    }
+    // The subject must appear in the control's own keybinding row.
+    const subject = namedRowSubject("editWhen", "대화: 보내기 실행 조건 편집");
+    expect("대화: 새 대화 ⌘N".includes(subject!)).toBe(false);
+  });
+  test("source details controls resolve to the source they name", () => {
+    expect(namedRowSubject("sourceDetails", "Toggle GitHub details")).toBe("GitHub");
+    expect(namedRowSubject("sourceDetails", "GitHub 세부 정보 열기/닫기")).toBe("GitHub");
+    for (const name of ["세부 정보 열기/닫기", "GitHub 세부 정보 열기", "Toggle details"]) {
+      expect(NAMED_ROW_PATTERNS.sourceDetails.test(name)).toBe(false);
+      expect(namedRowSubject("sourceDetails", name)).toBe(null);
+    }
   });
 });
 
