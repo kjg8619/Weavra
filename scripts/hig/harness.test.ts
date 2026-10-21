@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
+import { WebView } from "bun";
 import { EventEmitter } from "node:events";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
@@ -21,6 +22,7 @@ import {
   savedActionIsVisible,
   openProviderDiagnostic,
   setNativeTheme,
+  readRenderedBackground,
   COMMAND_DIALOG_POPUP,
   switchCheckedState,
   SIDEBAR_VARIANT_MARKERS,
@@ -420,6 +422,33 @@ describe("saved action visibility", () => {
       ),
     ).toBe(false);
   });
+});
+
+describe("rendered palette preservation", () => {
+  async function comparePalette(after: string) {
+    await using view = new WebView({ backend: "chrome" });
+    await view.navigate("about:blank");
+    const readColor = (value: string) =>
+      view.evaluate(`(() => {
+        document.documentElement.style.setProperty("--background", ${JSON.stringify(value)});
+        return (${readRenderedBackground.toString()})();
+      })()`);
+    const beforeColor = await readColor("oklch(14.5% 0 none)");
+    const afterColor = await readColor(after);
+    return executeCheck(
+      "19",
+      "custom-theme-preview",
+      async (assert: (label: string, actual: unknown, expected: unknown) => void) =>
+        assert("opening custom editor preserves palette", afterColor, beforeColor),
+      async () => [{ file: "palette.json", sha256: "a".repeat(64) }],
+    );
+  }
+  test("passes equivalent CSS colors rendered by headless Chromium", async () => {
+    expect((await comparePalette("oklch(0.144788 0 0)")).status).toBe("PASS");
+  }, 15_000);
+  test("fails when the rendered background really changes", async () => {
+    expect((await comparePalette("oklch(0.3 0 0)")).status).toBe("FAIL");
+  }, 15_000);
 });
 
 describe("native System color scheme", () => {
