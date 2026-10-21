@@ -176,7 +176,16 @@ function ThemeLibraryCard({
                     }
                   }}
                   onKeyDown={(event) => {
-                    if (event.key === "Escape") setRadialModeOpen(null);
+                    if (event.key !== "Escape" || radialModeOpen === null) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.currentTarget
+                      .querySelector<HTMLButtonElement>(
+                        `[data-theme-variant-trigger="${radialModeOpen}"]`,
+                      )
+                      ?.focus();
+                    // The opener's synchronous focus handler must not reopen it.
+                    setRadialModeOpen(null);
                   }}
                   onMouseLeave={() => setRadialModeOpen(null)}
                 >
@@ -201,6 +210,8 @@ function ThemeLibraryCard({
                               isActive && "bg-accent/30",
                             )}
                             data-icon-control
+                            data-theme-variant-trigger={mode}
+                            aria-expanded={options.length > 1 ? isOpen : undefined}
                             style={{
                               transform: `translateX(calc(-50% + ${rootOffsetX}px))`,
                             }}
@@ -261,6 +272,8 @@ function ThemeLibraryCard({
                                       optionIsActive && "bg-accent/30",
                                     )}
                                     data-icon-control
+                                    disabled={!isOpen}
+                                    aria-hidden={!isOpen}
                                     tabIndex={isOpen ? 0 : -1}
                                     style={{
                                       opacity: isOpen ? 1 : 0,
@@ -313,7 +326,7 @@ function ThemeLibraryCard({
                   <button
                     aria-label={`Use ${variantNavigation ? `${variantNavigation.collectionLabel}, ${theme.label} variant` : `${theme.label} theme`}${isActive ? ", currently active" : ""}`}
                     aria-pressed={isActive}
-                    className="min-h-9 min-w-0 cursor-pointer rounded-sm px-2.5 text-left text-sm font-medium break-words text-foreground outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                    className="min-h-9 min-w-0 cursor-pointer rounded-sm px-2.5 text-left text-sm font-medium break-words text-foreground outline-none [word-break:keep-all] [text-wrap:pretty] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground"
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation();
