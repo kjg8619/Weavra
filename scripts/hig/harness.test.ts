@@ -24,6 +24,8 @@ import {
   setNativeTheme,
   readRenderedBackground,
   threadDeleteConfirmation,
+  readCodeTranscript,
+  assertCodeTranscriptParity,
   COMMAND_DIALOG_POPUP,
   switchCheckedState,
   SIDEBAR_VARIANT_MARKERS,
@@ -498,6 +500,87 @@ describe("thread delete confirmation readiness", () => {
   test("rejects unrelated Confirm text as state 44 evidence", () => {
     expect(() => validateVisibleState("44", { text: "03 Code blocks Confirm" })).toThrow();
   });
+});
+
+describe("code transcript theme parity", () => {
+  async function cycle(mutation = "") {
+    await using view = new WebView({ backend: "chrome" });
+    await view.navigate("about:blank");
+    await view.evaluate(`(() => {
+      location.hash = "/thread/baseline-code";
+      document.body.innerHTML = \`
+        <div id="transcript" style="height:180px;overflow-y:auto">
+          <div data-timeline-row-id="code-message">
+            <h2>Example</h2>
+            <pre id="greeting" style="height:200px">export function greeting() {}
+console.log(greeting());</pre>
+            <pre id="shell">printf 'local fixture only'</pre>
+            <table><tbody><tr><td>Profile</td><td>Isolated</td></tr>
+              <tr><td>Paid requests</td><td>Zero</td></tr></tbody></table>
+            <div style="height:400px"></div>
+          </div>
+        </div>\`;
+      const port = document.querySelector("#transcript");
+      port.scrollTop = port.scrollHeight;
+    })()`);
+    const before = await view.evaluate(`(${readCodeTranscript.toString()})()`);
+    await view.evaluate(`(${readCodeTranscript.toString()})(true)`);
+    const baseline = await view.evaluate(`(${readCodeTranscript.toString()})()`);
+    const rows: ReturnType<typeof readCodeTranscript>[] = [];
+    for (const mode of ["light", "dark", "light"]) {
+      rows.push(
+        await view.evaluate(`(() => {
+          document.documentElement.classList.toggle("dark", ${mode === "dark"});
+          ${mode === "dark" ? mutation : ""}
+          return (${readCodeTranscript.toString()})();
+        })()`),
+      );
+    }
+    const result = await executeCheck(
+      "21",
+      "theme-content-parity",
+      async (assert: (label: string, actual: unknown, expected: unknown) => void) => {
+        for (const row of rows) assertCodeTranscriptParity(assert, row, baseline);
+      },
+      async () => [{ file: "transcript.json", sha256: "a".repeat(64) }],
+    );
+    return { before, baseline, result };
+  }
+  test("anchors an end-scrolled parent and samples light dark light without visible-text timeout", async () => {
+    const { before, baseline, result } = await cycle();
+    expect(before.content.find((node: { tag: string }) => node.tag === "PRE").intersects).toBe(false);
+    expect(baseline.content.find((node: { tag: string }) => node.tag === "PRE").intersects).toBe(true);
+    // The table remains mounted below the viewport; it is content, not a readiness target.
+    expect(baseline.content.find((node: { tag: string }) => node.tag === "TABLE").intersects).toBe(false);
+    expect(result.status).toBe("PASS");
+  }, 15_000);
+  test("fails when shell content truly disappears", async () => {
+    const { result } = await cycle('document.querySelector("#shell").remove();');
+    expect(result.status).toBe("FAIL");
+    expect(result.error).toContain("seeded code transcript contains local fixture only");
+  }, 15_000);
+  test("fails when all content remains but its order changes", async () => {
+    const { result } = await cycle(
+      'document.querySelector("#greeting").before(document.querySelector("#shell"));',
+    );
+    expect(result.status).toBe("FAIL");
+    expect(result.error).toContain("theme preserves heading code and table order");
+  }, 15_000);
+  test("fails when the transcript is blank despite retained DOM text", async () => {
+    const { result } = await cycle('document.querySelector("#transcript").style.opacity = "0";');
+    expect(result.status).toBe("FAIL");
+    expect(result.error).toContain("all content has painted nonzero rectangles");
+  }, 15_000);
+  test("fails when a content rectangle goes to zero", async () => {
+    const { result } = await cycle('document.querySelector("#shell").style.display = "none";');
+    expect(result.status).toBe("FAIL");
+    expect(result.error).toContain("all content has painted nonzero rectangles");
+  }, 15_000);
+  test("fails when the still-visible code anchor drifts", async () => {
+    const { result } = await cycle('document.querySelector("#transcript").scrollTop += 30;');
+    expect(result.status).toBe("FAIL");
+    expect(result.error).toContain("theme retains same code scroll anchor");
+  }, 15_000);
 });
 
 describe("rendered palette preservation", () => {

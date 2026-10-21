@@ -34,7 +34,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
 }: PanelLayoutControlsProps) {
   return (
     <div
-      className="flex h-full shrink-0 items-center gap-1 [-webkit-app-region:no-drag]"
+      className="flex h-full shrink-0 items-center gap-2 [-webkit-app-region:no-drag]"
       data-panel-layout-controls
     >
       {showTerminalControl ? (
@@ -62,6 +62,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
       <Tooltip>
         <TooltipTrigger render={<span className="flex shrink-0" />}>
           <Toggle
+            data-icon-control
             className="shrink-0 [-webkit-app-region:no-drag]"
             pressed={rightPanelOpen}
             onPressedChange={onToggleRightPanel}
