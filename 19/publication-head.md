@@ -24,13 +24,21 @@ the group through that focus event. Closed options are disabled and hidden
 from accessibility traversal, so Enter cannot activate the formerly focused
 hidden option.
 
+QA fix2 grows the variant preview group from 80px to 96px at normal text
+scale (`h-20` to `h-24`). The 68px preview targets and 14px labels are
+unchanged; the labels now sit below the circles and selected check badges.
+The regression measurement includes non-interactive text: every text-node
+rectangle in the variant name and `+1`, the whole label box, the preview
+target box and the actual check badge. It exercises both selected halves
+in all 12 viewport/text-scale/theme combinations.
+
 Closes: W-26 only.
 
 Base: `hig/18-provider-layout` at
 `fb97140d6781ff14b680cd56eec95e31fb23841b`.
-Head: `14914ad09237ab6d89e6c21b11b0e2e008fa42d5`.
+Head: `b4de3b5dbdf441925ac2c5d64b9276737af2f1b3`.
 Head app.asar SHA-256:
-`a6600f48f09202257bdb8ff1f9aecff1dd9aa09b9e40d20a29b27330ba7dc9a1`.
+`05a2a75650d7022953156ac03b69c139febbb7662a1bbe9ca370c506085e518f`.
 Parent app.asar SHA-256:
 `6a80bc979588694edbccbd75d4017d887c589f900b4b2fe488683f059f726b80`.
 
@@ -39,4 +47,6 @@ foundations [#74](https://github.com/kjg8619/Weavra/pull/74) and
 Appearance's shared settings predecessor [#89](https://github.com/kjg8619/Weavra/pull/89).
 Shared runner
 [`fa5e1dbc`](https://github.com/kjg8619/Weavra/commit/fa5e1dbcfb12fd51c5ac0d9dd0ca7a6e89f91c4a)
-is integrated by a normal merge. The shared hig-01 worktree was not edited.
+is integrated by a normal merge. This run uses those exact scripts from
+the todo 19 worktree to avoid the moving shared hig-01 head. The shared
+hig-01 worktree was not edited.
