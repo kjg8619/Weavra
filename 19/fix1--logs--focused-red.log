@@ -1,0 +1,38 @@
+[1m[2mnote:[0m[0m You are running [94m`vp test`[39m as a Vite+ built-in command. If you meant to run the test npm script, use [94m`vpr test`[39m instead.
+
+ RUN  v4.1.11 /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-19/app/t3code/apps/web
+
+stderr | src/components/settings/ThemeSelection.test.tsx > Appearance selection > returns focus to the light opener without reopening its dismissed choices
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | src/components/settings/ThemeSelection.test.tsx > Appearance selection > returns focus to the dark opener without reopening its dismissed choices
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+ ❯ |unit| src/components/settings/ThemeSelection.test.tsx (6 tests | 2 failed) 68ms
+     × returns focus to the light opener without reopening its dismissed choices 9ms
+     × returns focus to the dark opener without reopening its dismissed choices 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| src/components/settings/ThemeSelection.test.tsx > Appearance selection > returns focus to the light opener without reopening its dismissed choices
+ FAIL  |unit| src/components/settings/ThemeSelection.test.tsx > Appearance selection > returns focus to the dark opener without reopening its dismissed choices
+AssertionError: expected "vi.fn()" to be called once with arguments: [ Array(1) ]
+
+Number of calls: 0
+
+ ❯ src/components/settings/ThemeSelection.test.tsx:228:29
+    226|       );
+    227|
+    228|       expect(querySelector).toHaveBeenCalledExactlyOnceWith(
+       |                             ^
+    229|         `[data-theme-variant-trigger="${mode}"]`,
+    230|       );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  12:02:42
+   Duration  975ms (transform 336ms, setup 45ms, import 792ms, tests 68ms, environment 0ms)
+
