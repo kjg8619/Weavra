@@ -1,13 +1,21 @@
+HEAD=fb97140d6781ff14b680cd56eec95e31fb23841b BASE=c4e04c655ec393a0641dbafbfa204d9580b992bb RUNNER=6aa04ecc910bc36c105b10930c1a0d04ffe8897e
+STEP runner-tests EXIT=0
+STEP runner-syntax EXIT=0
+STEP diff-check EXIT=0
+STEP fmt EXIT=0
+STEP lint EXIT=0
+STEP typecheck EXIT=0
+STEP focused EXIT=0
+STEP build-after EXIT=0
 STEP measure-after EXIT=0
 STEP measure-summary EXIT=0
 STEP supplemental-diff EXIT=0
 STEP capture-before EXIT=0
 STEP capture-after EXIT=0
 STEP diff EXIT=0
-STEP accept-scenarios-01 EXIT=1
-STEP verify-packet-01 EXIT=1
-STEP diff-check-01 EXIT=0
-STEP accept-scenarios-02 EXIT=1
-STEP verify-packet-02 EXIT=1
-STEP diff-check-02 EXIT=0
-BLOCKED_SHARED_RUNNER_SELECTOR
+STEP accept-scenarios-01 EXIT=0
+STEP verify-packet-01 EXIT=0
+STEP accept-scenarios-02 EXIT=0
+STEP verify-packet-02 EXIT=0
+STEP final-diff-check EXIT=0
+PIPELINE_FINAL_DONE

@@ -1,8 +1,8 @@
 # Todo 18 final capture inspection
 
-Source: 16955bb57c8c4611823d39e0fa3bf6960beb429e.
+Source: fb97140d6781ff14b680cd56eec95e31fb23841b.
 Parent: c4e04c655ec393a0641dbafbfa204d9580b992bb.
-App: 84de85e7bd26789da889425241e1b278183ea9b342313c09a7fdbf0a5b781f1c.
+App: 9e66e7ef7014b1412ff30a6da7505884fc9e1aa49cbfff6d21392bb5e14fd69b.
 
 Both actual packaged capture runs exit 0 with 152 records each. The shared diff
 has 158 matching PNG pairs and zero failures. The supplemental model-form diff
@@ -27,7 +27,9 @@ fabricated baseline references. The baseline has inline diagnostics rather than
 the new labelled diagnostic disclosure. Original installed-audit pixels are not
 claimed to be source-built c4e04c65 evidence.
 
-Strict acceptance remains blocked: the raw-diagnostic helper opens the global
-All environments breadcrumb and retargets its expanded-state locator. The final
-raw-diagnostic failure screenshot, actual Electron AX tree and action log are
-published alongside both actual receipts. No PR or product PASS is claimed.
+Strict acceptance now passes twice with runner 6aa04ecc. The author opened the
+fresh provider-raw-diagnostic PNG: the intended diagnostic button is focused and
+expanded, the complete synthetic diagnostic is visible, and the unrelated
+breadcrumb menu stays closed. Actual Electron AX trees, action logs and both
+6/6 PASS receipts are published. The earlier selector failure remains historical
+evidence, not a current blocker.

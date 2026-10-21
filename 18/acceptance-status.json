@@ -1,0 +1,198 @@
+{
+  "status": "PASS",
+  "source": "fb97140d6781ff14b680cd56eec95e31fb23841b",
+  "parent": "c4e04c655ec393a0641dbafbfa204d9580b992bb",
+  "asarSha256": "9e66e7ef7014b1412ff30a6da7505884fc9e1aa49cbfff6d21392bb5e14fd69b",
+  "runner": "6aa04ecc910bc36c105b10930c1a0d04ffe8897e",
+  "sourceChecks": {
+    "fmtExit": 0,
+    "lintExit": 0,
+    "typecheckExit": 0,
+    "testExit": 0,
+    "tests": 27,
+    "runnerTestsExit": 0
+  },
+  "captures": {
+    "before": 152,
+    "after": 152,
+    "pairs": 158,
+    "formPairs": 42,
+    "diffFailures": 0,
+    "dimensionFailures": 0,
+    "alphaFailures": 0
+  },
+  "measure": {
+    "revision": "fb97140d6781ff14b680cd56eec95e31fb23841b",
+    "asarSha256": "9e66e7ef7014b1412ff30a6da7505884fc9e1aa49cbfff6d21392bb5e14fd69b",
+    "scriptSha256": "ca5f4ba3043b5cec535ff0ddff2033c089701263e5eaaa718b9f89fcc956547d",
+    "nativeSample": {
+      "minimum": [
+        840,
+        620
+      ],
+      "bounds": {
+        "x": 206,
+        "y": 37,
+        "width": 840,
+        "height": 620
+      },
+      "content": {
+        "x": 206,
+        "y": 37,
+        "width": 840,
+        "height": 620
+      }
+    },
+    "rows": 2749,
+    "frames": 120,
+    "failures": [],
+    "cleanup": "app.close completed",
+    "counters": {
+      "model": 0,
+      "execution": 0,
+      "externalNetwork": 0
+    },
+    "minTextContrast": 4.783187205191262,
+    "minIconContrast": 4.391840562014776,
+    "minExplanatorySize": 14,
+    "minIconWidth": 36,
+    "minIconHeight": 36,
+    "minTextButtonHeight": 32,
+    "minFocusWidth": 2,
+    "minFocusContrast": 14.318906775932096,
+    "checks": {
+      "i/status-summary": {
+        "total": 12,
+        "failed": 0
+      },
+      "a/target": {
+        "total": 216,
+        "failed": 0
+      },
+      "a/hits": {
+        "total": 192,
+        "failed": 0
+      },
+      "h/icons": {
+        "total": 216,
+        "failed": 0
+      },
+      "h/focus": {
+        "total": 36,
+        "failed": 0
+      },
+      "c/contrast": {
+        "total": 372,
+        "failed": 0
+      },
+      "d/orphan": {
+        "total": 432,
+        "failed": 0
+      },
+      "i/clipping": {
+        "total": 372,
+        "failed": 0
+      },
+      "e-g/diagnostic": {
+        "total": 12,
+        "failed": 0
+      },
+      "b/size": {
+        "total": 156,
+        "failed": 0
+      },
+      "f/one-owner": {
+        "total": 12,
+        "failed": 0
+      },
+      "f/form-contained": {
+        "total": 12,
+        "failed": 0
+      },
+      "f/no-page-overflow": {
+        "total": 12,
+        "failed": 0
+      },
+      "j/control-overlap": {
+        "total": 240,
+        "failed": 0
+      },
+      "e-g/edit-cancel": {
+        "total": 12,
+        "failed": 0
+      },
+      "e-g/add-cancel": {
+        "total": 12,
+        "failed": 0
+      },
+      "no-paid-or-execution": {
+        "total": 1,
+        "failed": 0
+      }
+    }
+  },
+  "rounds": [
+    {
+      "number": "01",
+      "acceptExit": 0,
+      "verifyExit": 0,
+      "checks": [
+        {
+          "id": "18/status-summary-complete",
+          "status": "PASS"
+        },
+        {
+          "id": "18/raw-diagnostic",
+          "status": "PASS"
+        },
+        {
+          "id": "18/six-adapters",
+          "status": "PASS"
+        },
+        {
+          "id": "18/one-scroll-owner",
+          "status": "PASS"
+        },
+        {
+          "id": "18/form-actions-reachable",
+          "status": "PASS"
+        },
+        {
+          "id": "18/draft-preserved",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "number": "02",
+      "acceptExit": 0,
+      "verifyExit": 0,
+      "checks": [
+        {
+          "id": "18/status-summary-complete",
+          "status": "PASS"
+        },
+        {
+          "id": "18/raw-diagnostic",
+          "status": "PASS"
+        },
+        {
+          "id": "18/six-adapters",
+          "status": "PASS"
+        },
+        {
+          "id": "18/one-scroll-owner",
+          "status": "PASS"
+        },
+        {
+          "id": "18/form-actions-reachable",
+          "status": "PASS"
+        },
+        {
+          "id": "18/draft-preserved",
+          "status": "PASS"
+        }
+      ]
+    }
+  ]
+}

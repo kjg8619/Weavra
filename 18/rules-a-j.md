@@ -30,8 +30,9 @@ apps completed app.close. The launcher checks ps twice before launch and again
 after launch, waits at most 600 seconds, and never closes a competing app.
 
 These are the direct self-audit results, not a substitute for shared acceptance.
-The two strict shared acceptance rounds and all failures are separately recorded
-in blocked-status.json. The earlier 0.0625px native-resize boundary finding is
+Both fresh strict shared acceptance rounds now pass 6/6, with acceptance and
+packet verification exit 0 twice; see acceptance-status.json and the official
+acceptance-verdict.json. The earlier 0.0625px native-resize boundary finding is
 preserved under previous-04ea3369-form-focus; this head adds token-based scroll
 margin to both the form reveal target and the actual focused input.
 

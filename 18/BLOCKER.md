@@ -1,4 +1,18 @@
-# Todo 18: shared runner prevents acceptance
+# Resolved: todo 18 shared diagnostic runner
+
+Runner `6aa04ecc910bc36c105b10930c1a0d04ffe8897e` fixes the selector and verifies
+the full raw panel text strictly. It was normally merged into head
+`fb97140d6781ff14b680cd56eec95e31fb23841b` without product-source changes.
+The rebuilt head has fresh `pr-18` captures and two independent 6/6 PASS rounds;
+acceptance and packet verification both exit 0 twice. Current authority is
+acceptance-status.json and the official acceptance-verdict.json.
+
+The previous blocked packet is retained in Git history at evidence commit
+`e52aca106e341770ebe65f0d5ab2b8f5dd7123c2` and locally under
+history-16955bb5-runner94. The remainder below describes that historical failure,
+not the current result.
+
+## Historical blocker before the owner fix
 
 No pull request is opened while required acceptance fails. This is not a product
 PASS and W-20/W-25 closure is not claimed.
