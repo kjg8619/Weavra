@@ -5,7 +5,13 @@ import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 import * as NodeURL from "node:url";
 import * as NodeChildProcess from "node:child_process";
-import { expectedCaptureFiles, DESKTOP_STATES, STRESS_STATES, CASES } from "./cases.mjs";
+import {
+  expectedCaptureFiles,
+  DESKTOP_STATES,
+  STRESS_STATES,
+  CASES,
+  DELETE_THREAD_CONFIRMATIONS,
+} from "./cases.mjs";
 import { bounded } from "../problem-cycle-browser.mjs";
 
 export { bounded };
@@ -307,7 +313,14 @@ export function validateVisibleState(id, observation, contract = {}) {
   const { target = "body", boundary = null, theme = null } = contract;
   const state = [...DESKTOP_STATES, ...STRESS_STATES].find((s) => s.id === id);
   NodeAssert.ok(state, `Unknown state: ${id}`);
-  if (id !== "45" && (!boundary || boundary !== "end"))
+  if (id === "44")
+    NodeAssert.ok(
+      DELETE_THREAD_CONFIRMATIONS.some(
+        ({ title, action }) => observation.text.includes(title) && observation.text.includes(action),
+      ),
+      "Wrong thread delete confirmation",
+    );
+  else if (id !== "45" && (!boundary || boundary !== "end"))
     NodeAssert.ok(
       observation.text.includes(state.expected),
       `Visible state mismatch ${id}: ${state.expected}`,
