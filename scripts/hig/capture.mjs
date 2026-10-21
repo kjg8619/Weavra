@@ -14,6 +14,8 @@ import {
   SIZES,
   chooseAlias,
   threadDeleteConfirmation,
+  copyNames,
+  ariaLabelSelector,
 } from "./cases.mjs";
 import {
   seed,
@@ -30,6 +32,7 @@ import {
   validateVisibleState,
   validateDistinctStates,
   selectedCases,
+  VISIBLE_STATE_SELECTORS,
 } from "./assert.mjs";
 
 const exec = NodeUtil.promisify(NodeChildProcess.execFile);
@@ -147,16 +150,21 @@ async function named(page, role, key, scope = page) {
   const counts = await Promise.all(locators.map((l) => l.count()));
   return locators[chooseAlias(counts)];
 }
-async function text(page, value) {
-  const target = page.getByText(value, { exact: true }).filter({ visible: true });
-  await target.waitFor({ state: "visible" });
-  NodeAssert.equal(await target.count(), 1, `Ambiguous text target: ${value}`);
-  return target;
+async function text(page, key) {
+  const aliases = LABELS[key] ?? [key];
+  const locators = aliases.map((value) =>
+    page.getByText(value, { exact: true }).filter({ visible: true }),
+  );
+  await locators.reduce((all, locator) => all.or(locator)).waitFor({ state: "visible" });
+  const counts = await Promise.all(locators.map((l) => l.count()));
+  return locators[chooseAlias(counts)];
 }
 
 // Observe DOM changes and actual animation frames, not guessed delays.
+// `expected` is one text or a list of exact baseline/current aliases.
 async function ready(page, expected, target = "body") {
-  const waitForFrame = async ({ expected, target }, observe) => {
+  const accepted = [expected].flat();
+  const waitForFrame = async ({ accepted, target, selectors }, observe) => {
     await document.fonts.ready;
     const finiteAnimations = document
       .getAnimations()
@@ -171,6 +179,11 @@ async function ready(page, expected, target = "body") {
         observer.disconnect();
         reject(new Error(`Readiness timeout: ${target}`));
       }, 15000);
+      const shows = (content, expected) =>
+        content.includes(expected) &&
+        (target !== "body" ||
+          !expected ||
+          observe({ target, boundary: null, selectors }).text.includes(expected));
       const sample = () => {
         const node = document.querySelector(target);
         const rect = node?.getBoundingClientRect();
@@ -191,10 +204,7 @@ async function ready(page, expected, target = "body") {
           node &&
           rect.width > 0 &&
           rect.height > 0 &&
-          content.includes(expected) &&
-          (target !== "body" ||
-            !expected ||
-            observe({ target, boundary: null }).text.includes(expected)) &&
+          accepted.some((expected) => shows(content, expected)) &&
           !document
             .getAnimations()
             .some(
@@ -224,9 +234,13 @@ async function ready(page, expected, target = "body") {
   };
   await bounded(
     page.evaluate(
-      `(${waitForFrame})(${JSON.stringify({ expected, target })}, ${observeVisibleState})`,
+      `(${waitForFrame})(${JSON.stringify({
+        accepted,
+        target,
+        selectors: VISIBLE_STATE_SELECTORS,
+      })}, ${observeVisibleState})`,
     ),
-    `State readiness ${expected}`,
+    `State readiness ${accepted.join(" | ")}`,
     20000,
   );
   return { stableFrames: 2, fonts: true, virtualMeasurement: true };
@@ -344,7 +358,7 @@ async function runSize(width, height, includeStress = false) {
           .getByRole("heading", { name: "Baseline review", exact: true })
           .scrollIntoViewIfNeeded();
       }
-      let expected = id === "45" ? "" : state.expected;
+      let expected = id === "45" ? "" : state.accepted;
       if (id === "44") {
         const confirmation = await threadDeleteConfirmation(page);
         target = '[role="alertdialog"]';
@@ -375,7 +389,11 @@ async function runSize(width, height, includeStress = false) {
       };
       const visibleState = validateVisibleState(
         id,
-        await page.evaluate(observeVisibleState, { target, boundary }),
+        await page.evaluate(observeVisibleState, {
+          target,
+          boundary,
+          selectors: VISIBLE_STATE_SELECTORS,
+        }),
         stateContract,
       );
       let paint = null;
@@ -576,7 +594,7 @@ async function runSize(width, height, includeStress = false) {
       const returnRoute = await page.evaluate(() => location.hash);
       await click("button", "settings");
       await click("button", "appearance");
-      await (await text(page, mode === "dark" ? "Dark" : "Light")).click();
+      await (await text(page, mode)).click();
       await bounded(
         page.evaluate(
           (mode) =>
@@ -671,7 +689,9 @@ async function runSize(width, height, includeStress = false) {
     await add.click();
     await page.locator('button[aria-label="프로젝트 변경"]').waitFor();
     await page.keyboard.press("Escape");
-    const notice = page.locator('button[aria-label="Dismiss notification"]');
+    const notice = page.locator(
+      ariaLabelSelector(copyNames("Dismiss notification"), { prefix: "button" }),
+    );
     if (await notice.isVisible()) await notice.click();
     await snap("07");
     await page.locator('button[aria-label="프로젝트 변경"]').click();
@@ -680,7 +700,7 @@ async function runSize(width, height, includeStress = false) {
     await click("button", "panel");
     await snap("09");
     await (await text(page, "파일")).click();
-    await page.locator('button[aria-label="Refresh workspace files"]').waitFor();
+    await named(page, "button", "refreshFiles");
     await snap("10");
     await page.locator('button[aria-label="작업 추가"]').click();
     await snap("11");
@@ -694,11 +714,11 @@ async function runSize(width, height, includeStress = false) {
     await click("button", "settings");
     await snap("17");
     await click("button", "appearance");
-    await (await text(page, "Light")).click();
+    await (await text(page, "light")).click();
     await snap("18");
-    await (await text(page, "Dark")).click();
+    await (await text(page, "dark")).click();
     await snap("19");
-    await (await text(page, "Light")).click();
+    await (await text(page, "light")).click();
     for (const [id, key] of [
       ["20", "keybindings"],
       ["21", "snapshots"],

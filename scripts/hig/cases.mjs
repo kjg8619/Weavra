@@ -60,10 +60,160 @@ const rows = [
   ["47", "project_settings_evidence", "증거 요약"],
   ["48", "project_settings_model_fitness", "순위가 아닌 계약 준수 증거"],
 ];
-export const DESKTOP_STATES = rows.map(([id, name, expected]) => ({ id, name, expected }));
+// English baseline -> exact Korean current copy shipped by todo 22 (W-03). One row per row of
+// pr-22/runner-alias-request.md sections A-D. Each alias matches exactly; there is no other
+// fallback. The English stays so builds before todo 22 still resolve.
+export const COPY_ALIASES = [
+  // A. Readiness expectations (state rows above)
+  ["Add Action", "작업 추가"],
+  ["Set up devices", "기기 설정하기"],
+  ["No preview yet", "아직 미리보기가 없어요"],
+  ["Restore device defaults", "기기 기본값 복원"],
+  ["Color scheme", "색상 모드"],
+  ["Keybindings", "키보드 단축키"],
+  ["SnapShots", "스냅샷"],
+  ["Providers", "공급자"],
+  ["Integrations", "연동"],
+  ["Source Control", "소스 제어"],
+  ["Storage", "저장 공간"],
+  ["Connections", "연결"],
+  ["Archive", "보관함"],
+  ["Cancel", "취소"],
+  ["Diagnostics", "진단"],
+  ["Third-party notices", "제3자 라이선스 고지"],
+  // B. Capture selectors
+  ["Light", "라이트"],
+  ["Dark", "다크"],
+  ["Dismiss notification", "알림 닫기"],
+  ["Refresh workspace files", "작업 공간 파일 새로 고침"],
+  // C. Case 22 named controls
+  ["Legacy features", "레거시 기능"],
+  ["Sidebar (legacy)", "레거시 사이드바"],
+  ["Add provider", "공급자 추가"],
+  // D. Other scenario controls
+  ["Thread notifications", "대화 알림"],
+  ["Notifications only", "알림만"],
+  ["In-app notifications", "앱 내 알림"],
+  ["Create theme", "테마 만들기"],
+  ["Inspect app colors", "앱 색상 검사"],
+  ["Cancel inspecting app colors", "앱 색상 검사 취소"],
+  ["Close the theme editor", "테마 편집기 닫기"],
+  ["Open links in", "링크 열기 위치"],
+  ["Add environment", "환경 추가"],
+  ["Use light mode", "라이트 모드 사용"],
+  ["Use dark mode", "다크 모드 사용"],
+  ["Follow the system appearance", "시스템 모양 따르기"],
+  ["Appearance mode", "색상 모드 선택"],
+  ["When expression", "실행 조건식"],
+  ["Unarchive", "보관 해제"],
+  ["baseline-project files", "baseline-project 파일"],
+  ["Run HIG saved action", "HIG saved action 실행"],
+];
+const COPY = new Map(COPY_ALIASES);
+
+// [English, Korean], or [Korean] where only the translated copy may satisfy the check.
+export function copyNames(english, { current = false } = {}) {
+  const korean = COPY.get(english);
+  if (korean === undefined) throw new Error(`No copy alias row: ${english}`);
+  return current ? [korean] : [english, korean];
+}
+
+// Case 22 closes W-03, so its checks accept only the Korean copy. Other cases also run
+// against builds from before todo 22 and accept either alias.
+export function copyNamesForCheck(check, english) {
+  return copyNames(english, { current: check.startsWith("22/") });
+}
+
+// A CSS selector list with one exact [aria-label] per alias.
+export function ariaLabelSelector(names, { prefix = "", suffix = "" } = {}) {
+  return names
+    .map((name) => `${prefix}[aria-label=${JSON.stringify(name)}]${suffix}`)
+    .join(", ");
+}
+
+// One exact role/name locator per alias. Playwright strictness still rejects two matches.
+export function exactName(scope, role, names, options = {}) {
+  return names
+    .map((name) => scope.getByRole(role, { ...options, name, exact: true }))
+    .reduce((all, locator) => all.or(locator));
+}
+
+// Lead decision 2026-10-22 on runner-alias-request.md section E. Every [A-Za-z]{3,} segment of an
+// authored label must be one of these exact segments, or part of a listed fixture value.
+// "Kernel" and "Runtime" are allowed only as the proper names of Weavra components.
+export const LOCALE_SEGMENT_CLASSES = {
+  "product/brand": [
+    "Weavra",
+    "Codex",
+    "Claude",
+    "Cursor",
+    "Grok",
+    "OpenCode",
+    "Antigravity",
+    "SnapShots",
+    "GitHub",
+    "GitLab",
+    "Bitbucket",
+  ],
+  "tool/VCS": ["Git", "Mercurial", "Jujutsu", "Tailscale"],
+  "protocol/format/acronym": ["HTTPS", "URL", "API", "SSH", "WSL", "CLI", "JSON", "QR"],
+  "Weavra component": ["Runtime", "Kernel"],
+};
+export const LOCALE_FIXTURE_VALUES = [
+  "baseline-project",
+  "01 Conversation",
+  "02 Long messages",
+  "03 Code blocks",
+  "04 Working fixture",
+  "05 Error fixture",
+  "06 Empty thread",
+];
+const LOCALE_SEGMENT_CLASS = new Map(
+  Object.entries(LOCALE_SEGMENT_CLASSES).flatMap(([kind, segments]) =>
+    segments.map((segment) => [segment, kind]),
+  ),
+);
+const LOCALE_FIXTURE_PATTERN = new RegExp(
+  `(?<![A-Za-z0-9-])(?:${LOCALE_FIXTURE_VALUES.join("|")})(?![A-Za-z0-9-])`,
+  "g",
+);
+
+// Classifies each Latin segment of one label; unclassified segments fail the audit.
+export function classifyLocaleText(value) {
+  const segments = [];
+  const rest = value.replace(LOCALE_FIXTURE_PATTERN, (segment) => {
+    segments.push({ segment, class: "fixture value" });
+    return " ";
+  });
+  for (const [segment] of rest.matchAll(/[A-Za-z]{3,}/g))
+    segments.push({ segment, class: LOCALE_SEGMENT_CLASS.get(segment) ?? null });
+  return { segments, unclassified: segments.filter((row) => row.class === null) };
+}
+
+export function auditLocaleLabels(labels) {
+  const unclassified = [];
+  const exceptions = [];
+  for (const row of labels)
+    for (const value of [row.text, row.name, row.placeholder]) {
+      if (!value) continue;
+      const result = classifyLocaleText(value);
+      if (result.unclassified.length)
+        unclassified.push({ ...row, text: value, segments: result.unclassified });
+      else if (result.segments.length) exceptions.push({ ...row, text: value, ...result });
+    }
+  return { unclassified, exceptions };
+}
+
+const acceptedTexts = (expected) => (COPY.has(expected) ? copyNames(expected) : [expected]);
+export const DESKTOP_STATES = rows.map(([id, name, expected]) => ({
+  id,
+  name,
+  expected,
+  accepted: acceptedTexts(expected),
+}));
 export const STRESS_STATES = [
-  { id: "42", name: "narrow_chat_dark", expected: "greeting" },
-  { id: "43", name: "narrow_chat_light", expected: "greeting" },
+  { id: "42", name: "narrow_chat_dark", expected: "greeting", accepted: ["greeting"] },
+  { id: "43", name: "narrow_chat_light", expected: "greeting", accepted: ["greeting"] },
 ];
 export function expectedFiles() {
   return [
@@ -96,23 +246,24 @@ export const LABELS = {
   skip: ["프로젝트 가져오지 않기"],
   import: ["프로젝트 추가", "새 프로젝트"],
   local: ["로컬 폴더"],
-  cancel: ["Cancel", "취소"],
+  cancel: copyNames("Cancel"),
   settings: ["설정"],
-  threadNotifications: ["Thread notifications"],
-  notificationsOnly: ["Notifications only"],
-  inAppNotifications: ["In-app notifications"],
+  threadNotifications: copyNames("Thread notifications"),
+  notificationsOnly: copyNames("Notifications only"),
+  inAppNotifications: copyNames("In-app notifications"),
   general: ["General", "일반"],
   appearance: ["Appearance", "모양"],
-  light: ["Light", "라이트"],
-  dark: ["Dark", "다크"],
-  keybindings: ["Keybindings", "키보드 단축키"],
-  snapshots: ["SnapShots", "스냅샷"],
-  providers: ["Providers", "공급자"],
-  integrations: ["Integrations", "연동"],
-  source_control: ["Source Control", "소스 제어"],
-  storage: ["Storage", "저장 공간"],
-  connections: ["Connections", "연결"],
-  archive: ["Archive", "보관함"],
+  light: copyNames("Light"),
+  dark: copyNames("Dark"),
+  keybindings: copyNames("Keybindings"),
+  snapshots: copyNames("SnapShots"),
+  providers: copyNames("Providers"),
+  integrations: copyNames("Integrations"),
+  source_control: copyNames("Source Control"),
+  storage: copyNames("Storage"),
+  connections: copyNames("Connections"),
+  archive: copyNames("Archive"),
+  refreshFiles: copyNames("Refresh workspace files"),
   customModel: ["Add custom model", "사용자 지정 모델 추가"],
   diagnostics: ["View diagnostics", "진단 보기"],
   licenses: ["View licenses", "라이선스 보기"],
@@ -669,8 +820,13 @@ export function countInActiveDialog(page, text) {
     .count();
 }
 
-export function savedActionIsVisible(page) {
-  return page.getByRole("button", { name: "Run HIG saved action", exact: true }).isVisible();
+export async function savedActionIsVisible(page) {
+  const visible = await Promise.all(
+    copyNames("Run HIG saved action").map((name) =>
+      page.getByRole("button", { name, exact: true }).isVisible(),
+    ),
+  );
+  return visible.some(Boolean);
 }
 
 export function readRenderedBackground() {
@@ -1086,6 +1242,12 @@ export async function runScenarios(context) {
     });
     await settle();
   }
+  // Exact aliases from COPY_ALIASES; case 22 checks accept only the Korean copy.
+  const names = (english) => copyNamesForCheck(current, english);
+  const byName = (scope, role, english, options) =>
+    exactName(scope, role, names(english), options);
+  const byLabel = (english, prefix, suffix) =>
+    ariaLabelSelector(names(english), { prefix, suffix });
   async function unique(selector) {
     const target = page.locator(selector).filter({ visible: true });
     await target.waitFor({ state: "visible" });
@@ -1579,7 +1741,7 @@ export async function runScenarios(context) {
       await home();
     }
     await openPanel("파일");
-    await page.getByRole("button", { name: "Refresh workspace files", exact: true }).waitFor();
+    await byName(page, "button", "Refresh workspace files").waitFor();
   }
   async function openPanel(name) {
     const toggle = await named(page, "button", "panel");
@@ -1645,16 +1807,14 @@ export async function runScenarios(context) {
     for (const legacy of [false, true]) {
       await settings("general");
       const section = page.locator("#legacy-features");
-      const disclosure = section.getByRole("button", { name: "Legacy features", exact: true });
+      const disclosure = byName(section, "button", "Legacy features");
       if ((await disclosure.getAttribute("aria-expanded")) !== "true") {
         await act("open Legacy features", () => disclosure.click());
-        await section
-          .getByRole("button", { name: "Legacy features", expanded: true, exact: true })
-          .waitFor();
+        await byName(section, "button", "Legacy features", { expanded: true }).waitFor();
       }
       // The panel animates open; clicking mid-expansion lands pointerup elsewhere.
       await settle();
-      const toggle = section.getByRole("switch", { name: "Sidebar (legacy)", exact: true });
+      const toggle = byName(section, "switch", "Sidebar (legacy)");
       await toggle.scrollIntoViewIfNeeded();
       await settle();
       const toggleState = async () =>
@@ -1703,18 +1863,8 @@ export async function runScenarios(context) {
           })),
       selector,
     );
-    const proper =
-      /^(Weavra|Codex|Claude|Cursor|Grok|OpenCode|Antigravity|SnapShots|GitHub|GitLab|Bitbucket|Git|Mercurial|Jujutsu|baseline-project|0[1-6] (Conversation|Long messages|Code blocks|Working fixture|Error fixture|Empty thread))$/;
-    const unclassified = labels.flatMap((row) =>
-      [row.text, row.name, row.placeholder]
-        .filter((value) => value && /[A-Za-z]{3}/.test(value) && !proper.test(value))
-        .map((text) => ({ ...row, text })),
-    );
-    observations.push({
-      label,
-      unclassified,
-      exceptions: labels.filter((row) => proper.test(row.text ?? "")),
-    });
+    const { unclassified, exceptions } = auditLocaleLabels(labels);
+    observations.push({ label, unclassified, exceptions });
     assert(
       `${label}: every authored label is Korean or a classified proper name`,
       unclassified,
@@ -1791,11 +1941,13 @@ export async function runScenarios(context) {
       // The product switch exposes its state as data-checked, not aria-checked.
       if ((await inApp.getAttribute("data-checked")) === null) await inApp.click();
     });
-    await (await named(page, "combobox", "threadNotifications"))
-      .filter({ hasText: "Notifications only" })
+    const threadNotifications = await named(page, "combobox", "threadNotifications");
+    await names("Notifications only")
+      .map((hasText) => threadNotifications.filter({ hasText }))
+      .reduce((all, locator) => all.or(locator))
       .waitFor({ state: "visible" });
     await page
-      .locator('[role="switch"][aria-label="In-app notifications"][data-checked]')
+      .locator(byLabel("In-app notifications", '[role="switch"]', "[data-checked]"))
       .waitFor({ state: "visible" });
     await home();
     await thread("01 Conversation");
@@ -2291,19 +2443,17 @@ export async function runScenarios(context) {
         await owner(assert, `image-modal-${mode}`, '[data-slot="dialog-popup"]');
         await page.keyboard.press("Escape");
         await settings("appearance");
-        await page.getByRole("button", { name: "Create theme", exact: true }).click();
+        await byName(page, "button", "Create theme").click();
         await settle();
         await owner(assert, `theme-editor-${mode}`, '[data-theme-editor-panel][role="dialog"]');
-        await page.getByRole("button", { name: "Inspect app colors", exact: true }).click();
+        await byName(page, "button", "Inspect app colors").click();
         assert(
           "theme inspector is armed",
-          await page
-            .getByRole("button", { name: "Cancel inspecting app colors", exact: true })
-            .isVisible(),
+          await byName(page, "button", "Cancel inspecting app colors").isVisible(),
           true,
         );
         await frame(`theme-inspector-${mode}`);
-        await page.getByRole("button", { name: "Close the theme editor", exact: true }).click();
+        await byName(page, "button", "Close the theme editor").click();
         await home();
         await thread("01 Conversation");
         const paragraph = page.locator("[data-assistant-citation-source] p").first();
@@ -3027,7 +3177,7 @@ export async function runScenarios(context) {
         await filesPanel({ fresh: true });
         await observedText(
           assert,
-          '[aria-label="baseline-project files"]',
+          byLabel("baseline-project files"),
           "files-loading",
           (text) => /불러오는|로딩|Loading/.test(text),
         );
@@ -3042,7 +3192,7 @@ export async function runScenarios(context) {
       }));
       await filesPanel({ fresh: true });
       await settle();
-      await observedText(assert, '[aria-label="baseline-project files"]', "files-empty", (text) =>
+      await observedText(assert, byLabel("baseline-project files"), "files-empty", (text) =>
         /비어|파일이 없|No files/.test(text),
       );
     },
@@ -3060,7 +3210,7 @@ export async function runScenarios(context) {
       await input.fill("absent-query");
       await observedText(
         assert,
-        '[aria-label="baseline-project files"]',
+        byLabel("baseline-project files"),
         "files-no-results",
         (text) => /검색 결과|일치|No results|No matches/.test(text),
       );
@@ -3087,7 +3237,7 @@ export async function runScenarios(context) {
       await filesPanel({ fresh: true });
       await observedText(
         assert,
-        '[aria-label="baseline-project files"]',
+        byLabel("baseline-project files"),
         "files-error",
         (text) =>
           /HIG directory access denied|불러오지 못|읽을 수 없/.test(text) &&
@@ -3110,7 +3260,7 @@ export async function runScenarios(context) {
       await settle();
       const before = calls;
       await act("refresh actual Files request", () =>
-        page.getByRole("button", { name: "Refresh workspace files", exact: true }).click(),
+        byName(page, "button", "Refresh workspace files").click(),
       );
       await page.getByRole("treeitem", { name: "refreshed.txt", exact: true }).waitFor();
       assert("refresh reached data boundary", calls > before, true);
@@ -3600,7 +3750,7 @@ export async function runScenarios(context) {
     },
     "14/selected-destination-visible": async (assert) => {
       await settings("integrations");
-      const trigger = page.getByRole("combobox", { name: "Open links in", exact: true });
+      const trigger = byName(page, "combobox", "Open links in");
       await trigger.scrollIntoViewIfNeeded();
       const geometry = await trigger.evaluate((e) => ({
         text: e.textContent,
@@ -3626,7 +3776,7 @@ export async function runScenarios(context) {
     },
     "14/long-destination": async (assert) => {
       await settings("integrations");
-      const trigger = page.getByRole("combobox", { name: "Open links in", exact: true });
+      const trigger = byName(page, "combobox", "Open links in");
       await trigger.scrollIntoViewIfNeeded();
       await trigger.click();
       await page.locator('[data-slot="select-popup"]').waitFor({ state: "visible" });
@@ -3650,7 +3800,7 @@ export async function runScenarios(context) {
     },
     "14/selection-preserved": async (assert) => {
       await settings("integrations");
-      const trigger = page.getByRole("combobox", { name: "Open links in", exact: true });
+      const trigger = byName(page, "combobox", "Open links in");
       await trigger.scrollIntoViewIfNeeded();
       const before = await trigger.innerText();
       await act("focus another option without activation", async () => {
@@ -3666,7 +3816,7 @@ export async function runScenarios(context) {
     },
     "14/keyboard-disclosure": async (assert) => {
       await settings("integrations");
-      const trigger = page.getByRole("combobox", { name: "Open links in", exact: true });
+      const trigger = byName(page, "combobox", "Open links in");
       await trigger.scrollIntoViewIfNeeded();
       await act("keyboard opens destination", async () => {
         await trigger.focus();
@@ -3675,7 +3825,8 @@ export async function runScenarios(context) {
       assert("keyboard exposes options", (await page.getByRole("option").count()) > 1, true);
       await page.keyboard.press("Escape");
       await page.waitForFunction(
-        () => document.activeElement?.getAttribute("aria-label") === "Open links in",
+        (names) => names.includes(document.activeElement?.getAttribute("aria-label")),
+        names("Open links in"),
       );
       assert(
         "keyboard focus returns",
@@ -3705,7 +3856,7 @@ export async function runScenarios(context) {
     },
     "16/empty-connection-action": async (assert) => {
       await settings("connections");
-      const add = page.getByRole("button", { name: "Add environment", exact: true });
+      const add = byName(page, "button", "Add environment");
       assert("one local connection draft action", await add.count(), 1);
       assert("local draft action available", await add.isEnabled(), true);
       await unchangedRequests(assert, () => add.click());
@@ -3713,7 +3864,7 @@ export async function runScenarios(context) {
     },
     "16/capability-copy-parity": async (assert) => {
       await settings("connections");
-      const add = page.getByRole("button", { name: "Add environment", exact: true });
+      const add = byName(page, "button", "Add environment");
       const disabled = await add.isDisabled();
       const text = await page.locator("main").innerText();
       observations.push({ disabled, text });
@@ -3739,7 +3890,7 @@ export async function runScenarios(context) {
         count,
       });
       if (count === 0) {
-        const add = page.getByRole("button", { name: "Add environment", exact: true });
+        const add = byName(page, "button", "Add environment");
         assert(
           "local draft remains available in local-only environment",
           await add.isEnabled(),
@@ -3764,7 +3915,7 @@ export async function runScenarios(context) {
     },
     "16/direct-remote": async (assert) => {
       await settings("connections");
-      await page.getByRole("button", { name: "Add environment", exact: true }).click();
+      await byName(page, "button", "Add environment").click();
       const dialog = page.getByRole("dialog");
       const text = await dialog.innerText();
       observations.push({ text });
@@ -3885,7 +4036,7 @@ export async function runScenarios(context) {
     },
     "18/six-adapters": async (assert) => {
       await settings("providers");
-      await page.getByRole("button", { name: "Add provider", exact: true }).click();
+      await byName(page, "button", "Add provider").click();
       const text = await page.getByRole("dialog").innerText();
       for (const name of ["Codex", "Claude", "Cursor", "Grok", "OpenCode", "Antigravity"])
         assert(`${name}: available or explicitly unavailable adapter`, text.includes(name), true);
@@ -3894,11 +4045,11 @@ export async function runScenarios(context) {
     },
     "19/selection-wash-check": async (assert) => {
       await settings("appearance");
-      const light = page.getByRole("button", { name: "Use light mode", exact: true });
+      const light = byName(page, "button", "Use light mode");
       await light.click();
       await light.blur();
-      const selected = await sample("appearance selection", () => {
-        const group = document.querySelector('[aria-label="Appearance mode"]');
+      const selected = await sample("appearance selection", (selector) => {
+        const group = document.querySelector(selector);
         const button = group.querySelector('[aria-pressed="true"]');
         const style = getComputedStyle(button);
         return {
@@ -3908,7 +4059,7 @@ export async function runScenarios(context) {
           check: Boolean(button.querySelector("svg.lucide-check,[data-slot=selection-check]")),
           border: style.borderColor,
         };
-      });
+      }, byLabel("Appearance mode"));
       assert("one selected appearance", selected.count, 1);
       assert("selection includes a check", selected.check, true);
       assert(
@@ -3920,8 +4071,8 @@ export async function runScenarios(context) {
     },
     "19/focus-not-selection": async (assert) => {
       await settings("appearance");
-      const light = page.getByRole("button", { name: "Use light mode", exact: true });
-      const dark = page.getByRole("button", { name: "Use dark mode", exact: true });
+      const light = byName(page, "button", "Use light mode");
+      const dark = byName(page, "button", "Use dark mode");
       await light.click();
       await act("focus unselected appearance", async () => {
         await light.focus();
@@ -3946,10 +4097,7 @@ export async function runScenarios(context) {
     },
     "19/system-live-theme": async (assert) => {
       await settings("appearance");
-      const system = page.getByRole("button", {
-        name: "Follow the system appearance",
-        exact: true,
-      });
+      const system = byName(page, "button", "Follow the system appearance");
       await system.click();
       for (const [index, mode] of ["light", "dark", "light"].entries()) {
         await act(`system appearance ${mode}`, async () => {
@@ -3972,11 +4120,13 @@ export async function runScenarios(context) {
       await settings("appearance");
       const before = await sample("palette before editor", readRenderedBackground);
       await act("create custom theme from current palette", () =>
-        page.getByRole("button", { name: "Create theme", exact: true }).click(),
+        byName(page, "button", "Create theme").click(),
       );
-      const editor = page.getByLabel("Create theme", { exact: true });
+      const editor = names("Create theme")
+        .map((name) => page.getByLabel(name, { exact: true }))
+        .reduce((all, locator) => all.or(locator));
       await editor.waitFor();
-      await owner(assert, "theme-editor", '[aria-label="Create theme"]');
+      await owner(assert, "theme-editor", byLabel("Create theme"));
       const previews = await sample("custom editor palette", () =>
         [...document.querySelectorAll("[data-theme-library-card]")].map((e) => ({
           id: e.getAttribute("data-theme-library-card"),
@@ -3989,7 +4139,7 @@ export async function runScenarios(context) {
         await sample("palette after editor", readRenderedBackground),
         before,
       );
-      await page.getByRole("button", { name: "Close the theme editor", exact: true }).click();
+      await byName(page, "button", "Close the theme editor").click();
     },
     "21/native-minimum": nativeBounds,
     "21/theme-content-parity": async (assert) =>
@@ -4172,7 +4322,7 @@ export async function runScenarios(context) {
         });
         await control.scrollIntoViewIfNeeded();
         await control.click();
-        const expression = page.getByRole("textbox", { name: "When expression", exact: true });
+        const expression = byName(page, "textbox", "When expression");
         await expression.waitFor();
         const raw = await expression.inputValue();
         actual.push(
@@ -4274,7 +4424,7 @@ export async function runScenarios(context) {
       await row.waitFor();
       assert("archive contains correct fixture", await row.count(), 1);
       await act("restore exact fixture thread", () =>
-        row.getByRole("button", { name: "Unarchive", exact: true }).click(),
+        byName(row, "button", "Unarchive").click(),
       );
       await row.waitFor({ state: "hidden" });
       await home();
