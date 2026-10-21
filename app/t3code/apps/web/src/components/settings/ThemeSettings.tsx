@@ -154,12 +154,11 @@ function ThemeLibraryCard({
         render={
           <div
             className={cn(
-              "cursor-pointer overflow-hidden rounded-xl border border-border/70 bg-card/60 transition-colors hover:bg-accent/10",
+              "cursor-pointer rounded-xl border border-muted-foreground bg-card/60 hover:bg-accent/10",
               isActive && "bg-accent/30",
             )}
             data-theme-library-card={theme.id}
             onClick={onUse}
-            style={isActive ? { boxShadow: "inset 0 0 0 1px var(--ring)" } : undefined}
           >
             <div className="relative">
               {variantNavigation ? (
@@ -197,7 +196,11 @@ function ThemeLibraryCard({
                                 : `Use ${mode} variant, currently ${selected.option.label}`
                             }
                             aria-pressed={isActive}
-                            className="absolute left-1/2 top-2 z-20 flex size-14 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className={cn(
+                              "absolute left-1/2 top-2 z-20 flex size-[68px] items-center justify-center rounded-full border border-muted-foreground text-foreground outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground",
+                              isActive && "bg-accent/30",
+                            )}
+                            data-icon-control
                             style={{
                               transform: `translateX(calc(-50% + ${rootOffsetX}px))`,
                             }}
@@ -216,27 +219,25 @@ function ThemeLibraryCard({
                             {isActive ? (
                               <span
                                 aria-hidden
-                                className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-ring"
-                              />
-                            ) : null}
-                            {isActive ? (
-                              <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full border border-border/70 bg-background text-foreground shadow-sm">
+                                className="pointer-events-none absolute bottom-0.5 right-0.5 flex h-5 items-center justify-center gap-1 rounded-full bg-background px-1 text-foreground"
+                              >
+                                <CheckIcon className="size-3" data-slot="selection-check" />
                                 {mode === "light" ? (
-                                  <SunIcon className="size-2.5" />
+                                  <SunIcon className="size-3" />
                                 ) : (
-                                  <MoonIcon className="size-2.5" />
+                                  <MoonIcon className="size-3" />
                                 )}
                               </span>
                             ) : null}
                           </button>
                         </ThemeVariantTooltip>
                         <span
-                          className="pointer-events-none absolute bottom-0 left-1/2 inline-flex max-w-24 -translate-x-1/2 items-center gap-1 text-[11px] font-medium text-foreground"
+                          className="pointer-events-none absolute bottom-0 left-1/2 inline-flex max-w-24 -translate-x-1/2 items-center gap-1 text-sm font-medium text-foreground"
                           style={{ marginLeft: rootOffsetX }}
                         >
                           <span className="truncate">{selected.option.label}</span>
                           {options.length > 1 ? (
-                            <span className="shrink-0 rounded-full bg-muted px-1 text-[9px] text-muted-foreground">
+                            <span className="shrink-0 rounded-full bg-muted px-1 text-sm text-foreground">
                               +{options.length - 1}
                             </span>
                           ) : null}
@@ -256,9 +257,11 @@ function ThemeLibraryCard({
                                     aria-label={`Use ${option.label} for ${mode} mode${optionIsActive ? ", currently active" : ""}`}
                                     aria-pressed={optionIsActive}
                                     className={cn(
-                                      "absolute left-1/2 top-1 z-30 flex size-7 items-center justify-center rounded-full bg-background shadow-sm outline-none transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring",
-                                      optionIsActive ? "ring-2 ring-ring" : "ring-1 ring-border/70",
+                                      "absolute left-1/2 top-1 z-30 flex size-9 items-center justify-center rounded-full border border-muted-foreground bg-background text-foreground outline-none transition-[transform,opacity] duration-(--motion-feedback) motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground",
+                                      optionIsActive && "bg-accent/30",
                                     )}
+                                    data-icon-control
+                                    tabIndex={isOpen ? 0 : -1}
                                     style={{
                                       opacity: isOpen ? 1 : 0,
                                       pointerEvents: isOpen ? "auto" : "none",
@@ -279,6 +282,13 @@ function ThemeLibraryCard({
                                         mode={preview.mode}
                                       />
                                     </span>
+                                    {optionIsActive ? (
+                                      <CheckIcon
+                                        aria-hidden
+                                        className="pointer-events-none absolute bottom-0 right-0 size-3 rounded-full bg-background"
+                                        data-slot="selection-check"
+                                      />
+                                    ) : null}
                                   </button>
                                 </ThemeVariantTooltip>
                               );
@@ -303,7 +313,7 @@ function ThemeLibraryCard({
                   <button
                     aria-label={`Use ${variantNavigation ? `${variantNavigation.collectionLabel}, ${theme.label} variant` : `${theme.label} theme`}${isActive ? ", currently active" : ""}`}
                     aria-pressed={isActive}
-                    className="min-w-0 cursor-pointer truncate rounded-sm text-left text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                    className="min-h-9 min-w-0 cursor-pointer rounded-sm px-2.5 text-left text-sm font-medium break-words text-foreground outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground"
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation();
@@ -691,14 +701,14 @@ export function ThemeLibrary({
     assignHalf(mode, cardId);
   };
 
-  // Rings always show the effective owner of each appearance: an unpicked
+  // Checks always show the effective owner of each appearance: an unpicked
   // half belongs to the default card (a null owner), so a fresh install
   // shows Weavra selected instead of nothing.
   const pickedModesFor = (cardId: string | null): ThemeMode[] => {
-    const rings: ThemeMode[] = [];
-    if (lightOwner === cardId) rings.push("light");
-    if (darkOwner === cardId) rings.push("dark");
-    return rings;
+    const modes: ThemeMode[] = [];
+    if (lightOwner === cardId) modes.push("light");
+    if (darkOwner === cardId) modes.push("dark");
+    return modes;
   };
 
   const wireframeColors = (appearance: ThemeAppearance) =>
@@ -727,23 +737,18 @@ export function ThemeLibrary({
             aria-label={mode === "system" ? "Follow the system appearance" : `Use ${mode} mode`}
             aria-pressed={isActive}
             className={cn(
-              "flex cursor-pointer flex-col items-stretch gap-1.5 rounded-xl border p-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-              isActive
-                ? "border-transparent bg-accent/30"
-                : "border-border/70 bg-card/60 hover:bg-accent/10",
+              "min-w-0 flex cursor-pointer flex-col items-stretch gap-1.5 rounded-xl border border-muted-foreground p-2 text-foreground outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground",
+              isActive ? "bg-accent/30" : "bg-card/60 hover:bg-accent/10",
             )}
             key={mode}
-            style={isActive ? { boxShadow: "inset 0 0 0 1px var(--ring)" } : undefined}
             onClick={() => setMode(mode)}
             type="button"
           >
             {renderWireframe(mode)}
-            <span
-              className={cn(
-                "flex items-center justify-center text-xs font-medium",
-                isActive ? "text-foreground" : "text-muted-foreground",
-              )}
-            >
+            <span className="flex min-h-5 flex-wrap items-center justify-center gap-1 text-sm font-medium text-foreground">
+              {isActive ? (
+                <CheckIcon aria-hidden className="size-4 shrink-0" data-slot="selection-check" />
+              ) : null}
               {mode === "system" ? "System" : mode === "light" ? "Light" : "Dark"}
             </span>
           </button>

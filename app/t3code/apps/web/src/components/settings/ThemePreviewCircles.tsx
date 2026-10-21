@@ -1,4 +1,4 @@
-import { MoonIcon, SunIcon } from "lucide-react";
+import { CheckIcon, MoonIcon, SunIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import {
   STANDARD_THEME_PREVIEW_COLORS as SHARED_STANDARD_THEME_PREVIEW_COLORS,
@@ -160,8 +160,8 @@ export function ThemePreviewCircle({
 
 /**
  * A theme card's light and dark balls. Clicking a ball assigns that theme to
- * that half of the appearance mix; assigned balls carry a ring and a sun or
- * moon badge.
+ * that half of the appearance mix; assigned balls carry a wash and a check
+ * beside the sun or moon badge. Only keyboard focus carries an outline.
  */
 export function ThemePreviewCircles({
   label,
@@ -187,9 +187,10 @@ export function ThemePreviewCircles({
                   aria-label={`Use ${label} ${mode} mode`}
                   aria-pressed={isPicked}
                   className={cn(
-                    "relative flex size-[68px] shrink-0 transform-gpu cursor-pointer items-center justify-center rounded-full p-1 outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
-                    isPicked && "hover:scale-100",
+                    "relative flex size-[68px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-muted-foreground p-1 text-foreground outline-none hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground",
+                    isPicked && "bg-accent/30",
                   )}
+                  data-icon-control
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelectMode(mode);
@@ -201,13 +202,9 @@ export function ThemePreviewCircles({
                     <>
                       <span
                         aria-hidden
-                        className="pointer-events-none absolute inset-0 rounded-full"
-                        style={{ boxShadow: "inset 0 0 0 2px var(--ring)" }}
-                      />
-                      <span
-                        aria-hidden
-                        className="pointer-events-none absolute bottom-0.5 right-0.5 flex size-5 items-center justify-center rounded-full border border-border/70 bg-background text-foreground shadow-sm"
+                        className="pointer-events-none absolute bottom-0.5 right-0.5 flex h-5 items-center justify-center gap-1 rounded-full bg-background px-1 text-foreground"
                       >
+                        <CheckIcon className="size-3" data-slot="selection-check" />
                         {mode === "light" ? (
                           <SunIcon className="size-3" />
                         ) : (
