@@ -1,32 +1,3912 @@
 {
-  "authority": "AUTHOR_VISUAL_REVIEW, not independent QA",
-  "head": "245a9efdfee4e949a5d312798bcdbf31ed0c1675",
-  "pairSheets": {
-    "count": 20,
-    "range": "01-20",
-    "pairs": 158
-  },
-  "hotspotSheets": {
-    "count": 25,
-    "range": "01-25",
-    "hotspots": 442
-  },
-  "measurementSheets": {
-    "count": 12,
-    "range": "01-12",
-    "images": 46
-  },
-  "themeCycleSheets": {
-    "count": 4,
-    "range": "01-04",
-    "matchedFrames": 15
-  },
-  "allListedSheetsOpened": true,
-  "scope": "Both final builds, full paired corpus and every reported hotspot; final measurement and parent/head theme-cycle frames.",
-  "channelSheets": {
-    "count": 5,
-    "range": "01-05",
-    "images": 40
-  },
-  "channelComparison": "Same-state renderer/Electron/DOM/AX with pre/post-capture painting at minimum and 390; raw outcomes retained separately."
+  "pairs": [
+    {
+      "sheet": "pairs-01.png",
+      "files": [
+        "1280x800/01_first_launch_onboarding_connection.png",
+        "1280x800/02_onboarding_agents.png",
+        "1280x800/03_onboarding_project_selection.png",
+        "1280x800/04_empty_projects.png",
+        "1280x800/05_add_project_import_modal.png",
+        "1280x800/06_local_folder_picker.png",
+        "1280x800/07_chat_empty_project.png",
+        "1280x800/08_project_selection.png"
+      ]
+    },
+    {
+      "sheet": "pairs-02.png",
+      "files": [
+        "1280x800/09_right_panel_menu.png",
+        "1280x800/10_right_files.png",
+        "1280x800/11_add_action_dialog.png",
+        "1280x800/12_right_agents.png",
+        "1280x800/13_right_run_graph.png",
+        "1280x800/14_device_setup_dialog.png",
+        "1280x800/15_right_browser.png",
+        "1280x800/16_right_terminal.png"
+      ]
+    },
+    {
+      "sheet": "pairs-03.png",
+      "files": [
+        "1280x800/17_settings_general.png",
+        "1280x800/18_settings_appearance_light.png",
+        "1280x800/19_settings_appearance_dark.png",
+        "1280x800/20_settings_keybindings.png",
+        "1280x800/21_settings_snapshots.png",
+        "1280x800/22_settings_providers.png",
+        "1280x800/23_settings_integrations.png",
+        "1280x800/24_settings_source_control.png"
+      ]
+    },
+    {
+      "sheet": "pairs-04.png",
+      "files": [
+        "1280x800/25_settings_storage.png",
+        "1280x800/26_settings_connections.png",
+        "1280x800/27_settings_archive.png",
+        "1280x800/28_add_custom_model_form.png",
+        "1280x800/29_settings_diagnostics.png",
+        "1280x800/30_settings_licenses.png",
+        "1280x800/31_chat_model_selector.png",
+        "1280x800/32_chat_permission_menu.png"
+      ]
+    },
+    {
+      "sheet": "pairs-05.png",
+      "files": [
+        "1280x800/33_project_list_with_threads.png",
+        "1280x800/34_chat_messages.png",
+        "1280x800/35_chat_long_messages.png",
+        "1280x800/36_chat_code_blocks.png",
+        "1280x800/37_chat_streaming_working.png",
+        "1280x800/38_chat_error.png",
+        "1280x800/39_chat_empty_existing_thread.png",
+        "1280x800/40_right_controlled_tasks.png"
+      ]
+    },
+    {
+      "sheet": "pairs-06.png",
+      "files": [
+        "1280x800/41_chat_code_blocks_dark.png",
+        "1280x800/44_delete_thread_confirmation.png",
+        "1280x800/45_rename_thread_inline.png",
+        "1280x800/46_project_settings_control.png",
+        "1280x800/47_project_settings_evidence.png",
+        "1280x800/48_project_settings_model_fitness.png",
+        "1920x1080/01_first_launch_onboarding_connection.png",
+        "1920x1080/02_onboarding_agents.png"
+      ]
+    },
+    {
+      "sheet": "pairs-07.png",
+      "files": [
+        "1920x1080/03_onboarding_project_selection.png",
+        "1920x1080/04_empty_projects.png",
+        "1920x1080/05_add_project_import_modal.png",
+        "1920x1080/06_local_folder_picker.png",
+        "1920x1080/07_chat_empty_project.png",
+        "1920x1080/08_project_selection.png",
+        "1920x1080/09_right_panel_menu.png",
+        "1920x1080/10_right_files.png"
+      ]
+    },
+    {
+      "sheet": "pairs-08.png",
+      "files": [
+        "1920x1080/11_add_action_dialog.png",
+        "1920x1080/12_right_agents.png",
+        "1920x1080/13_right_run_graph.png",
+        "1920x1080/14_device_setup_dialog.png",
+        "1920x1080/15_right_browser.png",
+        "1920x1080/16_right_terminal.png",
+        "1920x1080/17_settings_general.png",
+        "1920x1080/18_settings_appearance_light.png"
+      ]
+    },
+    {
+      "sheet": "pairs-09.png",
+      "files": [
+        "1920x1080/19_settings_appearance_dark.png",
+        "1920x1080/20_settings_keybindings.png",
+        "1920x1080/21_settings_snapshots.png",
+        "1920x1080/22_settings_providers.png",
+        "1920x1080/23_settings_integrations.png",
+        "1920x1080/24_settings_source_control.png",
+        "1920x1080/25_settings_storage.png",
+        "1920x1080/26_settings_connections.png"
+      ]
+    },
+    {
+      "sheet": "pairs-10.png",
+      "files": [
+        "1920x1080/27_settings_archive.png",
+        "1920x1080/28_add_custom_model_form.png",
+        "1920x1080/29_settings_diagnostics.png",
+        "1920x1080/30_settings_licenses.png",
+        "1920x1080/31_chat_model_selector.png",
+        "1920x1080/32_chat_permission_menu.png",
+        "1920x1080/33_project_list_with_threads.png",
+        "1920x1080/34_chat_messages.png"
+      ]
+    },
+    {
+      "sheet": "pairs-11.png",
+      "files": [
+        "1920x1080/35_chat_long_messages.png",
+        "1920x1080/36_chat_code_blocks.png",
+        "1920x1080/37_chat_streaming_working.png",
+        "1920x1080/38_chat_error.png",
+        "1920x1080/39_chat_empty_existing_thread.png",
+        "1920x1080/40_right_controlled_tasks.png",
+        "1920x1080/41_chat_code_blocks_dark.png",
+        "1920x1080/44_delete_thread_confirmation.png"
+      ]
+    },
+    {
+      "sheet": "pairs-12.png",
+      "files": [
+        "1920x1080/45_rename_thread_inline.png",
+        "1920x1080/46_project_settings_control.png",
+        "1920x1080/47_project_settings_evidence.png",
+        "1920x1080/48_project_settings_model_fitness.png",
+        "390x844/42_narrow_chat_dark.png",
+        "390x844/43_narrow_chat_light.png",
+        "1280x800/36_chat_code_blocks.electron.png",
+        "1280x800/41_chat_code_blocks_dark.electron.png"
+      ]
+    },
+    {
+      "sheet": "pairs-13.png",
+      "files": [
+        "390x844/42_narrow_chat_dark.electron.png",
+        "390x844/43_narrow_chat_light.electron.png",
+        "matrix/1280x800/light/46/prepare-end-default.png",
+        "matrix/1280x800/light/48/actions-end-default.png",
+        "matrix/1280x800/dark/46/top-default.png",
+        "matrix/1280x800/dark/46/end-default.png",
+        "matrix/1280x800/dark/47/top-default.png",
+        "matrix/1280x800/dark/47/end-default.png"
+      ]
+    },
+    {
+      "sheet": "pairs-14.png",
+      "files": [
+        "matrix/1280x800/dark/48/top-default.png",
+        "matrix/1280x800/dark/48/end-default.png",
+        "matrix/1280x800/dark/48/actions-end-default.png",
+        "matrix/1280x800/light/46/top-default.png",
+        "matrix/1280x800/light/46/end-default.png",
+        "matrix/1280x800/light/47/top-default.png",
+        "matrix/1280x800/light/47/end-default.png",
+        "matrix/1280x800/light/48/top-default.png"
+      ]
+    },
+    {
+      "sheet": "pairs-15.png",
+      "files": [
+        "matrix/1280x800/light/48/end-default.png",
+        "matrix/840x620/light/46/top-default.png",
+        "matrix/840x620/light/46/end-default.png",
+        "matrix/840x620/light/47/top-default.png",
+        "matrix/840x620/light/47/end-default.png",
+        "matrix/840x620/light/48/top-default.png",
+        "matrix/840x620/light/48/end-default.png",
+        "matrix/840x620/light/48/actions-end-default.png"
+      ]
+    },
+    {
+      "sheet": "pairs-16.png",
+      "files": [
+        "matrix/840x620/dark/46/top-default.png",
+        "matrix/840x620/dark/46/end-default.png",
+        "matrix/840x620/dark/47/top-default.png",
+        "matrix/840x620/dark/47/end-default.png",
+        "matrix/840x620/dark/48/top-default.png",
+        "matrix/840x620/dark/48/end-default.png",
+        "matrix/840x620/dark/48/actions-end-default.png",
+        "matrix/2560x1440/light/46/top-default.png"
+      ]
+    },
+    {
+      "sheet": "pairs-17.png",
+      "files": [
+        "matrix/2560x1440/light/46/end-default.png",
+        "matrix/2560x1440/light/47/top-default.png",
+        "matrix/2560x1440/light/47/end-default.png",
+        "matrix/2560x1440/light/48/top-default.png",
+        "matrix/2560x1440/light/48/end-default.png",
+        "matrix/2560x1440/light/48/actions-end-default.png",
+        "matrix/2560x1440/dark/46/top-default.png",
+        "matrix/2560x1440/dark/46/end-default.png"
+      ]
+    },
+    {
+      "sheet": "pairs-18.png",
+      "files": [
+        "matrix/2560x1440/dark/47/top-default.png",
+        "matrix/2560x1440/dark/47/end-default.png",
+        "matrix/2560x1440/dark/48/top-default.png",
+        "matrix/2560x1440/dark/48/end-default.png",
+        "matrix/2560x1440/dark/48/actions-end-default.png",
+        "1920x1080/36_chat_code_blocks.electron.png",
+        "1920x1080/41_chat_code_blocks_dark.electron.png",
+        "matrix/1920x1080/light/46/prepare-end-default.png"
+      ]
+    },
+    {
+      "sheet": "pairs-19.png",
+      "files": [
+        "matrix/1920x1080/light/48/actions-end-default.png",
+        "matrix/1920x1080/dark/46/top-default.png",
+        "matrix/1920x1080/dark/46/end-default.png",
+        "matrix/1920x1080/dark/47/top-default.png",
+        "matrix/1920x1080/dark/47/end-default.png",
+        "matrix/1920x1080/dark/48/top-default.png",
+        "matrix/1920x1080/dark/48/end-default.png",
+        "matrix/1920x1080/dark/48/actions-end-default.png"
+      ]
+    },
+    {
+      "sheet": "pairs-20.png",
+      "files": [
+        "matrix/1920x1080/light/46/top-default.png",
+        "matrix/1920x1080/light/46/end-default.png",
+        "matrix/1920x1080/light/47/top-default.png",
+        "matrix/1920x1080/light/47/end-default.png",
+        "matrix/1920x1080/light/48/top-default.png",
+        "matrix/1920x1080/light/48/end-default.png"
+      ]
+    }
+  ],
+  "hotspots": [
+    {
+      "sheet": "hotspots-01.png",
+      "regions": [
+        {
+          "file": "1280x800/06_local_folder_picker.png",
+          "box": [
+            480,
+            100,
+            640,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/06_local_folder_picker.png",
+          "box": [
+            640,
+            100,
+            800,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/07_chat_empty_project.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/07_chat_empty_project.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/07_chat_empty_project.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/08_project_selection.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/08_project_selection.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/08_project_selection.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/09_right_panel_menu.png",
+          "box": [
+            640,
+            0,
+            800,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/09_right_panel_menu.png",
+          "box": [
+            480,
+            0,
+            640,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/09_right_panel_menu.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/10_right_files.png",
+          "box": [
+            640,
+            0,
+            800,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/10_right_files.png",
+          "box": [
+            480,
+            0,
+            640,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/10_right_files.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/11_add_action_dialog.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/11_add_action_dialog.png",
+          "box": [
+            640,
+            0,
+            800,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/11_add_action_dialog.png",
+          "box": [
+            480,
+            0,
+            640,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/12_right_agents.png",
+          "box": [
+            640,
+            0,
+            800,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-02.png",
+      "regions": [
+        {
+          "file": "1280x800/12_right_agents.png",
+          "box": [
+            480,
+            0,
+            640,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/12_right_agents.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/13_right_run_graph.png",
+          "box": [
+            640,
+            0,
+            800,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/13_right_run_graph.png",
+          "box": [
+            480,
+            0,
+            640,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/13_right_run_graph.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/14_device_setup_dialog.png",
+          "box": [
+            640,
+            0,
+            800,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/14_device_setup_dialog.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/14_device_setup_dialog.png",
+          "box": [
+            480,
+            0,
+            640,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/15_right_browser.png",
+          "box": [
+            640,
+            0,
+            800,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/15_right_browser.png",
+          "box": [
+            480,
+            0,
+            640,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/15_right_browser.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/16_right_terminal.png",
+          "box": [
+            640,
+            0,
+            800,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/16_right_terminal.png",
+          "box": [
+            480,
+            0,
+            640,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/16_right_terminal.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/18_settings_appearance_light.png",
+          "box": [
+            960,
+            700,
+            1120,
+            800
+          ]
+        },
+        {
+          "file": "1280x800/18_settings_appearance_light.png",
+          "box": [
+            1120,
+            700,
+            1280,
+            800
+          ]
+        },
+        {
+          "file": "1280x800/19_settings_appearance_dark.png",
+          "box": [
+            960,
+            700,
+            1120,
+            800
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            320,
+            300,
+            480,
+            400
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-03.png",
+      "regions": [
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            320,
+            400,
+            480,
+            500
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            640,
+            500,
+            800,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            640,
+            300,
+            800,
+            400
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            320,
+            200,
+            480,
+            300
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            960,
+            500,
+            1120,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            640,
+            200,
+            800,
+            300
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            160,
+            400,
+            320,
+            500
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            800,
+            300,
+            960,
+            400
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            800,
+            500,
+            960,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            480,
+            500,
+            640,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            640,
+            600,
+            800,
+            700
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            1120,
+            500,
+            1280,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            160,
+            300,
+            320,
+            400
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            480,
+            600,
+            640,
+            700
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            480,
+            300,
+            640,
+            400
+          ]
+        },
+        {
+          "file": "1280x800/29_settings_diagnostics.png",
+          "box": [
+            960,
+            600,
+            1120,
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-04.png",
+      "regions": [
+        {
+          "file": "1280x800/31_chat_model_selector.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/31_chat_model_selector.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/31_chat_model_selector.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/32_chat_permission_menu.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/32_chat_permission_menu.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/32_chat_permission_menu.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/33_project_list_with_threads.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/33_project_list_with_threads.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/33_project_list_with_threads.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/33_project_list_with_threads.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/34_chat_messages.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/34_chat_messages.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/34_chat_messages.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/34_chat_messages.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/35_chat_long_messages.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/35_chat_long_messages.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/35_chat_long_messages.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/35_chat_long_messages.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-05.png",
+      "regions": [
+        {
+          "file": "1280x800/36_chat_code_blocks.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/36_chat_code_blocks.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/36_chat_code_blocks.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/36_chat_code_blocks.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/37_chat_streaming_working.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/37_chat_streaming_working.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/37_chat_streaming_working.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/37_chat_streaming_working.png",
+          "box": [
+            320,
+            200,
+            480,
+            300
+          ]
+        },
+        {
+          "file": "1280x800/37_chat_streaming_working.png",
+          "box": [
+            480,
+            100,
+            640,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/38_chat_error.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/38_chat_error.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/38_chat_error.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/38_chat_error.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/39_chat_empty_existing_thread.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/39_chat_empty_existing_thread.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/39_chat_empty_existing_thread.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/39_chat_empty_existing_thread.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/40_right_controlled_tasks.png",
+          "box": [
+            480,
+            0,
+            640,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-06.png",
+      "regions": [
+        {
+          "file": "1280x800/40_right_controlled_tasks.png",
+          "box": [
+            640,
+            0,
+            800,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/40_right_controlled_tasks.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/40_right_controlled_tasks.png",
+          "box": [
+            320,
+            400,
+            480,
+            500
+          ]
+        },
+        {
+          "file": "1280x800/40_right_controlled_tasks.png",
+          "box": [
+            160,
+            400,
+            320,
+            500
+          ]
+        },
+        {
+          "file": "1280x800/40_right_controlled_tasks.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.png",
+          "box": [
+            960,
+            100,
+            1120,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.png",
+          "box": [
+            160,
+            100,
+            320,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.png",
+          "box": [
+            1120,
+            100,
+            1280,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/44_delete_thread_confirmation.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/44_delete_thread_confirmation.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/44_delete_thread_confirmation.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/44_delete_thread_confirmation.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        },
+        {
+          "file": "1280x800/45_rename_thread_inline.png",
+          "box": [
+            960,
+            0,
+            1120,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/45_rename_thread_inline.png",
+          "box": [
+            1120,
+            0,
+            1280,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-07.png",
+      "regions": [
+        {
+          "file": "1280x800/45_rename_thread_inline.png",
+          "box": [
+            800,
+            0,
+            960,
+            100
+          ]
+        },
+        {
+          "file": "1280x800/45_rename_thread_inline.png",
+          "box": [
+            160,
+            500,
+            320,
+            600
+          ]
+        },
+        {
+          "file": "1920x1080/06_local_folder_picker.png",
+          "box": [
+            720,
+            135,
+            960,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/06_local_folder_picker.png",
+          "box": [
+            960,
+            135,
+            1200,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/07_chat_empty_project.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/07_chat_empty_project.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/08_project_selection.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/08_project_selection.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/09_right_panel_menu.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/09_right_panel_menu.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/09_right_panel_menu.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/10_right_files.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/10_right_files.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/10_right_files.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/11_add_action_dialog.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/11_add_action_dialog.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/11_add_action_dialog.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/12_right_agents.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-08.png",
+      "regions": [
+        {
+          "file": "1920x1080/12_right_agents.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/12_right_agents.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/13_right_run_graph.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/13_right_run_graph.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/13_right_run_graph.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/14_device_setup_dialog.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/14_device_setup_dialog.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/14_device_setup_dialog.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/15_right_browser.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/15_right_browser.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/15_right_browser.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/16_right_terminal.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/16_right_terminal.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/16_right_terminal.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/18_settings_appearance_light.png",
+          "box": [
+            1200,
+            675,
+            1440,
+            810
+          ]
+        },
+        {
+          "file": "1920x1080/18_settings_appearance_light.png",
+          "box": [
+            1440,
+            810,
+            1680,
+            945
+          ]
+        },
+        {
+          "file": "1920x1080/18_settings_appearance_light.png",
+          "box": [
+            1200,
+            945,
+            1440,
+            1080
+          ]
+        },
+        {
+          "file": "1920x1080/18_settings_appearance_light.png",
+          "box": [
+            1200,
+            810,
+            1440,
+            945
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-09.png",
+      "regions": [
+        {
+          "file": "1920x1080/18_settings_appearance_light.png",
+          "box": [
+            1440,
+            675,
+            1680,
+            810
+          ]
+        },
+        {
+          "file": "1920x1080/19_settings_appearance_dark.png",
+          "box": [
+            1200,
+            675,
+            1440,
+            810
+          ]
+        },
+        {
+          "file": "1920x1080/19_settings_appearance_dark.png",
+          "box": [
+            1440,
+            675,
+            1680,
+            810
+          ]
+        },
+        {
+          "file": "1920x1080/19_settings_appearance_dark.png",
+          "box": [
+            1200,
+            810,
+            1440,
+            945
+          ]
+        },
+        {
+          "file": "1920x1080/19_settings_appearance_dark.png",
+          "box": [
+            1440,
+            810,
+            1680,
+            945
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            960,
+            270,
+            1200,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            480,
+            270,
+            720,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            960,
+            405,
+            1200,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            1440,
+            945,
+            1680,
+            1080
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            720,
+            270,
+            960,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            960,
+            540,
+            1200,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            720,
+            405,
+            960,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            1440,
+            540,
+            1680,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            1440,
+            810,
+            1680,
+            945
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            960,
+            810,
+            1200,
+            945
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            480,
+            540,
+            720,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            720,
+            540,
+            960,
+            675
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-10.png",
+      "regions": [
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            1200,
+            540,
+            1440,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/29_settings_diagnostics.png",
+          "box": [
+            1200,
+            270,
+            1440,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/30_settings_licenses.png",
+          "box": [
+            1440,
+            270,
+            1680,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/31_chat_model_selector.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/31_chat_model_selector.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/32_chat_permission_menu.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/32_chat_permission_menu.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/33_project_list_with_threads.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/33_project_list_with_threads.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/33_project_list_with_threads.png",
+          "box": [
+            0,
+            405,
+            240,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/34_chat_messages.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/34_chat_messages.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/34_chat_messages.png",
+          "box": [
+            0,
+            405,
+            240,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/35_chat_long_messages.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/35_chat_long_messages.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/35_chat_long_messages.png",
+          "box": [
+            0,
+            405,
+            240,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/36_chat_code_blocks.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/36_chat_code_blocks.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-11.png",
+      "regions": [
+        {
+          "file": "1920x1080/36_chat_code_blocks.png",
+          "box": [
+            0,
+            405,
+            240,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/37_chat_streaming_working.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/37_chat_streaming_working.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/37_chat_streaming_working.png",
+          "box": [
+            720,
+            135,
+            960,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/37_chat_streaming_working.png",
+          "box": [
+            480,
+            135,
+            720,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/38_chat_error.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/38_chat_error.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/38_chat_error.png",
+          "box": [
+            0,
+            405,
+            240,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/39_chat_empty_existing_thread.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/39_chat_empty_existing_thread.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/39_chat_empty_existing_thread.png",
+          "box": [
+            0,
+            405,
+            240,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/40_right_controlled_tasks.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/40_right_controlled_tasks.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/40_right_controlled_tasks.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/40_right_controlled_tasks.png",
+          "box": [
+            0,
+            405,
+            240,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.png",
+          "box": [
+            1200,
+            135,
+            1440,
+            270
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-12.png",
+      "regions": [
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.png",
+          "box": [
+            0,
+            0,
+            240,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.png",
+          "box": [
+            1440,
+            135,
+            1680,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.png",
+          "box": [
+            0,
+            405,
+            240,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1200,
+            135,
+            1440,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            960,
+            135,
+            1200,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            720,
+            405,
+            960,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            720,
+            135,
+            960,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1200,
+            405,
+            1440,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            720,
+            270,
+            960,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            960,
+            405,
+            1200,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            720,
+            0,
+            960,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            960,
+            270,
+            1200,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1200,
+            270,
+            1440,
+            405
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-13.png",
+      "regions": [
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1440,
+            135,
+            1680,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1440,
+            405,
+            1680,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            720,
+            540,
+            960,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            480,
+            135,
+            720,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1440,
+            270,
+            1680,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1440,
+            540,
+            1680,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            480,
+            540,
+            720,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            480,
+            270,
+            720,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            960,
+            540,
+            1200,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            480,
+            405,
+            720,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            1200,
+            540,
+            1440,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            0,
+            405,
+            240,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/44_delete_thread_confirmation.png",
+          "box": [
+            0,
+            540,
+            240,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1200,
+            135,
+            1440,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            720,
+            405,
+            960,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            960,
+            405,
+            1200,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1200,
+            405,
+            1440,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            960,
+            135,
+            1200,
+            270
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-14.png",
+      "regions": [
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            960,
+            0,
+            1200,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            720,
+            135,
+            960,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1200,
+            0,
+            1440,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            720,
+            270,
+            960,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            720,
+            0,
+            960,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1200,
+            270,
+            1440,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            960,
+            270,
+            1200,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1680,
+            0,
+            1920,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1440,
+            0,
+            1680,
+            135
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1440,
+            135,
+            1680,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            720,
+            540,
+            960,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1440,
+            405,
+            1680,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            960,
+            540,
+            1200,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1200,
+            540,
+            1440,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1440,
+            270,
+            1680,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            480,
+            405,
+            720,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            480,
+            135,
+            720,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            480,
+            540,
+            720,
+            675
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-15.png",
+      "regions": [
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            480,
+            270,
+            720,
+            405
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            1440,
+            540,
+            1680,
+            675
+          ]
+        },
+        {
+          "file": "1920x1080/45_rename_thread_inline.png",
+          "box": [
+            0,
+            405,
+            240,
+            540
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "box": [
+            243,
+            0,
+            292,
+            105
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "box": [
+            292,
+            0,
+            341,
+            105
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "box": [
+            146,
+            0,
+            195,
+            105
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "box": [
+            195,
+            0,
+            243,
+            105
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "box": [
+            292,
+            105,
+            341,
+            211
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "box": [
+            243,
+            105,
+            292,
+            211
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "box": [
+            341,
+            0,
+            390,
+            105
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "box": [
+            97,
+            0,
+            146,
+            105
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.png",
+          "box": [
+            341,
+            105,
+            390,
+            211
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            146,
+            633,
+            195,
+            738
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            195,
+            633,
+            243,
+            738
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            97,
+            633,
+            146,
+            738
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            243,
+            633,
+            292,
+            738
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            48,
+            633,
+            97,
+            738
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            292,
+            633,
+            341,
+            738
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-16.png",
+      "regions": [
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            341,
+            738,
+            390,
+            844
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            0,
+            633,
+            48,
+            738
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            341,
+            633,
+            390,
+            738
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            0,
+            738,
+            48,
+            844
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            292,
+            738,
+            341,
+            844
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            48,
+            738,
+            97,
+            844
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            97,
+            738,
+            146,
+            844
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            146,
+            738,
+            195,
+            844
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            195,
+            738,
+            243,
+            844
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            243,
+            738,
+            292,
+            844
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            292,
+            0,
+            341,
+            105
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            146,
+            0,
+            195,
+            105
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            243,
+            0,
+            292,
+            105
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            195,
+            527,
+            243,
+            633
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            146,
+            527,
+            195,
+            633
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            341,
+            105,
+            390,
+            211
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            195,
+            0,
+            243,
+            105
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            341,
+            211,
+            390,
+            316
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-17.png",
+      "regions": [
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            341,
+            316,
+            390,
+            422
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            341,
+            422,
+            390,
+            527
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            341,
+            0,
+            390,
+            105
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            341,
+            527,
+            390,
+            633
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            97,
+            527,
+            146,
+            633
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            243,
+            527,
+            292,
+            633
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            292,
+            105,
+            341,
+            211
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            243,
+            105,
+            292,
+            211
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.png",
+          "box": [
+            97,
+            0,
+            146,
+            105
+          ]
+        },
+        {
+          "file": "1280x800/36_chat_code_blocks.electron.png",
+          "box": [
+            1920,
+            0,
+            2240,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/36_chat_code_blocks.electron.png",
+          "box": [
+            2240,
+            0,
+            2560,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/36_chat_code_blocks.electron.png",
+          "box": [
+            1600,
+            0,
+            1920,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/36_chat_code_blocks.electron.png",
+          "box": [
+            320,
+            1000,
+            640,
+            1200
+          ]
+        },
+        {
+          "file": "1280x800/36_chat_code_blocks.electron.png",
+          "box": [
+            640,
+            1200,
+            960,
+            1400
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            2240,
+            0,
+            2560,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            1920,
+            0,
+            2240,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            1600,
+            0,
+            1920,
+            200
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            1920,
+            200,
+            2240,
+            400
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-18.png",
+      "regions": [
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            320,
+            200,
+            640,
+            400
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            2240,
+            200,
+            2560,
+            400
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            320,
+            1000,
+            640,
+            1200
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            640,
+            1200,
+            960,
+            1400
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            2240,
+            1200,
+            2560,
+            1400
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            640,
+            1400,
+            960,
+            1600
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            2240,
+            1400,
+            2560,
+            1600
+          ]
+        },
+        {
+          "file": "1280x800/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            0,
+            1000,
+            320,
+            1200
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            487,
+            0,
+            585,
+            211
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            585,
+            0,
+            682,
+            211
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            292,
+            0,
+            390,
+            211
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            390,
+            0,
+            487,
+            211
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            585,
+            211,
+            682,
+            422
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            682,
+            0,
+            780,
+            211
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            487,
+            211,
+            585,
+            422
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            195,
+            0,
+            292,
+            211
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            682,
+            211,
+            780,
+            422
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            0,
+            1266,
+            97,
+            1477
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-19.png",
+      "regions": [
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            682,
+            1266,
+            780,
+            1477
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            0,
+            1477,
+            97,
+            1688
+          ]
+        },
+        {
+          "file": "390x844/42_narrow_chat_dark.electron.png",
+          "box": [
+            682,
+            1477,
+            780,
+            1688
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            292,
+            1266,
+            390,
+            1477
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            390,
+            1266,
+            487,
+            1477
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            195,
+            1266,
+            292,
+            1477
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            487,
+            1266,
+            585,
+            1477
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            97,
+            1266,
+            195,
+            1477
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            585,
+            1266,
+            682,
+            1477
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            682,
+            1477,
+            780,
+            1688
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            0,
+            1266,
+            97,
+            1477
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            682,
+            1266,
+            780,
+            1477
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            0,
+            1477,
+            97,
+            1688
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            585,
+            1477,
+            682,
+            1688
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            97,
+            1477,
+            195,
+            1688
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            195,
+            1477,
+            292,
+            1688
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            292,
+            1477,
+            390,
+            1688
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            390,
+            1477,
+            487,
+            1688
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-20.png",
+      "regions": [
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            487,
+            1477,
+            585,
+            1688
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            585,
+            0,
+            682,
+            211
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            292,
+            0,
+            390,
+            211
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            487,
+            0,
+            585,
+            211
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            390,
+            1055,
+            487,
+            1266
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            292,
+            1055,
+            390,
+            1266
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            682,
+            211,
+            780,
+            422
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            682,
+            422,
+            780,
+            633
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            682,
+            633,
+            780,
+            844
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            682,
+            844,
+            780,
+            1055
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            390,
+            0,
+            487,
+            211
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            682,
+            0,
+            780,
+            211
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            682,
+            1055,
+            780,
+            1266
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            195,
+            1055,
+            292,
+            1266
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            487,
+            1055,
+            585,
+            1266
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            585,
+            211,
+            682,
+            422
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            487,
+            211,
+            585,
+            422
+          ]
+        },
+        {
+          "file": "390x844/43_narrow_chat_light.electron.png",
+          "box": [
+            195,
+            0,
+            292,
+            211
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-21.png",
+      "regions": [
+        {
+          "file": "matrix/1280x800/dark/47/top-default.png",
+          "box": [
+            1120,
+            300,
+            1280,
+            400
+          ]
+        },
+        {
+          "file": "matrix/1280x800/dark/47/top-default.png",
+          "box": [
+            320,
+            200,
+            480,
+            300
+          ]
+        },
+        {
+          "file": "matrix/1280x800/dark/47/top-default.png",
+          "box": [
+            960,
+            300,
+            1120,
+            400
+          ]
+        },
+        {
+          "file": "matrix/1280x800/dark/47/top-default.png",
+          "box": [
+            320,
+            400,
+            480,
+            500
+          ]
+        },
+        {
+          "file": "matrix/1280x800/dark/47/top-default.png",
+          "box": [
+            1120,
+            200,
+            1280,
+            300
+          ]
+        },
+        {
+          "file": "matrix/1280x800/dark/47/top-default.png",
+          "box": [
+            320,
+            300,
+            480,
+            400
+          ]
+        },
+        {
+          "file": "matrix/1280x800/dark/47/top-default.png",
+          "box": [
+            320,
+            100,
+            480,
+            200
+          ]
+        },
+        {
+          "file": "matrix/1280x800/dark/47/top-default.png",
+          "box": [
+            320,
+            600,
+            480,
+            700
+          ]
+        },
+        {
+          "file": "1920x1080/36_chat_code_blocks.electron.png",
+          "box": [
+            3360,
+            0,
+            3840,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/36_chat_code_blocks.electron.png",
+          "box": [
+            2880,
+            0,
+            3360,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/36_chat_code_blocks.electron.png",
+          "box": [
+            0,
+            810,
+            480,
+            1080
+          ]
+        },
+        {
+          "file": "1920x1080/36_chat_code_blocks.electron.png",
+          "box": [
+            1440,
+            1620,
+            1920,
+            1890
+          ]
+        },
+        {
+          "file": "1920x1080/36_chat_code_blocks.electron.png",
+          "box": [
+            1440,
+            1890,
+            1920,
+            2160
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            3360,
+            0,
+            3840,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            2880,
+            0,
+            3360,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            2400,
+            270,
+            2880,
+            540
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            0,
+            0,
+            480,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            2880,
+            270,
+            3360,
+            540
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "hotspots-22.png",
+      "regions": [
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            0,
+            810,
+            480,
+            1080
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            1440,
+            1620,
+            1920,
+            1890
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            2400,
+            0,
+            2880,
+            270
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            960,
+            1620,
+            1440,
+            1890
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            2880,
+            1620,
+            3360,
+            1890
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            960,
+            1890,
+            1440,
+            2160
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            1440,
+            1890,
+            1920,
+            2160
+          ]
+        },
+        {
+          "file": "1920x1080/41_chat_code_blocks_dark.electron.png",
+          "box": [
+            2880,
+            1890,
+            3360,
+            2160
+          ]
+        },
+        {
+          "file": "matrix/1920x1080/dark/48/top-default.png",
+          "box": [
+            720,
+            540,
+            960,
+            675
+          ]
+        },
+        {
+          "file": "matrix/1920x1080/dark/48/top-default.png",
+          "box": [
+            1440,
+            540,
+            1680,
+            675
+          ]
+        },
+        {
+          "file": "matrix/1920x1080/dark/48/top-default.png",
+          "box": [
+            1200,
+            945,
+            1440,
+            1080
+          ]
+        }
+      ]
+    }
+  ],
+  "cycles": [
+    {
+      "sheet": "cycles-01.png",
+      "files": [
+        "code-1280-dark-5.png",
+        "code-1280-light-4.png",
+        "code-1280-light-6.png",
+        "code-1920-dark-8.png"
+      ]
+    },
+    {
+      "sheet": "cycles-02.png",
+      "files": [
+        "code-1920-light-7.png",
+        "code-1920-light-9.png",
+        "code-2560-dark-11.png",
+        "code-2560-light-10.png"
+      ]
+    },
+    {
+      "sheet": "cycles-03.png",
+      "files": [
+        "code-2560-light-12.png",
+        "code-390-dark-14.png",
+        "code-390-light-13.png",
+        "code-390-light-15.png"
+      ]
+    },
+    {
+      "sheet": "cycles-04.png",
+      "files": [
+        "code-840-dark-2.png",
+        "code-840-light-1.png",
+        "code-840-light-3.png"
+      ]
+    }
+  ]
 }
