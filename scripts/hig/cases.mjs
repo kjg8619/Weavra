@@ -565,6 +565,22 @@ export function savedActionIsVisible(page) {
   return page.getByRole("button", { name: "Run HIG saved action", exact: true }).isVisible();
 }
 
+export async function openProviderDiagnostic(page, assert, act, label) {
+  const control = (expanded) =>
+    page.getByRole("button", { name: "원문 진단 및 복구 안내", exact: true, expanded });
+  assert(`${label}: one diagnostic disclosure`, await control().count(), 1);
+  assert(`${label}: initially collapsed`, await control().getAttribute("aria-expanded"), "false");
+  const target = await control().getAttribute("aria-controls");
+  assert(`${label}: diagnostic target exists`, Boolean(target), true);
+  await act(`${label}: open disclosure with keyboard`, async () => {
+    await control().focus();
+    await page.keyboard.press("Enter");
+  });
+  await control(true).waitFor({ state: "visible", timeout: 10_000 });
+  assert(`${label}: expanded`, await control().getAttribute("aria-expanded"), "true");
+  return `[id="${target}"]`;
+}
+
 export function deliverScenarioEvent(sockets, method, value) {
   let delivered = 0;
   for (const entry of sockets) {
@@ -1282,16 +1298,9 @@ export async function runScenarios(context) {
   }
   async function settingsDisclosure(assert, section, label) {
     await settings(section);
-    const controls = page.locator('button[aria-expanded="false"]').filter({ visible: true });
-    const count = await controls.count();
-    assert(`${label}: disclosure exists`, count > 0, true);
-    const control = controls.first();
-    await act(`${label}: open disclosure with keyboard`, async () => {
-      await control.focus();
-      await page.keyboard.press("Enter");
-    });
-    assert(`${label}: expanded`, await control.getAttribute("aria-expanded"), "true");
+    const target = await openProviderDiagnostic(page, assert, act, label);
     await frame(label);
+    return target;
   }
   async function runtimeVariant(variant) {
     const state = {
@@ -3723,9 +3732,11 @@ export async function runScenarios(context) {
       );
     },
     "18/raw-diagnostic": async (assert) => {
-      await settingsDisclosure(assert, "providers", "provider-raw-diagnostic");
-      await observedText(assert, "main", "raw-diagnostic-preserved", (text) =>
-        /원문|진단|diagnostic|codex login/i.test(text),
+      await providerEvent("error");
+      const target = await settingsDisclosure(assert, "providers", "provider-raw-diagnostic");
+      await page.locator(target).waitFor({ state: "visible" });
+      await observedText(assert, target, "raw-diagnostic-preserved", (text) =>
+        text.trim() === "HIG fixture requires codex login",
       );
       assert(
         "reading raw diagnostic does not authenticate",
