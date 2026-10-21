@@ -1,4 +1,4 @@
-import { act, type ReactNode } from "react";
+import { act, useEffect, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { useTheme } from "../../hooks/useTheme";
@@ -34,12 +34,15 @@ let snapshot: ReturnType<typeof useTheme>;
 let customThemes: ReturnType<typeof installCustomTheme>[] = [];
 
 function Library() {
-  snapshot = useTheme();
+  const theme = useTheme();
+  useEffect(() => {
+    snapshot = theme;
+  }, [theme]);
   return (
     <ThemeLibrary
-      {...snapshot}
+      {...theme}
       customThemes={customThemes}
-      initialAppearance={snapshot.resolvedTheme}
+      initialAppearance={theme.resolvedTheme}
       isImportOpen={false}
       onImportOpenChange={() => undefined}
     />
