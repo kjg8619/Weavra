@@ -1,0 +1,132 @@
+{
+  "at": "2026-10-21T14:26:03.457Z",
+  "status": "PASS",
+  "cleanup": "Close owned applications only; retain every manifest-referenced directory and bundle.",
+  "priorConvention": [
+    "pr-19",
+    "pr-20"
+  ],
+  "manifests": [
+    {
+      "file": "before/capture/capture-manifest.json",
+      "sha256": "d66be7fd6405145294dd4f6108a6f511753e71c566339ab16f9b1ff9551122dd",
+      "revision": "d81bc594776ea0cf5b9ea45db6865a4f24831ded",
+      "directories": [
+        "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-21/before/app/weavra-desktop.app",
+        "/private/tmp/weavra-hig-vv5Fr9",
+        "/private/tmp/weavra-hig-vv5Fr9/home",
+        "/private/tmp/weavra-hig-vv5Fr9/workspace",
+        "/private/tmp/weavra-hig-vv5Fr9/app",
+        "/private/tmp/weavra-hig-vv5Fr9/home/Library/Application Support/weavra",
+        "/private/tmp/weavra-hig-plOINz",
+        "/private/tmp/weavra-hig-plOINz/home",
+        "/private/tmp/weavra-hig-plOINz/workspace",
+        "/private/tmp/weavra-hig-plOINz/app",
+        "/private/tmp/weavra-hig-plOINz/home/Library/Application Support/weavra"
+      ],
+      "processesExited": true
+    },
+    {
+      "file": "after/capture/capture-manifest.json",
+      "sha256": "3b846e44108ef74048e7374b5bbb2c624772ad98cf532736f9c11a44266fb518",
+      "revision": "245a9efdfee4e949a5d312798bcdbf31ed0c1675",
+      "directories": [
+        "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-21/after/app/weavra-desktop.app",
+        "/private/tmp/weavra-hig-2QGMve",
+        "/private/tmp/weavra-hig-2QGMve/home",
+        "/private/tmp/weavra-hig-2QGMve/workspace",
+        "/private/tmp/weavra-hig-2QGMve/app",
+        "/private/tmp/weavra-hig-2QGMve/home/Library/Application Support/weavra",
+        "/private/tmp/weavra-hig-2q7zMm",
+        "/private/tmp/weavra-hig-2q7zMm/home",
+        "/private/tmp/weavra-hig-2q7zMm/workspace",
+        "/private/tmp/weavra-hig-2q7zMm/app",
+        "/private/tmp/weavra-hig-2q7zMm/home/Library/Application Support/weavra"
+      ],
+      "processesExited": true
+    },
+    {
+      "file": "qa-round-01/run-a2cfb6e4-7c53-458d-8a02-c3bedaeff83f/capture-manifest.json",
+      "sha256": "20283df306006d4582fc4caa44fe8179064cffb4e34cfbb8c297998fd6262a66",
+      "revision": "245a9efdfee4e949a5d312798bcdbf31ed0c1675",
+      "directories": [
+        "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-21/after/app/weavra-desktop.app",
+        "/private/tmp/weavra-hig-txIM8k",
+        "/private/tmp/weavra-hig-txIM8k/home",
+        "/private/tmp/weavra-hig-txIM8k/workspace",
+        "/private/tmp/weavra-hig-txIM8k/app",
+        "/private/tmp/weavra-hig-txIM8k/home/Library/Application Support/weavra",
+        "/private/tmp/weavra-hig-PrNF6L",
+        "/private/tmp/weavra-hig-PrNF6L/home",
+        "/private/tmp/weavra-hig-PrNF6L/workspace",
+        "/private/tmp/weavra-hig-PrNF6L/app",
+        "/private/tmp/weavra-hig-PrNF6L/home/Library/Application Support/weavra"
+      ],
+      "processesExited": true
+    },
+    {
+      "file": "qa/run-467729e7-2507-4847-bfe7-dec57479efb6/capture-manifest.json",
+      "sha256": "858fa917beb392d94ef5d10aead81db2c545143b2fe8dd34e16d1e100b243ead",
+      "revision": "245a9efdfee4e949a5d312798bcdbf31ed0c1675",
+      "directories": [
+        "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-21/after/app/weavra-desktop.app",
+        "/private/tmp/weavra-hig-o09mf4",
+        "/private/tmp/weavra-hig-o09mf4/home",
+        "/private/tmp/weavra-hig-o09mf4/workspace",
+        "/private/tmp/weavra-hig-o09mf4/app",
+        "/private/tmp/weavra-hig-o09mf4/home/Library/Application Support/weavra",
+        "/private/tmp/weavra-hig-TG3mvG",
+        "/private/tmp/weavra-hig-TG3mvG/home",
+        "/private/tmp/weavra-hig-TG3mvG/workspace",
+        "/private/tmp/weavra-hig-TG3mvG/app",
+        "/private/tmp/weavra-hig-TG3mvG/home/Library/Application Support/weavra"
+      ],
+      "processesExited": true
+    }
+  ],
+  "directories": [
+    "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-21/after/app/weavra-desktop.app",
+    "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-21/before/app/weavra-desktop.app",
+    "/private/tmp/weavra-hig-2QGMve",
+    "/private/tmp/weavra-hig-2QGMve/app",
+    "/private/tmp/weavra-hig-2QGMve/home",
+    "/private/tmp/weavra-hig-2QGMve/home/Library/Application Support/weavra",
+    "/private/tmp/weavra-hig-2QGMve/workspace",
+    "/private/tmp/weavra-hig-2q7zMm",
+    "/private/tmp/weavra-hig-2q7zMm/app",
+    "/private/tmp/weavra-hig-2q7zMm/home",
+    "/private/tmp/weavra-hig-2q7zMm/home/Library/Application Support/weavra",
+    "/private/tmp/weavra-hig-2q7zMm/workspace",
+    "/private/tmp/weavra-hig-PrNF6L",
+    "/private/tmp/weavra-hig-PrNF6L/app",
+    "/private/tmp/weavra-hig-PrNF6L/home",
+    "/private/tmp/weavra-hig-PrNF6L/home/Library/Application Support/weavra",
+    "/private/tmp/weavra-hig-PrNF6L/workspace",
+    "/private/tmp/weavra-hig-TG3mvG",
+    "/private/tmp/weavra-hig-TG3mvG/app",
+    "/private/tmp/weavra-hig-TG3mvG/home",
+    "/private/tmp/weavra-hig-TG3mvG/home/Library/Application Support/weavra",
+    "/private/tmp/weavra-hig-TG3mvG/workspace",
+    "/private/tmp/weavra-hig-o09mf4",
+    "/private/tmp/weavra-hig-o09mf4/app",
+    "/private/tmp/weavra-hig-o09mf4/home",
+    "/private/tmp/weavra-hig-o09mf4/home/Library/Application Support/weavra",
+    "/private/tmp/weavra-hig-o09mf4/workspace",
+    "/private/tmp/weavra-hig-plOINz",
+    "/private/tmp/weavra-hig-plOINz/app",
+    "/private/tmp/weavra-hig-plOINz/home",
+    "/private/tmp/weavra-hig-plOINz/home/Library/Application Support/weavra",
+    "/private/tmp/weavra-hig-plOINz/workspace",
+    "/private/tmp/weavra-hig-txIM8k",
+    "/private/tmp/weavra-hig-txIM8k/app",
+    "/private/tmp/weavra-hig-txIM8k/home",
+    "/private/tmp/weavra-hig-txIM8k/home/Library/Application Support/weavra",
+    "/private/tmp/weavra-hig-txIM8k/workspace",
+    "/private/tmp/weavra-hig-vv5Fr9",
+    "/private/tmp/weavra-hig-vv5Fr9/app",
+    "/private/tmp/weavra-hig-vv5Fr9/home",
+    "/private/tmp/weavra-hig-vv5Fr9/home/Library/Application Support/weavra",
+    "/private/tmp/weavra-hig-vv5Fr9/workspace"
+  ],
+  "ownedApps": []
+}
