@@ -98,7 +98,11 @@ describe("LocalApi", () => {
   it("uses the themed confirmation host when it is available", async () => {
     requestConfirmDialogMock.mockResolvedValue(true);
     const { createLocalApi } = await import("./localApi");
-    const options = { variant: "destructive" } as const;
+    const options = {
+      variant: "destructive",
+      title: "Disposable fixture",
+      confirmLabel: "Delete fixture",
+    } as const;
 
     await expect(createLocalApi().dialogs.confirm("Delete this thread?", options)).resolves.toBe(
       true,

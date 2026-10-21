@@ -1950,10 +1950,14 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
       if (appSettingsConfirmThreadDelete) {
         const confirmed = await api.dialogs.confirm(
           [
-            `Delete ${count} thread${count === 1 ? "" : "s"}?`,
-            "This permanently clears conversation history for these threads.",
+            ...selectedThreadEntries.map(({ thread }) => `“${thread.title}”`),
+            "이 스레드들의 대화 기록이 영구히 지워지며 되돌릴 수 없어요.",
           ].join("\n"),
-          { variant: "destructive" },
+          {
+            variant: "destructive",
+            title: `선택한 스레드 ${count}개를 삭제할까요?`,
+            confirmLabel: "스레드 삭제",
+          },
         );
         if (!confirmed) return;
       }
@@ -2311,11 +2315,12 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
       if (clicked !== "delete") return;
       if (appSettingsConfirmThreadDelete) {
         const confirmed = await api.dialogs.confirm(
-          [
-            `Delete thread "${thread.title}"?`,
-            "This permanently clears conversation history for this thread.",
-          ].join("\n"),
-          { variant: "destructive" },
+          "이 스레드의 대화 기록이 영구히 지워지며 되돌릴 수 없어요.",
+          {
+            variant: "destructive",
+            title: `“${thread.title}” 스레드를 삭제할까요?`,
+            confirmLabel: "스레드 삭제",
+          },
         );
         if (!confirmed) {
           return;

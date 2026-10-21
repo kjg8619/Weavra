@@ -23,6 +23,7 @@ import {
   openProviderDiagnostic,
   setNativeTheme,
   readRenderedBackground,
+  threadDeleteConfirmation,
   COMMAND_DIALOG_POPUP,
   switchCheckedState,
   SIDEBAR_VARIANT_MARKERS,
@@ -421,6 +422,81 @@ describe("saved action visibility", () => {
         page([{ role: "button", name: "Run HIG saved action", visible: false }]),
       ),
     ).toBe(false);
+  });
+});
+
+describe("thread delete confirmation readiness", () => {
+  const parent = 'Delete thread "03 Code blocks"?';
+  const successor = "“03 Code blocks” 스레드를 삭제할까요?";
+  const fixture = (title: string, action: string, actionRole = "button") => {
+    const actions: string[] = [];
+    const controls = [
+      { role: "button", name: "Cancel", run: () => actions.push("cancel") },
+      { role: actionRole, name: action, run: () => actions.push("delete:baseline-code") },
+    ];
+    const page = {
+      getByRole: (role: string, options?: { name: string; exact: boolean }) => {
+        const dialogs = role === "alertdialog" && (!options || options.name === title) ? [title] : [];
+        return {
+          waitFor: async () => {
+            if (dialogs.length !== 1) throw new Error("Missing alertdialog");
+          },
+          count: async () => dialogs.length,
+          getByRole: (childRole: string, childOptions: { name: string; exact: boolean }) => {
+            const buttons = dialogs.flatMap(() =>
+              controls.filter((control) =>
+                control.role === childRole &&
+                (childOptions.exact
+                  ? control.name === childOptions.name
+                  : control.name.includes(childOptions.name)),
+              ),
+            );
+            return {
+              count: async () => buttons.length,
+              isEnabled: async () => true,
+              waitFor: async () => {
+                if (buttons.length !== 1) throw new Error("Missing confirm button");
+              },
+              click: async () => {
+                if (buttons.length !== 1) throw new Error("Ambiguous confirm button");
+                for (const button of buttons) button.run();
+              },
+            };
+          },
+        };
+      },
+    };
+    return { page, actions };
+  };
+  test("accepts the parent Confirm action on the exact target dialog", async () => {
+    const { page, actions } = fixture(parent, "Confirm");
+    const confirmation = await threadDeleteConfirmation(page);
+    validateVisibleState("44", { text: `${parent} Cancel Confirm` });
+    await confirmation.button.click();
+    expect(actions).toEqual(["delete:baseline-code"]);
+  });
+  test("accepts the successor thread deletion action on the exact target dialog", async () => {
+    const { page, actions } = fixture(successor, "스레드 삭제");
+    const confirmation = await threadDeleteConfirmation(page);
+    validateVisibleState("44", { text: `${successor} 취소 스레드 삭제` });
+    await confirmation.button.click();
+    expect(actions).toEqual(["delete:baseline-code"]);
+  });
+  test("rejects missing actions, wrong targets, wrong actions and non-button labels", async () => {
+    for (const [title, action, role] of [
+      [parent, "Cancel", "button"],
+      ['Delete thread "01 Conversation"?', "Confirm", "button"],
+      ['Archive thread "03 Code blocks"?', "Confirm", "button"],
+      [successor, "스레드 삭제하기", "button"],
+      [successor, "스레드 삭제", "menuitem"],
+    ]) {
+      const { page, actions } = fixture(title, action, role);
+      await expect(threadDeleteConfirmation(page)).rejects.toThrow();
+      expect(actions).toEqual([]);
+    }
+  });
+  test("rejects unrelated Confirm text as state 44 evidence", () => {
+    expect(() => validateVisibleState("44", { text: "03 Code blocks Confirm" })).toThrow();
   });
 });
 
