@@ -6,6 +6,8 @@ import * as fs from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 const root=dirname(fileURLToPath(import.meta.url)),exec=promisify(execFile);
+const fixRoot=join(dirname(root),"pr-19-fix1-measure");
+const source=file=>file.startsWith("fix1/")?join(fixRoot,file.slice(5)):join(root,file);
 const base="https://github.com/kjg8619/Weavra/blob/hig-evidence/19/19";
 const url=file=>`${base}/${file}?raw=true`;
 const flat=file=>file.replaceAll("/","--");
@@ -14,7 +16,8 @@ const json=async file=>JSON.parse(await fs.readFile(join(root,file),"utf8"));
 const [mode,arg]=process.argv.slice(2);
 async function inventory() {
   assert.equal((await json("acceptance-verdict.json")).product,"PASS");
-  assert.equal((await json("repeat-01/pr-19/acceptance-verdict.json")).product,"PASS");
+  const revision=(await json("after/capture/capture-manifest.json")).revision;
+  assert.equal((await json("qa/scenario-receipt.json")).revision,revision);
   assert.equal((await json("measure-after/measurements.json")).failures.length,0);
   const pairs=(await json("diff/pairs.json")).pairs;
   const supplemental=(await json("supplemental/pairs.json")).pairs;
@@ -26,7 +29,14 @@ async function inventory() {
       else if(file.endsWith(".png")) images.push({file,name:flat(file),sha256:sha(await fs.readFile(join(root,file)))});
     }
   }
-  for(const dir of ["before/capture","after/capture","measure-before","measure-after","qa","qa-round-01"])await scan(dir);
+  for(const dir of ["before/capture","after/capture","measure-before","measure-after","qa"])await scan(dir);
+  const fix=JSON.parse(await fs.readFile(join(fixRoot,"measurements.json"),"utf8"));
+  assert.equal(fix.revision,revision);assert.equal(fix.failures.length,0);
+  for(const image of fix.screenshots){
+    const file=`fix1/${image.file}`,bytes=await fs.readFile(source(file));
+    assert.equal(sha(bytes),image.sha256);
+    images.push({file,name:flat(file),sha256:image.sha256});
+  }
   return {pairs,supplemental,images};
 }
 function gallery(data) {
@@ -49,6 +59,7 @@ async function stage(data,destination) {
     "capture-before.log","capture-after.log","diff.log","supplemental-diff.log","capture-accept.log",
     "accept-scenarios-01.log","accept-scenarios-02.log","verify-packet-01.log","verify-packet-02.log",
     "diff-check-01.log","diff-check-02.log","evidence-apps.log",
+    "accept-scenarios-fix1.log","verify-packet-fix1.log","diff-check-fix1.log","capture-fix1.log",
   ]);
   async function scan(dir) {
     for(const entry of await fs.readdir(join(root,dir),{withFileTypes:true})){
@@ -57,9 +68,10 @@ async function stage(data,destination) {
       else if(/\.(?:json|png|md|mjs|sh|log)$/.test(file)&&(dir!=="logs"||finalLogs.has(entry.name)))files.push(file);
     }
   }
-  for(const dir of ["before/capture","after/capture","measure-before","measure-after","qa","qa-round-01","diff","supplemental","logs","tools","repeat-01"])await scan(dir);
+  for(const dir of ["before/capture","after/capture","measure-before","measure-after","qa","diff","supplemental","logs","tools"])await scan(dir);
+  files.push("fix1/measurements.json","fix1/summary.json","fix1/measure.mjs","fix1/logs/measure.log","fix1/logs/focused-red.log","fix1/logs/build.log",...data.images.filter(image=>image.file.startsWith("fix1/")).map(image=>image.file));
   files.push("rules-a-j.md","acceptance-status.json","acceptance-verdict.json","publication-head.md","publication-tail.md","publication-body.md","publish-19.mjs","diff-inspection.md");
-  for(const file of files)await fs.copyFile(join(root,file),join(out,flat(file)));
+  for(const file of files)await fs.copyFile(source(file),join(out,flat(file)));
   await fs.writeFile(join(out,"image-table.md"),gallery(data));
   await fs.writeFile(join(out,"publication-index.json"),JSON.stringify({images:data.images,files},null,2));
   console.log(`STAGED files=${files.length} images=${data.images.length}`);
@@ -79,12 +91,16 @@ if(mode==="body"){
   const cwd=arg;
   const git=async(...args)=>(await exec("git",args,{cwd,maxBuffer:16<<20,timeout:1800000})).stdout.trim();
   assert.equal(await git("branch","--show-current"),"hig-evidence/19");
-  const files=(await git("ls-files","--others","--exclude-standard","--","19")).split("\n").filter(Boolean).sort();
+  const files=[...new Set([
+    ...(await git("diff","--name-only","HEAD","--","19")).split("\n"),
+    ...(await git("diff","--cached","--name-only","--","19")).split("\n"),
+    ...(await git("ls-files","--others","--exclude-standard","--","19")).split("\n"),
+  ])].filter(Boolean).sort();
   let batch=[],bytes=0,round=0;
   const push=async()=>{
     if(!batch.length)return;
     await git("add","--",...batch);
-    await git("commit","-m",`docs(hig): publish verified todo 19 evidence batch ${++round}`);
+    await git("commit","-m",`docs(hig): refresh verified todo 19 fix1 evidence batch ${++round}`);
     const head=await git("rev-parse","HEAD");
     const result=await exec("git",["-c","http.version=HTTP/2","-c","pack.threads=2","-c","pack.window=0","push","origin","HEAD:refs/heads/hig-evidence/19"],{cwd,maxBuffer:16<<20,timeout:1800000});
     console.log(`BATCH ${round} PUSH_EXIT=0 SHA=${head}`);console.log(result.stderr);

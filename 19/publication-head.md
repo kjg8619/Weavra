@@ -17,13 +17,20 @@ saved System mode through media events, and dismissal without persistence.
 The test fixture publishes its captured hook snapshot after render, removing
 the new globals warning without suppressing lint.
 
+QA fix1 preserves whole Korean words in imported library theme titles using
+keep-all and pretty wrapping. Escape on an open variant group restores its
+actual mode opener before closing, consumes the dismissal and does not reopen
+the group through that focus event. Closed options are disabled and hidden
+from accessibility traversal, so Enter cannot activate the formerly focused
+hidden option.
+
 Closes: W-26 only.
 
 Base: `hig/18-provider-layout` at
 `fb97140d6781ff14b680cd56eec95e31fb23841b`.
-Head: `0ae0238b299714d6b07e8514de7a981afeb77aef`.
+Head: `14914ad09237ab6d89e6c21b11b0e2e008fa42d5`.
 Head app.asar SHA-256:
-`d06fcfd595913ac826ff438b1636ee62204347a266f84c709a63bba0f7955b23`.
+`a6600f48f09202257bdb8ff1f9aecff1dd9aa09b9e40d20a29b27330ba7dc9a1`.
 Parent app.asar SHA-256:
 `6a80bc979588694edbccbd75d4017d887c589f900b4b2fe488683f059f726b80`.
 
