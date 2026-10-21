@@ -1,0 +1,69 @@
+{
+  "file": "1280x800/33_project_list_with_threads.png",
+  "beforeSha256": "ffe683b538173f783e65b123ecba154e56c50531b7b979e33569c39b23a868cc",
+  "afterSha256": "783da2c5248e26f02bd3eed2f886bbb2d25b5272a5a1a7b6a681f7fe6f56dfb5",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 6544,
+    "diffRatio": 0.0064,
+    "similarityScore": 99,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 6,
+        "gridY": 0,
+        "x": 960,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1981
+      },
+      {
+        "gridX": 7,
+        "gridY": 0,
+        "x": 1120,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1453
+      },
+      {
+        "gridX": 5,
+        "gridY": 0,
+        "x": 800,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0618
+      },
+      {
+        "gridX": 1,
+        "gridY": 5,
+        "x": 160,
+        "y": 500,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0039
+      }
+    ],
+    "summary": "99/100 similarity; 6544/1024000 pixels differ; 4 hotspot region(s)."
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "scope": "Completed source, package, measurement, capture and scenario gates; publication receipts are recorded separately after publication.",
+  "parent": "d81bc594776ea0cf5b9ea45db6865a4f24831ded",
+  "head": "245a9efdfee4e949a5d312798bcdbf31ed0c1675",
+  "runner": "82834bcf1be52aed98eef525696550077bf83df2",
+  "model": {
+    "model": "chatgpt-subscription/gpt-6.1-sol",
+    "thinking": "high"
+  },
+  "exitCodes": {
+    "ownership": 0,
+    "fmt": 0,
+    "lint": 0,
+    "typecheckWeb": 0,
+    "typecheckDesktop": 0,
+    "focusedWeb": 0,
+    "focusedDesktop": 0,
+    "sourcePush": 0,
+    "buildBefore": 0,
+    "buildAfter": 0,
+    "selfMeasurement": 0,
+    "captureBefore": 0,
+    "captureAfter": 0,
+    "imageDiff": 0,
+    "accept01": 0,
+    "verifyPacket01": 0,
+    "diffCheck01": 0,
+    "accept02": 0,
+    "verifyPacket02": 0,
+    "diffCheck02": 0,
+    "prepareParentDiagnosis": 0,
+    "sameStateFourChannelComparison": 0
+  },
+  "tests": {
+    "webFiles": 4,
+    "webTests": 262,
+    "desktopFiles": 1,
+    "desktopTests": 34
+  },
+  "measurement": {
+    "rows": 1821,
+    "failures": 0,
+    "unsupportedStressFindings": 12,
+    "images": 46,
+    "checks": {
+      "f": {
+        "total": 350,
+        "failed": 0,
+        "diagnosticFailed": 0
+      },
+      "a": {
+        "total": 359,
+        "failed": 0,
+        "diagnosticFailed": 4
+      },
+      "h": {
+        "total": 265,
+        "failed": 0,
+        "diagnosticFailed": 0
+      },
+      "j": {
+        "total": 334,
+        "failed": 0,
+        "diagnosticFailed": 8
+      },
+      "e": {
+        "total": 151,
+        "failed": 0,
+        "diagnosticFailed": 0
+      },
+      "b": {
+        "total": 48,
+        "failed": 0,
+        "diagnosticFailed": 0
+      },
+      "c": {
+        "total": 48,
+        "failed": 0,
+        "diagnosticFailed": 0
+      },
+      "d": {
+        "total": 48,
+        "failed": 0,
+        "diagnosticFailed": 0
+      },
+      "i": {
+        "total": 48,
+        "failed": 0,
+        "diagnosticFailed": 0
+      },
+      "g-h": {
+        "total": 73,
+        "failed": 0,
+        "diagnosticFailed": 0
+      },
+      "g": {
+        "total": 4,
+        "failed": 0,
+        "diagnosticFailed": 0
+      }
+    }
+  },
+  "comparisons": {
+    "pairs": 158,
+    "changed": 58,
+    "hotspots": 442,
+    "failures": []
+  },
+  "packageHashes": {
+    "before": "ac879d51d6317a0d1d4bf34dbe0b905bf2ca1f86e485dab25992d3629f8d9c90",
+    "after": "81debd18a2c3d7332ed2588c824b59db8f273e122efc2e6402b8400c2af92f65"
+  },
+  "unverified": {
+    "freshLsp": "Large ChatView/GitActionsControl fresh LSP diagnostics timed out at 3000ms; actual web and desktop typechecks exit 0.",
+    "finalWave": "Full universal-Q cross-product, 200% zoom, +40% copy, VoiceOver/IME and interrupted motion remain Final-wave scope under the Oct19 amendment."
+  }
+}

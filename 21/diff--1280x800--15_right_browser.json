@@ -1,0 +1,60 @@
+{
+  "file": "1280x800/15_right_browser.png",
+  "beforeSha256": "859a69ef4f703d394ea54ad127eec44229cb04616fe11e3eca312d1be49df6df",
+  "afterSha256": "bb47e3582465789a4af505dc9a69f4c5d3378589cd24e4ebfcd3f721ce0b7256",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 4537,
+    "diffRatio": 0.0044,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 4,
+        "gridY": 0,
+        "x": 640,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1135
+      },
+      {
+        "gridX": 3,
+        "gridY": 0,
+        "x": 480,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1054
+      },
+      {
+        "gridX": 7,
+        "gridY": 0,
+        "x": 1120,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0646
+      }
+    ],
+    "summary": "100/100 similarity; 4537/1024000 pixels differ; 3 hotspot region(s)."
+  }
+}

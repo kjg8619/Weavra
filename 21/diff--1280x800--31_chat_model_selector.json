@@ -1,0 +1,60 @@
+{
+  "file": "1280x800/31_chat_model_selector.png",
+  "beforeSha256": "d129a0c6e245c1cd5c4bec394bdc5b940d635ebf494cbacee096b93ad0716e66",
+  "afterSha256": "47e85057c86fe07c84bcebdc3da3d33f337d9ad51e725096b9d125c7822bf008",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 6482,
+    "diffRatio": 0.0063,
+    "similarityScore": 99,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 6,
+        "gridY": 0,
+        "x": 960,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1981
+      },
+      {
+        "gridX": 7,
+        "gridY": 0,
+        "x": 1120,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1453
+      },
+      {
+        "gridX": 5,
+        "gridY": 0,
+        "x": 800,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0618
+      }
+    ],
+    "summary": "99/100 similarity; 6482/1024000 pixels differ; 3 hotspot region(s)."
+  }
+}
