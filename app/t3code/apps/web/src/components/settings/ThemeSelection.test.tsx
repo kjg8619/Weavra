@@ -170,11 +170,70 @@ describe("Appearance selection", () => {
     const group = renderer.root.find(
       (node) => node.type === "div" && node.props["aria-label"] === "Light and dark theme variants",
     );
-    await act(() => group.props.onKeyDown({ key: "Escape" }));
+    await act(() =>
+      group.props.onKeyDown({
+        key: "Escape",
+        currentTarget: { querySelector: () => null },
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      }),
+    );
 
     // Then focus and dismissal have no persistence effect.
     expect([...storage]).toEqual(saved);
     expect(writes).not.toHaveBeenCalled();
     expect(button("Use one for light mode").props.tabIndex).toBe(-1);
   });
+
+  it.each(["light", "dark"] as const)(
+    "returns focus to the %s opener without reopening its dismissed choices",
+    async (mode) => {
+      customThemes = ["one", "two"].map((id) =>
+        installCustomTheme(
+          parseThemeFile({
+            version: THEME_FILE_VERSION,
+            id: `hig-${id}`,
+            name: `HIG ${id}`,
+            appearance: mode,
+            collection: { id: "hig", label: "HIG" },
+            colors: { accent: "#327a45" },
+          }),
+        ),
+      );
+      await act(() => renderer?.update(<Library />));
+      const opener = button(`Choose ${mode} variant, 2 options, currently one`);
+      await act(() => opener.props.onFocus());
+      await act(() => button(`Use two for ${mode} mode`).props.onFocus());
+      writes.mockClear();
+      // Native focus synchronously dispatches the opener's focus handler.
+      const focus = vi.fn(() => opener.props.onFocus());
+      const querySelector = vi.fn(() => ({ focus }));
+      const preventDefault = vi.fn();
+      const stopPropagation = vi.fn();
+      if (!renderer) throw new Error("Theme library is not mounted");
+      const group = renderer.root.find(
+        (node) =>
+          node.type === "div" && node.props["aria-label"] === "Light and dark theme variants",
+      );
+
+      await act(() =>
+        group.props.onKeyDown({
+          key: "Escape",
+          currentTarget: { querySelector },
+          preventDefault,
+          stopPropagation,
+        }),
+      );
+
+      expect(querySelector).toHaveBeenCalledExactlyOnceWith(
+        `[data-theme-variant-trigger="${mode}"]`,
+      );
+      expect(focus).toHaveBeenCalledOnce();
+      expect(preventDefault).toHaveBeenCalledOnce();
+      expect(stopPropagation).toHaveBeenCalledOnce();
+      expect(button(`Use two for ${mode} mode`).props.disabled).toBe(true);
+      expect(button(`Use two for ${mode} mode`).props.tabIndex).toBe(-1);
+      expect(writes).not.toHaveBeenCalled();
+    },
+  );
 });
