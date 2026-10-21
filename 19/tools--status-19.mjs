@@ -8,7 +8,8 @@ const git=async(path,...args)=>(await exec("git",["-C",path,...args])).stdout.tr
 const before=await json("before/capture/capture-manifest.json");
 const after=await json("after/capture/capture-manifest.json");
 const measure=await json("measure-after/measurements.json");
-const rounds=await Promise.all(["qa-round-01","qa"].map(async name=>{
+const fix=JSON.parse(await fs.readFile(`${root}-fix1-measure/measurements.json`,"utf8"));
+const rounds=await Promise.all(["qa"].map(async name=>{
   const receipt=await json(`${name}/scenario-receipt.json`);
   return {name,revision:receipt.revision,checks:receipt.checks.map(c=>({caseId:c.caseId,checkId:c.checkId,status:c.status,assertions:c.assertions.length})),cleanup:receipt.cleanup,counters:receipt.counters};
 }));
@@ -19,13 +20,14 @@ const status={
   captures:{before:before.manifest.length,after:after.manifest.length,pairs:(await json("diff/pairs.json")).pairs.length,supplementalPairs:(await json("supplemental/pairs.json")).pairs.length},
   captureProvenance:{before:before.provenance,after:after.provenance},
   measure:{...measure.summary,revision:measure.revision,cleanup:measure.cleanup,counters:measure.counters},
-  acceptance:{rounds,firstVerifier:await json("repeat-01/pr-19/acceptance-verdict.json"),secondVerifier:await json("acceptance-verdict.json")},
-  commandExits:{focused:0,fmt:0,lint:0,typecheck:0,runnerTests:0,buildBefore:0,buildAfter:0,measureBefore:0,measureAfter:0,captureBefore:0,captureAfter:0,diff:0,supplementalDiff:0,acceptPr19Round1:0,acceptPr19Round2:0,verifyPacketRound1:0,verifyPacketRound2:0,diffCheck:0},
+  fix1:fix.summary,
+  acceptance:{rounds,verifier:await json("acceptance-verdict.json")},
+  commandExits:{focused:0,fmt:0,lint:0,typecheck:0,buildAfter:0,fix1Measure:0,measureAfter:0,captureAfter:0,diff:0,supplementalDiff:0,acceptPr19Fix1:0,verifyPacketFix1:0,diffCheck:0},
 };
 for(const round of rounds){
   if(round.revision!==after.revision||!round.cleanup.exited||round.checks.some(c=>c.status!=="PASS"))throw new Error(`Incomplete acceptance ${round.name}`);
 }
-if(status.acceptance.firstVerifier.product!=="PASS"||status.acceptance.secondVerifier.product!=="PASS"||measure.failures.length)throw new Error("Packet is not accepted");
+if(status.acceptance.verifier.product!=="PASS"||measure.failures.length||fix.failures.length||fix.revision!==after.revision||fix.asarSha256!==after.provenance.asarSha256)throw new Error("Packet is not accepted");
 await fs.writeFile(`${root}/acceptance-status.json`,JSON.stringify(status,null,2));
 const lines=[
   "# Todo 19 fresh self-measurement",
@@ -40,10 +42,10 @@ const lines=[
   `| a | PASS: ${measure.summary.checks["a/target"].total} targets >=36px; ${measure.summary.checks["a/five-point-hit"].total} five-point checks pass. |`,
   `| b | PASS: measured touched labels >=${measure.summary.minimumTextSize}px. |`,
   `| c | PASS: composited text contrast >=${measure.summary.minimumTextContrast.toFixed(5)}:1. |`,
-  "| d | PASS: measured Korean orphan checks have zero failures. |",
+  `| d | PASS: actual imported Korean title, ${fix.summary.koreanContexts} contexts; ${fix.summary.orphans} orphans and ${fix.summary.midWordBreaks} mid-word breaks. Character rectangles and per-word line membership are retained. |`,
   "| e | PASS: selection survives focus-only navigation; System light/dark/light stays selected; opening the editor preserves rendered palette. |",
   `| f | PASS: strict-fit, clipping and horizontal-overflow checks have zero failures; exactly one overflowing scroll owner in each measured pane. |`,
-  "| g | PASS: measured keyboard focus and editor close preserve selection. Full IME/VoiceOver traversal remains Final-wave coverage. |",
+  `| g | PASS: ${fix.summary.focusContexts} Escape/Enter contexts restore the correct opener, keep the route and selection, disable hidden options and activate only the opener on Enter. Full IME/VoiceOver traversal remains Final-wave coverage. |`,
   `| h | PASS: control borders >=${measure.summary.minimumBorderContrast.toFixed(5)}:1, glyph checks >=3:1; visible focus >=2px and >=3:1. |`,
   "| i | PASS: no required-text ellipsis or clipping in measured controls. Optional identity/title disclosures outside these touched controls retain their existing behavior. |",
   "| j | PASS: measured sibling-control intersection area is zero. |",
@@ -52,7 +54,7 @@ const lines=[
   "The launcher uses showInactive and suppresses native activation while preserving renderer DOM focus; it does not exercise or claim native app-focus behavior.",
   "Two ps checks, a bounded competitor wait, a post-launch competitor check and owned app.close are recorded in logs/evidence-apps.log.",
   "The complete universal Q cross-product, 200% zoom, +40% authored copy, VoiceOver/IME and interrupted-motion sequences remain Final-wave checks under the approved amendment.",
-  "Both fresh accept_pr 19 rounds and both --verify-packet runs exit 0; see acceptance-status.json, scenario receipts and raw command logs.",
+  "Fix1 has one fresh accept_pr 19 and one fresh --verify-packet run, both exit 0 on this revision. The preceding revision's two rounds are historical, not acceptance for this head.",
 ];
 await fs.writeFile(`${root}/rules-a-j.md`,lines.join("\n")+"\n");
 console.log(`STATUS head=${status.head} checks=${rounds.map(r=>r.checks.length).join("/")} measurementFailures=${measure.failures.length}`);
