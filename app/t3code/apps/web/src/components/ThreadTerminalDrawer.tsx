@@ -111,7 +111,7 @@ function writeSystemMessage(terminal: GhosttyTerminalSurface, message: string): 
 
 // Display-only: the default "Terminal N" label is shown in Korean; custom labels and the
 // label passed into terminal context stay unchanged.
-function terminalDisplayLabel(terminalId: string, serverLabel: string | undefined): string {
+export function terminalDisplayLabel(terminalId: string, serverLabel: string | undefined): string {
   if (serverLabel !== undefined && serverLabel !== getTerminalLabel(terminalId)) {
     return serverLabel;
   }

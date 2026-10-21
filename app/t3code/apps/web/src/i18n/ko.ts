@@ -2850,6 +2850,13 @@ export const ko = freeze({
       loadingSpanNames: "스팬 이름 불러오는 중…",
     }),
     telemetry: freeze({
+      sourceStatus: freeze({
+        starting: "시작 중",
+        healthy: "정상",
+        degraded: "저하됨",
+        unavailable: "사용할 수 없음",
+        stopped: "중지됨",
+      }),
       window5m: "5분",
       window15m: "15분",
       window30m: "30분",

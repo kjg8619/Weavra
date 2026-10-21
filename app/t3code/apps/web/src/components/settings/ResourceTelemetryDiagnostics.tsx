@@ -195,7 +195,7 @@ function SourceStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm font-semibold uppercase tracking-[0.08em]",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm font-semibold",
         tone === "neutral" && "border-border/70 bg-muted/45 text-muted-foreground",
         tone === "default" &&
           "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -213,7 +213,7 @@ function SourceStatusBadge({
           tone === "danger" && "bg-destructive",
         )}
       />
-      {label} {presentation?.label ?? status}
+      {label} {presentation?.label ?? ko.settings.telemetry.sourceStatus[status]}
     </span>
   );
 }
@@ -259,7 +259,7 @@ function IconStat({
 }) {
   return (
     <div className="group min-w-0 px-4 py-4 sm:px-5">
-      <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.11em] text-muted-foreground">
+      <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
         <span
           aria-hidden="true"
           className="shrink-0 text-muted-foreground transition-colors group-hover:text-foreground/65"
@@ -297,14 +297,12 @@ function AggregateCard({
     <div className="relative overflow-hidden border-t border-border/60 px-4 py-4 first:border-t-0 md:border-t-0 md:border-l md:first:border-l-0 sm:px-5">
       <span className={cn("absolute inset-x-5 top-0 h-0.5 rounded-full opacity-75", accentClass)} />
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold uppercase tracking-[0.11em] text-muted-foreground">
-          {label}
-        </div>
+        <div className="text-sm font-semibold text-muted-foreground">{label}</div>
         <div className="rounded-md bg-muted/55 px-1.5 py-0.5 font-mono text-sm tabular-nums text-muted-foreground">
           {ko.settings.telemetry.processCount(aggregate.processCount)}
         </div>
       </div>
-      <div className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5">
+      <div className="mt-3.5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,6rem),1fr))] gap-x-4 gap-y-2.5">
         <MetricPair
           label={ko.settings.telemetry.cpu}
           value={`${aggregate.currentCpuPercent.toFixed(1)}%`}
@@ -329,9 +327,7 @@ function AggregateCard({
 function MetricPair({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-sm font-semibold text-muted-foreground">{label}</div>
       <div className="truncate font-mono text-sm font-medium tabular-nums text-foreground/90">
         {value}
       </div>
@@ -344,8 +340,8 @@ function HealthSource({ label, health }: { label: string; health: ResourceTeleme
     health.status === "unavailable" &&
     Option.exists(health.lastError, (error) => error.includes("'web' mode"));
   return (
-    <div className="flex items-start justify-between gap-4 border-t border-border/50 py-3 first:border-t-0">
-      <div className="min-w-0">
+    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-border/50 py-3 first:border-t-0">
+      <div className="min-w-0 flex-1 basis-48">
         <div className="text-sm font-medium text-foreground">{label}</div>
         <div className="mt-1 text-sm leading-relaxed text-muted-foreground">
           {expectedInBrowser
@@ -604,7 +600,7 @@ function ProcessTable({
       hideScrollbars
       className="max-h-[min(68vh,48rem)] w-full max-w-full border-t border-border/60"
     >
-      <table className="w-full min-w-[1320px] table-fixed text-left text-sm">
+      <table className="w-full min-w-[82.5rem] table-fixed text-left text-sm">
         <colgroup>
           <col className="w-[20%]" />
           <col className="w-[10%]" />
@@ -618,7 +614,7 @@ function ProcessTable({
           <col className="w-[6%]" />
           <col className="w-[4%]" />
         </colgroup>
-        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm uppercase tracking-[0.08em] text-muted-foreground">
+        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-semibold sm:pl-5">
               {ko.settings.telemetry.columnProcess}
@@ -666,7 +662,7 @@ function ProcessTable({
                   onToggle={toggle}
                 />
               </td>
-              <td className="truncate px-3 py-2 text-sm text-muted-foreground">
+              <td className="px-3 py-2 text-sm text-muted-foreground">
                 {categoryLabel(process.category)}
               </td>
               <td className="px-3 py-2 text-right font-mono tabular-nums">
@@ -723,7 +719,7 @@ function HistoryProcessTable({
       hideScrollbars
       className="max-h-[28rem] w-full max-w-full border-t border-border/60"
     >
-      <table className="w-full min-w-[1020px] table-fixed text-left text-sm">
+      <table className="w-full min-w-[63.75rem] table-fixed text-left text-sm">
         <colgroup>
           <col className="w-[24%]" />
           <col className="w-[11%]" />
@@ -735,7 +731,7 @@ function HistoryProcessTable({
           <col className="w-[7%]" />
           <col className="w-[5%]" />
         </colgroup>
-        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm uppercase tracking-[0.08em] text-muted-foreground">
+        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-semibold sm:pl-5">
               {ko.settings.telemetry.columnProcess}
@@ -787,7 +783,7 @@ function HistoryProcessTable({
                   </TooltipPopup>
                 </Tooltip>
               </td>
-              <td className="truncate px-3 py-2 text-sm text-muted-foreground">
+              <td className="px-3 py-2 text-sm text-muted-foreground">
                 {categoryLabel(process.category)}
               </td>
               <td className="px-3 py-2 text-right font-mono tabular-nums">
@@ -822,7 +818,7 @@ function HistoryProcessTable({
 function AttributionTable({ entries }: { entries: ReadonlyArray<ResourceAttributionEntry> }) {
   return (
     <div className="overflow-x-auto border-t border-border/60">
-      <table className="w-full min-w-[720px] table-fixed text-left text-sm">
+      <table className="w-full min-w-[45rem] table-fixed text-left text-sm">
         <colgroup>
           <col className="w-[22%]" />
           <col className="w-[28%]" />
@@ -831,7 +827,7 @@ function AttributionTable({ entries }: { entries: ReadonlyArray<ResourceAttribut
           <col className="w-[10%]" />
           <col className="w-[12%]" />
         </colgroup>
-        <thead className="border-b border-border/60 text-sm uppercase tracking-[0.08em] text-muted-foreground">
+        <thead className="border-b border-border/60 text-sm text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-semibold sm:pl-5">
               {ko.settings.telemetry.columnComponent}
@@ -1064,7 +1060,7 @@ export function ResourceTelemetryDiagnostics({
         <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_1px_1px_rgb(0_0_0/0.03),0_8px_30px_rgb(0_0_0/0.035)]">
           <div className="flex flex-col gap-3 border-b border-border/60 bg-linear-to-r from-muted/45 via-muted/20 to-transparent px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <div className="text-sm font-semibold text-muted-foreground">
                 {ko.settings.telemetry.footprint}
               </div>
               <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
@@ -1196,7 +1192,7 @@ export function ResourceTelemetryDiagnostics({
       >
         <div className="grid overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_1px_1px_rgb(0_0_0/0.03)] md:grid-cols-2 md:divide-x md:divide-border/60">
           <div className="px-4 py-4 sm:px-5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
               <span className="flex size-6 items-center justify-center rounded-md bg-muted/60">
                 <BatteryIcon className="size-3.5" />
               </span>
@@ -1263,7 +1259,7 @@ export function ResourceTelemetryDiagnostics({
             )}
           </div>
           <div className="border-t border-border/60 px-4 py-4 md:border-t-0 sm:px-5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
               <span className="flex size-6 items-center justify-center rounded-md bg-muted/60">
                 <GaugeIcon className="size-3.5" />
               </span>

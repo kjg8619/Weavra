@@ -232,7 +232,7 @@ import {
 } from "@t3tools/client-runtime/state/subagentRuntime";
 import { BranchToolbar, type BranchToolbarHandle } from "./BranchToolbar";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
-import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
+import ThreadTerminalDrawer, { terminalDisplayLabel } from "./ThreadTerminalDrawer";
 import {
   AlarmClockIcon,
   CheckCircle2Icon,
@@ -5227,7 +5227,7 @@ export default function ChatView(props: ChatViewProps) {
   );
   const requestCloseTerminal = useCallback(
     (terminalId: string) => {
-      const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
+      const label = terminalDisplayLabel(terminalId, activeTerminalLabelsById.get(terminalId));
       void confirmTerminalClose([label]).then((confirmed) => {
         if (confirmed) closeTerminal(terminalId);
       });
@@ -5236,7 +5236,7 @@ export default function ChatView(props: ChatViewProps) {
   );
   const requestClosePanelTerminal = useCallback(
     (terminalId: string) => {
-      const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
+      const label = terminalDisplayLabel(terminalId, activeTerminalLabelsById.get(terminalId));
       void confirmTerminalClose([label]).then((confirmed) => {
         if (confirmed) closePanelTerminal(terminalId);
       });

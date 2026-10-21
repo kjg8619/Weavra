@@ -95,7 +95,7 @@ function StatBlock({
 }) {
   return (
     <div className="min-w-0 border-border/60 px-4 py-3 sm:px-5">
-      <div className="flex min-w-0 items-center gap-2 text-sm font-medium uppercase tracking-[0.08em] text-muted-foreground">
+      <div className="flex min-w-0 items-center gap-2 text-sm font-medium text-muted-foreground">
         <span className="min-w-0 break-keep text-pretty">{label}</span>
         {tooltip ? (
           <Tooltip>
@@ -163,7 +163,7 @@ function EmptyRows({ label }: { label: string }) {
 function DiagnosticsTable({
   headers,
   children,
-  minTableWidth = "min-w-[640px]",
+  minTableWidth = "min-w-[40rem]",
   columnWidths,
 }: {
   headers: ReadonlyArray<string>;
@@ -188,7 +188,7 @@ function DiagnosticsTable({
             ))}
           </colgroup>
         ) : null}
-        <thead className="border-b border-border/60 text-sm uppercase tracking-[0.08em] text-muted-foreground">
+        <thead className="border-b border-border/60 text-sm text-muted-foreground">
           <tr>
             {headers.map((header, index) => (
               <th
@@ -370,7 +370,7 @@ function ProcessDiagnosticsTable({
       hideScrollbars
       className="max-h-[min(64vh,44rem)] w-full max-w-full rounded-none border-t border-border/60"
     >
-      <table className="w-full min-w-[1040px] table-fixed text-left text-sm">
+      <table className="w-full min-w-[65rem] table-fixed text-left text-sm">
         <colgroup>
           <col className="w-[24%]" />
           <col className="w-[8%]" />
@@ -380,7 +380,7 @@ function ProcessDiagnosticsTable({
           <col className="w-[11%]" />
           <col className="w-[6%]" />
         </colgroup>
-        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm uppercase tracking-[0.08em] text-muted-foreground">
+        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-semibold sm:pl-5">
               {ko.settings.diagnostics.columnName}
@@ -619,7 +619,7 @@ function ProcessResourceHistoryTable({
       hideScrollbars
       className="max-h-[min(64vh,44rem)] w-full max-w-full border-t border-border/60"
     >
-      <table className="w-full min-w-[980px] table-fixed text-left text-sm">
+      <table className="w-full min-w-[61.25rem] table-fixed text-left text-sm">
         <colgroup>
           <col className="w-[24%]" />
           <col className="w-[10%]" />
@@ -630,7 +630,7 @@ function ProcessResourceHistoryTable({
           <col className="w-[16%]" />
           <col className="w-[10%]" />
         </colgroup>
-        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm uppercase tracking-[0.08em] text-muted-foreground">
+        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-semibold sm:pl-5">
               {ko.settings.diagnostics.columnProcess}
@@ -1245,7 +1245,7 @@ export function DiagnosticsSettingsPanel() {
               ko.settings.diagnostics.columnCause,
               ko.settings.diagnostics.columnLastSeen,
             ]}
-            minTableWidth="min-w-[760px]"
+            minTableWidth="min-w-[47.5rem]"
           >
             {data.commonFailures.map((failure) => (
               <tr key={`${failure.name}:${failure.cause}`}>
@@ -1284,7 +1284,7 @@ export function DiagnosticsSettingsPanel() {
               ko.settings.diagnostics.columnEnded,
               ko.settings.diagnostics.columnTrace,
             ]}
-            minTableWidth="min-w-[900px]"
+            minTableWidth="min-w-[56.25rem]"
             columnWidths={["w-[44%]", "w-[14%]", "w-[12%]", "w-[30%]"]}
           >
             {data.slowestSpans.map((span) => (
@@ -1323,7 +1323,7 @@ export function DiagnosticsSettingsPanel() {
             hideScrollbars
             className="w-full max-w-full rounded-none"
           >
-            <table className="w-full min-w-[920px] table-fixed text-left text-sm">
+            <table className="w-full min-w-[57.5rem] table-fixed text-left text-sm">
               <colgroup>
                 <col className="w-[11%]" />
                 <col className="w-[9%]" />
@@ -1331,7 +1331,7 @@ export function DiagnosticsSettingsPanel() {
                 <col className="w-[26%]" />
                 <col className="w-[30%]" />
               </colgroup>
-              <thead className="border-b border-border/60 text-sm uppercase tracking-[0.08em] text-muted-foreground">
+              <thead className="border-b border-border/60 text-sm text-muted-foreground">
                 <tr>
                   <th className="whitespace-nowrap px-4 py-2.5 font-semibold sm:pl-5">
                     {ko.settings.diagnostics.columnTime}
@@ -1403,7 +1403,7 @@ export function DiagnosticsSettingsPanel() {
               ko.settings.diagnostics.columnAverage,
               ko.settings.diagnostics.columnMax,
             ]}
-            minTableWidth="min-w-[760px]"
+            minTableWidth="min-w-[47.5rem]"
             columnWidths={["w-[48%]", "w-[13%]", "w-[13%]", "w-[13%]", "w-[13%]"]}
           >
             {data.topSpansByCount.map((span) => (
