@@ -164,7 +164,7 @@ function ThemeLibraryCard({
               {variantNavigation ? (
                 <div
                   aria-label="Light and dark theme variants"
-                  className="relative h-20"
+                  className="relative h-24"
                   role="group"
                   onBlurCapture={(event) => {
                     const nextTarget = event.relatedTarget;
