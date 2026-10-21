@@ -178,6 +178,7 @@ export function ProviderModelsSection({
   // Slug of the custom model whose inline editor is open, if any.
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const addFormRef = useRef<HTMLDivElement>(null);
   // Slug of a just-added custom model, scrolled into view once its row exists.
   const scrollToSlugRef = useRef<string | null>(null);
   const hiddenModelSet = useMemo(() => new Set(hiddenModels), [hiddenModels]);
@@ -221,6 +222,19 @@ export function ProviderModelsSection({
     scrollToSlugRef.current = null;
     row.scrollIntoView({ block: "nearest" });
   }, [displayModels]);
+
+  useEffect(() => {
+    if (!isAdding) return;
+    const reveal = () => addFormRef.current?.scrollIntoView({ block: "nearest" });
+    reveal();
+    const observer = new ResizeObserver(reveal);
+    if (addFormRef.current) observer.observe(addFormRef.current);
+    window.addEventListener("resize", reveal);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", reveal);
+    };
+  }, [isAdding]);
 
   const handleAdd = () => {
     if (driverKind === "antigravity") return;
@@ -311,13 +325,14 @@ export function ProviderModelsSection({
       <TooltipTrigger
         render={
           <Button
+            data-icon-control
             size="icon-micro"
             variant="ghost"
             className={cn(
               "[--control-icon-color:currentColor]",
               isFavorite
-                ? "text-yellow-500 hover:text-yellow-600"
-                : "text-muted-foreground/40 hover:text-muted-foreground",
+                ? "text-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
             onClick={() => handleToggleFavorite(model.slug)}
             aria-label={`${isFavorite ? "Remove" : "Add"} ${model.name} ${
@@ -351,9 +366,11 @@ export function ProviderModelsSection({
             <TooltipTrigger
               render={
                 <Button
+                  data-icon-control
                   size="icon-micro"
                   variant="ghost-muted"
                   disabled={!options.canMoveUp}
+                  className="disabled:opacity-100"
                   onClick={() => handleMove(model.slug, -1)}
                   aria-label={`Move ${model.name} up`}
                 />
@@ -367,9 +384,11 @@ export function ProviderModelsSection({
             <TooltipTrigger
               render={
                 <Button
+                  data-icon-control
                   size="icon-micro"
                   variant="ghost-muted"
                   disabled={!options.canMoveDown}
+                  className="disabled:opacity-100"
                   onClick={() => handleMove(model.slug, 1)}
                   aria-label={`Move ${model.name} down`}
                 />
@@ -387,6 +406,7 @@ export function ProviderModelsSection({
             <TooltipTrigger
               render={
                 <Button
+                  data-icon-control
                   size="icon-micro"
                   variant="ghost-muted"
                   aria-label={`Edit ${model.slug}`}
@@ -404,6 +424,7 @@ export function ProviderModelsSection({
             <TooltipTrigger
               render={
                 <Button
+                  data-icon-control
                   size="icon-micro"
                   variant="ghost-muted"
                   aria-label={`Remove ${model.slug}`}
@@ -459,36 +480,25 @@ export function ProviderModelsSection({
     const canMoveUp =
       !isFiltering && previousModel !== undefined && groupOf(previousModel) === group;
     const canMoveDown = !isFiltering && nextModel !== undefined && groupOf(nextModel) === group;
-    const nameClassName = cn("text-xs", isHidden ? "text-muted-foreground" : "text-foreground/90");
+    const nameClassName = cn("text-sm", isHidden ? "text-muted-foreground" : "text-foreground");
 
     return (
       <div
         key={`${instanceId}:${model.slug}`}
         data-model-slug={model.slug}
         className={cn(
-          // Actions column is at least wide enough for the four custom-row
-          // buttons so capability labels line up across built-in and custom rows.
-          "grid h-7 grid-cols-[1.5rem_minmax(0,1fr)_auto_minmax(5.5rem,auto)_auto] items-center gap-2 rounded-md px-2 transition-colors hover:bg-muted/30",
-          isHidden && "opacity-50",
+          "flex min-h-10 flex-wrap items-center gap-2 rounded-md px-2 py-1 hover:bg-muted/30",
         )}
       >
         {starButton(model, isFavorite)}
-        <span className="flex min-w-0 items-baseline gap-2">
-          <span className={cn(nameClassName, "truncate")}>{model.name}</span>
+        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2 [overflow-wrap:anywhere]">
+          <span className={nameClassName}>{model.name}</span>
           {model.name !== model.slug ? (
-            <code className="truncate font-mono text-[11px] text-muted-foreground/70">
-              {model.slug}
-            </code>
+            <code className="font-mono text-sm text-muted-foreground">{model.slug}</code>
           ) : null}
-          {model.isCustom ? (
-            <span className="text-[11px] text-muted-foreground/70">custom</span>
-          ) : null}
+          {model.isCustom ? <span className="text-sm text-muted-foreground">custom</span> : null}
         </span>
-        {/*
-          Always a grid item so the columns line up across rows; the text
-          itself drops out on phone widths where it would starve the name.
-        */}
-        <span className="text-[11px] text-muted-foreground/70">
+        <span className="text-sm text-muted-foreground">
           {capLabels.length > 0 ? (
             <span className="hidden sm:inline">{capLabels.join(" · ")}</span>
           ) : null}
@@ -500,13 +510,13 @@ export function ProviderModelsSection({
   };
 
   const groupLabel = (label: string, isFirst: boolean) => (
-    <div className={cn("px-2 pb-1.5 text-[11px] text-muted-foreground", isFirst ? "pt-1" : "pt-5")}>
+    <div className={cn("px-2 pb-1.5 text-sm text-muted-foreground", isFirst ? "pt-1" : "pt-5")}>
       {label}
     </div>
   );
 
   return (
-    <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+    <div className="min-w-0 [&_button]:transition-[opacity,transform] [&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-solid [&_button]:focus-visible:outline-offset-2 [&_button]:focus-visible:outline-foreground [&_button]:focus-visible:ring-0 [&_button]:focus-visible:ring-offset-0 [&_button:active:not([aria-haspopup])]:scale-100">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {showFilter ? (
           <Input
@@ -523,7 +533,7 @@ export function ProviderModelsSection({
           {builtInModels.length > 0 ? (
             <Button
               type="button"
-              size="xs"
+              size="default"
               variant="ghost-muted"
               onClick={() =>
                 onHiddenModelsChange(nextHiddenModelsForBulkToggle(models, hiddenModels))
@@ -532,7 +542,7 @@ export function ProviderModelsSection({
               {allBuiltInModelsHidden ? "Enable all" : "Disable all"}
             </Button>
           ) : null}
-          <span className="text-xs text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             {models.length} model{models.length === 1 ? "" : "s"}
             {favoriteCount > 0
               ? ` · ${favoriteCount} favorite${favoriteCount === 1 ? "" : "s"}`
@@ -543,7 +553,7 @@ export function ProviderModelsSection({
         {driverKind !== "antigravity" && !isAdding ? (
           <Button
             type="button"
-            size="xs"
+            size="default"
             variant="ghost-muted"
             className="ml-auto"
             onClick={() => setIsAdding(true)}
@@ -553,12 +563,9 @@ export function ProviderModelsSection({
           </Button>
         ) : null}
       </div>
-      <div
-        ref={listRef}
-        className="mt-2 -mx-2 max-h-64 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1"
-      >
+      <div ref={listRef} className="mt-2 -mx-2">
         {visibleModels.length === 0 ? (
-          <p className="px-2 py-2 text-xs text-muted-foreground">
+          <p className="px-2 py-2 text-sm text-muted-foreground">
             {isFiltering ? "No models match." : "No models reported for this provider yet."}
           </p>
         ) : null}
@@ -599,7 +606,11 @@ export function ProviderModelsSection({
       </div>
 
       {driverKind === "antigravity" ? null : isAdding ? (
-        <div className="mt-3 flex flex-col gap-1">
+        <div
+          ref={addFormRef}
+          className="mt-3 flex scroll-m-4 flex-col gap-2 [&_input]:scroll-my-4"
+          onFocusCapture={() => addFormRef.current?.scrollIntoView({ block: "nearest" })}
+        >
           <label
             htmlFor={`provider-instance-${instanceId}-custom-model`}
             className="text-foreground text-sm"
@@ -608,14 +619,15 @@ export function ProviderModelsSection({
           </label>
           <p
             id={`provider-instance-${instanceId}-custom-model-hint`}
-            className="text-muted-foreground text-sm"
+            className="text-muted-foreground text-sm break-keep text-pretty"
           >
             공급자에 그대로 전달할 모델 이름이에요. 공급자 문서에 적힌 ID를 입력해 주세요.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Input
               id={`provider-instance-${instanceId}-custom-model`}
-              aria-describedby={`provider-instance-${instanceId}-custom-model-hint`}
+              aria-describedby={`provider-instance-${instanceId}-custom-model-hint${error ? ` provider-instance-${instanceId}-custom-model-error` : ""}`}
+              aria-invalid={error ? true : undefined}
               size="sm"
               autoFocus
               value={input}
@@ -626,6 +638,7 @@ export function ProviderModelsSection({
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   event.preventDefault();
+                  event.stopPropagation();
                   cancelAdd();
                   return;
                 }
@@ -645,11 +658,16 @@ export function ProviderModelsSection({
               </Button>
             </div>
           </div>
+          {error ? (
+            <p
+              id={`provider-instance-${instanceId}-custom-model-error`}
+              role="alert"
+              className="text-sm text-foreground"
+            >
+              {error}
+            </p>
+          ) : null}
         </div>
-      ) : null}
-
-      {driverKind !== "antigravity" && error ? (
-        <p className="mt-2 text-xs text-destructive">{error}</p>
       ) : null}
     </div>
   );

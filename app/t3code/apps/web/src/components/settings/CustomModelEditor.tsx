@@ -1,7 +1,7 @@
 "use client";
 
 import { PlusIcon, XIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProviderDriverKind, ServerProviderModel } from "@t3tools/contracts";
 import type { CustomModelDefinition } from "@t3tools/shared/model";
 
@@ -53,6 +53,13 @@ export function CustomModelEditor({
 }: CustomModelEditorProps) {
   const [draft, setDraft] = useState<CustomModelDraft>(() => draftFromDefinition(entry));
   const [error, setError] = useState<string | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const reveal = () => editorRef.current?.scrollIntoView({ block: "nearest" });
+    reveal();
+    window.addEventListener("resize", reveal);
+    return () => window.removeEventListener("resize", reveal);
+  }, []);
   const presets = useMemo(
     () => (driverKind ? (DESCRIPTOR_PRESETS_BY_KIND[driverKind] ?? []) : []),
     [driverKind],
@@ -180,6 +187,7 @@ export function CustomModelEditor({
         Default
       </label>
       <Button
+        data-icon-control
         size="icon-micro"
         variant="ghost-muted"
         aria-label="Remove choice"
@@ -258,6 +266,7 @@ export function CustomModelEditor({
           </SelectPopup>
         </Select>
         <Button
+          data-icon-control
           size="icon-micro"
           variant="ghost-muted"
           aria-label={`Remove option ${index + 1}`}
@@ -290,16 +299,24 @@ export function CustomModelEditor({
 
   return (
     <div
-      className="mx-2 mt-1 mb-2 flex flex-col gap-3 rounded-md border border-border bg-muted/20 p-3"
+      ref={editorRef}
+      className="mx-2 mt-1 mb-2 flex flex-col gap-3 rounded-md border border-border bg-muted/20 p-3 [&_button]:transition-[opacity,transform] [&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-solid [&_button]:focus-visible:outline-offset-2 [&_button]:focus-visible:outline-foreground [&_button]:focus-visible:ring-0 [&_button]:focus-visible:ring-offset-0 [&_button:active:not([aria-haspopup])]:scale-100"
+      onFocusCapture={() => {
+        const editor = editorRef.current;
+        if (editor && editor.getBoundingClientRect().height < window.innerHeight / 2) {
+          editor.scrollIntoView({ block: "nearest" });
+        }
+      }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
+          event.stopPropagation();
           onCancel();
         }
       }}
     >
       <div className="flex flex-col gap-1">
-        <label htmlFor={domId("name")} className="text-xs text-muted-foreground">
+        <label htmlFor={domId("name")} className="text-sm text-foreground">
           Display name
         </label>
         <Input
@@ -316,7 +333,7 @@ export function CustomModelEditor({
 
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-muted-foreground">Options shown in the composer</span>
+          <span className="text-sm text-muted-foreground">Options shown in the composer</span>
           {startFromCandidates.length > 0 ? (
             <Select value={START_FROM_NONE} onValueChange={handleStartFrom}>
               <SelectTrigger
@@ -337,7 +354,7 @@ export function CustomModelEditor({
           ) : null}
         </div>
         {draft.descriptors.length === 0 ? (
-          <p className="text-xs text-muted-foreground/70">
+          <p className="text-sm text-muted-foreground">
             No custom options. The composer uses the provider's default options.
           </p>
         ) : null}
@@ -372,13 +389,17 @@ export function CustomModelEditor({
         </div>
       </div>
 
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="text-sm text-foreground">
+          {error}
+        </p>
+      ) : null}
 
       <div className="flex gap-2">
-        <Button size="sm" variant="outline" onClick={handleSave}>
+        <Button size="default" variant="outline" onClick={handleSave}>
           Save
         </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
+        <Button size="default" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
       </div>

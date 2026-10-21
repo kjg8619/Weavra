@@ -18,6 +18,7 @@ import {
   createRpcLedger,
   countInActiveDialog,
   savedActionIsVisible,
+  openProviderDiagnostic,
   COMMAND_DIALOG_POPUP,
   switchCheckedState,
   SIDEBAR_VARIANT_MARKERS,
@@ -416,6 +417,79 @@ describe("saved action visibility", () => {
         page([{ role: "button", name: "Run HIG saved action", visible: false }]),
       ),
     ).toBe(false);
+  });
+});
+
+describe("provider diagnostic disclosure", () => {
+  const name = "원문 진단 및 복구 안내";
+  const fixture = (opens = true, role = "button", diagnosticName = name) => {
+    const menu = { role: "button", name: "All environments", expanded: false, id: "environment-menu" };
+    const diagnostic = {
+      role,
+      name: diagnosticName,
+      expanded: false,
+      id: "provider-instance-codex-diagnostic",
+    };
+    let focused = menu;
+    const locator = (matches: () => typeof menu[]) => ({
+      filter: () => locator(matches),
+      first: () => locator(() => matches().slice(0, 1)),
+      count: async () => matches().length,
+      waitFor: async () => {
+        if (matches().length !== 1) throw new Error("No unique expanded diagnostic");
+      },
+      focus: async () => {
+        const control = matches()[0];
+        if (!control) throw new Error("No matching control");
+        focused = control;
+      },
+      getAttribute: async (attribute: string) => {
+        const control = matches()[0];
+        if (!control) throw new Error("Stale collapsed locator");
+        return attribute === "aria-controls" ? control.id : String(control.expanded);
+      },
+    });
+    return {
+      menu,
+      diagnostic,
+      page: {
+        locator: () => locator(() => [menu, diagnostic].filter((control) => !control.expanded)),
+        getByRole: (
+          selectedRole: string,
+          options: { name: string; exact: boolean; expanded?: boolean },
+        ) =>
+          locator(() =>
+            [menu, diagnostic].filter(
+              (control) =>
+                control.role === selectedRole &&
+                (options.exact ? control.name === options.name : control.name.includes(options.name)) &&
+                (options.expanded === undefined || control.expanded === options.expanded),
+            ),
+          ),
+        keyboard: {
+          press: async () => {
+            if (opens) focused.expanded = true;
+          },
+        },
+      },
+    };
+  };
+  const assert = (_label: string, actual: unknown, expected: unknown) =>
+    expect(actual).toEqual(expected);
+  const act = async (_label: string, action: () => Promise<void>) => action();
+  test("opens the diagnostic rather than an earlier environment menu and re-queries expanded state", async () => {
+    const { page, menu, diagnostic } = fixture();
+    const target = await openProviderDiagnostic(page, assert, act, "diagnostic");
+    expect(target).toBe('[id="provider-instance-codex-diagnostic"]');
+    expect(diagnostic.expanded).toBe(true);
+    expect(menu.expanded).toBe(false);
+  });
+  test("fails when keyboard activation does not open the diagnostic", async () => {
+    await expect(openProviderDiagnostic(fixture(false).page, assert, act, "diagnostic")).rejects.toThrow();
+  });
+  test("rejects a different role or an inexact accessible name", async () => {
+    for (const page of [fixture(true, "menuitem").page, fixture(true, "button", `${name} extra`).page])
+      await expect(openProviderDiagnostic(page, assert, act, "diagnostic")).rejects.toThrow();
   });
 });
 

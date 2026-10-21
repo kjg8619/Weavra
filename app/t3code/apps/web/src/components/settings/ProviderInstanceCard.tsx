@@ -424,6 +424,7 @@ export function ProviderInstanceCard({
   onRunUpdate,
   isUpdating = false,
 }: ProviderInstanceCardProps) {
+  const [diagnosticExpanded, setDiagnosticExpanded] = useState(false);
   const enabled = resolveProviderInstanceEnabled(instance);
   // A locally disabled provider reads "Disabled" with a muted dot even if its
   // last server status is stale. Enabled providers use the server status.
@@ -432,7 +433,7 @@ export function ProviderInstanceCard({
     : "disabled";
   const statusStyle = PROVIDER_STATUS_STYLES[statusKey];
   const summary = enabled
-    ? getProviderSummary(liveProvider)
+    ? getProviderSummary(liveProvider, { concise: true })
     : { headline: "Disabled", detail: null };
   const authEmail = liveProvider?.auth.email?.trim();
   const isAuthenticated = enabled && liveProvider?.auth.status === "authenticated";
@@ -571,9 +572,7 @@ export function ProviderInstanceCard({
     statusKey === "warning" || statusKey === "error" ? (
       <span className={cn("size-1.5 shrink-0 rounded-full", statusStyle.dot)} aria-hidden />
     ) : null;
-  // Trouble states carry the server's explanation (a failed probe, a shadow
-  // home entry that is not a symlink, a missing binary). Show it wherever the
-  // headline shows so the user can act without opening the editor.
+  // The list carries the structured state; diagnostics belong to the detail.
   const needsAttention = statusKey === "warning" || statusKey === "error";
   const editorStatusNode =
     isAuthenticated && authEmail ? (
@@ -582,16 +581,13 @@ export function ProviderInstanceCard({
         <span>Authenticated as</span>
         <ProviderAuthEmail email={authEmail} />
         {authLabel ? <span>· {authLabel}</span> : null}
-        {summary.detail ? (
-          <span className="min-w-0 [overflow-wrap:anywhere]">· {summary.detail}</span>
-        ) : null}
       </>
     ) : (
       <>
         {statusDotNode}
         <span>{summary.headline}</span>
-        {summary.detail ? (
-          <span className="min-w-0 [overflow-wrap:anywhere]">· {summary.detail}</span>
+        {isAuthenticated && authLabel ? (
+          <span className="min-w-0 [overflow-wrap:anywhere]">· {authLabel}</span>
         ) : null}
       </>
     );
@@ -604,19 +600,13 @@ export function ProviderInstanceCard({
           selected ? "bg-muted/45" : "hover:bg-muted/25",
         )}
       >
-        <div
-          className={cn(
-            "pointer-events-none relative flex min-w-0 flex-1 items-start gap-3 rounded-md text-left transition-opacity",
-            !enabled && !selected && "opacity-60 group-hover:opacity-100",
-          )}
+        <button
+          type="button"
+          className="flex min-h-9 min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-md text-left outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground"
+          onClick={onSelect}
+          aria-label={`Select ${displayName}`}
+          aria-pressed={selected}
         >
-          <button
-            type="button"
-            className="pointer-events-auto absolute inset-0 cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            onClick={onSelect}
-            aria-label={`Select ${displayName}`}
-            aria-pressed={selected}
-          />
           {titleIconNode}
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-2">
@@ -631,45 +621,41 @@ export function ProviderInstanceCard({
                   {versionLabel}
                 </code>
               ) : null}
-              {versionAdvisory ? (
-                updateCommand ? (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          type="button"
-                          size="icon-micro"
-                          variant="ghost-muted"
-                          className="pointer-events-auto relative shrink-0"
-                          aria-label={`Copy ${displayName} update command`}
-                          onClick={() =>
-                            copyToClipboard(updateCommand, { providerName: displayName })
-                          }
-                        >
-                          <ArrowUpCircleIcon className="size-3.5" />
-                        </Button>
-                      }
-                    />
-                    <TooltipPopup side="top">Copy update command</TooltipPopup>
-                  </Tooltip>
-                ) : (
-                  <span role="img" aria-label="Update available" className="inline-flex shrink-0">
-                    <ArrowUpCircleIcon className="size-3.5 text-muted-foreground" />
-                  </span>
-                )
-              ) : null}
             </span>
-            <span className="mt-0.5 flex items-start gap-1.5 text-[13px] leading-[1.45] text-muted-foreground/80">
+            <span className="mt-0.5 flex items-start gap-1.5 text-sm leading-normal text-muted-foreground">
               {statusDotNode ? (
                 <span className="flex h-[1.45em] shrink-0 items-center">{statusDotNode}</span>
               ) : null}
-              <span className="line-clamp-2 [overflow-wrap:anywhere]">
-                {summary.headline}
-                {needsAttention && summary.detail ? ` · ${summary.detail}` : null}
-              </span>
+              <span className="break-keep text-pretty">{summary.headline}</span>
             </span>
           </span>
-        </div>
+        </button>
+        {versionAdvisory ? (
+          updateCommand ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    data-icon-control
+                    type="button"
+                    size="icon-micro"
+                    variant="ghost-muted"
+                    className="shrink-0"
+                    aria-label={`Copy ${displayName} update command`}
+                    onClick={() => copyToClipboard(updateCommand, { providerName: displayName })}
+                  >
+                    <ArrowUpCircleIcon className="size-3.5" />
+                  </Button>
+                }
+              />
+              <TooltipPopup side="top">Copy update command</TooltipPopup>
+            </Tooltip>
+          ) : (
+            <span role="img" aria-label="Update available" className="inline-flex shrink-0">
+              <ArrowUpCircleIcon className="size-3.5 text-muted-foreground" />
+            </span>
+          )
+        ) : null}
         <span className="flex h-5 shrink-0 items-center">
           <Switch
             checked={enabled}
@@ -807,6 +793,27 @@ export function ProviderInstanceCard({
   return (
     <>
       <SettingsSection title={displayName} icon={titleIconNode} headerAction={editorHeaderAction}>
+        {summary.detail ? (
+          <div className="mx-3 min-w-0 rounded-lg bg-muted/30 p-3 text-sm text-foreground sm:mx-4">
+            <Button
+              variant="ghost"
+              size="default"
+              aria-expanded={diagnosticExpanded}
+              aria-controls={`provider-instance-${instanceId}-diagnostic`}
+              className="h-auto min-h-8 whitespace-normal break-keep text-pretty transition-[opacity,transform] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:ring-0 focus-visible:ring-offset-0 [&:active:not([aria-haspopup])]:scale-100"
+              onClick={() => setDiagnosticExpanded((value) => !value)}
+            >
+              원문 진단 및 복구 안내
+            </Button>
+            <p
+              id={`provider-instance-${instanceId}-diagnostic`}
+              hidden={!diagnosticExpanded}
+              className="mt-2 whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              {summary.detail}
+            </p>
+          </div>
+        ) : null}
         <SettingsRow
           title="Display name"
           status={
@@ -892,7 +899,7 @@ export function ProviderInstanceCard({
           className={readOnly ? "opacity-50 select-none" : undefined}
         >
           <div className="px-3 py-3 sm:px-4">
-            <p className="mb-3 text-xs text-muted-foreground">
+            <p className="mb-3 text-sm text-muted-foreground">
               Favorites, visibility, and ordering are saved on this device. Custom models are saved
               on the selected environment.
             </p>

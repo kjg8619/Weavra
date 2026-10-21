@@ -174,11 +174,6 @@ function providerEnvironmentDetail(environment: EnvironmentPresentation): string
   return environment.displayUrl ?? "Remote device";
 }
 
-// Shared by the editor grid and the placeholder states so switching devices
-// never changes the card's footprint.
-const providerCardHeightClassName =
-  "@min-[48rem]/providers:h-[min(44rem,calc(100dvh-11rem))] @min-[48rem]/providers:min-h-[32rem]";
-
 /**
  * Same chrome as the provider editor (section heading, floating device tabs,
  * tall card) for states that cannot render provider settings yet.
@@ -201,10 +196,7 @@ function ProviderSettingsPlaceholder({
       {deviceTabs ? (
         <div className="flex min-h-11 min-w-0 items-center px-3 sm:px-4">{deviceTabs}</div>
       ) : null}
-      <SettingsGroup
-        divided={false}
-        className={cn(providerCardHeightClassName, "flex overflow-x-hidden overflow-y-auto")}
-      >
+      <SettingsGroup divided={false} className="flex min-w-0">
         <Empty className="min-h-88">
           <EmptyMedia variant="icon">{icon}</EmptyMedia>
           <EmptyHeader>
@@ -1074,49 +1066,38 @@ export function EnvironmentProviderSettings({
         ) : null}
         <SettingsGroup
           divided={false}
-          className={cn(
-            providerCardHeightClassName,
-            "overflow-hidden @min-[48rem]/providers:grid @min-[48rem]/providers:grid-cols-[17rem_minmax(0,1fr)]",
-          )}
+          className="min-w-0 @min-[48rem]/providers:grid @min-[48rem]/providers:grid-cols-[17rem_minmax(0,1fr)]"
         >
-          <div className="border-b border-border/60 bg-muted/10 @min-[48rem]/providers:flex @min-[48rem]/providers:min-h-0 @min-[48rem]/providers:flex-col @min-[48rem]/providers:border-r @min-[48rem]/providers:border-b-0">
-            <ScrollArea
-              scrollFade
-              chainVerticalScroll
-              className="@min-[48rem]/providers:min-h-0 @min-[48rem]/providers:flex-1"
-            >
-              <div className="divide-y divide-border/50">
-                {rows.map((row) => renderProviderInstance(row, "list"))}
-              </div>
-            </ScrollArea>
+          <div className="min-w-0 border-b border-border/60 bg-muted/10 @min-[48rem]/providers:border-r @min-[48rem]/providers:border-b-0">
+            <div className="divide-y divide-border/50">
+              {rows.map((row) => renderProviderInstance(row, "list"))}
+            </div>
           </div>
 
-          <div className="min-w-0 @min-[48rem]/providers:min-h-0">
+          <div className="min-w-0">
             {selectedRow ? (
-              <ScrollArea scrollFade chainVerticalScroll className="@min-[48rem]/providers:h-full">
-                <div className="space-y-6 p-4">
-                  {renderProviderInstance(selectedRow, "editor")}
-                  {selectedUpdateResult ? (
-                    <div
-                      role="status"
-                      className={cn(
-                        "rounded-lg border px-3 py-2 text-sm",
-                        selectedUpdateResult.type === "error"
-                          ? "border-destructive/32 text-destructive-foreground"
-                          : selectedUpdateResult.type === "warning"
-                            ? "border-warning/32"
-                            : "border-border/70",
-                      )}
-                      data-provider-update-result={selectedUpdateResult.phase}
-                    >
-                      <p className="font-medium">{selectedUpdateResult.title}</p>
-                      <p className="whitespace-pre-wrap text-muted-foreground">
-                        {selectedUpdateResult.description}
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-              </ScrollArea>
+              <div className="space-y-6 p-4">
+                {renderProviderInstance(selectedRow, "editor")}
+                {selectedUpdateResult ? (
+                  <div
+                    role="status"
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-sm",
+                      selectedUpdateResult.type === "error"
+                        ? "border-destructive/32 text-destructive-foreground"
+                        : selectedUpdateResult.type === "warning"
+                          ? "border-warning/32"
+                          : "border-border/70",
+                    )}
+                    data-provider-update-result={selectedUpdateResult.phase}
+                  >
+                    <p className="font-medium">{selectedUpdateResult.title}</p>
+                    <p className="whitespace-pre-wrap text-muted-foreground">
+                      {selectedUpdateResult.description}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <div className="p-6 text-sm text-muted-foreground">
                 {targetInstanceMissing
