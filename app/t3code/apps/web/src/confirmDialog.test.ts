@@ -89,6 +89,41 @@ describe("confirm dialog coordinator", () => {
     expect(readConfirmDialogState()).toEqual({ status: "idle" });
   });
 
+  it("keeps each queued target and action through the closing state", async () => {
+    const unregister = registerConfirmDialogHost();
+    const firstOptions = { title: "fixture-a", confirmLabel: "remove-a" };
+    const secondOptions = {
+      title: "fixture-b",
+      confirmLabel: "remove-b",
+      variant: "destructive",
+    } as const;
+    const first = requireConfirmation(requestConfirmDialog("first", firstOptions));
+    const second = requireConfirmation(requestConfirmDialog("second", secondOptions));
+
+    respondToConfirmDialog(false);
+    expect(readConfirmDialogState()).toEqual({
+      status: "closing",
+      message: "first",
+      variant: "default",
+      ...firstOptions,
+    });
+    completeConfirmDialogClose();
+    expect(readConfirmDialogState()).toEqual({
+      status: "confirming",
+      message: "second",
+      ...secondOptions,
+    });
+    respondToConfirmDialog(true);
+    expect(readConfirmDialogState()).toEqual({
+      status: "closing",
+      message: "second",
+      ...secondOptions,
+    });
+    await expect(Promise.all([first, second])).resolves.toEqual([false, true]);
+    completeConfirmDialogClose();
+    unregister();
+  });
+
   it("ignores responses after the active dialog has been closed", () => {
     const unregister = registerConfirmDialogHost();
     const confirmation = requireConfirmation(requestConfirmDialog("Continue?"));

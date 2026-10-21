@@ -72,6 +72,7 @@ import { useScopedModelDisabledReason } from "./useScopedModelAvailability";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import { useThreadActions } from "../../hooks/useThreadActions";
+import { useClientSettings } from "../../hooks/useSettings";
 import {
   getCustomModelOptionsByInstance,
   resolveAppModelSelectionState,
@@ -3007,7 +3008,8 @@ export function ArchivedThreadsPanel() {
   const canGoBack = useCanGoBack();
   const navigate = useNavigate();
   const { scope } = useSettingsScope();
-  const { unarchiveThread, confirmAndDeleteThread } = useThreadActions();
+  const { unarchiveThread, deleteThread } = useThreadActions();
+  const confirmThreadDelete = useClientSettings((settings) => settings.confirmThreadDelete);
   const {
     snapshots: archivedSnapshots,
     error: archiveError,
@@ -3096,7 +3098,22 @@ export function ArchivedThreadsPanel() {
       }
 
       if (clicked === "delete") {
-        const result = await confirmAndDeleteThread(threadRef);
+        const target = archivedSnapshots
+          .find(({ environmentId }) => environmentId === threadRef.environmentId)
+          ?.snapshot.threads.find((thread) => thread.id === threadRef.threadId);
+        if (!target) return;
+        if (confirmThreadDelete) {
+          const confirmed = await api.dialogs.confirm(
+            "이 스레드의 대화 기록이 영구히 지워지며 되돌릴 수 없어요.",
+            {
+              variant: "destructive",
+              title: `“${target.title}” 스레드를 삭제할까요?`,
+              confirmLabel: "스레드 삭제",
+            },
+          );
+          if (!confirmed) return;
+        }
+        const result = await deleteThread(threadRef);
         if (result._tag === "Success") {
           refreshArchivedThreads();
         } else if (!isAtomCommandInterrupted(result)) {
@@ -3111,7 +3128,7 @@ export function ArchivedThreadsPanel() {
         }
       }
     },
-    [confirmAndDeleteThread, refreshArchivedThreads, unarchiveThread],
+    [archivedSnapshots, confirmThreadDelete, deleteThread, refreshArchivedThreads, unarchiveThread],
   );
 
   return (

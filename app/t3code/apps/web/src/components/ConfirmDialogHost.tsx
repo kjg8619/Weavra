@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import {
   completeConfirmDialogClose,
@@ -52,6 +52,7 @@ function resolveConfirmDialogCopy(message: string): ConfirmationCopy {
 }
 
 export function ConfirmDialogHost() {
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const state = useSyncExternalStore(
     subscribeConfirmDialog,
     readConfirmDialogState,
@@ -60,7 +61,10 @@ export function ConfirmDialogHost() {
 
   useEffect(() => registerConfirmDialogHost(), []);
 
-  const copy = resolveConfirmDialogCopy(state.status === "idle" ? "" : state.message);
+  const copy =
+    state.status !== "idle" && state.title !== undefined
+      ? { title: state.title, description: state.message }
+      : resolveConfirmDialogCopy(state.status === "idle" ? "" : state.message);
   const confirmVariant = state.status === "idle" ? "default" : state.variant;
   const onCancel = () => respondToConfirmDialog(false);
   const onConfirm = () => respondToConfirmDialog(true);
@@ -75,19 +79,40 @@ export function ConfirmDialogHost() {
         if (!open) completeConfirmDialogClose();
       }}
     >
-      <AlertDialogPopup className="max-w-lg">
+      <AlertDialogPopup className="max-w-lg" initialFocus={titleRef}>
         <AlertDialogHeader>
-          <AlertDialogTitle className="wrap-anywhere">{copy.title}</AlertDialogTitle>
+          <AlertDialogTitle
+            ref={titleRef}
+            tabIndex={-1}
+            className="wrap-anywhere break-keep rounded-sm leading-snug focus:outline-2 focus:outline-offset-4 focus:outline-foreground"
+          >
+            {copy.title}
+          </AlertDialogTitle>
           {copy.description ? (
-            <AlertDialogDescription className="wrap-anywhere whitespace-pre-line">
+            <AlertDialogDescription className="wrap-anywhere break-keep whitespace-pre-line text-sm text-popover-foreground">
               {copy.description}
             </AlertDialogDescription>
           ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
-          <Button variant={confirmVariant} onClick={onConfirm}>
-            Confirm
+          <AlertDialogClose
+            render={
+              <Button
+                variant="outline"
+                size="lg"
+                className="rounded-none border-foreground text-sm focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground [:hover,[data-pressed]]:border-foreground"
+              />
+            }
+          >
+            {state.status !== "idle" && state.confirmLabel !== undefined ? "취소" : "Cancel"}
+          </AlertDialogClose>
+          <Button
+            variant={confirmVariant === "destructive" ? "destructive-outline" : confirmVariant}
+            size="lg"
+            className="rounded-none border-foreground text-sm focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground [:hover,[data-pressed]]:border-foreground"
+            onClick={onConfirm}
+          >
+            {state.status !== "idle" ? (state.confirmLabel ?? "Confirm") : "Confirm"}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
