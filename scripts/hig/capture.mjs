@@ -6,7 +6,15 @@ import * as NodeOS from "node:os";
 import * as NodeURL from "node:url";
 import * as NodeUtil from "node:util";
 import * as NodeModule from "node:module";
-import { DESKTOP_STATES, STRESS_STATES, LABELS, CASES, SIZES, chooseAlias } from "./cases.mjs";
+import {
+  DESKTOP_STATES,
+  STRESS_STATES,
+  LABELS,
+  CASES,
+  SIZES,
+  chooseAlias,
+  threadDeleteConfirmation,
+} from "./cases.mjs";
 import {
   seed,
   assertProfile,
@@ -336,7 +344,13 @@ async function runSize(width, height, includeStress = false) {
           .getByRole("heading", { name: "Baseline review", exact: true })
           .scrollIntoViewIfNeeded();
       }
-      const readiness = await ready(page, id === "45" ? "" : state.expected, target);
+      let expected = id === "45" ? "" : state.expected;
+      if (id === "44") {
+        const confirmation = await threadDeleteConfirmation(page);
+        target = '[role="alertdialog"]';
+        expected = confirmation.label;
+      }
+      const readiness = await ready(page, expected, target);
       NodeAssert.equal(
         networkFixture.unexpectedUpdateChecks,
         false,
@@ -766,7 +780,7 @@ async function runSize(width, height, includeStress = false) {
     }
     await nativeMenu("삭제");
     await snap("44");
-    await click("button", "cancel");
+    await click("button", "cancel", page.getByRole("alertdialog"));
     await nativeMenu("대화 이름 바꾸기");
     await page.locator('input[aria-label="대화 제목"]').waitFor();
     await snap("45");

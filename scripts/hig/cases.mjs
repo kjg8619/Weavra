@@ -54,7 +54,7 @@ const rows = [
   ["39", "chat_empty_existing_thread", "06 Empty thread"],
   ["40", "right_controlled_tasks", "baseline-project 통제 설정"],
   ["41", "chat_code_blocks_dark", "greeting"],
-  ["44", "delete_thread_confirmation", "Confirm"],
+  ["44", "delete_thread_confirmation", "03 Code blocks"],
   ["45", "rename_thread_inline", "03 Code blocks"],
   ["46", "project_settings_control", "Runtime 실행 제어"],
   ["47", "project_settings_evidence", "증거 요약"],
@@ -135,6 +135,29 @@ export function chooseAlias(counts) {
   const total = counts.reduce((sum, count) => sum + count, 0);
   if (total !== 1) throw new Error(`Selector ambiguity/missing target: ${counts.join(",")}`);
   return counts.findIndex((count) => count === 1);
+}
+
+export const DELETE_THREAD_CONFIRMATIONS = [
+  { title: 'Delete thread "03 Code blocks"?', action: "Confirm" },
+  { title: "“03 Code blocks” 스레드를 삭제할까요?", action: "스레드 삭제" },
+];
+
+export async function threadDeleteConfirmation(page) {
+  await page.getByRole("alertdialog").waitFor({ state: "visible" });
+  const index = chooseAlias(
+    await Promise.all(
+      DELETE_THREAD_CONFIRMATIONS.map(({ title }) =>
+        page.getByRole("alertdialog", { name: title, exact: true }).count(),
+      ),
+    ),
+  );
+  const { title, action } = DELETE_THREAD_CONFIRMATIONS[index];
+  const dialog = page.getByRole("alertdialog", { name: title, exact: true });
+  const button = dialog.getByRole("button", { name: action, exact: true });
+  if ((await button.count()) !== 1 || !(await button.isEnabled()))
+    throw new Error("Missing, ambiguous or disabled thread delete action");
+  await button.waitFor({ state: "visible" });
+  return { dialog, button, label: action };
 }
 
 // Assertions are selected by task, not inferred from screenshot names.
