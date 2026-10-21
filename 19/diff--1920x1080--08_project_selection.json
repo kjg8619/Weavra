@@ -1,7 +1,7 @@
 {
   "file": "1920x1080/08_project_selection.png",
   "beforeSha256": "1bb24b6f8a32ecadb10c1eee83d065c6b3a78341204e6d993edbfeda42264f92",
-  "afterSha256": "1bb24b6f8a32ecadb10c1eee83d065c6b3a78341204e6d993edbfeda42264f92",
+  "afterSha256": "a07070402804ba026e65787cd8238ff5602037392c12d57f003eb7dd57f2242f",
   "beforeDimensions": {
     "width": 1920,
     "height": 1080
@@ -22,11 +22,30 @@
       "height": 1080
     },
     "totalPixels": 2073600,
-    "diffPixels": 0,
+    "diffPixels": 100,
     "diffRatio": 0,
     "similarityScore": 100,
     "alphaChannelIntact": true,
-    "hotspots": [],
-    "summary": "100/100 similarity; 0/2073600 pixels differ."
+    "hotspots": [
+      {
+        "gridX": 3,
+        "gridY": 2,
+        "x": 720,
+        "y": 270,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0019
+      },
+      {
+        "gridX": 4,
+        "gridY": 2,
+        "x": 960,
+        "y": 270,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0011
+      }
+    ],
+    "summary": "100/100 similarity; 100/2073600 pixels differ; 2 hotspot region(s)."
   }
 }

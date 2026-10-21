@@ -1,7 +1,7 @@
 {
   "file": "1280x800/02_onboarding_agents.png",
   "beforeSha256": "a33e7bada3093f8f46a317174cefe12ea5cba9eea06a3071b15cc3a43d36ec53",
-  "afterSha256": "a33e7bada3093f8f46a317174cefe12ea5cba9eea06a3071b15cc3a43d36ec53",
+  "afterSha256": "fad33961a4da31577288472453f9bb9be53f6067a012f526377da6aba80775b6",
   "beforeDimensions": {
     "width": 1280,
     "height": 800
@@ -22,11 +22,30 @@
       "height": 800
     },
     "totalPixels": 1024000,
-    "diffPixels": 0,
-    "diffRatio": 0,
+    "diffPixels": 2744,
+    "diffRatio": 0.0027,
     "similarityScore": 100,
     "alphaChannelIntact": true,
-    "hotspots": [],
-    "summary": "100/100 similarity; 0/1024000 pixels differ."
+    "hotspots": [
+      {
+        "gridX": 5,
+        "gridY": 6,
+        "x": 800,
+        "y": 600,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1156
+      },
+      {
+        "gridX": 5,
+        "gridY": 5,
+        "x": 800,
+        "y": 500,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0559
+      }
+    ],
+    "summary": "100/100 similarity; 2744/1024000 pixels differ; 2 hotspot region(s)."
   }
 }
