@@ -1,0 +1,652 @@
+{
+  "schemaVersion": 1,
+  "selection": "21",
+  "revision": "d81bc594776ea0cf5b9ea45db6865a4f24831ded",
+  "asarSha256": "0385a57b7203aaec8be0a94fe8257b2aa85f45468ce5060b0a08e6e60b51b5ef",
+  "sources": {
+    "assert.mjs": "b5c1238a22b19f3d800898d68641a773355b5ee298ab8548e32a8b4cad65e67f",
+    "cases.mjs": "663806a5e1504a9b10495d4744ceb001aff521a6f95fb7645dbdf11589760ead",
+    "capture.mjs": "a7ba4976d7eefd0aab37461b52139adc2def12ebd4d8a8a5e8c278c9cb1c8e25",
+    "seed.mjs": "68c839b49a3e5b951ea4b6c432d43044c683d9f03bc1be7206817bb0c6101bcf"
+  },
+  "startedAt": "2026-10-21T07:52:26.549Z",
+  "checks": [
+    {
+      "caseId": "21",
+      "checkId": "theme-content-parity",
+      "status": "FAIL",
+      "assertions": [
+        {
+          "label": "same selected code thread",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "seeded code transcript contains Example",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "seeded code transcript contains greeting",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "seeded code transcript contains console.log",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "seeded code transcript contains local fixture only",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "seeded code transcript contains Profile",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "seeded code transcript contains Isolated",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "seeded code transcript contains Paid requests",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "seeded code transcript contains Zero",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "theme preserves heading code and table order",
+          "actual": [
+            {
+              "tag": "H2",
+              "text": "Example"
+            },
+            {
+              "tag": "PRE",
+              "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+            },
+            {
+              "tag": "PRE",
+              "text": "printf 'local fixture only\\n'\n"
+            },
+            {
+              "tag": "TABLE",
+              "text": "CheckResultProfileIsolatedPaid requestsZero"
+            }
+          ],
+          "expected": [
+            {
+              "tag": "H2",
+              "text": "Example"
+            },
+            {
+              "tag": "PRE",
+              "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+            },
+            {
+              "tag": "PRE",
+              "text": "printf 'local fixture only\\n'\n"
+            },
+            {
+              "tag": "TABLE",
+              "text": "CheckResultProfileIsolatedPaid requestsZero"
+            }
+          ]
+        },
+        {
+          "label": "all content has painted nonzero rectangles",
+          "actual": false,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-840-light-1.png",
+          "sha256": "98c0fe3e663320bb41448d51461961dc8a7ae359729c360ff42aef2a4a9f0ead"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-840-light-1.ax.json",
+          "sha256": "63679aa063fc8b9842570346faf244cac7901a7ec2bc133908b3cc7fd105e694"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-840-dark-2.png",
+          "sha256": "760f9219e0322247f167ee4df57fc854d9ba823ecad9db261fb65212f72ca054"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-840-dark-2.ax.json",
+          "sha256": "8c6575e06a2118951a4044e69810d0e17d47a8994e719b5a6f16e137c6aa6bb9"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-840-light-3.png",
+          "sha256": "98c0fe3e663320bb41448d51461961dc8a7ae359729c360ff42aef2a4a9f0ead"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-840-light-3.ax.json",
+          "sha256": "e6610a9cf8bcb7e83aba0efdf1728c1ad4eda46ed39b93965808164cf03c2f34"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1280-light-4.png",
+          "sha256": "f45018f03366d4672653ea8ffa4a0e989cdaac859e17b19a4c64e81940c1f08e"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1280-light-4.ax.json",
+          "sha256": "73aef5479963c407cffbb7ee5bbe848d159e22fdd782a64a946e4d900493d0d0"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1280-dark-5.png",
+          "sha256": "d9ac4ef1c8535672c8658e2c7dbefeb539613a0b4c25e476be4fbbadc80fb89d"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1280-dark-5.ax.json",
+          "sha256": "6c6073b83774b8c74d4085e95a9211e98cc60da18a3c06d41cbf5b8c294ba099"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1280-light-6.png",
+          "sha256": "f45018f03366d4672653ea8ffa4a0e989cdaac859e17b19a4c64e81940c1f08e"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1280-light-6.ax.json",
+          "sha256": "05485c6898d1d26dc207c81dfe544ed43283b72faca73f40108f7b6159ffb5e3"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1920-light-7.png",
+          "sha256": "d42aba0d2e94d98a5c2243c2756a6dff6bd7aa5064934103e04a98fc583c02dc"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1920-light-7.ax.json",
+          "sha256": "f097b0f8e17b3762b8bbd0bf827c74c74fa718e028821e7b4dee129989abf3ee"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1920-dark-8.png",
+          "sha256": "5f3a74869ff590e4bde6a977670ed59b74c5b301672b496fd603f09781477785"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1920-dark-8.ax.json",
+          "sha256": "eb596ef9852bbf6fb4b315c0fbcdbf5a8246c0603c269153e7942cc90bbd806f"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1920-light-9.png",
+          "sha256": "d42aba0d2e94d98a5c2243c2756a6dff6bd7aa5064934103e04a98fc583c02dc"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-1920-light-9.ax.json",
+          "sha256": "872a94f333636df508df7d054906e3f66a676e592da58e43bfc382a8baf4623c"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-2560-light-10.png",
+          "sha256": "3a77a8e788c14b21c81b5370eb578ba95f27dfdcf5572d572e2e8dbb500c7ed7"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-2560-light-10.ax.json",
+          "sha256": "9327d885fe1ca453a7f1d0f424266860c8ff8af814ea630759599a7a9c16e484"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-2560-dark-11.png",
+          "sha256": "265b03805e45c79e91190f730ec0946ec02026ef7738863b6f56599e5901145a"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-2560-dark-11.ax.json",
+          "sha256": "a0252a8814188313e038e4fa3569e4d027263fb6895186c14e12125b72eeb355"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-2560-light-12.png",
+          "sha256": "3a77a8e788c14b21c81b5370eb578ba95f27dfdcf5572d572e2e8dbb500c7ed7"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-2560-light-12.ax.json",
+          "sha256": "63583e519761efd638323fa1ef56be02e10aafca14182f440e952579651e4bfa"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-390-light-13.png",
+          "sha256": "8b5623872d91ab51b185ccfdcf24ab967a50faee0550941ff6fb3ffec49d9796"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-390-light-13.ax.json",
+          "sha256": "1e41e7152935a237194225079e597a76d5eeeaa737b2546ce6e2a96609d05e23"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-390-dark-14.png",
+          "sha256": "f5c39850898f634c7e86d7cecccca883ca3dcfbc0d4ab5011237e76ab189b87c"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-390-dark-14.ax.json",
+          "sha256": "0b3c9c6d01c6e13749f557bf16e35ffee8780884fb69e5e81609baacce7bd4dd"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-390-light-15.png",
+          "sha256": "8b5623872d91ab51b185ccfdcf24ab967a50faee0550941ff6fb3ffec49d9796"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/code-390-light-15.ax.json",
+          "sha256": "21875e93e40048d1b716f9d88d7206a840d66b7eaa987e97da9a2b2c8986558b"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/result.png",
+          "sha256": "3fd6e5691cb4fed276c97d85c3faa48a2c7f02e4542e950bbdabfd08d44fa5a1"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/result.ax.json",
+          "sha256": "f6e01eafe5199ea072177c52b25039ee1d932e93507c8e3c5402be014c31ed90"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/theme-content-parity/observations.json",
+          "sha256": "277ad802a8b9b3019c429d9d768b9bbe52e8a1d73620eb465963b7b6352ad543"
+        }
+      ],
+      "error": "AssertionError [ERR_ASSERTION]: all content has painted nonzero rectangles\n\nfalse !== true\n"
+    },
+    {
+      "caseId": "21",
+      "checkId": "renderer-electron-parity",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "renderer/native paired corpus",
+          "actual": 6,
+          "expected": 6
+        },
+        {
+          "label": "renderer hash",
+          "actual": "f1ad6a7eb74468f14f45f9b63d60dd7aa3b32e7055581b5a9cd8a61a9c89c387",
+          "expected": "f1ad6a7eb74468f14f45f9b63d60dd7aa3b32e7055581b5a9cd8a61a9c89c387"
+        },
+        {
+          "label": "Electron hash",
+          "actual": "d2b4c7b85c2bcf68fe9fb782f8e41c974ebbcc03e72d089b95019e53679504fc",
+          "expected": "d2b4c7b85c2bcf68fe9fb782f8e41c974ebbcc03e72d089b95019e53679504fc"
+        },
+        {
+          "label": "painted code content",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "renderer hash",
+          "actual": "62f38b6fe559a8d5c0a030095c5dcc0d10eed46337b1bc611333bdb4449583a2",
+          "expected": "62f38b6fe559a8d5c0a030095c5dcc0d10eed46337b1bc611333bdb4449583a2"
+        },
+        {
+          "label": "Electron hash",
+          "actual": "a27c9d40df5a8df95dc89399b3a643f2d52b6d4269c78943f3bf562e66a82cca",
+          "expected": "a27c9d40df5a8df95dc89399b3a643f2d52b6d4269c78943f3bf562e66a82cca"
+        },
+        {
+          "label": "painted code content",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "renderer hash",
+          "actual": "940b9872a7f8047e2582db955d272a621678ad251930be042b095a00727cad28",
+          "expected": "940b9872a7f8047e2582db955d272a621678ad251930be042b095a00727cad28"
+        },
+        {
+          "label": "Electron hash",
+          "actual": "d6e9bf1c1f6899f5d4978ecfa17efcc491bc74937933778d1f9e520db33daa51",
+          "expected": "d6e9bf1c1f6899f5d4978ecfa17efcc491bc74937933778d1f9e520db33daa51"
+        },
+        {
+          "label": "painted code content",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "renderer hash",
+          "actual": "8820891381a66be86164940e74f42a7e2763b133f07191fab758495ceba13208",
+          "expected": "8820891381a66be86164940e74f42a7e2763b133f07191fab758495ceba13208"
+        },
+        {
+          "label": "Electron hash",
+          "actual": "d2516c34425cdbbf2e2b6d207580467de07137ae3f9f408692e0c977f7e6e849",
+          "expected": "d2516c34425cdbbf2e2b6d207580467de07137ae3f9f408692e0c977f7e6e849"
+        },
+        {
+          "label": "painted code content",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "renderer hash",
+          "actual": "b937aebb5f4a152ffc6445f7a5941516543d1d16f3a2bbd22f4605506440c66e",
+          "expected": "b937aebb5f4a152ffc6445f7a5941516543d1d16f3a2bbd22f4605506440c66e"
+        },
+        {
+          "label": "Electron hash",
+          "actual": "c1c5857d32329c9ce40ef708fa2526708d668a7319b21905c2f50082318d9677",
+          "expected": "c1c5857d32329c9ce40ef708fa2526708d668a7319b21905c2f50082318d9677"
+        },
+        {
+          "label": "painted code content",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "renderer hash",
+          "actual": "51c314f2b1b51d56e0b24eb8d7a278a43a1c04e514baf36cbf5669722d63954d",
+          "expected": "51c314f2b1b51d56e0b24eb8d7a278a43a1c04e514baf36cbf5669722d63954d"
+        },
+        {
+          "label": "Electron hash",
+          "actual": "7103b7a74dc58761333937640ea8ee42e8865d9bb6488d29f90d3ad446be2b72",
+          "expected": "7103b7a74dc58761333937640ea8ee42e8865d9bb6488d29f90d3ad446be2b72"
+        },
+        {
+          "label": "painted code content",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/renderer-electron-parity/result.png",
+          "sha256": "2713df8ed42608f06a50e44c9b18903d3d617de18eddfae07739b9f792be2cd4"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/renderer-electron-parity/result.ax.json",
+          "sha256": "af05e25c3595a1a9b537db9e0a7ad5ab4c12e542c61139c67b157ddc5391819e"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/renderer-electron-parity/observations.json",
+          "sha256": "bd2e4e671d425dad0c8eeb965a2b45981ca548f9899332421f37b1cb3d584aa9"
+        }
+      ]
+    },
+    {
+      "caseId": "21",
+      "checkId": "virtual-anchor",
+      "status": "FAIL",
+      "assertions": [
+        {
+          "label": "theme retains same message and scroll anchor",
+          "actual": {
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "y": 315.796875,
+            "route": "#/7870fa7e-ec66-4e30-a190-3b5accc6b5ee/baseline-code"
+          },
+          "expected": {
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "y": 233.796875,
+            "route": "#/7870fa7e-ec66-4e30-a190-3b5accc6b5ee/baseline-code"
+          }
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/virtual-anchor/result.png",
+          "sha256": "5f3a74869ff590e4bde6a977670ed59b74c5b301672b496fd603f09781477785"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/virtual-anchor/result.ax.json",
+          "sha256": "fbf91250c371e5b3540b6e4aa5e55fb7108e72bd7ff593c05a578793ed0cfabf"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/virtual-anchor/observations.json",
+          "sha256": "cb02de52edec6f59a30ef6c911397eb72bd1a8cbe5542dccb7f883d88155cb71"
+        }
+      ],
+      "error": "AssertionError [ERR_ASSERTION]: theme retains same message and scroll anchor\n+ actual - expected\n\n  {\n    route: '#/7870fa7e-ec66-4e30-a190-3b5accc6b5ee/baseline-code',\n    text: 'export function greeting(name: string): string {\\n' +\n      '  return `Hello, ${name}!`;\\n' +\n      '}\\n' +\n      '\\n' +\n      \"console.log(greeting('Weavra'));\\n\",\n+   y: 315.796875\n-   y: 233.796875\n  }\n"
+    },
+    {
+      "caseId": "21",
+      "checkId": "native-minimum",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "native minimum unchanged",
+          "actual": [
+            840,
+            620
+          ],
+          "expected": [
+            840,
+            620
+          ]
+        },
+        {
+          "label": "native rejects unsupported dimensions",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/native-minimum/result.png",
+          "sha256": "6d1c711b9075aa0ff29ae0f108a7cc52433073f39a99c9d7d78ec0de25d98028"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/native-minimum/result.ax.json",
+          "sha256": "6a5dae444fa63c3054d98ec1abc5d86ccd00e74918a0f6559d7644f6ecdcb5d7"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/native-minimum/observations.json",
+          "sha256": "8f31f008e964527e08069b48108b2ec395626be6631a9bfeae1344cb135edd64"
+        }
+      ]
+    },
+    {
+      "caseId": "21",
+      "checkId": "git-overflow",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "Git action or labelled overflow is available",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Git and panel targets never overlap",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Git action or labelled overflow is available",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Git and panel targets never overlap",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Git action or labelled overflow is available",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Git and panel targets never overlap",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Git action or labelled overflow is available",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Git and panel targets never overlap",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Git action or labelled overflow is available",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Git and panel targets never overlap",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/toolbar-840.png",
+          "sha256": "70b92e3cb0888dd87caed545a93a8dbf5118d030ba2326dbcc58f9b635e7b1ef"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/toolbar-840.ax.json",
+          "sha256": "20d2640b80fb0769a79b77ea50c1add877b280fc305f0152555cc27e2fc9b27c"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/toolbar-1024.png",
+          "sha256": "b0211c3ccfb9ecd3f496fc36b42fa537b377cd0fb3d5f35ab59c38fcf1157f7c"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/toolbar-1024.ax.json",
+          "sha256": "19ad0065d5f3c36f0cc2fde283e088c3b314679e6c4637e74b452237cf1898e1"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/toolbar-1280.png",
+          "sha256": "6a241673c1580d10047a095319c1845e023b2961fd990daab07f6844dba070e5"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/toolbar-1280.ax.json",
+          "sha256": "32a4815105c02c2d566b69778e94ea97f6a26a649e345916a004e17fa4387d0c"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/toolbar-1920.png",
+          "sha256": "6d1c711b9075aa0ff29ae0f108a7cc52433073f39a99c9d7d78ec0de25d98028"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/toolbar-1920.ax.json",
+          "sha256": "1a15d13096953910f78f00e50beb25e1ca85f353c9898cf6d80f5deb4393bf83"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/toolbar-2560.png",
+          "sha256": "d15f3fc6d9003661f0c0ba2c6f65c27b34bf874ecf9b7c2eaf16993e922f6ab4"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/toolbar-2560.ax.json",
+          "sha256": "b31036400784e3381bf272021b881ef1fa3fba5b8b8b1abae3166c27362b4d17"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/result.png",
+          "sha256": "6d1c711b9075aa0ff29ae0f108a7cc52433073f39a99c9d7d78ec0de25d98028"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/result.ax.json",
+          "sha256": "1d4cdf539eb782ee4bce63a1940cc3a86de8fc496482d2aa4dae762010a99405"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/git-overflow/observations.json",
+          "sha256": "b616505ffcf5bfae5d9755c4853c9160430d022e59301ba417a85b032ae73906"
+        }
+      ]
+    },
+    {
+      "caseId": "21",
+      "checkId": "hit-test",
+      "status": "FAIL",
+      "assertions": [
+        {
+          "label": "panel-hit-840: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "panel-hit-840: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "panel-hit-840: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "panel icon has desktop minimum hit size",
+          "actual": false,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/hit-test/panel-hit-840.png",
+          "sha256": "70b92e3cb0888dd87caed545a93a8dbf5118d030ba2326dbcc58f9b635e7b1ef"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/hit-test/panel-hit-840.ax.json",
+          "sha256": "d144ce44928beb611b135b7b37d587cc326531d05a0fbf52f53c2ddb2edfdf0b"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/hit-test/result.png",
+          "sha256": "70b92e3cb0888dd87caed545a93a8dbf5118d030ba2326dbcc58f9b635e7b1ef"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/hit-test/result.ax.json",
+          "sha256": "d144ce44928beb611b135b7b37d587cc326531d05a0fbf52f53c2ddb2edfdf0b"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/hit-test/observations.json",
+          "sha256": "bf28e2b7e7cfafb208583e11f4bc84b2b0fda95d1d29b9052fc453422b637963"
+        }
+      ],
+      "error": "AssertionError [ERR_ASSERTION]: panel icon has desktop minimum hit size\n\nfalse !== true\n"
+    },
+    {
+      "caseId": "21",
+      "checkId": "draft-preserved",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "theme and resize retain draft",
+          "actual": "HIG unsent Korean draft: 저장하지 않은 입력",
+          "expected": "HIG unsent Korean draft: 저장하지 않은 입력"
+        },
+        {
+          "label": "no turn dispatched",
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/draft-preserved/result.png",
+          "sha256": "f1a0463d095c05e6916a72650087f20503cd70e1a78fa608859776e5128bed92"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/draft-preserved/result.ax.json",
+          "sha256": "d0df004639c2571f2ab398a6bcfb520c86a825e44be28435a3d6f73344ee2e72"
+        },
+        {
+          "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/scenarios/21/draft-preserved/observations.json",
+          "sha256": "0b7a84dcaefe714a0530ad5f4d6c45bb260835a4fad370f06f2dae290fde52ea"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-21T07:53:38.593Z",
+  "capture": {
+    "file": "run-a1ef8eb7-1966-443e-a8d2-898ac216e64a/capture-manifest.json",
+    "sha256": "d2650f2b7810a950577423e40284b51bf85e3b59756bc20bc24f090f9848e7ad"
+  },
+  "failure": "AssertionError [ERR_ASSERTION]: Scenario failed: 21/theme-content-parity: AssertionError [ERR_ASSERTION]: all content has painted nonzero rectangles\n\nfalse !== true\n\n\n'FAIL' !== 'PASS'\n"
+}
