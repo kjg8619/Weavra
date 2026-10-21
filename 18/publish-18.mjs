@@ -13,6 +13,9 @@ const json = async path => JSON.parse(await fs.readFile(join(root,path),"utf8"))
 const flat = (side, file) => `${side}--${file.replaceAll("/","--")}`;
 const [mode,arg] = process.argv.slice(2);
 async function index() {
+  const verdict=await json("acceptance-verdict.json");
+  assert.equal(verdict.product,"PASS");
+  assert.equal((await json("repeat-01/pr-18/acceptance-verdict.json")).product,"PASS");
   const pairs = [...(await json("diff/pairs.json")).pairs,...(await json("supplemental/pairs.json")).pairs], images = [];
   for (const pair of pairs) {
     assert.equal(pair.result.dimensionsMatch,true,pair.file);
@@ -59,7 +62,8 @@ if (mode === "stage") {
     "diff/pairs.json","supplemental/pairs.json","measure-summary.json","qa/scenario-receipt.json","qa-round-01/scenario-receipt.json",
     "before/capture/capture-manifest.json","after/capture/capture-manifest.json",
     "measure-before/qa-measure.json","measure-after/qa-measure.json",
-    "blocked-status.json","BLOCKER.md","blocked-accept-18.sh",
+    "acceptance-status.json","acceptance-verdict.json","repeat-01/pr-18/acceptance-verdict.json",
+    "BLOCKER.md","blocked-status.json","resume-18.sh",
     "rules-a-j.md","diff-inspection.md","pipeline-18.sh","pipeline-18-final.log",
     "tools/measure-18.mjs","tools/preload-app-gate.mjs","tools/gate.sh","tools/build.sh",
     "logs/focused.log","logs/fmt.log","logs/lint.log","logs/typecheck.log",
@@ -68,6 +72,7 @@ if (mode === "stage") {
     "logs/verify-packet-01.log","logs/verify-packet-02.log","logs/evidence-apps.log",
     "publication-head.md","publication-tail.md","publication-body.md","publish-18.mjs",
     "tools/summarize-18.mjs","tools/diff-forms.mjs","logs/parent-lint.log",
+    "logs/runner-tests.log","logs/runner-syntax.log","tools/acceptance-summary.mjs",
   ];
   for (const file of files) await fs.copyFile(join(root,file),join(out,file.replaceAll("/","--")));
   for (const round of ["qa","qa-round-01"]) {
@@ -112,7 +117,7 @@ if (mode === "stage") {
   }));
   const failures=checks.filter(c=>c.status!==200||c.sha256!==c.expected);
   const textLinks=[];
-  for (const file of ["BLOCKER.md","blocked-status.json","rules-a-j.md","measure-summary.json","publication-body.md"]) {
+  for (const file of ["acceptance-status.json","acceptance-verdict.json","rules-a-j.md","measure-summary.json","publication-body.md"]) {
     const name=file.replaceAll("/","--"), local=await fs.readFile(join(root,file));
     const response=await fetch(url(name),{signal:AbortSignal.timeout(30000)});
     const actual=sha(new Uint8Array(await response.arrayBuffer()));

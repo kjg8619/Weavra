@@ -1,8 +1,8 @@
 ## Problem and change
 
-Status: blocked by the shared runner's disclosure selector. No PR is open and
-no completed W closure is claimed. This local body is prepared for publication
-after the hig-01 owner repairs the strict acceptance scenario.
+The shared diagnostic-runner fix is integrated by a normal merge. This
+integration changes only `scripts/hig/cases.mjs` and `scripts/hig/harness.test.ts`;
+the provider product implementation is unchanged.
 
 Provider rows used to truncate a detailed CLI failure into the status sentence.
 They now show the complete structured status headline, while a labelled,
@@ -20,11 +20,11 @@ uses a ResizeObserver and preserves the selected provider and unsaved model ID.
 Model ordering, favorites, visibility and explicit save/cancel behavior remain
 at their existing persistence boundaries.
 
-Intended closure after passing acceptance: W-20, W-25 only.
+Closes: W-20, W-25 only.
 
 Base: `hig/17-archive-next-step` at `c4e04c655ec393a0641dbafbfa204d9580b992bb`.
-Head: `16955bb57c8c4611823d39e0fa3bf6960beb429e`.
-app.asar SHA-256: `84de85e7bd26789da889425241e1b278183ea9b342313c09a7fdbf0a5b781f1c`.
+Head: `fb97140d6781ff14b680cd56eec95e31fb23841b`.
+app.asar SHA-256: `9e66e7ef7014b1412ff30a6da7505884fc9e1aa49cbfff6d21392bb5e14fd69b`.
 Parent app.asar: `8aad4d93be48a7767b56d8437d48c41d26ebe6190cf2d1f2a9ef84e8ca8e4a4f`.
 
 Dependencies: stack parent [#89](https://github.com/kjg8619/Weavra/pull/89);
@@ -33,7 +33,9 @@ contextual provider feedback [#76](https://github.com/kjg8619/Weavra/pull/76),
 persistent input labels [#80](https://github.com/kjg8619/Weavra/pull/80).
 The parent's later boundary fix was merged normally, not rebased. Earlier
 builds/captures invalidated by that movement are retained locally, outside this
-final published packet. The shared hig-01 runner was not edited.
+final published packet. Shared runner
+[`6aa04ecc`](https://github.com/kjg8619/Weavra/commit/6aa04ecc910bc36c105b10930c1a0d04ffe8897e)
+was merged forward without editing the shared hig-01 worktree or rewriting history.
 
 The concise status option is explicit on provider cards. Onboarding keeps the
 existing default summary contract, and the selected provider editor retains

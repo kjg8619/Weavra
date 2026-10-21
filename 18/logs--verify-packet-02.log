@@ -1,26 +1,196 @@
-51 |   const actual = receipt.checks.map((check) => `${check.caseId}/${check.checkId}`);
-52 |   NodeAssert.equal(new Set(actual).size, actual.length, "Duplicate scenario check");
-53 |   NodeAssert.deepEqual([...actual].sort(), expected.sort(), "Missing or unexpected scenario check");
-54 |   for (const check of receipt.checks) {
-55 |     const key = `${check.caseId}/${check.checkId}`;
-56 |     NodeAssert.equal(
-                    ^
-AssertionError: Scenario failed: 18/raw-diagnostic: AssertionError [ERR_ASSERTION]: provider-raw-diagnostic: expanded
-
-'false' !== 'true'
-
-
-'FAIL' !== 'PASS'
-
- generatedMessage: false,
-     actual: "FAIL",
-   expected: "PASS",
-   operator: "strictEqual",
-       diff: "simple",
-       code: "ERR_ASSERTION"
-
-      at validateCheckCoverage (/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/assert.mjs:56:16)
-      at verifyScenarioReceipt (/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/assert.mjs:84:17)
-      at verifyPacket (/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/assert.mjs:576:38)
-
-Bun v1.4.0 (macOS arm64)
+{
+  "authority": "PACKAGED_SCENARIO_ACCEPTANCE",
+  "harness": "PASS",
+  "product": "PASS",
+  "closes": [
+    "W-20",
+    "W-25"
+  ],
+  "prerequisite": "G-07",
+  "baselineFindings": [
+    {
+      "id": "G-07",
+      "original": "47/48 can duplicate; 46 can omit prepare",
+      "disposition": "repaired-reference; no product change"
+    },
+    {
+      "id": "W-14",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-15",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-13",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-17",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-18",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-19",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-21",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-22",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-23",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-24",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-20",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-25",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-26",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-30",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-33",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-34",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-03",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-27",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-28",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-29",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-06",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-31",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-32",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-01",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-02",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-04",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-05",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-10",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-09",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-16",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-07",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-08",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-11",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    },
+    {
+      "id": "W-12",
+      "verdict": "NOT_REMEDIATED",
+      "reason": "Harness prerequisite only"
+    }
+  ],
+  "images": 152,
+  "pairs": 158,
+  "revision": "fb97140d6781ff14b680cd56eec95e31fb23841b",
+  "harnessOnly": false,
+  "cases": [
+    "18"
+  ],
+  "checks": 6,
+  "receiptSha256": "e30777875d874082e7586118587ca2497630999505431ec36b238af5ac4f55da"
+}
