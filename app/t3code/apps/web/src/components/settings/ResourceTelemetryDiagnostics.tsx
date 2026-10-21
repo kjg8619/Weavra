@@ -382,7 +382,7 @@ function DetailRow({
       <span className="text-sm text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "min-w-0 truncate text-right font-mono text-sm tabular-nums text-foreground/85",
+          "min-w-0 break-words text-right font-mono text-sm tabular-nums text-foreground/85",
           valueClassName,
         )}
       >

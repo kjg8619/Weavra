@@ -1598,7 +1598,7 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    expect(markup).toContain("Working for");
+    expect(markup).toContain(ko.chat.timeline.workingFor);
     expect(markup).toContain(ko.chat.timeline.commandRunning("pnpm"));
   });
 

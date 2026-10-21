@@ -264,6 +264,7 @@ import {
   type ReviewCommentContext,
 } from "../../reviewCommentContext";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+import { ko } from "~/i18n/ko";
 
 // ---------------------------------------------------------------------------
 // Context — shared state consumed by every row component via Context.
@@ -2620,15 +2621,15 @@ function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "workin
   // place instead of remounting the row.
   const shimmer = isPreparingWorktree || isCompacting;
   const label = isPreparingWorktree ? (
-    "worktree를 설정하는 중…"
+    ko.chat.timeline.preparingWorktree
   ) : isCompacting ? (
     <CompactingLabel />
   ) : row.createdAt ? (
     <>
-      Working for <WorkingTimer createdAt={row.createdAt} />
+      {ko.chat.timeline.workingFor} <WorkingTimer createdAt={row.createdAt} />
     </>
   ) : (
-    "Working..."
+    ko.chat.timeline.working
   );
   return (
     <div className="border-b border-border/60 pb-2 pt-1">

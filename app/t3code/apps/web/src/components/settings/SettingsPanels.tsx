@@ -2877,7 +2877,7 @@ export function GeneralSettingsPanel() {
               >
                 <SelectTrigger
                   size="sm"
-                  className="w-full sm:w-40"
+                  className="w-full sm:w-auto sm:min-w-40"
                   aria-label={copy.quit.ariaLabel}
                 >
                   <SelectValue>{QUIT_CONFIRMATION_MODE_LABELS[settings.confirmQuit]}</SelectValue>
