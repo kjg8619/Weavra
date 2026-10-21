@@ -1,0 +1,68 @@
+{
+  "todo": 20,
+  "closes": ["W-30"],
+  "source": "d81bc594776ea0cf5b9ea45db6865a4f24831ded",
+  "implementation": "ff9b25f85b770d4778d4b49204bcbab3f7d4dcfb",
+  "parent": "b4de3b5dbdf441925ac2c5d64b9276737af2f1b3",
+  "parentMerge": "d81bc594776ea0cf5b9ea45db6865a4f24831ded",
+  "runner": "7bc326a366fe5936f850afbd414809f50e4d0841",
+  "runnerMerge": "0f19e3e5b5c19d6a2d04a6f0e8f2c4c653c88161",
+  "headAsarSha256": "0385a57b7203aaec8be0a94fe8257b2aa85f45468ce5060b0a08e6e60b51b5ef",
+  "parentAsarSha256": "b8f532347d32afed00c74bd1c86082e7f006faa3fd1e1dde70bea727a73d3b65",
+  "focusedTests": {"files": 5, "passed": 33, "exitCode": 0},
+  "runnerTests": {"passed": 91, "exitCode": 0},
+  "checks": {
+    "fmt": 0,
+    "lint": 0,
+    "webTypecheck": 0,
+    "contractsTypecheck": 0,
+    "diffCheck": 0,
+    "buildBefore": 0,
+    "buildAfter": 0,
+    "state44Regression16to19": 0,
+    "measureAfter": 0,
+    "captureBefore": 0,
+    "captureAfter": 0,
+    "imageDiff": 0,
+    "acceptPr20Round01": 0,
+    "verifyPacketRound01": 0,
+    "diffCheckRound01": 0,
+    "acceptPr20Round02": 0,
+    "verifyPacketRound02": 0,
+    "diffCheckRound02": 0
+  },
+  "selfMeasurement": {
+    "rows": 2613,
+    "screenshots": 53,
+    "failures": 0,
+    "fivePointTargets": 152,
+    "hitPoints": 760,
+    "minimumTextPx": 14,
+    "minimumTextContrast": 5.825966594943867,
+    "minimumControlBoundaryContrast": 14.249762162337925
+  },
+  "state44Regression": {
+    "todos": [16, 17, 18, 19],
+    "sizes": ["1280x800", "1920x1080"],
+    "passed": 8
+  },
+  "officialPacket": {
+    "case": "20",
+    "scenariosPerRound": 5,
+    "images": 152,
+    "pairs": 158,
+    "runDirectory": "pr-20"
+  },
+  "visualInspection": {
+    "pairSheets": 40,
+    "measurementSheets": 14,
+    "unexpectedFailures": 0
+  },
+  "model": "chatgpt-subscription/gpt-5.6-sol",
+  "limitations": [
+    "Independent visual subagents were unavailable at this child-session nesting depth; the implementer opened all 40 pair sheets and 14 measurement sheets.",
+    "Full universal Q, 200% zoom, +40% copy, VoiceOver/IME and interrupted motion remain Final-wave coverage.",
+    "Queued target/action retention and generic consumers have unit coverage; no queued-dialog visual is claimed.",
+    "Existing 39 owned-file lint warnings remain; none was suppressed."
+  ]
+}
