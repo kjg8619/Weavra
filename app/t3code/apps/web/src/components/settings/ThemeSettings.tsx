@@ -728,7 +728,7 @@ export function ThemeLibrary({
     />
   );
 
-  // Keep rounded paint, with a square hit surface inside the exact border box.
+  // Keep rounded paint, with a square hit surface that cannot add scroll overflow.
   const renderModeTiles = () => (
     <div aria-label="Appearance mode" className="grid w-full grid-cols-3 gap-3" role="group">
       {(["system", "light", "dark"] as const).map((mode) => {
@@ -738,7 +738,7 @@ export function ThemeLibrary({
             aria-label={mode === "system" ? "Follow the system appearance" : `Use ${mode} mode`}
             aria-pressed={isActive}
             className={cn(
-              "relative min-w-0 flex cursor-pointer flex-col items-stretch gap-1.5 rounded-xl border border-muted-foreground p-2 text-foreground outline-none after:absolute after:-inset-px after:rounded-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground",
+              "relative min-w-0 flex cursor-pointer flex-col items-stretch gap-1.5 rounded-xl border border-muted-foreground p-2 text-foreground outline-none after:absolute after:inset-0 after:rounded-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground",
               isActive ? "bg-accent/30" : "bg-card/60 hover:bg-accent/10",
             )}
             key={mode}
