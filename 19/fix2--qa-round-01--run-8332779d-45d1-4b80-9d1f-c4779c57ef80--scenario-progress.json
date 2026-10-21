@@ -1,0 +1,230 @@
+[
+  {
+    "caseId": "19",
+    "checkId": "selection-wash-check",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "one selected appearance",
+        "actual": 1,
+        "expected": 1
+      },
+      {
+        "label": "selection includes a check",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "unfocused selection has no inset accent ring",
+        "actual": false,
+        "expected": false
+      },
+      {
+        "label": "selection has tonal wash",
+        "actual": true,
+        "expected": true
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/19/selection-wash-check/result.png",
+        "sha256": "05864a497a20721358e974f6b828320a009de27826edad1891847f99fd3a449d"
+      },
+      {
+        "file": "scenarios/19/selection-wash-check/result.ax.json",
+        "sha256": "f086f00981cc9ccde6976aa20316e5e4a663359161224fedb79d26d1d2e0ec10"
+      },
+      {
+        "file": "scenarios/19/selection-wash-check/observations.json",
+        "sha256": "e61c270fa251bfb4b99609a38c923ed6d0088af738576059645a98222417c912"
+      }
+    ]
+  },
+  {
+    "caseId": "19",
+    "checkId": "focus-not-selection",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "focus moved without selecting",
+        "actual": "true",
+        "expected": "true"
+      },
+      {
+        "label": "dark remains unselected",
+        "actual": "false",
+        "expected": "false"
+      },
+      {
+        "label": "keyboard focus visibly treated",
+        "actual": true,
+        "expected": true
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/19/focus-not-selection/result.png",
+        "sha256": "836da46f7bbde327d2de51113872c50107e51da12039384fdacb757caebeef9e"
+      },
+      {
+        "file": "scenarios/19/focus-not-selection/result.ax.json",
+        "sha256": "451da2f685a3e94466a17217f92f6d896b87e80e98f482e37bdae8c85b06e5f7"
+      },
+      {
+        "file": "scenarios/19/focus-not-selection/observations.json",
+        "sha256": "a08dc3859e55ef65610d120b71fadbe39645d5acbfa75f27fde8f0922b3f33b6"
+      }
+    ]
+  },
+  {
+    "caseId": "19",
+    "checkId": "system-live-theme",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "native appearance follows requested OS change",
+        "actual": false,
+        "expected": false
+      },
+      {
+        "label": "System remains selected through OS change",
+        "actual": "true",
+        "expected": "true"
+      },
+      {
+        "label": "native appearance follows requested OS change",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "System remains selected through OS change",
+        "actual": "true",
+        "expected": "true"
+      },
+      {
+        "label": "native appearance follows requested OS change",
+        "actual": false,
+        "expected": false
+      },
+      {
+        "label": "System remains selected through OS change",
+        "actual": "true",
+        "expected": "true"
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/19/system-live-theme/system-0-light.png",
+        "sha256": "4b3e63a37b90b48b0ad57982fe87ae2c4b09ba72e0141038453df7c82a38b020"
+      },
+      {
+        "file": "scenarios/19/system-live-theme/system-0-light.ax.json",
+        "sha256": "66f6b35462cc0cd65f140513bf0188e1ed35ffd0a57caaf9989888f7b83a6e8b"
+      },
+      {
+        "file": "scenarios/19/system-live-theme/system-1-dark.png",
+        "sha256": "5b8205915635fdd8dd9bcbb37ce8c1ab1eba58275654c771bb9af0a8bc0f3bd6"
+      },
+      {
+        "file": "scenarios/19/system-live-theme/system-1-dark.ax.json",
+        "sha256": "7cace1f0c4f143ac5e072c4df08efd56a136360c08c9032ec4050577c1639f6b"
+      },
+      {
+        "file": "scenarios/19/system-live-theme/system-2-light.png",
+        "sha256": "21edbb137b5973c038433d1f52ce90c6ff7ac608d326ec61b2f07cc9f7f0991a"
+      },
+      {
+        "file": "scenarios/19/system-live-theme/system-2-light.ax.json",
+        "sha256": "053189312f01548d0cd685560083b8a324b3096c982a542308220fce39c506f1"
+      },
+      {
+        "file": "scenarios/19/system-live-theme/result.png",
+        "sha256": "39069b9ec873a237a028a7fd949d7773b92aca51fc4b38652c1e906d65d0f6f5"
+      },
+      {
+        "file": "scenarios/19/system-live-theme/result.ax.json",
+        "sha256": "053189312f01548d0cd685560083b8a324b3096c982a542308220fce39c506f1"
+      },
+      {
+        "file": "scenarios/19/system-live-theme/observations.json",
+        "sha256": "2c11203754eeba05a34ec078158e4875fd72137240c00103efff3a29d3be677a"
+      }
+    ]
+  },
+  {
+    "caseId": "19",
+    "checkId": "custom-theme-preview",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "theme-editor: unique visible owner",
+        "actual": 1,
+        "expected": 1
+      },
+      {
+        "label": "theme-editor: positive geometry",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme-editor: five hit points",
+        "actual": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "expected": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "real theme previews remain mounted",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "opening custom editor preserves palette",
+        "actual": [
+          10,
+          10,
+          10,
+          255
+        ],
+        "expected": [
+          10,
+          10,
+          10,
+          255
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/19/custom-theme-preview/theme-editor.png",
+        "sha256": "0e069ee470ab3d9e2349bd2f5d1b624d0870d5367a62b0638e04531c0447a5eb"
+      },
+      {
+        "file": "scenarios/19/custom-theme-preview/theme-editor.ax.json",
+        "sha256": "46ccc380ded5aedfe6aff163a8e71ee8b445e0ddf730b413d8365a5cef5e30a4"
+      },
+      {
+        "file": "scenarios/19/custom-theme-preview/result.png",
+        "sha256": "a88757f5424b513f40aca0cd2854c87231dbedbb866d9e492283e7e9102fb561"
+      },
+      {
+        "file": "scenarios/19/custom-theme-preview/result.ax.json",
+        "sha256": "970464784af84a4448a2152cbafeafea246d0f9d5f489bc32006909700578a1c"
+      },
+      {
+        "file": "scenarios/19/custom-theme-preview/observations.json",
+        "sha256": "a1045d013b889fb9e0f92b28ce9401c071908185e871b6cb302ce245f48e0fdc"
+      }
+    ]
+  }
+]
