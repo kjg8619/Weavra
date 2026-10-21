@@ -61,8 +61,8 @@ const rows = [
   ["48", "project_settings_model_fitness", "순위가 아닌 계약 준수 증거"],
 ];
 // English baseline -> exact Korean current copy shipped by todo 22 (W-03). One row per row of
-// pr-22/runner-alias-request.md sections A-D. Each alias matches exactly; there is no other
-// fallback. The English stays so builds before todo 22 still resolve.
+// pr-22/runner-alias-request.md sections A-D, plus the lead's state 13 row. Each alias matches
+// exactly; there is no other fallback. The English stays so builds before todo 22 still resolve.
 export const COPY_ALIASES = [
   // A. Readiness expectations (state rows above)
   ["Add Action", "작업 추가"],
@@ -108,6 +108,8 @@ export const COPY_ALIASES = [
   ["Unarchive", "보관 해제"],
   ["baseline-project files", "baseline-project 파일"],
   ["Run HIG saved action", "HIG saved action 실행"],
+  // E. Lead addition 2026-10-22: state 13 readiness and the run graph panel name
+  ["Run 그래프", "실행 그래프"],
 ];
 const COPY = new Map(COPY_ALIASES);
 
@@ -204,6 +206,27 @@ export function auditLocaleLabels(labels) {
   return { unclassified, exceptions };
 }
 
+// Add-panel menu items are named "<panel> <shortcut>"; one exact item name per panel alias.
+export const PANEL_SHORTCUTS = {
+  파일: "F",
+  에이전트: "A",
+  "Run 그래프": "G",
+  "실행 그래프": "G",
+  기기: "M",
+  브라우저: "B",
+  터미널: "T",
+};
+export function panelMenuItem(page, names) {
+  return exactName(
+    page,
+    "menuitem",
+    names.map((name) => {
+      if (!PANEL_SHORTCUTS[name]) throw new Error(`No panel shortcut: ${name}`);
+      return `${name} ${PANEL_SHORTCUTS[name]}`;
+    }),
+  );
+}
+
 const acceptedTexts = (expected) => (COPY.has(expected) ? copyNames(expected) : [expected]);
 export const DESKTOP_STATES = rows.map(([id, name, expected]) => ({
   id,
@@ -273,7 +296,7 @@ export const LABELS = {
   addPanel: ["패널 추가"],
   files: ["파일"],
   agents: ["에이전트"],
-  graph: ["Run 그래프"],
+  graph: copyNames("Run 그래프"),
   devices: ["기기"],
   browser: ["브라우저"],
   terminal: ["터미널"],
@@ -1743,20 +1766,23 @@ export async function runScenarios(context) {
     await openPanel("파일");
     await byName(page, "button", "Refresh workspace files").waitFor();
   }
-  async function openPanel(name) {
+  // `panelNames` is one panel name or its exact baseline/current aliases.
+  async function openPanel(panelNames) {
+    const aliases = [panelNames].flat();
     const toggle = await named(page, "button", "panel");
     if ((await toggle.getAttribute("aria-pressed")) !== "true") await toggle.click();
-    const tab = page.locator("[data-active-tab]").getByRole("button", { name, exact: true });
+    const tab = exactName(page.locator("[data-active-tab]"), "button", aliases);
     if (await tab.count()) await tab.click();
     else {
       const add = page.getByRole("button", { name: "패널 추가", exact: true });
       if (await add.isVisible()) {
         await add.click();
-        const shortcut = { 파일: "F", 브라우저: "B", "Run 그래프": "G", 터미널: "T", 기기: "M" }[
-          name
-        ];
-        await page.getByRole("menuitem", { name: `${name} ${shortcut}`, exact: true }).click();
-      } else await page.getByText(name, { exact: true }).filter({ visible: true }).click();
+        await panelMenuItem(page, aliases).click();
+      } else
+        await aliases
+          .map((name) => page.getByText(name, { exact: true }).filter({ visible: true }))
+          .reduce((all, locator) => all.or(locator))
+          .click();
     }
     await settle();
   }
@@ -3593,7 +3619,7 @@ export async function runScenarios(context) {
     },
     "10/graph-no-snapshot": async (assert) => {
       await home();
-      await openPanel("Run 그래프");
+      await openPanel(names("Run 그래프"));
       await observedText(
         assert,
         "main",

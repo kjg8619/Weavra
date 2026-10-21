@@ -39,6 +39,7 @@ import {
   ariaLabelSelector,
   auditLocaleLabels,
   classifyLocaleText,
+  panelMenuItem,
 } from "./cases.mjs";
 import {
   bounded,
@@ -632,9 +633,9 @@ describe("English-baseline / Korean-current copy aliases", () => {
     english: string,
   ) => exactName(page, role, copyNamesForCheck(check, english)).click();
 
-  test("keeps exactly one alias row per runner-alias-request row", () => {
-    expect(COPY_ALIASES.length).toBe(40);
-    expect(new Set(COPY_ALIASES.map(([english]) => english)).size).toBe(40);
+  test("keeps one alias row per request row plus the lead's state 13 row", () => {
+    expect(COPY_ALIASES.length).toBe(41);
+    expect(new Set(COPY_ALIASES.map(([english]) => english)).size).toBe(41);
     for (const [english, korean] of COPY_ALIASES) {
       expect(korean).not.toBe(english);
       expect(copyNames(english)).toEqual([english, korean]);
@@ -723,6 +724,43 @@ describe("English-baseline / Korean-current copy aliases", () => {
         selectedAppearance: "다크 모드 사용",
       }),
     ).toThrow("Wrong selected appearance");
+  });
+  test("run graph panel opens by its English baseline or Korean current name", async () => {
+    for (const [label, check] of [
+      ["Run 그래프 G", "10/graph-no-snapshot"],
+      ["실행 그래프 G", "10/graph-no-snapshot"],
+      ["실행 그래프 G", "22/any"],
+    ]) {
+      const { page, actions } = fixture([
+        ["menuitem", "브라우저 B", "browser"],
+        ["menuitem", label, "graph"],
+      ]);
+      await panelMenuItem(page, copyNamesForCheck(check, "Run 그래프")).click();
+      expect(actions).toEqual(["graph"]);
+    }
+    validateVisibleState("13", { text: "Run 그래프" });
+    validateVisibleState("13", { text: "실행 그래프" });
+  });
+  test("a missing or wrongly named run graph panel fails", async () => {
+    for (const controls of [
+      [["menuitem", "브라우저 B", "browser"]],
+      [["menuitem", "실행 그래프", "graph"]],
+      [["menuitem", "Run Graph G", "graph"]],
+      [["menuitem", "실행 그래프 보기 G", "graph"]],
+      [["button", "실행 그래프 G", "graph"]],
+    ] as Array<Array<[string, string, string]>>) {
+      const { page, actions } = fixture(controls);
+      await expect(panelMenuItem(page, copyNames("Run 그래프")).click()).rejects.toThrow();
+      expect(actions).toEqual([]);
+    }
+    const english = fixture([["menuitem", "Run 그래프 G", "graph"]]);
+    await expect(
+      panelMenuItem(english.page, copyNamesForCheck("22/any", "Run 그래프")).click(),
+    ).rejects.toThrow();
+    expect(() => panelMenuItem(english.page, ["그래프"])).toThrow("No panel shortcut");
+    expect(() => validateVisibleState("13", { text: "그래프" })).toThrow(
+      "Visible state mismatch",
+    );
   });
   test("renderer selectors list one exact aria-label per alias", () => {
     expect(ariaLabelSelector(copyNames("Appearance mode"), { suffix: " [aria-pressed]" })).toBe(

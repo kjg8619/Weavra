@@ -16,6 +16,7 @@ import {
   threadDeleteConfirmation,
   copyNames,
   ariaLabelSelector,
+  panelMenuItem,
 } from "./cases.mjs";
 import {
   seed,
@@ -646,14 +647,9 @@ async function runSize(width, height, includeStress = false) {
     async function panel(key, id) {
       await click("button", "addPanel");
       // Exact accessible names in menu include an optional shortcut description.
-      const name = LABELS[key][0];
-      const shortcuts = { agents: "A", graph: "G", devices: "M", browser: "B", terminal: "T" };
-      const item = page.getByRole("menuitem", {
-        name: `${name} ${shortcuts[key]}`,
-        exact: true,
-      });
+      const item = panelMenuItem(page, LABELS[key]);
       await item.waitFor({ state: "visible" });
-      NodeAssert.equal(await item.count(), 1, `Ambiguous panel: ${name}`);
+      NodeAssert.equal(await item.count(), 1, `Ambiguous panel: ${key}`);
       await item.click();
       await snap(id);
     }
