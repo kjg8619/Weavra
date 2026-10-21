@@ -22,6 +22,7 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -979,6 +980,51 @@ export default function GitActionsControl({
   const [excludedFiles, setExcludedFiles] = useState<ReadonlySet<string>>(new Set());
   const [isEditingFiles, setIsEditingFiles] = useState(false);
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
+  const [toolbarElement, setToolbarElement] = useState<HTMLDivElement | null>(null);
+  const [compactToolbar, setCompactToolbar] = useState(true);
+  const compactToolbarRef = useRef(true);
+  const focusAfterResizeRef = useRef<HTMLElement | null>(null);
+  const [isInitMenuOpen, setIsInitMenuOpen] = useState(false);
+  useLayoutEffect(() => {
+    const container = toolbarElement?.closest('[class~="@container/header-actions"]');
+    if (!toolbarElement || !container) return;
+    const measure = () => {
+      // Match the existing @3xl/header-actions label breakpoint.
+      const compact =
+        container.getBoundingClientRect().width <
+        48 * parseFloat(getComputedStyle(document.documentElement).fontSize);
+      if (compact === compactToolbarRef.current) return;
+      const active = document.activeElement;
+      focusAfterResizeRef.current =
+        active instanceof HTMLElement && (toolbarElement.contains(active) || isInitMenuOpen)
+          ? active
+          : null;
+      compactToolbarRef.current = compact;
+      setCompactToolbar(compact);
+      setIsInitMenuOpen(false);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    const appearance = new MutationObserver(measure);
+    appearance.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    return () => {
+      observer.disconnect();
+      appearance.disconnect();
+    };
+  }, [isInitMenuOpen, toolbarElement]);
+  useLayoutEffect(() => {
+    const previous = focusAfterResizeRef.current;
+    if (!previous) return;
+    focusAfterResizeRef.current = null;
+    if (previous.isConnected && previous.checkVisibility()) previous.focus();
+    else
+      toolbarElement
+        ?.querySelector<HTMLButtonElement>(
+          compactToolbar ? 'button[aria-haspopup="menu"]' : "button",
+        )
+        ?.focus();
+  }, [compactToolbar, toolbarElement]);
   const [pendingDefaultBranchAction, setPendingDefaultBranchAction] =
     useState<PendingDefaultBranchAction | null>(null);
   const activeGitActionProgressRef = useRef<ActiveGitActionProgress | null>(null);
@@ -1631,169 +1677,251 @@ export default function GitActionsControl({
   );
 
   const canPublishRepository = isRepo && gitStatusForActions !== null && !hasPrimaryRemote;
+  const initializeRepository = () => {
+    void (async () => {
+      const result = await initAction.run();
+      if (result._tag === "Success" || isAtomCommandInterrupted(result)) return;
+      const error = squashAtomCommandFailure(result);
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Git을 초기화하지 못했어요",
+          description: error instanceof Error ? error.message : "오류가 발생했어요.",
+          ...(threadToastData !== undefined ? { data: threadToastData } : {}),
+        }),
+      );
+    })();
+  };
 
   if (!gitCwd) return null;
 
   return (
     <>
-      {!isRepo ? (
-        <Button
-          variant="outline"
-          size="xs"
-          disabled={initAction.isPending}
-          onClick={() => {
-            void (async () => {
-              const result = await initAction.run();
-              if (result._tag === "Success" || isAtomCommandInterrupted(result)) {
-                return;
-              }
-              const error = squashAtomCommandFailure(result);
-              toastManager.add(
-                stackedThreadToast({
-                  type: "error",
-                  title: "Git을 초기화하지 못했어요",
-                  description: error instanceof Error ? error.message : "오류가 발생했어요.",
-                  ...(threadToastData !== undefined ? { data: threadToastData } : {}),
-                }),
-              );
-            })();
-          }}
-        >
-          <GitBranchPlusIcon className="size-3.5" aria-hidden />
-          <span className="ml-0.5">{initAction.isPending ? "초기화하는 중..." : "Git 초기화"}</span>
-        </Button>
-      ) : (
-        <Group aria-label="Git 작업" className="shrink-0">
-          {quickActionDisabledReason ? (
-            <Popover>
-              <PopoverTrigger
-                openOnHover
+      <div
+        ref={setToolbarElement}
+        className="shrink-0"
+        data-git-toolbar
+        data-compact={compactToolbar ? "true" : "false"}
+      >
+        {!isRepo ? (
+          compactToolbar ? (
+            <Menu open={isInitMenuOpen} onOpenChange={setIsInitMenuOpen}>
+              <MenuTrigger
                 render={
                   <Button
-                    aria-disabled="true"
-                    className="cursor-not-allowed rounded-e-none border-e-0 ps-[8.5px] opacity-64 before:rounded-e-none"
-                    size="xs"
+                    data-icon-control
+                    aria-label="Git 작업"
+                    size="icon-xs"
                     variant="outline"
+                    className="border-muted-foreground disabled:opacity-100"
+                    disabled={initAction.isPending}
                   />
                 }
               >
-                <GitQuickActionIcon
-                  quickAction={quickAction}
-                  SourceControlIcon={SourceControlIcon}
-                />
-                <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5">
-                  {quickAction.label}
-                </span>
-              </PopoverTrigger>
-              <PopoverPopup tooltipStyle side="bottom" align="start">
-                {quickActionDisabledReason}
-              </PopoverPopup>
-            </Popover>
+                <GitBranchPlusIcon className="size-4" aria-hidden />
+                <span className="sr-only">Git 작업</span>
+              </MenuTrigger>
+              <MenuPopup align="end" className="min-w-40">
+                <MenuItem
+                  className="min-h-9 px-2.5 text-sm data-disabled:opacity-100 sm:min-h-9"
+                  onClick={initializeRepository}
+                >
+                  <GitBranchPlusIcon className="size-4" aria-hidden />
+                  Git 초기화
+                </MenuItem>
+              </MenuPopup>
+            </Menu>
           ) : (
             <Button
+              data-icon-control
               variant="outline"
               size="xs"
-              className="ps-[8.5px]"
-              disabled={isGitActionRunning || quickAction.disabled}
-              onClick={runQuickAction}
+              className="border-muted-foreground px-2.5 text-sm disabled:opacity-100 sm:text-sm"
+              disabled={initAction.isPending}
+              onClick={initializeRepository}
             >
-              <GitQuickActionIcon quickAction={quickAction} SourceControlIcon={SourceControlIcon} />
-              <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5">
-                {quickAction.label}
+              <GitBranchPlusIcon className="size-3.5" aria-hidden />
+              <span className="ml-0.5">
+                {initAction.isPending ? "초기화하는 중..." : "Git 초기화"}
               </span>
             </Button>
-          )}
-          <GroupSeparator className="hidden @3xl/header-actions:block" />
-          <Menu
-            onOpenChange={(open) => {
-              if (open) {
-                requestVcsStatusRefresh(refreshVcsStatus, activeEnvironmentId, gitCwd);
-              }
-            }}
-          >
-            <MenuTrigger
-              render={<Button aria-label="Git 작업 옵션" size="icon-xs" variant="outline" />}
-              disabled={isGitActionRunning}
-            >
-              <ChevronDownIcon aria-hidden="true" className="size-4" />
-            </MenuTrigger>
-            <MenuPopup align="end" className="w-full">
-              {gitActionMenuItems.map((item) => {
-                const disabledReason = getMenuActionDisabledReason({
-                  item,
-                  gitStatus: gitStatusForActions,
-                  isBusy: isGitActionRunning,
-                  hasPrimaryRemote,
-                });
-                if (item.disabled && disabledReason) {
-                  return (
-                    <Popover key={`${item.id}-${item.label}`}>
-                      <PopoverTrigger
-                        openOnHover
-                        nativeButton={false}
-                        render={<span className="block w-max cursor-not-allowed" />}
-                      >
-                        <MenuItem className="w-full" disabled>
-                          <GitActionItemIcon
-                            icon={item.icon}
-                            SourceControlIcon={SourceControlIcon}
-                          />
-                          {item.label}
-                        </MenuItem>
-                      </PopoverTrigger>
-                      <PopoverPopup tooltipStyle side="left" align="center">
-                        {disabledReason}
-                      </PopoverPopup>
-                    </Popover>
-                  );
+          )
+        ) : (
+          <Group aria-label="Git 작업" className="shrink-0">
+            {!compactToolbar &&
+              (quickActionDisabledReason ? (
+                <Popover>
+                  <PopoverTrigger
+                    openOnHover
+                    render={
+                      <Button
+                        data-icon-control
+                        aria-disabled="true"
+                        className="cursor-not-allowed rounded-e-none border-e-0 border-muted-foreground ps-[8.5px] text-sm before:rounded-e-none sm:text-sm"
+                        size="xs"
+                        variant="outline"
+                      />
+                    }
+                  >
+                    <GitQuickActionIcon
+                      quickAction={quickAction}
+                      SourceControlIcon={SourceControlIcon}
+                    />
+                    <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5">
+                      {quickAction.label}
+                    </span>
+                  </PopoverTrigger>
+                  <PopoverPopup tooltipStyle side="bottom" align="start">
+                    {quickActionDisabledReason}
+                  </PopoverPopup>
+                </Popover>
+              ) : (
+                <Button
+                  data-icon-control
+                  variant="outline"
+                  size="xs"
+                  className="border-muted-foreground ps-[8.5px] text-sm disabled:opacity-100 sm:text-sm"
+                  disabled={isGitActionRunning || quickAction.disabled}
+                  onClick={runQuickAction}
+                >
+                  <GitQuickActionIcon
+                    quickAction={quickAction}
+                    SourceControlIcon={SourceControlIcon}
+                  />
+                  <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5">
+                    {quickAction.label}
+                  </span>
+                </Button>
+              ))}
+            <GroupSeparator className="hidden @3xl/header-actions:block" />
+            <Menu
+              onOpenChange={(open) => {
+                if (open) {
+                  requestVcsStatusRefresh(refreshVcsStatus, activeEnvironmentId, gitCwd);
                 }
+              }}
+            >
+              <MenuTrigger
+                render={
+                  <Button
+                    data-icon-control
+                    aria-label="Git 작업 옵션"
+                    size="icon-xs"
+                    variant="outline"
+                    className="border-muted-foreground disabled:opacity-100"
+                  />
+                }
+                disabled={isGitActionRunning}
+              >
+                <ChevronDownIcon aria-hidden="true" className="size-4" />
+                <span className="sr-only">Git 작업</span>
+              </MenuTrigger>
+              <MenuPopup align="end" className="min-w-40">
+                {compactToolbar ? (
+                  <>
+                    <MenuItem
+                      className="min-h-9 px-2.5 text-sm data-disabled:opacity-100 sm:min-h-9"
+                      disabled={isGitActionRunning || quickAction.disabled}
+                      onClick={runQuickAction}
+                    >
+                      <GitQuickActionIcon
+                        quickAction={quickAction}
+                        SourceControlIcon={SourceControlIcon}
+                      />
+                      {quickAction.label}
+                    </MenuItem>
+                    {quickActionDisabledReason ? (
+                      <p
+                        tabIndex={0}
+                        className="max-w-64 break-keep px-2.5 py-1.5 text-sm text-muted-foreground"
+                      >
+                        {quickActionDisabledReason}
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+                {gitActionMenuItems.map((item) => {
+                  const disabledReason = getMenuActionDisabledReason({
+                    item,
+                    gitStatus: gitStatusForActions,
+                    isBusy: isGitActionRunning,
+                    hasPrimaryRemote,
+                  });
+                  if (item.disabled && disabledReason) {
+                    return (
+                      <Popover key={`${item.id}-${item.label}`}>
+                        <PopoverTrigger
+                          openOnHover
+                          nativeButton={false}
+                          render={<span className="block w-max cursor-not-allowed" />}
+                        >
+                          <MenuItem
+                            className="min-h-9 w-full px-2.5 text-sm data-disabled:opacity-100 sm:min-h-9"
+                            disabled
+                          >
+                            <GitActionItemIcon
+                              icon={item.icon}
+                              SourceControlIcon={SourceControlIcon}
+                            />
+                            {item.label}
+                          </MenuItem>
+                        </PopoverTrigger>
+                        <PopoverPopup tooltipStyle side="left" align="center">
+                          {disabledReason}
+                        </PopoverPopup>
+                      </Popover>
+                    );
+                  }
 
-                return (
+                  return (
+                    <MenuItem
+                      className="min-h-9 px-2.5 text-sm data-disabled:opacity-100 sm:min-h-9"
+                      key={`${item.id}-${item.label}`}
+                      disabled={item.disabled}
+                      onClick={() => {
+                        openDialogForMenuItem(item);
+                      }}
+                    >
+                      <GitActionItemIcon icon={item.icon} SourceControlIcon={SourceControlIcon} />
+                      {item.label}
+                    </MenuItem>
+                  );
+                })}
+                {canPublishRepository ? (
                   <MenuItem
-                    key={`${item.id}-${item.label}`}
-                    disabled={item.disabled}
+                    className="min-h-9 px-2.5 text-sm data-disabled:opacity-100 sm:min-h-9"
+                    disabled={isGitActionRunning}
                     onClick={() => {
-                      openDialogForMenuItem(item);
+                      setIsPublishDialogOpen(true);
                     }}
                   >
-                    <GitActionItemIcon icon={item.icon} SourceControlIcon={SourceControlIcon} />
-                    {item.label}
+                    <CloudUploadIcon />
+                    저장소 게시...
                   </MenuItem>
-                );
-              })}
-              {canPublishRepository ? (
-                <MenuItem
-                  disabled={isGitActionRunning}
-                  onClick={() => {
-                    setIsPublishDialogOpen(true);
-                  }}
-                >
-                  <CloudUploadIcon />
-                  저장소 게시...
-                </MenuItem>
-              ) : null}
-              {gitStatusForActions?.refName === null && (
-                <p className="px-2 py-1.5 text-xs text-warning">
-                  Detached HEAD: create and check out a branch to enable push and pull request
-                  actions.
-                </p>
-              )}
-              {gitStatusForActions &&
-                gitStatusForActions.refName !== null &&
-                !gitStatusForActions.hasWorkingTreeChanges &&
-                gitStatusForActions.behindCount > 0 &&
-                gitStatusForActions.aheadCount === 0 && (
+                ) : null}
+                {gitStatusForActions?.refName === null && (
                   <p className="px-2 py-1.5 text-xs text-warning">
-                    Behind upstream. Pull/rebase first.
+                    Detached HEAD: create and check out a branch to enable push and pull request
+                    actions.
                   </p>
                 )}
-              {gitStatusError && (
-                <p className="px-2 py-1.5 text-xs text-destructive">{gitStatusError}</p>
-              )}
-            </MenuPopup>
-          </Menu>
-        </Group>
-      )}
+                {gitStatusForActions &&
+                  gitStatusForActions.refName !== null &&
+                  !gitStatusForActions.hasWorkingTreeChanges &&
+                  gitStatusForActions.behindCount > 0 &&
+                  gitStatusForActions.aheadCount === 0 && (
+                    <p className="px-2 py-1.5 text-xs text-warning">
+                      Behind upstream. Pull/rebase first.
+                    </p>
+                  )}
+                {gitStatusError && (
+                  <p className="px-2 py-1.5 text-xs text-destructive">{gitStatusError}</p>
+                )}
+              </MenuPopup>
+            </Menu>
+          </Group>
+        )}
+      </div>
 
       <Dialog
         open={isCommitDialogOpen}
