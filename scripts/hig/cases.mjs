@@ -565,6 +565,39 @@ export function savedActionIsVisible(page) {
   return page.getByRole("button", { name: "Run HIG saved action", exact: true }).isVisible();
 }
 
+export function readRenderedBackground() {
+  const value = getComputedStyle(document.documentElement).getPropertyValue("--background");
+  if (!CSS.supports("color", value)) throw new Error(`Invalid palette background: ${value}`);
+  const probe = document.createElement("span");
+  probe.hidden = true;
+  probe.style.color = value;
+  document.documentElement.append(probe);
+  const resolved = getComputedStyle(probe).color;
+  probe.remove();
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const context = canvas.getContext("2d", { colorSpace: "srgb" });
+  context.fillStyle = resolved;
+  context.fillRect(0, 0, 1, 1);
+  // Exact 8-bit sRGB RGBA equality: zero tolerance, including alpha.
+  return [...context.getImageData(0, 0, 1, 1, { colorSpace: "srgb" }).data];
+}
+
+export async function setNativeTheme(application, page, mode) {
+  // Native System changes must reach matchMedia, not a stale Playwright override.
+  await page.emulateMedia({ colorScheme: null });
+  const nativeDark = await application.evaluate(({ nativeTheme }, mode) => {
+    nativeTheme.themeSource = mode;
+    return nativeTheme.shouldUseDarkColors;
+  }, mode);
+  await page.waitForFunction(
+    (dark) => matchMedia("(prefers-color-scheme: dark)").matches === dark,
+    nativeDark,
+    { timeout: 10_000 },
+  );
+  return nativeDark;
+}
+
 export async function openProviderDiagnostic(page, assert, act, label) {
   const control = (expanded) =>
     page.getByRole("button", { name: "원문 진단 및 복구 안내", exact: true, expanded });
@@ -3812,12 +3845,11 @@ export async function runScenarios(context) {
         exact: true,
       });
       await system.click();
-      for (const mode of ["light", "dark", "light"]) {
-        await act(`system appearance ${mode}`, () =>
-          context.application.evaluate(({ nativeTheme }, mode) => {
-            nativeTheme.themeSource = mode;
-          }, mode),
-        );
+      for (const [index, mode] of ["light", "dark", "light"].entries()) {
+        await act(`system appearance ${mode}`, async () => {
+          const nativeDark = await setNativeTheme(context.application, page, mode);
+          assert("native appearance follows requested OS change", nativeDark, mode === "dark");
+        });
         await page.waitForFunction(
           (dark) => document.documentElement.classList.contains("dark") === dark,
           mode === "dark",
@@ -3827,14 +3859,12 @@ export async function runScenarios(context) {
           await system.getAttribute("aria-pressed"),
           "true",
         );
-        await frame(`system-${mode}`);
+        await frame(`system-${index}-${mode}`);
       }
     },
     "19/custom-theme-preview": async (assert) => {
       await settings("appearance");
-      const before = await sample("palette before editor", () =>
-        getComputedStyle(document.documentElement).getPropertyValue("--background"),
-      );
+      const before = await sample("palette before editor", readRenderedBackground);
       await act("create custom theme from current palette", () =>
         page.getByRole("button", { name: "Create theme", exact: true }).click(),
       );
@@ -3850,9 +3880,7 @@ export async function runScenarios(context) {
       assert("real theme previews remain mounted", previews.length > 0, true);
       assert(
         "opening custom editor preserves palette",
-        await page.evaluate(() =>
-          getComputedStyle(document.documentElement).getPropertyValue("--background"),
-        ),
+        await sample("palette after editor", readRenderedBackground),
         before,
       );
       await page.getByRole("button", { name: "Close the theme editor", exact: true }).click();

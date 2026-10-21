@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
+import { WebView } from "bun";
 import { EventEmitter } from "node:events";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
+import { runInNewContext } from "node:vm";
 import {
   expectedFiles,
   expectedCaptureFiles,
@@ -19,6 +21,8 @@ import {
   countInActiveDialog,
   savedActionIsVisible,
   openProviderDiagnostic,
+  setNativeTheme,
+  readRenderedBackground,
   COMMAND_DIALOG_POPUP,
   switchCheckedState,
   SIDEBAR_VARIANT_MARKERS,
@@ -417,6 +421,80 @@ describe("saved action visibility", () => {
         page([{ role: "button", name: "Run HIG saved action", visible: false }]),
       ),
     ).toBe(false);
+  });
+});
+
+describe("rendered palette preservation", () => {
+  async function comparePalette(after: string) {
+    await using view = new WebView({ backend: "chrome" });
+    await view.navigate("about:blank");
+    const readColor = (value: string) =>
+      view.evaluate(`(() => {
+        document.documentElement.style.setProperty("--background", ${JSON.stringify(value)});
+        return (${readRenderedBackground.toString()})();
+      })()`);
+    const beforeColor = await readColor("oklch(14.5% 0 none)");
+    const afterColor = await readColor(after);
+    return executeCheck(
+      "19",
+      "custom-theme-preview",
+      async (assert: (label: string, actual: unknown, expected: unknown) => void) =>
+        assert("opening custom editor preserves palette", afterColor, beforeColor),
+      async () => [{ file: "palette.json", sha256: "a".repeat(64) }],
+    );
+  }
+  test("passes equivalent CSS colors rendered by headless Chromium", async () => {
+    expect((await comparePalette("oklch(0.144788 0 0)")).status).toBe("PASS");
+  }, 15_000);
+  test("fails when the rendered background really changes", async () => {
+    expect((await comparePalette("oklch(0.3 0 0)")).status).toBe("FAIL");
+  }, 15_000);
+});
+
+describe("native System color scheme", () => {
+  const fixture = (clearOverride = true) => {
+    let override: string | null = "light";
+    const nativeTheme = {
+      themeSource: "light",
+      get shouldUseDarkColors() {
+        return this.themeSource === "dark";
+      },
+    };
+    const matchMedia = () => ({
+      matches: override === null ? nativeTheme.shouldUseDarkColors : override === "dark",
+    });
+    return {
+      nativeTheme,
+      application: {
+        evaluate: async (
+          action: (electron: { nativeTheme: typeof nativeTheme }, mode: string) => boolean,
+          mode: string,
+        ) => action({ nativeTheme }, mode),
+      },
+      page: {
+        emulateMedia: async (options: { colorScheme: string | null }) => {
+          if (clearOverride) override = options.colorScheme;
+        },
+        waitForFunction: async (predicate: (dark: boolean) => boolean, dark: boolean) => {
+          if (!runInNewContext(`(${predicate})(${dark})`, { matchMedia }))
+            throw new Error("Renderer color scheme differs from native theme");
+        },
+      },
+      rendererDark: () => matchMedia().matches,
+    };
+  };
+  test("follows native light dark light despite the default light media override", async () => {
+    const { application, page, nativeTheme, rendererDark } = fixture();
+    for (const mode of ["light", "dark", "light"]) {
+      expect(await setNativeTheme(application, page, mode)).toBe(mode === "dark");
+      expect(rendererDark()).toBe(nativeTheme.shouldUseDarkColors);
+    }
+  });
+  test("fails when renderer emulation remains light after the native theme turns dark", async () => {
+    const { application, page } = fixture(false);
+    await expect(setNativeTheme(application, page, "dark")).rejects.toThrow(
+      "Renderer color scheme differs from native theme",
+    );
   });
 });
 
