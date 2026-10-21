@@ -47,17 +47,18 @@ async function inventory() {
     for (const entry of await fs.readdir(`${root}/${directory}`, { withFileTypes: true })) {
       const file = `${directory}/${entry.name}`;
       if (entry.isDirectory()) await scan(file);
-      else if (/\.(png|json|md|mjs|sh|log)$/.test(file)) await add(file);
+      else if (/\.(png|json|md|mjs|py|sh|log)$/.test(file)) await add(file);
     }
   }
   for (const directory of ["before/capture","after/capture","diff","measure-after","qa","qa-round-01","tools","review","diagnosis-parent","channel-comparison"])
     await scan(directory);
   for (const file of ["rules-a-j.md","W33-DIAGNOSIS.md","gate-results.json","lint-comparison.json",
     "ownership.json","acceptance-verdict.json","acceptance-verdict-01.json",
-    "acceptance-verdict-02.json","diff-inspection.md","publication-body.md"]) await add(file);
+    "acceptance-verdict-02.json","diff-inspection.md","publication-body.md",
+    "fixture-retention.json","packet-recovery.md"]) await add(file);
   for (const name of ["tests-desktop","lint-parent","build-before","build-after","measure-after",
     "capture-before","capture-after","diff","accept-scenarios-01","accept-scenarios-02","verify-packet-01",
-    "verify-packet-02","diff-check-01","diff-check-02","runner-identity","evidence-apps","push-source"])
+    "verify-packet-02","verify-packet-retained","diff-check-01","diff-check-02","runner-identity","evidence-apps","push-source"])
     await add(`logs/${name}.log`);
   await scan("logs/final-ink");
   assert.equal(new Set(files.map(file => file.name)).size, files.length);
@@ -95,7 +96,7 @@ async function table() {
 if (mode === "stage") {
   assert.equal(await git(arg,"branch","--show-current"), "hig-evidence/21");
   const files = await inventory(), directory = `${arg}/21`;
-  await fs.mkdir(directory);
+  await fs.mkdir(directory, { recursive: true });
   for (const file of files) await fs.copyFile(`${root}/${file.file}`,`${directory}/${file.name}`);
   const gallery = await table();
   await fs.writeFile(`${directory}/image-table.md`,gallery);
