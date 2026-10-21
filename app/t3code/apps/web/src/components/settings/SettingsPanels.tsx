@@ -1147,7 +1147,7 @@ export function AppearanceSettingsPanel() {
             ) : null
           }
           control={
-            <div className="w-full sm:w-40">
+            <div className="w-full sm:w-auto sm:min-w-40 sm:max-w-full">
               <Select
                 value={settings.diffColorScheme}
                 onValueChange={(value) => {
