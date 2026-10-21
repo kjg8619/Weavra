@@ -568,7 +568,9 @@ export function ProviderInstanceCard({
   ) : null;
 
   const versionCodeNode = versionLabel ? (
-    <code className="text-xs text-muted-foreground">{versionLabel}</code>
+    <span role="group" aria-label={copy.versionGroup(displayName)}>
+      <code className="text-xs text-muted-foreground">{versionLabel}</code>
+    </span>
   ) : null;
 
   // Healthy and disabled rows read fine from their text; only trouble gets a dot.
@@ -827,12 +829,18 @@ export function ProviderInstanceCard({
               >
                 {rawDiagnostics ? (
                   <>
-                    <p className="text-xs font-medium text-muted-foreground">
+                    <p
+                      id={`provider-instance-${instanceId}-diagnostic-label`}
+                      className="text-xs font-medium text-muted-foreground"
+                    >
                       {ko.common.rawDiagnostics}
                     </p>
-                    <p className="mt-1 whitespace-pre-wrap font-mono text-xs select-text [overflow-wrap:anywhere]">
+                    <pre
+                      aria-labelledby={`provider-instance-${instanceId}-diagnostic-label`}
+                      className="mt-1 whitespace-pre-wrap font-mono text-xs select-text [overflow-wrap:anywhere]"
+                    >
                       {rawDiagnostics}
-                    </p>
+                    </pre>
                   </>
                 ) : (
                   <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{summary.detail}</p>

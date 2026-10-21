@@ -1266,6 +1266,7 @@ export const ko = freeze({
       connectEnvironment: "환경을 연결해 공급자를 설정해 주세요.",
     }),
     card: freeze({
+      versionGroup: (providerName: string) => `${providerName} 버전`,
       toggleEmailVisibility: "계정 이메일 표시 전환",
       revealEmail: "클릭해서 이메일 보기",
       hideEmail: "클릭해서 이메일 숨기기",
