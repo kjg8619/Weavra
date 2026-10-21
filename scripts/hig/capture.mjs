@@ -242,6 +242,7 @@ async function runSize(width, height, includeStress = false) {
   packet.runs.push(run);
   try {
     application = await _electron.launch({
+      colorScheme: null,
       executablePath: NodePath.join(bundle, "Contents/MacOS/weavra-desktop"),
       args: [`--user-data-dir=${isolation.home}/chromium`, "--disable-background-networking"],
       env: {

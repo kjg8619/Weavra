@@ -565,6 +565,21 @@ export function savedActionIsVisible(page) {
   return page.getByRole("button", { name: "Run HIG saved action", exact: true }).isVisible();
 }
 
+export async function setNativeTheme(application, page, mode) {
+  // Native System changes must reach matchMedia, not a stale Playwright override.
+  await page.emulateMedia({ colorScheme: null });
+  const nativeDark = await application.evaluate(({ nativeTheme }, mode) => {
+    nativeTheme.themeSource = mode;
+    return nativeTheme.shouldUseDarkColors;
+  }, mode);
+  await page.waitForFunction(
+    (dark) => matchMedia("(prefers-color-scheme: dark)").matches === dark,
+    nativeDark,
+    { timeout: 10_000 },
+  );
+  return nativeDark;
+}
+
 export async function openProviderDiagnostic(page, assert, act, label) {
   const control = (expanded) =>
     page.getByRole("button", { name: "원문 진단 및 복구 안내", exact: true, expanded });
@@ -3812,12 +3827,11 @@ export async function runScenarios(context) {
         exact: true,
       });
       await system.click();
-      for (const mode of ["light", "dark", "light"]) {
-        await act(`system appearance ${mode}`, () =>
-          context.application.evaluate(({ nativeTheme }, mode) => {
-            nativeTheme.themeSource = mode;
-          }, mode),
-        );
+      for (const [index, mode] of ["light", "dark", "light"].entries()) {
+        await act(`system appearance ${mode}`, async () => {
+          const nativeDark = await setNativeTheme(context.application, page, mode);
+          assert("native appearance follows requested OS change", nativeDark, mode === "dark");
+        });
         await page.waitForFunction(
           (dark) => document.documentElement.classList.contains("dark") === dark,
           mode === "dark",
@@ -3827,7 +3841,7 @@ export async function runScenarios(context) {
           await system.getAttribute("aria-pressed"),
           "true",
         );
-        await frame(`system-${mode}`);
+        await frame(`system-${index}-${mode}`);
       }
     },
     "19/custom-theme-preview": async (assert) => {

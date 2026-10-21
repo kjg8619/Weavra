@@ -4,6 +4,7 @@ import { EventEmitter } from "node:events";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
+import { runInNewContext } from "node:vm";
 import {
   expectedFiles,
   expectedCaptureFiles,
@@ -19,6 +20,7 @@ import {
   countInActiveDialog,
   savedActionIsVisible,
   openProviderDiagnostic,
+  setNativeTheme,
   COMMAND_DIALOG_POPUP,
   switchCheckedState,
   SIDEBAR_VARIANT_MARKERS,
@@ -417,6 +419,53 @@ describe("saved action visibility", () => {
         page([{ role: "button", name: "Run HIG saved action", visible: false }]),
       ),
     ).toBe(false);
+  });
+});
+
+describe("native System color scheme", () => {
+  const fixture = (clearOverride = true) => {
+    let override: string | null = "light";
+    const nativeTheme = {
+      themeSource: "light",
+      get shouldUseDarkColors() {
+        return this.themeSource === "dark";
+      },
+    };
+    const matchMedia = () => ({
+      matches: override === null ? nativeTheme.shouldUseDarkColors : override === "dark",
+    });
+    return {
+      nativeTheme,
+      application: {
+        evaluate: async (
+          action: (electron: { nativeTheme: typeof nativeTheme }, mode: string) => boolean,
+          mode: string,
+        ) => action({ nativeTheme }, mode),
+      },
+      page: {
+        emulateMedia: async (options: { colorScheme: string | null }) => {
+          if (clearOverride) override = options.colorScheme;
+        },
+        waitForFunction: async (predicate: (dark: boolean) => boolean, dark: boolean) => {
+          if (!runInNewContext(`(${predicate})(${dark})`, { matchMedia }))
+            throw new Error("Renderer color scheme differs from native theme");
+        },
+      },
+      rendererDark: () => matchMedia().matches,
+    };
+  };
+  test("follows native light dark light despite the default light media override", async () => {
+    const { application, page, nativeTheme, rendererDark } = fixture();
+    for (const mode of ["light", "dark", "light"]) {
+      expect(await setNativeTheme(application, page, mode)).toBe(mode === "dark");
+      expect(rendererDark()).toBe(nativeTheme.shouldUseDarkColors);
+    }
+  });
+  test("fails when renderer emulation remains light after the native theme turns dark", async () => {
+    const { application, page } = fixture(false);
+    await expect(setNativeTheme(application, page, "dark")).rejects.toThrow(
+      "Renderer color scheme differs from native theme",
+    );
   });
 });
 
