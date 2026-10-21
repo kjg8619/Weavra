@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "selection": "20",
+  "revision": "d81bc594776ea0cf5b9ea45db6865a4f24831ded",
+  "asarSha256": "0385a57b7203aaec8be0a94fe8257b2aa85f45468ce5060b0a08e6e60b51b5ef",
+  "sources": {
+    "assert.mjs": "b5c1238a22b19f3d800898d68641a773355b5ee298ab8548e32a8b4cad65e67f",
+    "cases.mjs": "a99485e55a27d6c39288dc58a82232927fdb5bf51a0f732d54a1cdb2e7544356",
+    "capture.mjs": "a7ba4976d7eefd0aab37461b52139adc2def12ebd4d8a8a5e8c278c9cb1c8e25",
+    "seed.mjs": "68c839b49a3e5b951ea4b6c432d43044c683d9f03bc1be7206817bb0c6101bcf"
+  },
+  "startedAt": "2026-10-21T06:57:20.591Z",
+  "checks": [
+    {
+      "caseId": "20",
+      "checkId": "named-delete-consequence",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "one confirmation owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "target identity in confirmation",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "named destructive action",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "permanent consequence is described",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/named-delete-consequence/result.png",
+          "sha256": "11919115c6a18f7f74306157762d3875936bf3ac8edd2c8aa902afe900cb028e"
+        },
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/named-delete-consequence/result.ax.json",
+          "sha256": "4deae7ae8e7a56a9d212a878621a2bfdf5aa0997b0d3bf162a7adbd90904db58"
+        },
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/named-delete-consequence/observations.json",
+          "sha256": "9d71f4b4951e80c4b7ee21d7b876073f02bd26db6b960a23fbdbba585eb6c710"
+        }
+      ]
+    },
+    {
+      "caseId": "20",
+      "checkId": "target-identity",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "correct named target",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "other fixture not target",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "cancel preserves selected route",
+          "actual": "#/c386c520-a33b-4cd6-a6d4-92ee7583c857/baseline-code",
+          "expected": "#/c386c520-a33b-4cd6-a6d4-92ee7583c857/baseline-code"
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/target-identity/result.png",
+          "sha256": "cba56c069d1094efe8f16bc8e111600f758822f1d5f88f0d2f47162fa60c625f"
+        },
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/target-identity/result.ax.json",
+          "sha256": "6f70b1e9837dbc41d6d3412bd4b700e334e86ad2191bac12545b6f79a90f9bb8"
+        },
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/target-identity/observations.json",
+          "sha256": "bc1c70ba6cd60d22681364b39dea0bff32640465adeb158db44f73ab0a4e6ade"
+        }
+      ]
+    },
+    {
+      "caseId": "20",
+      "checkId": "enter-no-delete",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "initial focus is neutral",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "unchosen Enter retains confirmation",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "thread still exists",
+          "actual": 1,
+          "expected": 1
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/enter-no-delete/result.png",
+          "sha256": "085d61df2447934943218cc18cd29bfc42c54f1069e45a2b7dd9db4616625c70"
+        },
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/enter-no-delete/result.ax.json",
+          "sha256": "04c3781da825c51b9da6ec7620fc5af738c56750eaaaf5a2787b33306882465c"
+        },
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/enter-no-delete/observations.json",
+          "sha256": "524a8556673809bf8ddcabfddd147d594e62f6f8fd7017281a5641d498f78eb2"
+        }
+      ]
+    },
+    {
+      "caseId": "20",
+      "checkId": "escape-cancel",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "selected fixture retained",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "other fixture retained",
+          "actual": 1,
+          "expected": 1
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/escape-cancel/result.png",
+          "sha256": "940083416140fc69c7f5d8b66fe68b3714cbc3f9e797186e6b1d8d048d9c8d42"
+        },
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/escape-cancel/result.ax.json",
+          "sha256": "85abb7779e59a46d9fb797070bc3345379c032b90b073415af7d560dc0d9043d"
+        },
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/escape-cancel/observations.json",
+          "sha256": "26415a55d8a274a8dbf480fb8cc76a9dca672551b0341cc22d0d7325a6e841b7"
+        }
+      ]
+    },
+    {
+      "caseId": "20",
+      "checkId": "focus-return",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "focus returns to originating thread",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/focus-return/result.png",
+          "sha256": "e297c440568c8aa72f18a264579fa05d4b73ea650eb811154cd25bafbaf7f496"
+        },
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/focus-return/result.ax.json",
+          "sha256": "50b9e8f75f4aa1202df5ea9c9e2c9068891e6cafa376699eb9fb02ed45a465e4"
+        },
+        {
+          "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/scenarios/20/focus-return/observations.json",
+          "sha256": "bdf3de4ec353cc7d82475957e89d79e99c335aaa07ec9787cbdf38533541e6d0"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-21T06:58:20.510Z",
+  "capture": {
+    "file": "run-78d39eb6-ef93-40c9-8ab0-061ae670702c/capture-manifest.json",
+    "sha256": "ec2e9ddb53ecfe57af636bd98395830a4ce0db22d6e1720482cff8adae21af4b"
+  }
+}
