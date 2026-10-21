@@ -11,6 +11,8 @@ import {
   STRESS_STATES,
   CASES,
   DELETE_THREAD_CONFIRMATIONS,
+  copyNames,
+  ariaLabelSelector,
 } from "./cases.mjs";
 import { bounded } from "../problem-cycle-browser.mjs";
 
@@ -220,8 +222,15 @@ export async function runCases(selection, evidence) {
   }
   return receipt;
 }
+// Renderer selectors for observeVisibleState, one exact aria-label per copy alias.
+export const VISIBLE_STATE_SELECTORS = {
+  selectedAppearance: ariaLabelSelector(copyNames("Appearance mode"), {
+    suffix: ' [aria-pressed="true"]',
+  }),
+  filesRefresh: ariaLabelSelector(copyNames("Refresh workspace files"), { prefix: "button" }),
+};
 // Runs in the renderer. Text in a mounted but clipped pane is not screenshot evidence.
-export function observeVisibleState({ target, boundary }) {
+export function observeVisibleState({ target, boundary, selectors }) {
   const visible = (element, rect) => {
     if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
     let clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
@@ -285,14 +294,14 @@ export function observeVisibleState({ target, boundary }) {
     route: location.hash,
     theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
     selectedAppearance: document
-      .querySelector('[aria-label="Appearance mode"] [aria-pressed="true"]')
+      .querySelector(selectors.selectedAppearance)
       ?.getAttribute("aria-label"),
     customModel: document.querySelector('input[id$="-custom-model"]')?.value,
     renameTitle: [...document.querySelectorAll('input[aria-label="대화 제목"]')]
       .filter((e) => visible(e, e.getBoundingClientRect()))
       .map((e) => e.value),
-    filesPane: [...document.querySelectorAll('button[aria-label="Refresh workspace files"]')].some(
-      (e) => visible(e, e.getBoundingClientRect()),
+    filesPane: [...document.querySelectorAll(selectors.filesRefresh)].some((e) =>
+      visible(e, e.getBoundingClientRect()),
     ),
     terminal: [...document.querySelectorAll("canvas")].some((e) =>
       visible(e, e.getBoundingClientRect()),
@@ -322,8 +331,8 @@ export function validateVisibleState(id, observation, contract = {}) {
     );
   else if (id !== "45" && (!boundary || boundary !== "end"))
     NodeAssert.ok(
-      observation.text.includes(state.expected),
-      `Visible state mismatch ${id}: ${state.expected}`,
+      state.accepted.some((expected) => observation.text.includes(expected)),
+      `Visible state mismatch ${id}: ${state.accepted.join(" | ")}`,
     );
   if (boundary) {
     NodeAssert.equal(observation.boundary?.position, boundary, `Wrong boundary ${id}`);
@@ -342,9 +351,10 @@ export function validateVisibleState(id, observation, contract = {}) {
   if (id === "10") NodeAssert.ok(observation.filesPane, "Files pane not visible");
   if (id === "16") NodeAssert.ok(observation.terminal, "Terminal not initialized");
   if (id === "18" || id === "19")
-    NodeAssert.equal(
-      observation.selectedAppearance,
-      `Use ${id === "18" ? "light" : "dark"} mode`,
+    NodeAssert.ok(
+      copyNames(`Use ${id === "18" ? "light" : "dark"} mode`).includes(
+        observation.selectedAppearance,
+      ),
       "Wrong selected appearance",
     );
   if (id === "28")

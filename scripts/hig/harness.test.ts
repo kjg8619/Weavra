@@ -32,6 +32,18 @@ import {
   TOAST_SELECTOR,
   iconTargetMeetsMinimum,
   assertIconTargetHits,
+  COPY_ALIASES,
+  copyNames,
+  copyNamesForCheck,
+  exactName,
+  ariaLabelSelector,
+  auditLocaleLabels,
+  classifyLocaleText,
+  panelMenuItem,
+  localeSources,
+  LOCALE_FIXTURE_VALUES,
+  NAMED_ROW_PATTERNS,
+  namedRowSubject,
 } from "./cases.mjs";
 import {
   bounded,
@@ -581,6 +593,364 @@ console.log(greeting());</pre>
     expect(result.status).toBe("FAIL");
     expect(result.error).toContain("theme retains same code scroll anchor");
   }, 15_000);
+});
+
+describe("English-baseline / Korean-current copy aliases", () => {
+  type Control = { role: string; name: string; run: () => void; visible?: boolean };
+  type Locator = {
+    matches: Control[];
+    or: (other: Locator) => Locator;
+    count: () => Promise<number>;
+    isVisible: () => Promise<boolean>;
+    click: () => Promise<void>;
+  };
+  // Mirrors Playwright: exact role/name matching, `or` unions, strict single-target actions.
+  const locator = (matches: Control[]): Locator => ({
+    matches,
+    or: (other) => locator([...new Set([...matches, ...other.matches])]),
+    count: async () => matches.length,
+    isVisible: async () => {
+      if (matches.length > 1) throw new Error("strict mode violation");
+      return matches[0]?.visible !== false && matches.length === 1;
+    },
+    click: async () => {
+      if (matches.length !== 1) throw new Error(`strict target count ${matches.length}`);
+      matches[0]!.run();
+    },
+  });
+  const fixture = (controls: Array<[string, string, string]>) => {
+    const actions: string[] = [];
+    const page = {
+      getByRole: (role: string, options: { name: string; exact: boolean }) =>
+        locator(
+          controls
+            .filter(([r, name]) => r === role && options.exact && name === options.name)
+            .map(([r, name, action]) => ({ role: r, name, run: () => actions.push(action) })),
+        ),
+    };
+    return { page, actions };
+  };
+  const click = (
+    page: ReturnType<typeof fixture>["page"],
+    check: string,
+    role: string,
+    english: string,
+  ) => exactName(page, role, copyNamesForCheck(check, english)).click();
+
+  test("keeps one alias row per request row plus the lead's state 13 row", () => {
+    expect(COPY_ALIASES.length).toBe(41);
+    expect(new Set(COPY_ALIASES.map(([english]) => english)).size).toBe(41);
+    for (const [english, korean] of COPY_ALIASES) {
+      expect(korean).not.toBe(english);
+      expect(copyNames(english)).toEqual([english, korean]);
+      expect(copyNames(english, { current: true })).toEqual([korean]);
+    }
+    expect(() => copyNames("Add provide")).toThrow("No copy alias row");
+  });
+  test("English-baseline fixtures pass before todo 22", async () => {
+    const { page, actions } = fixture([
+      ["button", "Add provider", "add-provider"],
+      ["switch", "Sidebar (legacy)", "legacy-sidebar"],
+      ["combobox", "Open links in", "open-links"],
+    ]);
+    await click(page, "18/six-adapters", "button", "Add provider");
+    await click(page, "06/sidebar", "switch", "Sidebar (legacy)");
+    await click(page, "14/keyboard-disclosure", "combobox", "Open links in");
+    expect(actions).toEqual(["add-provider", "legacy-sidebar", "open-links"]);
+    validateVisibleState("11", { text: "Add Action" });
+    validateVisibleState("18", {
+      text: "Color scheme",
+      route: "#/settings/appearance",
+      selectedAppearance: "Use light mode",
+    });
+    validateVisibleState("10", { text: "파일", filesPane: true });
+  });
+  test("Korean-current fixtures pass, including case 22", async () => {
+    const { page, actions } = fixture([
+      ["button", "공급자 추가", "add-provider"],
+      ["button", "레거시 기능", "legacy-features"],
+      ["switch", "레거시 사이드바", "legacy-sidebar"],
+      ["button", "HIG saved action 실행", "run-saved"],
+    ]);
+    await click(page, "22/six-adapters", "button", "Add provider");
+    await click(page, "22/both-sidebars", "button", "Legacy features");
+    await click(page, "22/both-sidebars", "switch", "Sidebar (legacy)");
+    await click(page, "06/sidebar", "switch", "Sidebar (legacy)");
+    expect(actions).toEqual([
+      "add-provider",
+      "legacy-features",
+      "legacy-sidebar",
+      "legacy-sidebar",
+    ]);
+    expect(await savedActionIsVisible(page)).toBe(true);
+    validateVisibleState("30", { text: "제3자 라이선스 고지" });
+    validateVisibleState("19", {
+      text: "색상 모드",
+      route: "#/settings/appearance",
+      selectedAppearance: "다크 모드 사용",
+    });
+  });
+  test("a missing control or readiness text fails", async () => {
+    const { page, actions } = fixture([["button", "공급자", "providers-nav"]]);
+    await expect(click(page, "18/six-adapters", "button", "Add provider")).rejects.toThrow();
+    await expect(click(page, "22/six-adapters", "button", "Add provider")).rejects.toThrow();
+    expect(await savedActionIsVisible(page)).toBe(false);
+    expect(actions).toEqual([]);
+    expect(() => validateVisibleState("14", { text: "기기" })).toThrow("Visible state mismatch");
+  });
+  test("a wrong name, role or action fails", async () => {
+    const { page, actions } = fixture([
+      ["button", "Add providers", "wrong"],
+      ["button", "공급자 추가하기", "wrong"],
+      ["menuitem", "공급자 추가", "wrong"],
+      ["button", "Run HIG saved action extra", "wrong"],
+    ]);
+    await expect(click(page, "18/six-adapters", "button", "Add provider")).rejects.toThrow();
+    expect(await savedActionIsVisible(page)).toBe(false);
+    expect(actions).toEqual([]);
+    // Case 22 closes W-03: the English baseline no longer satisfies its named controls.
+    const english = fixture([["button", "Legacy features", "legacy-features"]]);
+    await expect(
+      click(english.page, "22/both-sidebars", "button", "Legacy features"),
+    ).rejects.toThrow();
+    expect(english.actions).toEqual([]);
+    // Both aliases at once is ambiguity, never a choice.
+    const both = fixture([
+      ["button", "Add provider", "a"],
+      ["button", "공급자 추가", "b"],
+    ]);
+    await expect(click(both.page, "18/six-adapters", "button", "Add provider")).rejects.toThrow();
+    expect(both.actions).toEqual([]);
+    expect(() =>
+      validateVisibleState("18", {
+        text: "색상 모드",
+        route: "#/settings/appearance",
+        selectedAppearance: "다크 모드 사용",
+      }),
+    ).toThrow("Wrong selected appearance");
+  });
+  test("run graph panel opens by its English baseline or Korean current name", async () => {
+    for (const [label, check] of [
+      ["Run 그래프 G", "10/graph-no-snapshot"],
+      ["실행 그래프 G", "10/graph-no-snapshot"],
+      ["실행 그래프 G", "22/any"],
+    ]) {
+      const { page, actions } = fixture([
+        ["menuitem", "브라우저 B", "browser"],
+        ["menuitem", label, "graph"],
+      ]);
+      await panelMenuItem(page, copyNamesForCheck(check, "Run 그래프")).click();
+      expect(actions).toEqual(["graph"]);
+    }
+    validateVisibleState("13", { text: "Run 그래프" });
+    validateVisibleState("13", { text: "실행 그래프" });
+  });
+  test("a missing or wrongly named run graph panel fails", async () => {
+    for (const controls of [
+      [["menuitem", "브라우저 B", "browser"]],
+      [["menuitem", "실행 그래프", "graph"]],
+      [["menuitem", "Run Graph G", "graph"]],
+      [["menuitem", "실행 그래프 보기 G", "graph"]],
+      [["button", "실행 그래프 G", "graph"]],
+    ] as Array<Array<[string, string, string]>>) {
+      const { page, actions } = fixture(controls);
+      await expect(panelMenuItem(page, copyNames("Run 그래프")).click()).rejects.toThrow();
+      expect(actions).toEqual([]);
+    }
+    const english = fixture([["menuitem", "Run 그래프 G", "graph"]]);
+    await expect(
+      panelMenuItem(english.page, copyNamesForCheck("22/any", "Run 그래프")).click(),
+    ).rejects.toThrow();
+    expect(() => panelMenuItem(english.page, ["그래프"])).toThrow("No panel shortcut");
+    expect(() => validateVisibleState("13", { text: "그래프" })).toThrow(
+      "Visible state mismatch",
+    );
+  });
+  test("renderer selectors list one exact aria-label per alias", () => {
+    expect(ariaLabelSelector(copyNames("Appearance mode"), { suffix: " [aria-pressed]" })).toBe(
+      '[aria-label="Appearance mode"] [aria-pressed], [aria-label="색상 모드 선택"] [aria-pressed]',
+    );
+    expect(
+      ariaLabelSelector(copyNames("Dismiss notification", { current: true }), {
+        prefix: "button",
+      }),
+    ).toBe('button[aria-label="알림 닫기"]');
+  });
+});
+
+describe("authored locale audit", () => {
+  const sources = localeSources({
+    keybindingsConfigPath: "/tmp/home/.weavra/keybindings.json",
+    providers: [{ instanceId: "codex", driver: "codex" }],
+  });
+  const row = (fields: Record<string, unknown>) => ({
+    tag: "BUTTON",
+    role: null,
+    text: "",
+    name: null,
+    placeholder: null,
+    keycaps: [],
+    font: null,
+    ...fields,
+  });
+  const audit = (fields: Record<string, unknown>, from = sources) =>
+    auditLocaleLabels([row(fields)], from);
+  const passes = (fields: Record<string, unknown>, from = sources) =>
+    expect(audit(fields, from).unclassified).toEqual([]);
+  const fails = (fields: Record<string, unknown>, from = sources) =>
+    expect(audit(fields, from).unclassified.length).toBeGreaterThan(0);
+
+  test("leftover authored English still fails", () => {
+    const { unclassified } = auditLocaleLabels(
+      [
+        row({ text: "레거시 기능" }),
+        row({ tag: "LABEL", text: "Sidebar (legacy)" }),
+        row({ text: "공급자 추가", name: "Add provider" }),
+      ],
+      sources,
+    );
+    expect(unclassified.map((r) => r.text)).toEqual(["Sidebar (legacy)", "Add provider"]);
+  });
+  test("Korean labels keep only classified Latin segments, recorded with class and source", () => {
+    const { unclassified, exceptions } = auditLocaleLabels(
+      [
+        row({ tag: "LABEL", text: "Tailscale HTTPS 사용" }),
+        row({ tag: "H2", text: "Codex 로그인 필요" }),
+        row({ name: "03 Code blocks 대화 작업" }),
+        row({ tag: "H3", text: "Weavra Runtime" }),
+        row({ name: "T3 Chat 테마 사용" }),
+        row({ name: "Azure DevOps 설정 안내" }),
+        row({ text: "CPU 사용량 Ember 복제 macOS" }),
+      ],
+      sources,
+    );
+    expect(unclassified).toEqual([]);
+    expect(exceptions.flatMap((r) => r.segments)).toEqual([
+      { segment: "Tailscale", class: "tool/VCS", source: "lead allowlist" },
+      { segment: "HTTPS", class: "protocol/format/acronym", source: "lead allowlist" },
+      { segment: "Codex", class: "product/brand", source: "lead allowlist" },
+      { segment: "03 Code blocks", class: "fixture value", source: "seed.mjs" },
+      { segment: "Weavra", class: "product/brand", source: "lead allowlist" },
+      { segment: "Runtime", class: "Weavra component", source: "lead allowlist" },
+      { segment: "T3 Chat", class: "built-in theme", source: "lead allowlist" },
+      { segment: "Azure DevOps", class: "product/brand", source: "lead allowlist" },
+      { segment: "CPU", class: "protocol/format/acronym", source: "lead allowlist" },
+      { segment: "Ember", class: "built-in theme", source: "lead allowlist" },
+      { segment: "macOS", class: "product/brand", source: "lead allowlist" },
+    ]);
+  });
+  test("plain English words fail in every field and context", () => {
+    const context = {
+      role: "combobox",
+      keycaps: ["Enter"],
+      font: { resolvable: false, mac: true },
+    };
+    for (const word of ["Settings", "Save", "Run", "Open", "Delete", "Run 그래프", "Serve 시작"]) {
+      fails({ ...context, text: word });
+      fails({ ...context, name: word });
+      fails({ ...context, placeholder: word });
+      fails({ keycaps: [word] });
+    }
+    for (const value of ["Chat 테마", "Vertex 설정", "Codexes", "codex 로그인", "Code blocks"])
+      fails({ text: value });
+  });
+  test("keycaps count only inside a keycap or a keycap control's trailing chord", () => {
+    passes({ text: "대기 메시지 반영", keycaps: ["⇧", "⌘", "Enter"] });
+    passes({ name: "대화: 대기 메시지 반영 단축키 편집: ⇧⌘Enter", keycaps: ["Enter"] });
+    passes({ name: "추가 (Ctrl Enter)", keycaps: ["Ctrl", "Enter"] });
+    fails({ text: "Enter 키를 눌러 보내요" });
+    fails({ text: "Enter 키를 눌러 보내요", keycaps: ["Enter"] });
+    fails({ name: "단축키 편집: ⇧⌘Enter" });
+    fails({ name: "Enter 키로 보내기", keycaps: ["Enter"] });
+    fails({ keycaps: ["enter"] });
+    fails({ keycaps: ["arrowdown"] });
+  });
+  test("data is accepted only in its own field and only when its source agrees", () => {
+    passes({ tag: "INPUT", placeholder: "codex" });
+    passes({ tag: "INPUT", placeholder: "~/.codex-t3/personal" });
+    passes({ tag: "INPUT", placeholder: "http://127.0.0.1:4096" });
+    passes({ tag: "INPUT", placeholder: "https://..." });
+    passes({ name: "keybindings.json 열기" });
+    passes({ role: "combobox", text: "Menlo", font: { resolvable: true, mac: true } });
+    passes({ role: "combobox", text: "SF Pro", font: { resolvable: false, mac: true } });
+    // Source disagrees.
+    fails({ tag: "INPUT", placeholder: "codex" }, localeSources({ providers: [] }));
+    fails({ tag: "INPUT", placeholder: "~/.gemini" });
+    fails({ name: "settings.json 열기" });
+    fails({ role: "combobox", text: "SF Pro", font: { resolvable: false, mac: false } });
+    fails({ role: "combobox", text: "Default", font: { resolvable: false, mac: true } });
+    // Pattern-shaped token outside its scoped field.
+    fails({ text: "codex" });
+    fails({ name: "~/.codex" });
+    fails({ text: "http://127.0.0.1:4096" });
+    fails({ tag: "H2", text: "keybindings.json" });
+    fails({ text: "Menlo" });
+    fails({ tag: "INPUT", placeholder: "my-project-id" });
+    fails({ tag: "INPUT", placeholder: "https://example.com" });
+  });
+  test("fixture text in composite rows matches seeded values exactly", async () => {
+    passes({ tag: "DIV", role: "button", text: "작업 중\n04 Working fixture\n3분 전" });
+    fails({ tag: "DIV", role: "button", text: "04 Working fixtures\n3분 전" });
+    fails({ tag: "DIV", role: "button", text: "01 Conversation\n3d ago" });
+    const seedSource = await NodeFSP.readFile(new URL("./seed.mjs", import.meta.url), "utf8");
+    for (const value of LOCALE_FIXTURE_VALUES) expect(seedSource).toContain(`"${value}"`);
+  });
+  test("late lead additions pass only as exact names or phrases", () => {
+    passes({ text: "RGB 색상 OTEL 내보내기 Niri Hyprland Omarchy" });
+    passes({ name: "VS Code에서 열기" });
+    passes({ text: "Mac mini 호스트" });
+    passes({ tag: "H3", text: "활성 MCP" });
+    fails({ text: "활성 Mcp" });
+    fails({ text: "Code 열기" });
+    fails({ text: "mini 모드" });
+  });
+  test("custom-model preset labels pass only inside the custom-model editor", () => {
+    passes({ text: "Reasoning", presetScope: true });
+    passes({ text: "Extra High", presetScope: true });
+    passes({ tag: "SPAN", text: "Fast Mode", presetScope: true });
+    fails({ text: "Reasoning" });
+    fails({ text: "Plan" });
+    fails({ text: "Reasoning effort", presetScope: true });
+    fails({ text: "Settings", presetScope: true });
+    fails({ tag: "INPUT", placeholder: "Low", presetScope: true });
+  });
+  test("every runner literal naming Run is an English baseline alias row", async () => {
+    const english = new Set(COPY_ALIASES.map(([name]) => name));
+    for (const file of ["cases.mjs", "capture.mjs", "assert.mjs"]) {
+      const source = await NodeFSP.readFile(new URL(`./${file}`, import.meta.url), "utf8");
+      for (const [literal] of source.matchAll(/"[^"\n]*\bRun\b[^"\n]*"/g))
+        expect(english.has(literal.slice(1, -1))).toBe(true);
+    }
+  });
+});
+
+describe("named row controls", () => {
+  test("Worked for disclosure matches either anchored form", () => {
+    for (const name of ["Worked for 1ms", "작업 시간 1ms"])
+      expect(NAMED_ROW_PATTERNS.workedFor.test(name)).toBe(true);
+    for (const name of ["작업시간 1ms", "Worked 1ms", "총 작업 시간 1ms", "worked for 1ms"])
+      expect(NAMED_ROW_PATTERNS.workedFor.test(name)).toBe(false);
+  });
+  test("when-clause controls resolve to the command they name", () => {
+    expect(namedRowSubject("editWhen", "Edit when clause for Chat: send")).toBe("Chat: send");
+    expect(namedRowSubject("editWhen", "대화: 보내기 실행 조건 편집")).toBe("대화: 보내기");
+    expect(NAMED_ROW_PATTERNS.editWhen.test("대화: 보내기 실행 조건 편집")).toBe(true);
+    for (const name of ["실행 조건 편집", "대화: 보내기 실행 조건 편집하기", "Edit when clause"]) {
+      expect(NAMED_ROW_PATTERNS.editWhen.test(name)).toBe(false);
+      expect(namedRowSubject("editWhen", name)).toBe(null);
+    }
+    // The subject must appear in the control's own keybinding row.
+    const subject = namedRowSubject("editWhen", "대화: 보내기 실행 조건 편집");
+    expect("대화: 새 대화 ⌘N".includes(subject!)).toBe(false);
+  });
+  test("source details controls resolve to the source they name", () => {
+    expect(namedRowSubject("sourceDetails", "Toggle GitHub details")).toBe("GitHub");
+    expect(namedRowSubject("sourceDetails", "GitHub 세부 정보 열기/닫기")).toBe("GitHub");
+    for (const name of ["세부 정보 열기/닫기", "GitHub 세부 정보 열기", "Toggle details"]) {
+      expect(NAMED_ROW_PATTERNS.sourceDetails.test(name)).toBe(false);
+      expect(namedRowSubject("sourceDetails", name)).toBe(null);
+    }
+  });
 });
 
 describe("rendered palette preservation", () => {

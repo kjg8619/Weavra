@@ -60,10 +60,389 @@ const rows = [
   ["47", "project_settings_evidence", "증거 요약"],
   ["48", "project_settings_model_fitness", "순위가 아닌 계약 준수 증거"],
 ];
-export const DESKTOP_STATES = rows.map(([id, name, expected]) => ({ id, name, expected }));
+// English baseline -> exact Korean current copy shipped by todo 22 (W-03). One row per row of
+// pr-22/runner-alias-request.md sections A-D, plus the lead's state 13 row. Each alias matches
+// exactly; there is no other fallback. The English stays so builds before todo 22 still resolve.
+export const COPY_ALIASES = [
+  // A. Readiness expectations (state rows above)
+  ["Add Action", "작업 추가"],
+  ["Set up devices", "기기 설정하기"],
+  ["No preview yet", "아직 미리보기가 없어요"],
+  ["Restore device defaults", "기기 기본값 복원"],
+  ["Color scheme", "색상 모드"],
+  ["Keybindings", "키보드 단축키"],
+  ["SnapShots", "스냅샷"],
+  ["Providers", "공급자"],
+  ["Integrations", "연동"],
+  ["Source Control", "소스 제어"],
+  ["Storage", "저장 공간"],
+  ["Connections", "연결"],
+  ["Archive", "보관함"],
+  ["Cancel", "취소"],
+  ["Diagnostics", "진단"],
+  ["Third-party notices", "제3자 라이선스 고지"],
+  // B. Capture selectors
+  ["Light", "라이트"],
+  ["Dark", "다크"],
+  ["Dismiss notification", "알림 닫기"],
+  ["Refresh workspace files", "작업 공간 파일 새로 고침"],
+  // C. Case 22 named controls
+  ["Legacy features", "레거시 기능"],
+  ["Sidebar (legacy)", "레거시 사이드바"],
+  ["Add provider", "공급자 추가"],
+  // D. Other scenario controls
+  ["Thread notifications", "대화 알림"],
+  ["Notifications only", "알림만"],
+  ["In-app notifications", "앱 내 알림"],
+  ["Create theme", "테마 만들기"],
+  ["Inspect app colors", "앱 색상 검사"],
+  ["Cancel inspecting app colors", "앱 색상 검사 취소"],
+  ["Close the theme editor", "테마 편집기 닫기"],
+  ["Open links in", "링크 열기 위치"],
+  ["Add environment", "환경 추가"],
+  ["Use light mode", "라이트 모드 사용"],
+  ["Use dark mode", "다크 모드 사용"],
+  ["Follow the system appearance", "시스템 모양 따르기"],
+  ["Appearance mode", "색상 모드 선택"],
+  ["When expression", "실행 조건식"],
+  ["Unarchive", "보관 해제"],
+  ["baseline-project files", "baseline-project 파일"],
+  ["Run HIG saved action", "HIG saved action 실행"],
+  // E. Lead addition 2026-10-22: state 13 readiness and the run graph panel name
+  ["Run 그래프", "실행 그래프"],
+];
+const COPY = new Map(COPY_ALIASES);
+
+// [English, Korean], or [Korean] where only the translated copy may satisfy the check.
+export function copyNames(english, { current = false } = {}) {
+  const korean = COPY.get(english);
+  if (korean === undefined) throw new Error(`No copy alias row: ${english}`);
+  return current ? [korean] : [english, korean];
+}
+
+// Case 22 closes W-03, so its checks accept only the Korean copy. Other cases also run
+// against builds from before todo 22 and accept either alias.
+export function copyNamesForCheck(check, english) {
+  return copyNames(english, { current: check.startsWith("22/") });
+}
+
+// A CSS selector list with one exact [aria-label] per alias.
+export function ariaLabelSelector(names, { prefix = "", suffix = "" } = {}) {
+  return names
+    .map((name) => `${prefix}[aria-label=${JSON.stringify(name)}]${suffix}`)
+    .join(", ");
+}
+
+// One exact role/name locator per alias. Playwright strictness still rejects two matches.
+export function exactName(scope, role, names, options = {}) {
+  return names
+    .map((name) => scope.getByRole(role, { ...options, name, exact: true }))
+    .reduce((all, locator) => all.or(locator));
+}
+
+// Lead decisions 2026-10-22 (section E) and 2026-10-22c (consolidated request A). Every
+// [A-Za-z]{3,} segment of an authored label must be classified; ordinary English never is.
+// "Kernel" and "Runtime" are allowed only as the proper names of Weavra components.
+export const LOCALE_SEGMENT_CLASSES = {
+  "product/brand": [
+    "Weavra",
+    "Codex",
+    "Claude",
+    "Cursor",
+    "Grok",
+    "OpenCode",
+    "Antigravity",
+    "SnapShots",
+    "GitHub",
+    "GitLab",
+    "Bitbucket",
+    "Forgejo",
+    "Gitea",
+    "Google",
+    "Gemini",
+    "MagicDNS",
+    "Xcode",
+    "VoiceOver",
+    "iOS",
+    "Android",
+    "Windows",
+    "Linux",
+    "macOS",
+    "Niri",
+    "Hyprland",
+    "Omarchy",
+  ],
+  "built-in theme": ["Grove", "Ocean", "Ember", "Iris"],
+  "tool/VCS": ["Git", "Mercurial", "Jujutsu", "Tailscale"],
+  "protocol/format/acronym": [
+    "HTTPS",
+    "HTTP",
+    "URL",
+    "API",
+    "SSH",
+    "WSL",
+    "CLI",
+    "JSON",
+    "QR",
+    "CPU",
+    "GPU",
+    "PID",
+    "RGB",
+    "OTEL",
+    "MCP",
+  ],
+  "Weavra component": ["Runtime", "Kernel"],
+};
+// Multi-word names count only as the whole exact phrase.
+export const LOCALE_PHRASE_CLASSES = {
+  "product/brand": [
+    "Azure DevOps",
+    "Vertex AI",
+    "GitHub Copilot",
+    "Claude Code",
+    "T3 Connect",
+    "Tailscale Serve",
+    "Android Studio",
+    "Face ID",
+    "Liquid Glass",
+    "VS Code",
+    "Mac mini",
+  ],
+  "built-in theme": ["T3 Chat"],
+};
+// Custom-model option labels are wire data (customModelEditor.logic.ts presets). They stay
+// English only inside the custom-model editor, as a whole field value.
+export const CUSTOM_MODEL_PRESET_LABELS = [
+  "Reasoning",
+  "Speed",
+  "Low",
+  "Medium",
+  "High",
+  "Extra High",
+  "Max",
+  "Standard",
+  "Fast",
+  "Fast Mode",
+  "Thinking",
+  "Agent",
+  "Build",
+  "Plan",
+];
+// Keycaps count only inside a <kbd> keycap, or as the trailing shortcut chord in the accessible
+// name of a control that renders one. Never in prose.
+export const LOCALE_KEYCAPS = [
+  "Ctrl",
+  "Alt",
+  "Shift",
+  "Cmd",
+  "Enter",
+  "Esc",
+  "Tab",
+  "Space",
+  "Up",
+  "Down",
+  "Left",
+  "Right",
+];
+export const LOCALE_FIXTURE_VALUES = [
+  "baseline-project",
+  "01 Conversation",
+  "02 Long messages",
+  "03 Code blocks",
+  "04 Working fixture",
+  "05 Error fixture",
+  "06 Empty thread",
+];
+const classMap = (classes) =>
+  new Map(
+    Object.entries(classes).flatMap(([kind, values]) => values.map((value) => [value, kind])),
+  );
+const LOCALE_SEGMENT_CLASS = classMap(LOCALE_SEGMENT_CLASSES);
+const LOCALE_PHRASE_CLASS = classMap(LOCALE_PHRASE_CLASSES);
+const LOCALE_KEYCAP = new Set(LOCALE_KEYCAPS);
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const exactValues = (values) =>
+  new RegExp(`(?<![A-Za-z0-9-])(?:${values.map(escapeRegExp).join("|")})(?![A-Za-z0-9-])`, "g");
+const LOCALE_FIXTURE_PATTERN = exactValues(LOCALE_FIXTURE_VALUES);
+const LOCALE_PHRASE_PATTERN = exactValues([...LOCALE_PHRASE_CLASS.keys()]);
+const LOCALE_FILE_TOKEN = /(?<![\w.-])[A-Za-z0-9_-]+\.json(?![\w.-])/g;
+const LOCALE_NAME_CHORD = new RegExp(
+  `(?:: |\\()(?:[⌘⇧⌥⌃] ?|(?:Ctrl|Alt|Shift|Cmd)[+ ])*(?:${LOCALE_KEYCAPS.join("|")}|[A-Z0-9])\\)?$`,
+);
+
+// Data, not authored copy: anchored whole-field patterns, each bound to the field that carries
+// it and to the real source of the value.
+function scopedData(value, context, sources) {
+  const provider = (name) => (sources.providerIds ?? []).includes(name.split("-")[0]);
+  if (context.field === "placeholder") {
+    const command = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.exec(value);
+    if (command && provider(value))
+      return { class: "command placeholder", source: "serverConfig.providers" };
+    const path = /^~\/\.([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?:\/[a-z0-9-]+)*$/.exec(value);
+    if (path && provider(path[1]))
+      return { class: "path placeholder", source: "serverConfig.providers" };
+    if (/^https?:\/\/(?:(?:localhost|127\.0\.0\.1)(?::(?:\d+|\.\.\.))?\/?|\.\.\.)$/.test(value))
+      return { class: "URL placeholder", source: "loopback or elided URL" };
+  }
+  if (
+    context.presetScope &&
+    (context.field === "text" || context.field === "name") &&
+    CUSTOM_MODEL_PRESET_LABELS.includes(value)
+  )
+    return { class: "custom-model option preset", source: "customModelEditor.logic.ts" };
+  if (
+    context.field === "text" &&
+    context.font &&
+    /^[A-Z][A-Za-z]*(?: [A-Z][A-Za-z]*){0,2}$/.test(value)
+  ) {
+    if (context.font.resolvable)
+      return { class: "font family", source: "renderer font resolution" };
+    if (context.font.mac && /^SF (?:Pro|Mono)$/.test(value))
+      return { class: "font family", source: "macOS system font label" };
+  }
+  return null;
+}
+
+// Classifies each Latin segment of one field; unclassified segments fail the audit.
+/**
+ * @param {{ field?: string, control?: boolean, keycap?: boolean, presetScope?: boolean,
+ *   font?: { resolvable: boolean, mac: boolean } | null }} context
+ */
+export function classifyLocaleText(value, context = {}, sources = {}) {
+  const field = context.field ?? "text";
+  const data = scopedData(value, { ...context, field }, sources);
+  if (data) return { segments: [{ segment: value, ...data }], unclassified: [] };
+  const segments = [];
+  let rest = value;
+  const take = (pattern, classify) => {
+    rest = rest.replace(pattern, (match) => {
+      const kind = classify(match);
+      if (!kind) return match;
+      segments.push({ segment: match, ...kind });
+      return " ";
+    });
+  };
+  if (field !== "keycap") {
+    take(LOCALE_FILE_TOKEN, (token) =>
+      context.control && token === sources.keybindingsFile
+        ? { class: "file name", source: "serverConfig.keybindingsConfigPath" }
+        : null,
+    );
+    take(LOCALE_FIXTURE_PATTERN, () => ({ class: "fixture value", source: "seed.mjs" }));
+    take(LOCALE_PHRASE_PATTERN, (phrase) => ({
+      class: LOCALE_PHRASE_CLASS.get(phrase),
+      source: "lead allowlist",
+    }));
+    if (field === "name" && context.keycap)
+      rest = rest.replace(LOCALE_NAME_CHORD, (chord) => {
+        for (const [segment] of chord.matchAll(/[A-Za-z]{3,}/g))
+          segments.push({ segment, class: "keycap", source: "shortcut chord of a keycap control" });
+        return " ";
+      });
+  }
+  for (const [segment] of rest.matchAll(/[A-Za-z]{3,}/g)) {
+    const kind =
+      field === "keycap"
+        ? LOCALE_KEYCAP.has(segment)
+          ? "keycap"
+          : null
+        : (LOCALE_SEGMENT_CLASS.get(segment) ?? null);
+    segments.push({
+      segment,
+      class: kind,
+      source: kind ? (field === "keycap" ? "kbd element" : "lead allowlist") : null,
+    });
+  }
+  return { segments, unclassified: segments.filter((row) => row.class === null) };
+}
+
+// Name patterns whose subject names one row: [English baseline, Korean current].
+export const NAMED_ROW_CONTROLS = {
+  workedFor: [/^Worked for (.+)$/, /^작업 시간 (.+)$/],
+  editWhen: [/^Edit when clause for (.+)$/, /^(.+) 실행 조건 편집$/],
+  sourceDetails: [/^Toggle (.+) details$/, /^(.+) 세부 정보 열기\/닫기$/],
+};
+// One anchored locator pattern per kind; the subject is checked against its row separately.
+export const NAMED_ROW_PATTERNS = {
+  workedFor: /^(?:Worked for |작업 시간 )/,
+  editWhen: /^(?:Edit when clause for .+|.+ 실행 조건 편집)$/,
+  sourceDetails: /^(?:Toggle .* details|.+ 세부 정보 열기\/닫기)$/,
+};
+export function namedRowSubject(kind, name) {
+  for (const pattern of NAMED_ROW_CONTROLS[kind]) {
+    const match = pattern.exec(name ?? "");
+    if (match) return match[1];
+  }
+  return null;
+}
+
+export function localeSources(config) {
+  return {
+    keybindingsFile: config?.keybindingsConfigPath?.split(/[\\/]/).at(-1) ?? null,
+    providerIds: [
+      ...new Set((config?.providers ?? []).flatMap((p) => [p.instanceId, p.driver])),
+    ].filter(Boolean),
+  };
+}
+
+export function auditLocaleLabels(labels, sources = {}) {
+  const unclassified = [];
+  const exceptions = [];
+  for (const row of labels) {
+    const context = {
+      control: row.tag === "BUTTON" || row.role === "button",
+      keycap: (row.keycaps?.length ?? 0) > 0,
+      presetScope: row.presetScope === true,
+      font: row.font ?? null,
+    };
+    const fields = [
+      ["text", row.text],
+      ["name", row.name],
+      ["placeholder", row.placeholder],
+      ...(row.keycaps ?? []).map((keycap) => ["keycap", keycap]),
+    ];
+    for (const [field, value] of fields) {
+      if (!value) continue;
+      const result = classifyLocaleText(value, { ...context, field }, sources);
+      if (result.unclassified.length)
+        unclassified.push({ ...row, field, text: value, segments: result.unclassified });
+      else if (result.segments.length) exceptions.push({ ...row, field, text: value, ...result });
+    }
+  }
+  return { unclassified, exceptions };
+}
+
+// Add-panel menu items are named "<panel> <shortcut>"; one exact item name per panel alias.
+export const PANEL_SHORTCUTS = {
+  파일: "F",
+  에이전트: "A",
+  "Run 그래프": "G",
+  "실행 그래프": "G",
+  기기: "M",
+  브라우저: "B",
+  터미널: "T",
+};
+export function panelMenuItem(page, names) {
+  return exactName(
+    page,
+    "menuitem",
+    names.map((name) => {
+      if (!PANEL_SHORTCUTS[name]) throw new Error(`No panel shortcut: ${name}`);
+      return `${name} ${PANEL_SHORTCUTS[name]}`;
+    }),
+  );
+}
+
+const acceptedTexts = (expected) => (COPY.has(expected) ? copyNames(expected) : [expected]);
+export const DESKTOP_STATES = rows.map(([id, name, expected]) => ({
+  id,
+  name,
+  expected,
+  accepted: acceptedTexts(expected),
+}));
 export const STRESS_STATES = [
-  { id: "42", name: "narrow_chat_dark", expected: "greeting" },
-  { id: "43", name: "narrow_chat_light", expected: "greeting" },
+  { id: "42", name: "narrow_chat_dark", expected: "greeting", accepted: ["greeting"] },
+  { id: "43", name: "narrow_chat_light", expected: "greeting", accepted: ["greeting"] },
 ];
 export function expectedFiles() {
   return [
@@ -96,23 +475,24 @@ export const LABELS = {
   skip: ["프로젝트 가져오지 않기"],
   import: ["프로젝트 추가", "새 프로젝트"],
   local: ["로컬 폴더"],
-  cancel: ["Cancel", "취소"],
+  cancel: copyNames("Cancel"),
   settings: ["설정"],
-  threadNotifications: ["Thread notifications"],
-  notificationsOnly: ["Notifications only"],
-  inAppNotifications: ["In-app notifications"],
+  threadNotifications: copyNames("Thread notifications"),
+  notificationsOnly: copyNames("Notifications only"),
+  inAppNotifications: copyNames("In-app notifications"),
   general: ["General", "일반"],
   appearance: ["Appearance", "모양"],
-  light: ["Light", "라이트"],
-  dark: ["Dark", "다크"],
-  keybindings: ["Keybindings", "키보드 단축키"],
-  snapshots: ["SnapShots", "스냅샷"],
-  providers: ["Providers", "공급자"],
-  integrations: ["Integrations", "연동"],
-  source_control: ["Source Control", "소스 제어"],
-  storage: ["Storage", "저장 공간"],
-  connections: ["Connections", "연결"],
-  archive: ["Archive", "보관함"],
+  light: copyNames("Light"),
+  dark: copyNames("Dark"),
+  keybindings: copyNames("Keybindings"),
+  snapshots: copyNames("SnapShots"),
+  providers: copyNames("Providers"),
+  integrations: copyNames("Integrations"),
+  source_control: copyNames("Source Control"),
+  storage: copyNames("Storage"),
+  connections: copyNames("Connections"),
+  archive: copyNames("Archive"),
+  refreshFiles: copyNames("Refresh workspace files"),
   customModel: ["Add custom model", "사용자 지정 모델 추가"],
   diagnostics: ["View diagnostics", "진단 보기"],
   licenses: ["View licenses", "라이선스 보기"],
@@ -122,7 +502,7 @@ export const LABELS = {
   addPanel: ["패널 추가"],
   files: ["파일"],
   agents: ["에이전트"],
-  graph: ["Run 그래프"],
+  graph: copyNames("Run 그래프"),
   devices: ["기기"],
   browser: ["브라우저"],
   terminal: ["터미널"],
@@ -669,8 +1049,13 @@ export function countInActiveDialog(page, text) {
     .count();
 }
 
-export function savedActionIsVisible(page) {
-  return page.getByRole("button", { name: "Run HIG saved action", exact: true }).isVisible();
+export async function savedActionIsVisible(page) {
+  const visible = await Promise.all(
+    copyNames("Run HIG saved action").map((name) =>
+      page.getByRole("button", { name, exact: true }).isVisible(),
+    ),
+  );
+  return visible.some(Boolean);
 }
 
 export function readRenderedBackground() {
@@ -1085,6 +1470,29 @@ export async function runScenarios(context) {
       await click("button", section);
     });
     await settle();
+  }
+  // Exact aliases from COPY_ALIASES; case 22 checks accept only the Korean copy.
+  const names = (english) => copyNamesForCheck(current, english);
+  const byName = (scope, role, english, options) =>
+    exactName(scope, role, names(english), options);
+  const byLabel = (english, prefix, suffix) =>
+    ariaLabelSelector(names(english), { prefix, suffix });
+  // The keybinding row a when-clause control edits, and whether its name points at that row.
+  async function whenControlRow(control) {
+    const row = await control.evaluate((element) => {
+      const own = element.closest('[data-slot="settings-row"]');
+      let row = own;
+      while (row && !row.id.startsWith("keybinding-")) row = row.previousElementSibling;
+      return {
+        command: row?.id.slice("keybinding-".length),
+        text: `${row?.textContent ?? ""}\n${own?.textContent ?? ""}`,
+      };
+    });
+    const subject = namedRowSubject("editWhen", await control.getAttribute("aria-label"));
+    return {
+      command: row.command,
+      owned: Boolean(row.command) && subject !== null && row.text.includes(subject),
+    };
   }
   async function unique(selector) {
     const target = page.locator(selector).filter({ visible: true });
@@ -1579,22 +1987,25 @@ export async function runScenarios(context) {
       await home();
     }
     await openPanel("파일");
-    await page.getByRole("button", { name: "Refresh workspace files", exact: true }).waitFor();
+    await byName(page, "button", "Refresh workspace files").waitFor();
   }
-  async function openPanel(name) {
+  // `panelNames` is one panel name or its exact baseline/current aliases.
+  async function openPanel(panelNames) {
+    const aliases = [panelNames].flat();
     const toggle = await named(page, "button", "panel");
     if ((await toggle.getAttribute("aria-pressed")) !== "true") await toggle.click();
-    const tab = page.locator("[data-active-tab]").getByRole("button", { name, exact: true });
+    const tab = exactName(page.locator("[data-active-tab]"), "button", aliases);
     if (await tab.count()) await tab.click();
     else {
       const add = page.getByRole("button", { name: "패널 추가", exact: true });
       if (await add.isVisible()) {
         await add.click();
-        const shortcut = { 파일: "F", 브라우저: "B", "Run 그래프": "G", 터미널: "T", 기기: "M" }[
-          name
-        ];
-        await page.getByRole("menuitem", { name: `${name} ${shortcut}`, exact: true }).click();
-      } else await page.getByText(name, { exact: true }).filter({ visible: true }).click();
+        await panelMenuItem(page, aliases).click();
+      } else
+        await aliases
+          .map((name) => page.getByText(name, { exact: true }).filter({ visible: true }))
+          .reduce((all, locator) => all.or(locator))
+          .click();
     }
     await settle();
   }
@@ -1645,16 +2056,14 @@ export async function runScenarios(context) {
     for (const legacy of [false, true]) {
       await settings("general");
       const section = page.locator("#legacy-features");
-      const disclosure = section.getByRole("button", { name: "Legacy features", exact: true });
+      const disclosure = byName(section, "button", "Legacy features");
       if ((await disclosure.getAttribute("aria-expanded")) !== "true") {
         await act("open Legacy features", () => disclosure.click());
-        await section
-          .getByRole("button", { name: "Legacy features", expanded: true, exact: true })
-          .waitFor();
+        await byName(section, "button", "Legacy features", { expanded: true }).waitFor();
       }
       // The panel animates open; clicking mid-expansion lands pointerup elsewhere.
       await settle();
-      const toggle = section.getByRole("switch", { name: "Sidebar (legacy)", exact: true });
+      const toggle = byName(section, "switch", "Sidebar (legacy)");
       await toggle.scrollIntoViewIfNeeded();
       await settle();
       const toggleState = async () =>
@@ -1695,26 +2104,49 @@ export async function runScenarios(context) {
             ...root.querySelectorAll("button,label,h1,h2,h3,h4,[role=status],input,textarea"),
           ])
           .filter((node) => node.checkVisibility())
-          .map((node) => ({
-            tag: node.tagName,
-            text: node.textContent?.trim(),
-            name: node.getAttribute("aria-label"),
-            placeholder: node.getAttribute("placeholder"),
-          })),
+          .map((node) => {
+            // Keycaps are classified on their own; they never count as the label's prose.
+            const prose = node.cloneNode(true);
+            for (const keycap of prose.querySelectorAll("kbd")) keycap.remove();
+            const role = node.getAttribute("role");
+            const text = prose.textContent?.trim();
+            let font = null;
+            if (role === "combobox" && text) {
+              const canvas = document.createElement("canvas").getContext("2d");
+              const width = (family) => {
+                canvas.font = `32px ${family}`;
+                return canvas.measureText("mmmmmmmmmmlliWW@#1").width;
+              };
+              font = {
+                resolvable: ["monospace", "serif", "sans-serif"].some(
+                  (generic) => width(`${JSON.stringify(text)}, ${generic}`) !== width(generic),
+                ),
+                mac: /Mac/.test(navigator.platform),
+              };
+            }
+            return {
+              tag: node.tagName,
+              role,
+              text,
+              name: node.getAttribute("aria-label"),
+              placeholder: node.getAttribute("placeholder"),
+              keycaps: [...node.querySelectorAll("kbd")]
+                .filter((keycap) => !keycap.querySelector("kbd"))
+                .map((keycap) => keycap.textContent.trim())
+                .filter(Boolean),
+              // Inside the custom-model editor, identified by its name input id, not by copy.
+              presetScope: [
+                ...document.querySelectorAll(
+                  'input[id^="provider-instance-"][id$="-custom-model-name"]',
+                ),
+              ].some((input) => input.parentElement?.parentElement?.contains(node)),
+              font,
+            };
+          }),
       selector,
     );
-    const proper =
-      /^(Weavra|Codex|Claude|Cursor|Grok|OpenCode|Antigravity|SnapShots|GitHub|GitLab|Bitbucket|Git|Mercurial|Jujutsu|baseline-project|0[1-6] (Conversation|Long messages|Code blocks|Working fixture|Error fixture|Empty thread))$/;
-    const unclassified = labels.flatMap((row) =>
-      [row.text, row.name, row.placeholder]
-        .filter((value) => value && /[A-Za-z]{3}/.test(value) && !proper.test(value))
-        .map((text) => ({ ...row, text })),
-    );
-    observations.push({
-      label,
-      unclassified,
-      exceptions: labels.filter((row) => proper.test(row.text ?? "")),
-    });
+    const { unclassified, exceptions } = auditLocaleLabels(labels, localeSources(liveConfig));
+    observations.push({ label, unclassified, exceptions });
     assert(
       `${label}: every authored label is Korean or a classified proper name`,
       unclassified,
@@ -1791,11 +2223,13 @@ export async function runScenarios(context) {
       // The product switch exposes its state as data-checked, not aria-checked.
       if ((await inApp.getAttribute("data-checked")) === null) await inApp.click();
     });
-    await (await named(page, "combobox", "threadNotifications"))
-      .filter({ hasText: "Notifications only" })
+    const threadNotifications = await named(page, "combobox", "threadNotifications");
+    await names("Notifications only")
+      .map((hasText) => threadNotifications.filter({ hasText }))
+      .reduce((all, locator) => all.or(locator))
       .waitFor({ state: "visible" });
     await page
-      .locator('[role="switch"][aria-label="In-app notifications"][data-checked]')
+      .locator(byLabel("In-app notifications", '[role="switch"]', "[data-checked]"))
       .waitFor({ state: "visible" });
     await home();
     await thread("01 Conversation");
@@ -2024,7 +2458,7 @@ export async function runScenarios(context) {
       await thread("05 Error fixture");
       const icons = page.locator('[class*="text-tool-error-icon"]').filter({ visible: true });
       if ((await icons.count()) === 0) {
-        const disclosure = page.getByRole("button", { name: /^Worked for / });
+        const disclosure = page.getByRole("button", { name: NAMED_ROW_PATTERNS.workedFor });
         assert("one work disclosure belongs to the error fixture", await disclosure.count(), 1);
         await disclosure.click();
       }
@@ -2291,19 +2725,17 @@ export async function runScenarios(context) {
         await owner(assert, `image-modal-${mode}`, '[data-slot="dialog-popup"]');
         await page.keyboard.press("Escape");
         await settings("appearance");
-        await page.getByRole("button", { name: "Create theme", exact: true }).click();
+        await byName(page, "button", "Create theme").click();
         await settle();
         await owner(assert, `theme-editor-${mode}`, '[data-theme-editor-panel][role="dialog"]');
-        await page.getByRole("button", { name: "Inspect app colors", exact: true }).click();
+        await byName(page, "button", "Inspect app colors").click();
         assert(
           "theme inspector is armed",
-          await page
-            .getByRole("button", { name: "Cancel inspecting app colors", exact: true })
-            .isVisible(),
+          await byName(page, "button", "Cancel inspecting app colors").isVisible(),
           true,
         );
         await frame(`theme-inspector-${mode}`);
-        await page.getByRole("button", { name: "Close the theme editor", exact: true }).click();
+        await byName(page, "button", "Close the theme editor").click();
         await home();
         await thread("01 Conversation");
         const paragraph = page.locator("[data-assistant-citation-source] p").first();
@@ -3027,7 +3459,7 @@ export async function runScenarios(context) {
         await filesPanel({ fresh: true });
         await observedText(
           assert,
-          '[aria-label="baseline-project files"]',
+          byLabel("baseline-project files"),
           "files-loading",
           (text) => /불러오는|로딩|Loading/.test(text),
         );
@@ -3042,7 +3474,7 @@ export async function runScenarios(context) {
       }));
       await filesPanel({ fresh: true });
       await settle();
-      await observedText(assert, '[aria-label="baseline-project files"]', "files-empty", (text) =>
+      await observedText(assert, byLabel("baseline-project files"), "files-empty", (text) =>
         /비어|파일이 없|No files/.test(text),
       );
     },
@@ -3060,7 +3492,7 @@ export async function runScenarios(context) {
       await input.fill("absent-query");
       await observedText(
         assert,
-        '[aria-label="baseline-project files"]',
+        byLabel("baseline-project files"),
         "files-no-results",
         (text) => /검색 결과|일치|No results|No matches/.test(text),
       );
@@ -3087,7 +3519,7 @@ export async function runScenarios(context) {
       await filesPanel({ fresh: true });
       await observedText(
         assert,
-        '[aria-label="baseline-project files"]',
+        byLabel("baseline-project files"),
         "files-error",
         (text) =>
           /HIG directory access denied|불러오지 못|읽을 수 없/.test(text) &&
@@ -3110,7 +3542,7 @@ export async function runScenarios(context) {
       await settle();
       const before = calls;
       await act("refresh actual Files request", () =>
-        page.getByRole("button", { name: "Refresh workspace files", exact: true }).click(),
+        byName(page, "button", "Refresh workspace files").click(),
       );
       await page.getByRole("treeitem", { name: "refreshed.txt", exact: true }).waitFor();
       assert("refresh reached data boundary", calls > before, true);
@@ -3443,7 +3875,7 @@ export async function runScenarios(context) {
     },
     "10/graph-no-snapshot": async (assert) => {
       await home();
-      await openPanel("Run 그래프");
+      await openPanel(names("Run 그래프"));
       await observedText(
         assert,
         "main",
@@ -3600,7 +4032,7 @@ export async function runScenarios(context) {
     },
     "14/selected-destination-visible": async (assert) => {
       await settings("integrations");
-      const trigger = page.getByRole("combobox", { name: "Open links in", exact: true });
+      const trigger = byName(page, "combobox", "Open links in");
       await trigger.scrollIntoViewIfNeeded();
       const geometry = await trigger.evaluate((e) => ({
         text: e.textContent,
@@ -3626,7 +4058,7 @@ export async function runScenarios(context) {
     },
     "14/long-destination": async (assert) => {
       await settings("integrations");
-      const trigger = page.getByRole("combobox", { name: "Open links in", exact: true });
+      const trigger = byName(page, "combobox", "Open links in");
       await trigger.scrollIntoViewIfNeeded();
       await trigger.click();
       await page.locator('[data-slot="select-popup"]').waitFor({ state: "visible" });
@@ -3650,7 +4082,7 @@ export async function runScenarios(context) {
     },
     "14/selection-preserved": async (assert) => {
       await settings("integrations");
-      const trigger = page.getByRole("combobox", { name: "Open links in", exact: true });
+      const trigger = byName(page, "combobox", "Open links in");
       await trigger.scrollIntoViewIfNeeded();
       const before = await trigger.innerText();
       await act("focus another option without activation", async () => {
@@ -3666,7 +4098,7 @@ export async function runScenarios(context) {
     },
     "14/keyboard-disclosure": async (assert) => {
       await settings("integrations");
-      const trigger = page.getByRole("combobox", { name: "Open links in", exact: true });
+      const trigger = byName(page, "combobox", "Open links in");
       await trigger.scrollIntoViewIfNeeded();
       await act("keyboard opens destination", async () => {
         await trigger.focus();
@@ -3675,7 +4107,8 @@ export async function runScenarios(context) {
       assert("keyboard exposes options", (await page.getByRole("option").count()) > 1, true);
       await page.keyboard.press("Escape");
       await page.waitForFunction(
-        () => document.activeElement?.getAttribute("aria-label") === "Open links in",
+        (names) => names.includes(document.activeElement?.getAttribute("aria-label")),
+        names("Open links in"),
       );
       assert(
         "keyboard focus returns",
@@ -3690,7 +4123,18 @@ export async function runScenarios(context) {
     "15/no-authentication-side-effect": async (assert) => {
       const before = requests.length;
       await sourceControlVariant(assert, "unauthenticated");
-      for (const button of await page.getByRole("button", { name: /^Toggle .* details$/ }).all()) {
+      const details = await page
+        .getByRole("button", { name: NAMED_ROW_PATTERNS.sourceDetails })
+        .all();
+      assert("source details controls reachable", details.length > 0, true);
+      for (const button of details) {
+        const subject = namedRowSubject("sourceDetails", await button.getAttribute("aria-label"));
+        assert(
+          `details control names a rendered source: ${subject}`,
+          subject !== null &&
+            (await page.locator("main").getByText(subject, { exact: true }).count()) > 0,
+          true,
+        );
         await button.scrollIntoViewIfNeeded();
         await button.click();
       }
@@ -3705,7 +4149,7 @@ export async function runScenarios(context) {
     },
     "16/empty-connection-action": async (assert) => {
       await settings("connections");
-      const add = page.getByRole("button", { name: "Add environment", exact: true });
+      const add = byName(page, "button", "Add environment");
       assert("one local connection draft action", await add.count(), 1);
       assert("local draft action available", await add.isEnabled(), true);
       await unchangedRequests(assert, () => add.click());
@@ -3713,7 +4157,7 @@ export async function runScenarios(context) {
     },
     "16/capability-copy-parity": async (assert) => {
       await settings("connections");
-      const add = page.getByRole("button", { name: "Add environment", exact: true });
+      const add = byName(page, "button", "Add environment");
       const disabled = await add.isDisabled();
       const text = await page.locator("main").innerText();
       observations.push({ disabled, text });
@@ -3739,7 +4183,7 @@ export async function runScenarios(context) {
         count,
       });
       if (count === 0) {
-        const add = page.getByRole("button", { name: "Add environment", exact: true });
+        const add = byName(page, "button", "Add environment");
         assert(
           "local draft remains available in local-only environment",
           await add.isEnabled(),
@@ -3764,7 +4208,7 @@ export async function runScenarios(context) {
     },
     "16/direct-remote": async (assert) => {
       await settings("connections");
-      await page.getByRole("button", { name: "Add environment", exact: true }).click();
+      await byName(page, "button", "Add environment").click();
       const dialog = page.getByRole("dialog");
       const text = await dialog.innerText();
       observations.push({ text });
@@ -3885,7 +4329,7 @@ export async function runScenarios(context) {
     },
     "18/six-adapters": async (assert) => {
       await settings("providers");
-      await page.getByRole("button", { name: "Add provider", exact: true }).click();
+      await byName(page, "button", "Add provider").click();
       const text = await page.getByRole("dialog").innerText();
       for (const name of ["Codex", "Claude", "Cursor", "Grok", "OpenCode", "Antigravity"])
         assert(`${name}: available or explicitly unavailable adapter`, text.includes(name), true);
@@ -3894,11 +4338,11 @@ export async function runScenarios(context) {
     },
     "19/selection-wash-check": async (assert) => {
       await settings("appearance");
-      const light = page.getByRole("button", { name: "Use light mode", exact: true });
+      const light = byName(page, "button", "Use light mode");
       await light.click();
       await light.blur();
-      const selected = await sample("appearance selection", () => {
-        const group = document.querySelector('[aria-label="Appearance mode"]');
+      const selected = await sample("appearance selection", (selector) => {
+        const group = document.querySelector(selector);
         const button = group.querySelector('[aria-pressed="true"]');
         const style = getComputedStyle(button);
         return {
@@ -3908,7 +4352,7 @@ export async function runScenarios(context) {
           check: Boolean(button.querySelector("svg.lucide-check,[data-slot=selection-check]")),
           border: style.borderColor,
         };
-      });
+      }, byLabel("Appearance mode"));
       assert("one selected appearance", selected.count, 1);
       assert("selection includes a check", selected.check, true);
       assert(
@@ -3920,8 +4364,8 @@ export async function runScenarios(context) {
     },
     "19/focus-not-selection": async (assert) => {
       await settings("appearance");
-      const light = page.getByRole("button", { name: "Use light mode", exact: true });
-      const dark = page.getByRole("button", { name: "Use dark mode", exact: true });
+      const light = byName(page, "button", "Use light mode");
+      const dark = byName(page, "button", "Use dark mode");
       await light.click();
       await act("focus unselected appearance", async () => {
         await light.focus();
@@ -3946,10 +4390,7 @@ export async function runScenarios(context) {
     },
     "19/system-live-theme": async (assert) => {
       await settings("appearance");
-      const system = page.getByRole("button", {
-        name: "Follow the system appearance",
-        exact: true,
-      });
+      const system = byName(page, "button", "Follow the system appearance");
       await system.click();
       for (const [index, mode] of ["light", "dark", "light"].entries()) {
         await act(`system appearance ${mode}`, async () => {
@@ -3972,11 +4413,13 @@ export async function runScenarios(context) {
       await settings("appearance");
       const before = await sample("palette before editor", readRenderedBackground);
       await act("create custom theme from current palette", () =>
-        page.getByRole("button", { name: "Create theme", exact: true }).click(),
+        byName(page, "button", "Create theme").click(),
       );
-      const editor = page.getByLabel("Create theme", { exact: true });
+      const editor = names("Create theme")
+        .map((name) => page.getByLabel(name, { exact: true }))
+        .reduce((all, locator) => all.or(locator));
       await editor.waitFor();
-      await owner(assert, "theme-editor", '[aria-label="Create theme"]');
+      await owner(assert, "theme-editor", byLabel("Create theme"));
       const previews = await sample("custom editor palette", () =>
         [...document.querySelectorAll("[data-theme-library-card]")].map((e) => ({
           id: e.getAttribute("data-theme-library-card"),
@@ -3989,7 +4432,7 @@ export async function runScenarios(context) {
         await sample("palette after editor", readRenderedBackground),
         before,
       );
-      await page.getByRole("button", { name: "Close the theme editor", exact: true }).click();
+      await byName(page, "button", "Close the theme editor").click();
     },
     "21/native-minimum": nativeBounds,
     "21/theme-content-parity": async (assert) =>
@@ -4157,7 +4600,7 @@ export async function runScenarios(context) {
         `${process.env.WEAVRA_CAPTURE_REPO}/app/t3code/packages/shared/src/keybindings.ts`
       );
       const bindings = mergeWithDefaultKeybindings(liveConfig.keybindings);
-      const controls = page.getByRole("button", { name: /^Edit when clause for / });
+      const controls = page.getByRole("button", { name: NAMED_ROW_PATTERNS.editWhen });
       const expected = [
         ...new Set(
           bindings.map((binding) => JSON.stringify([binding.command, binding.whenAst ?? null])),
@@ -4165,14 +4608,11 @@ export async function runScenarios(context) {
       ].sort();
       const actual = [];
       for (const control of await controls.all()) {
-        const command = await control.evaluate((element) => {
-          let row = element.closest('[data-slot="settings-row"]');
-          while (row && !row.id.startsWith("keybinding-")) row = row.previousElementSibling;
-          return row?.id.slice("keybinding-".length);
-        });
+        const { command, owned } = await whenControlRow(control);
+        assert(`when control names its own row: ${command}`, owned, true);
         await control.scrollIntoViewIfNeeded();
         await control.click();
-        const expression = page.getByRole("textbox", { name: "When expression", exact: true });
+        const expression = byName(page, "textbox", "When expression");
         await expression.waitFor();
         const raw = await expression.inputValue();
         actual.push(
@@ -4245,8 +4685,10 @@ export async function runScenarios(context) {
     "12/no-rebind": async (assert) => {
       await settings("keybindings");
       const before = structuredClone(liveConfig.keybindings);
-      const controls = page.getByRole("button", { name: /^Edit when clause for / });
+      const controls = page.getByRole("button", { name: NAMED_ROW_PATTERNS.editWhen });
       assert("advanced conditions reachable", (await controls.count()) > 0, true);
+      const first = await whenControlRow(controls.first());
+      assert("when control names its own row", first.owned, true);
       await controls.first().click();
       await page.keyboard.press("Escape");
       await page.reload();
@@ -4274,7 +4716,7 @@ export async function runScenarios(context) {
       await row.waitFor();
       assert("archive contains correct fixture", await row.count(), 1);
       await act("restore exact fixture thread", () =>
-        row.getByRole("button", { name: "Unarchive", exact: true }).click(),
+        byName(row, "button", "Unarchive").click(),
       );
       await row.waitFor({ state: "hidden" });
       await home();
