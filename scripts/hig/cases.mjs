@@ -160,6 +160,91 @@ export async function threadDeleteConfirmation(page) {
   return { dialog, button, label: action };
 }
 
+// Runs in the renderer. Mounted content and viewport intersection are different
+// obligations: a shell/table below the code anchor need not fit in one viewport.
+export function readCodeTranscript(establishAnchor = false) {
+  const first = document.querySelector("pre");
+  let scrollport = first?.closest("[data-timeline-row-id]")?.parentElement ?? first?.parentElement;
+  while (scrollport && !/(auto|scroll)/.test(getComputedStyle(scrollport).overflowY))
+    scrollport = scrollport.parentElement;
+  if (establishAnchor && first)
+    first.scrollIntoView({ block: "start", behavior: "instant" });
+  const boundary = scrollport?.getBoundingClientRect();
+  const clip = {
+    top: Math.max(0, boundary?.top ?? 0),
+    bottom: Math.min(innerHeight, boundary?.bottom ?? innerHeight),
+    left: Math.max(0, boundary?.left ?? 0),
+    right: Math.min(innerWidth, boundary?.right ?? innerWidth),
+  };
+  const content = [...(scrollport ?? document).querySelectorAll("h2, pre, table")].map(
+    (node) => {
+      const rect = node.getBoundingClientRect();
+      const painted = node.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+      return {
+        tag: node.tagName,
+        text: node.textContent,
+        rect: rect.toJSON(),
+        painted,
+        intersects:
+          painted &&
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.top < clip.bottom &&
+          rect.bottom > clip.top &&
+          rect.left < clip.right &&
+          rect.right > clip.left,
+      };
+    },
+  );
+  return {
+    route: location.hash,
+    text: content.map(({ tag, text }) => ({ tag, text })),
+    content,
+    anchor: first
+      ? {
+          text: first.textContent,
+          offset: first.getBoundingClientRect().top - (boundary?.top ?? 0),
+          scrollLeft: scrollport?.scrollLeft ?? 0,
+        }
+      : null,
+    zoom: { css: getComputedStyle(document.documentElement).zoom, scale: visualViewport.scale },
+    viewport: { width: innerWidth, height: innerHeight },
+    pageWidth: document.documentElement.scrollWidth,
+  };
+}
+
+export function assertCodeTranscriptParity(assert, row, baseline) {
+  assert("same selected code thread", row.route.includes("baseline-code"), true);
+  const body = row.text.map(({ text }) => text).join("\n");
+  for (const token of [
+    "Example",
+    "greeting",
+    "console.log",
+    "local fixture only",
+    "Profile",
+    "Isolated",
+    "Paid requests",
+    "Zero",
+  ])
+    assert(`seeded code transcript contains ${token}`, body.includes(token), true);
+  assert("theme preserves heading code and table order", row.text, baseline.text);
+  assert(
+    "all content has painted nonzero rectangles",
+    row.content.length > 0 &&
+      row.content.every((node) => node.painted && node.rect.width > 0 && node.rect.height > 0),
+    true,
+  );
+  assert(
+    "code anchor intersects nonblank transcript viewport",
+    row.content.some(
+      (node) => node.tag === "PRE" && node.text === row.anchor?.text && node.intersects,
+    ),
+    true,
+  );
+  assert("theme retains same code scroll anchor", row.anchor, baseline.anchor);
+  assert("theme retains same zoom", row.zoom, baseline.zoom);
+}
+
 // Assertions are selected by task, not inferred from screenshot names.
 // A product case never inherits task 01's harness-only verdict.
 export const CASES = {
@@ -1288,7 +1373,12 @@ export async function runScenarios(context) {
   }
   async function codeCycle(assert, check) {
     await home();
-    await thread("03 Code blocks");
+    // navigateThread waits for the mounted code, not viewport-visible greeting.
+    // The parent may legitimately arrive at the end of this conversation.
+    await navigateThread("03 Code blocks");
+    await page.waitForFunction(() => location.hash.includes("baseline-code"));
+    await sample("intended code anchor", readCodeTranscript, true);
+    await context.ready(page, "");
     const samples = [];
     for (const [width, height] of [
       [840, 620],
@@ -1298,24 +1388,17 @@ export async function runScenarios(context) {
       [390, 844],
     ]) {
       await context.resize(width, height, width === 390);
+      await sample(`code-${width}-anchor`, readCodeTranscript, true);
+      await context.ready(page, "");
+      const baseline = await sample(`code-${width}-baseline`, readCodeTranscript);
       for (const mode of ["light", "dark", "light"]) {
         // Settings navigation at stress width is not a supported native route.
         if (width === 390) await context.resize(1280, 800);
         await theme(mode);
         if (width === 390) await context.resize(width, height, true);
-        await context.ready(page, "greeting");
-        samples.push(
-          await sample(`code-${width}-${mode}`, () => ({
-            route: location.hash,
-            text: [...document.querySelectorAll("pre, table")].map((node) => node.textContent),
-            code: [...document.querySelectorAll("pre")].map((node) => ({
-              text: node.textContent,
-              rect: node.getBoundingClientRect().toJSON(),
-            })),
-            viewport: { width: innerWidth, height: innerHeight },
-            pageWidth: document.documentElement.scrollWidth,
-          })),
-        );
+        await context.ready(page, "");
+        const row = await sample(`code-${width}-${mode}`, readCodeTranscript);
+        samples.push({ ...row, baseline });
         await frame(`code-${width}-${mode}-${samples.length}`);
       }
     }
@@ -3911,15 +3994,8 @@ export async function runScenarios(context) {
     "21/native-minimum": nativeBounds,
     "21/theme-content-parity": async (assert) =>
       codeCycle(assert, async (samples) => {
-        for (const row of samples) {
-          assert("same selected code thread", row.route.includes("baseline-code"), true);
-          assert("theme preserves code and table order", row.text, samples[0].text);
-          assert(
-            "visible nonzero code",
-            row.code.some((code) => code.rect.width > 0 && code.rect.height > 0),
-            true,
-          );
-        }
+        for (const row of samples)
+          assertCodeTranscriptParity(assert, row, { ...row.baseline, text: samples[0].baseline.text });
       }),
     "21/renderer-electron-parity": async (assert) => {
       const records = packet.manifest.filter((r) => ["36", "41", "42", "43"].includes(r.stateId));
