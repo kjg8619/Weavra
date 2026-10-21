@@ -561,6 +561,7 @@ const EMPTY_PROVIDERS: ServerProvider[] = [];
 const EMPTY_USAGE_LIMIT_SOURCES: UsageLimitSourceSnapshots = [];
 const EMPTY_PROVIDER_SKILLS: ServerProvider["skills"] = [];
 const EMPTY_PENDING_USER_INPUT_ANSWERS: Record<string, PendingUserInputDraftAnswer> = {};
+const dismissedProviderStatusBanners = new Map<string, string>();
 
 /**
  * Read-only first requests for an empty conversation, plus the scope of the
@@ -3903,14 +3904,19 @@ export default function ChatView(props: ChatViewProps) {
     setResumeCompactionPermanentlyDismissed,
   ]);
   const providerStatusBannerKey = getProviderStatusBannerKey(activeProviderStatus);
-  const [dismissedProviderStatusBannerKey, setDismissedProviderStatusBannerKey] = useState<
-    string | null
-  >(null);
+  const providerStatusBannerScope =
+    activeThreadEnvironmentId && activeProviderStatus
+      ? `${activeThreadEnvironmentId}\u0000${activeProviderStatus.instanceId}`
+      : null;
+  const [, setProviderStatusBannerDismissTick] = useState(0);
+  const dismissedProviderStatusBannerKey = providerStatusBannerScope
+    ? (dismissedProviderStatusBanners.get(providerStatusBannerScope) ?? null)
+    : null;
   useEffect(() => {
-    if (providerStatusBannerKey === null && dismissedProviderStatusBannerKey !== null) {
-      setDismissedProviderStatusBannerKey(null);
+    if (providerStatusBannerScope && activeProviderStatus && providerStatusBannerKey === null) {
+      dismissedProviderStatusBanners.delete(providerStatusBannerScope);
     }
-  }, [dismissedProviderStatusBannerKey, providerStatusBannerKey]);
+  }, [activeProviderStatus, providerStatusBannerKey, providerStatusBannerScope]);
   const visibleProviderStatus = shouldShowProviderStatusBanner(
     activeProviderStatus,
     dismissedProviderStatusBannerKey,
@@ -10440,7 +10446,17 @@ export default function ChatView(props: ChatViewProps) {
             <div className="flex shrink-0 flex-col empty:hidden" data-chat-feedback-region="true">
               <ProviderStatusBanner
                 status={visibleProviderStatus}
-                onDismiss={() => setDismissedProviderStatusBannerKey(providerStatusBannerKey)}
+                onDismiss={() => {
+                  // Settings navigation must not reinsert an unchanged notice
+                  // above the saved conversation anchor.
+                  if (providerStatusBannerScope && providerStatusBannerKey) {
+                    dismissedProviderStatusBanners.set(
+                      providerStatusBannerScope,
+                      providerStatusBannerKey,
+                    );
+                    setProviderStatusBannerDismissTick((tick) => tick + 1);
+                  }
+                }}
                 onOpenProviderSetup={openProviderSetup}
               />
               <ThreadErrorBanner

@@ -1384,7 +1384,13 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             getItemType={getItemType}
             renderItem={renderItem}
             estimatedItemSize={90}
-            initialScrollAtEnd={citationRequest === null && rememberedPosition?.atEnd !== false}
+            // A saved DOM offset already includes the footer. Replaying the
+            // initial end-index bootstrap adds it again and can wait forever
+            // for an offset beyond the scrollport's actual maximum.
+            initialScrollAtEnd={citationRequest === null && rememberedPosition === undefined}
+            {...(citationRequest === null && rememberedPosition
+              ? { initialScrollOffset: rememberedPosition.scrollOffset }
+              : {})}
             // Legend needs a data refresh to mount new pins without a scroll event.
             dataVersion={readyCitationRequest?.key ?? listIdentityKey}
             {...(alwaysRender ? { alwaysRender } : {})}
