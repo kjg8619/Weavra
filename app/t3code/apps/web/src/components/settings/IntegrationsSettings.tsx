@@ -19,6 +19,7 @@ import {
   BROWSER_RECORDING_FRAME_RATES,
   DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW,
   DEFAULT_BROWSER_PROFILE_ID,
+  INCOGNITO_BROWSER_PROFILE_ID,
   DEFAULT_BROWSER_LINK_TARGET,
   DEFAULT_BROWSER_RECORDING_FRAME_RATE,
   DEFAULT_BROWSER_VIEWPORT,
@@ -115,6 +116,15 @@ import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { BrowserImportWizard, type WizardTarget } from "./BrowserImportWizard";
 import type { ImportOutcome } from "./browserImportWizard.logic";
+
+/** Built-in profiles keep their stored names; only the shown name is localized. */
+function profileDisplayName(profile: Pick<BrowserProfile, "id" | "name">): string {
+  if (profile.id === DEFAULT_BROWSER_PROFILE_ID)
+    return ko.settings.integrations.builtInDefaultProfile;
+  if (profile.id === INCOGNITO_BROWSER_PROFILE_ID)
+    return ko.settings.integrations.builtInIncognitoProfile;
+  return profile.name;
+}
 
 const FILL_VALUE = "fill";
 const RESPONSIVE_VALUE = "responsive";
@@ -1204,7 +1214,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                       profileWritesDisabled && "opacity-64",
                     )}
                   >
-                    {profile.name}
+                    {profileDisplayName(profile)}
                   </span>
                 ) : (
                   <DraftInput
@@ -1237,7 +1247,9 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                       size="icon-xs"
                       variant="ghost-muted"
                       disabled={profileWritesDisabled || importInFlight}
-                      aria-label={ko.settings.integrations.profileOptions(profile.name)}
+                      aria-label={ko.settings.integrations.profileOptions(
+                        profileDisplayName(profile),
+                      )}
                     />
                   }
                 >
@@ -1256,7 +1268,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                   </MenuItem>
                   <MenuItem
                     disabled={!settingsHydrated || !removalAvailable}
-                    onClick={() => clearProfileData(profile.id, profile.name)}
+                    onClick={() => clearProfileData(profile.id, profileDisplayName(profile))}
                   >
                     {ko.settings.integrations.clearCookiesAndCache}
                   </MenuItem>
@@ -1342,7 +1354,10 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
         <BrowserImportWizard
           source={importSession.source}
           destinationEnvironmentName={importSession.environmentName}
-          targetProfiles={listedProfiles.map((profile) => ({ id: profile.id, name: profile.name }))}
+          targetProfiles={listedProfiles.map((profile) => ({
+            id: profile.id,
+            name: profileDisplayName(profile),
+          }))}
           canCreateProfile={settingsHydrated && !atProfileLimit}
           onImport={(input) =>
             runWizardImport(importSession.source, importSession.environmentId, input)

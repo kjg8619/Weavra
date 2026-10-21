@@ -76,7 +76,7 @@ export function SettingsBreadcrumb({
           <WorkspaceBreadcrumbSeparator />
         </>
       ) : null}
-      <WorkspaceBreadcrumbItem current className="truncate">
+      <WorkspaceBreadcrumbItem current className="shrink-0">
         {sectionLabel ?? ko.common.settings}
       </WorkspaceBreadcrumbItem>
       {scope ? (
@@ -118,7 +118,9 @@ function ScopeMenu({
         )}
       >
         {icon}
-        <span className="min-w-0 truncate">{label}</span>
+        <span className="min-w-0 truncate" data-ellipsis="identity" title={label}>
+          {label}
+        </span>
       </MenuTrigger>
       <MenuPopup align="start" className="w-64 max-w-[calc(100vw-2rem)]">
         {children}

@@ -58,7 +58,14 @@ function LicenseNoticeRow({
               ) : null}
             </span>
             <span className="max-w-[42%] shrink-0 truncate text-xs text-muted-foreground">
-              {entry.license} · {formatLicenseBundles(entry.bundles)}
+              <code className="font-mono">{entry.license}</code> ·{" "}
+              {entry.bundles
+                .map((bundle) =>
+                  Object.hasOwn(ko.settings.licenses.bundles, bundle)
+                    ? ko.settings.licenses.bundles[bundle]!
+                    : formatLicenseBundles([bundle]),
+                )
+                .join(", ")}
             </span>
           </CollapsibleTrigger>
           {entry.sourceUrl ? (
