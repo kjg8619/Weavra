@@ -1,0 +1,51 @@
+{
+  "file": "1280x800/36_chat_code_blocks.electron.png",
+  "beforeSha256": "52714e991d6cbbb566539af93f86cead2afdfd9b83b4c37e5308194538dd0d1d",
+  "afterSha256": "69ad82216973b849badbe6607f0c86a2149fa6a57a8191222b5f68c85d093244",
+  "beforeDimensions": {
+    "width": 2560,
+    "height": 1600
+  },
+  "afterDimensions": {
+    "width": 2560,
+    "height": 1600
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 2560,
+      "height": 1600
+    },
+    "actual": {
+      "width": 2560,
+      "height": 1600
+    },
+    "totalPixels": 4096000,
+    "diffPixels": 245,
+    "diffRatio": 0.0001,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 1,
+        "gridY": 5,
+        "x": 320,
+        "y": 1000,
+        "width": 320,
+        "height": 200,
+        "diffRatio": 0.0028
+      },
+      {
+        "gridX": 2,
+        "gridY": 6,
+        "x": 640,
+        "y": 1200,
+        "width": 320,
+        "height": 200,
+        "diffRatio": 0.001
+      }
+    ],
+    "summary": "100/100 similarity; 245/4096000 pixels differ; 2 hotspot region(s)."
+  }
+}

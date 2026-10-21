@@ -1,0 +1,42 @@
+{
+  "file": "1280x800/18_settings_appearance_light.png",
+  "beforeSha256": "add1f6c73b696cbf116054b62c5c96781e4ac6e32b3994562de192b272ecbc99",
+  "afterSha256": "deca28995b4f6b5e47c4950fd90f8c172e69e5b937f37307574e6545d1a3e52c",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 14,
+    "diffRatio": 0,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 6,
+        "gridY": 7,
+        "x": 960,
+        "y": 700,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0009
+      }
+    ],
+    "summary": "100/100 similarity; 14/1024000 pixels differ; 1 hotspot region(s)."
+  }
+}
