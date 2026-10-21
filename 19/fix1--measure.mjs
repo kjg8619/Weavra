@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 const root="/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-19-fix1-measure";
 const packet="/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-19";
 const wt="/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-19";
-const qa="/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig";
+const qa="/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-19/scripts/hig";
 const bundle=`${packet}/after/app/weavra-desktop.app`;
 const {seed,prepareCaptureProfile,installCaptureNetworkFixture}=await import(`${qa}/seed.mjs`);
 const {_electron}=await import(`${wt}/app/t3code/apps/desktop/node_modules/playwright-core/index.mjs`);
