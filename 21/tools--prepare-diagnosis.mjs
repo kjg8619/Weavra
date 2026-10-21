@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import * as fs from "node:fs/promises";
+import { createHash } from "node:crypto";
+const root="/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra";
+const source=`${root}/pr-21-runnerfix`;
+const packet=`${root}/pr-21`;
+const receipt=JSON.parse(await fs.readFile(`${source}/scenario-receipt.json`,"utf8"));
+assert.equal(receipt.revision,"d81bc594776ea0cf5b9ea45db6865a4f24831ded");
+assert.equal(receipt.checks.find(check=>check.checkId==="theme-content-parity").status,"FAIL");
+assert.ok(receipt.checks.find(check=>check.checkId==="theme-content-parity").error.includes("painted nonzero rectangles"));
+const cases=await fs.readFile("/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/cases.mjs");
+assert.equal(receipt.sources["cases.mjs"],createHash("sha256").update(cases).digest("hex"));
+const probe=JSON.parse(await fs.readFile(`${packet}/probe-bootstrap-parent/observations.json`,"utf8"));
+assert.equal(probe.asarSha256,receipt.asarSha256);
+const target=`${packet}/diagnosis-parent`;
+await fs.mkdir(target);
+await fs.mkdir(`${target}/lead`);
+for(const file of ["RUNNER-FIX-RESULTS.md","scenario-receipt.json"])
+  await fs.copyFile(`${source}/${file}`,`${target}/lead/${file}`);
+const run=receipt.capture.file.split("/")[0];
+assert.match(run,/^run-[a-f0-9-]+$/);
+await fs.cp(`${source}/${run}`,`${target}/lead/${run}`,{recursive:true,force:false,errorOnExist:true});
+await fs.cp(`${packet}/probe-bootstrap-parent`,`${target}/probe`,{recursive:true,force:false,errorOnExist:true});
+console.log(`DIAGNOSIS_COPIED parent=${receipt.revision} asar=${receipt.asarSha256} source=${run}`);
