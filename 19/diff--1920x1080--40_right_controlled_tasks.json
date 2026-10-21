@@ -1,0 +1,42 @@
+{
+  "file": "1920x1080/40_right_controlled_tasks.png",
+  "beforeSha256": "c72db114a9b28bcef3414ebfda0ddf57c97725b3a435dd5ee00dca281fc0126d",
+  "afterSha256": "87576bc416b9c12102871d7a501406dc875883fee767fa11ec66f54490ddfde4",
+  "beforeDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "afterDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1920,
+      "height": 1080
+    },
+    "actual": {
+      "width": 1920,
+      "height": 1080
+    },
+    "totalPixels": 2073600,
+    "diffPixels": 55,
+    "diffRatio": 0,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 3,
+        "x": 0,
+        "y": 405,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0017
+      }
+    ],
+    "summary": "100/100 similarity; 55/2073600 pixels differ; 1 hotspot region(s)."
+  }
+}

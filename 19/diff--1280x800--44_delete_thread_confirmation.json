@@ -1,0 +1,42 @@
+{
+  "file": "1280x800/44_delete_thread_confirmation.png",
+  "beforeSha256": "6324f2cefb34bbdd0527df5ea2354974c34b2bb6430f230b25af5e384bf71178",
+  "afterSha256": "d26ae97b81686d66d2eb7bcb299fa15c25958ecc640b0cba86ea97a702d19dd0",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 434,
+    "diffRatio": 0.0004,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 1,
+        "gridY": 5,
+        "x": 160,
+        "y": 500,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0271
+      }
+    ],
+    "summary": "100/100 similarity; 434/1024000 pixels differ; 1 hotspot region(s)."
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "file": "1280x800/38_chat_error.png",
+  "beforeSha256": "6e9b8b0c01441e5ba205cf69ed6360a14d37b4c3062625e09a54aa3b307aa4f7",
+  "afterSha256": "c1cb3291dca07f746f555666082ec35b5677121ad850b0655ae6ae4be48b00c3",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 48,
+    "diffRatio": 0,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 1,
+        "gridY": 5,
+        "x": 160,
+        "y": 500,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.003
+      }
+    ],
+    "summary": "100/100 similarity; 48/1024000 pixels differ; 1 hotspot region(s)."
+  }
+}

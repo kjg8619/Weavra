@@ -1,0 +1,25 @@
+SYSTEM light {
+  source: "light",
+  dark: false,
+} {
+  media: false,
+  mode: "system",
+  classes: "electron",
+}
+SYSTEM dark {
+  source: "dark",
+  dark: true,
+} {
+  media: true,
+  mode: "system",
+  classes: "electron dark",
+}
+SYSTEM light {
+  source: "light",
+  dark: false,
+} {
+  media: false,
+  mode: "system",
+  classes: "electron",
+}
+MEASURE_before rows=1056 PNGs=29 failures=0

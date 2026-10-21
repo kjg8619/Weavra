@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "selection": "19",
+  "revision": "0ae0238b299714d6b07e8514de7a981afeb77aef",
+  "asarSha256": "d06fcfd595913ac826ff438b1636ee62204347a266f84c709a63bba0f7955b23",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "d84976244ca15440d2b143a0f7bf987033cfa2d66fc21a9f7f316e7c6715f198",
+    "capture.mjs": "bafc2569d965d4c75cceb5dd4fc2bc214226e1ab8ece0d2d13f8f91486b1be20",
+    "seed.mjs": "68c839b49a3e5b951ea4b6c432d43044c683d9f03bc1be7206817bb0c6101bcf"
+  },
+  "startedAt": "2026-10-21T01:53:26.617Z",
+  "checks": [
+    {
+      "caseId": "19",
+      "checkId": "selection-wash-check",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "one selected appearance",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "selection includes a check",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "unfocused selection has no inset accent ring",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "selection has tonal wash",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/selection-wash-check/result.png",
+          "sha256": "05864a497a20721358e974f6b828320a009de27826edad1891847f99fd3a449d"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/selection-wash-check/result.ax.json",
+          "sha256": "dd8386942a6cfac590f20ee21dea93f1cf7a3e408bfc90666745f2a6d5efa966"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/selection-wash-check/observations.json",
+          "sha256": "e61c270fa251bfb4b99609a38c923ed6d0088af738576059645a98222417c912"
+        }
+      ]
+    },
+    {
+      "caseId": "19",
+      "checkId": "focus-not-selection",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "focus moved without selecting",
+          "actual": "true",
+          "expected": "true"
+        },
+        {
+          "label": "dark remains unselected",
+          "actual": "false",
+          "expected": "false"
+        },
+        {
+          "label": "keyboard focus visibly treated",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/focus-not-selection/result.png",
+          "sha256": "836da46f7bbde327d2de51113872c50107e51da12039384fdacb757caebeef9e"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/focus-not-selection/result.ax.json",
+          "sha256": "13578fcfcd636cba30795b759dbabfbf58c98be84eee7971beb3fcac171762af"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/focus-not-selection/observations.json",
+          "sha256": "a08dc3859e55ef65610d120b71fadbe39645d5acbfa75f27fde8f0922b3f33b6"
+        }
+      ]
+    },
+    {
+      "caseId": "19",
+      "checkId": "system-live-theme",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "native appearance follows requested OS change",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "System remains selected through OS change",
+          "actual": "true",
+          "expected": "true"
+        },
+        {
+          "label": "native appearance follows requested OS change",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "System remains selected through OS change",
+          "actual": "true",
+          "expected": "true"
+        },
+        {
+          "label": "native appearance follows requested OS change",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "System remains selected through OS change",
+          "actual": "true",
+          "expected": "true"
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/system-live-theme/system-0-light.png",
+          "sha256": "e58763e82d2c6dec7de8687226b73aea0acce010f367cd49d589d6673217bebc"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/system-live-theme/system-0-light.ax.json",
+          "sha256": "17adcb30a17239afa50a12593f51a2fcdc8827b8d00e8ff429184d515501a929"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/system-live-theme/system-1-dark.png",
+          "sha256": "7f7b9d34aad78211d109e80a0abbe9d6e4b163e76bcc903fa96c71727d0be95c"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/system-live-theme/system-1-dark.ax.json",
+          "sha256": "f90746b5ff3e47518cb5b9d498e44451183ecd067cf26ae9a360f29823d40e98"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/system-live-theme/system-2-light.png",
+          "sha256": "3936c4b4fa6302654627ff1cab5bd9548ebdbbe8e65bd38775215e0369a4d5ed"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/system-live-theme/system-2-light.ax.json",
+          "sha256": "98a8fcb657f62bbce3095e2836239db914051ed9c22a5edf1b89304e03d7934f"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/system-live-theme/result.png",
+          "sha256": "b45a6fde07e41b923a1a68199a6cca05c21d65c0361afaa1946a5e3279f8e912"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/system-live-theme/result.ax.json",
+          "sha256": "1fe1174a34ce6553db2e6f73171e03cddff0b0d7c31c925216be3e7b19a520ff"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/system-live-theme/observations.json",
+          "sha256": "2c11203754eeba05a34ec078158e4875fd72137240c00103efff3a29d3be677a"
+        }
+      ]
+    },
+    {
+      "caseId": "19",
+      "checkId": "custom-theme-preview",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "theme-editor: unique visible owner",
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "theme-editor: positive geometry",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "theme-editor: five hit points",
+          "actual": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "expected": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        {
+          "label": "real theme previews remain mounted",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "opening custom editor preserves palette",
+          "actual": [
+            10,
+            10,
+            10,
+            255
+          ],
+          "expected": [
+            10,
+            10,
+            10,
+            255
+          ]
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/custom-theme-preview/theme-editor.png",
+          "sha256": "12d1e563592cfca1901f9c17d3fa712d74b9647a9f2297f4a97c8d5918ffab82"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/custom-theme-preview/theme-editor.ax.json",
+          "sha256": "8dddfdab839cefd63bed6ee63d3e54e720338e9cecd44b1f012929f4efd8acb6"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/custom-theme-preview/result.png",
+          "sha256": "81cffa1fcaed17db197b2fa7ee1940f5202a2fd4022d54c1307456443fc1d2aa"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/custom-theme-preview/result.ax.json",
+          "sha256": "81621970ce2ef9c3b2ac9c042fe57fbe81faa95a4acdf445f1fcb580c5f5f8ac"
+        },
+        {
+          "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/scenarios/19/custom-theme-preview/observations.json",
+          "sha256": "a1045d013b889fb9e0f92b28ce9401c071908185e871b6cb302ce245f48e0fdc"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-21T01:54:26.670Z",
+  "capture": {
+    "file": "run-56666127-20c6-40ff-84dd-7407f459cc5a/capture-manifest.json",
+    "sha256": "da249009dfdd8ded46ebf78072fc9d07621db20827f4f9665c0801d91e6686a5"
+  }
+}
