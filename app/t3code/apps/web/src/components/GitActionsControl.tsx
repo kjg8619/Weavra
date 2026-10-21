@@ -1713,7 +1713,7 @@ export default function GitActionsControl({
                     aria-label="Git 작업"
                     size="icon-xs"
                     variant="outline"
-                    className="border-muted-foreground disabled:opacity-100"
+                    className="border-muted-foreground disabled:text-muted-foreground disabled:opacity-100"
                     disabled={initAction.isPending}
                   />
                 }
@@ -1723,7 +1723,7 @@ export default function GitActionsControl({
               </MenuTrigger>
               <MenuPopup align="end" className="min-w-40">
                 <MenuItem
-                  className="min-h-9 px-2.5 text-sm data-disabled:opacity-100 sm:min-h-9"
+                  className="min-h-9 px-2.5 text-sm data-disabled:text-muted-foreground data-disabled:opacity-100 sm:min-h-9"
                   onClick={initializeRepository}
                 >
                   <GitBranchPlusIcon className="size-4" aria-hidden />
@@ -1736,7 +1736,7 @@ export default function GitActionsControl({
               data-icon-control
               variant="outline"
               size="xs"
-              className="border-muted-foreground px-2.5 text-sm disabled:opacity-100 sm:text-sm"
+              className="border-muted-foreground px-2.5 text-sm disabled:text-muted-foreground disabled:opacity-100 sm:text-sm"
               disabled={initAction.isPending}
               onClick={initializeRepository}
             >
@@ -1757,7 +1757,7 @@ export default function GitActionsControl({
                       <Button
                         data-icon-control
                         aria-disabled="true"
-                        className="cursor-not-allowed rounded-e-none border-e-0 border-muted-foreground ps-[8.5px] text-sm before:rounded-e-none sm:text-sm"
+                        className="cursor-not-allowed rounded-e-none border-e-0 border-muted-foreground ps-[8.5px] text-sm text-muted-foreground before:rounded-e-none sm:text-sm"
                         size="xs"
                         variant="outline"
                       />
@@ -1780,7 +1780,7 @@ export default function GitActionsControl({
                   data-icon-control
                   variant="outline"
                   size="xs"
-                  className="border-muted-foreground ps-[8.5px] text-sm disabled:opacity-100 sm:text-sm"
+                  className="border-muted-foreground ps-[8.5px] text-sm disabled:text-muted-foreground disabled:opacity-100 sm:text-sm"
                   disabled={isGitActionRunning || quickAction.disabled}
                   onClick={runQuickAction}
                 >
@@ -1808,7 +1808,7 @@ export default function GitActionsControl({
                     aria-label="Git 작업 옵션"
                     size="icon-xs"
                     variant="outline"
-                    className="border-muted-foreground disabled:opacity-100"
+                    className="border-muted-foreground disabled:text-muted-foreground disabled:opacity-100"
                   />
                 }
                 disabled={isGitActionRunning}
@@ -1817,10 +1817,12 @@ export default function GitActionsControl({
                 <span className="sr-only">Git 작업</span>
               </MenuTrigger>
               <MenuPopup align="end" className="min-w-40">
-                {compactToolbar ? (
+                {compactToolbar &&
+                quickAction.kind !== "open_publish" &&
+                quickAction.kind !== "open_pr" ? (
                   <>
                     <MenuItem
-                      className="min-h-9 px-2.5 text-sm data-disabled:opacity-100 sm:min-h-9"
+                      className="min-h-9 px-2.5 text-sm data-disabled:text-muted-foreground data-disabled:opacity-100 sm:min-h-9"
                       disabled={isGitActionRunning || quickAction.disabled}
                       onClick={runQuickAction}
                     >
@@ -1856,7 +1858,7 @@ export default function GitActionsControl({
                           render={<span className="block w-max cursor-not-allowed" />}
                         >
                           <MenuItem
-                            className="min-h-9 w-full px-2.5 text-sm data-disabled:opacity-100 sm:min-h-9"
+                            className="min-h-9 w-full px-2.5 text-sm data-disabled:text-muted-foreground data-disabled:opacity-100 sm:min-h-9"
                             disabled
                           >
                             <GitActionItemIcon
@@ -1875,7 +1877,7 @@ export default function GitActionsControl({
 
                   return (
                     <MenuItem
-                      className="min-h-9 px-2.5 text-sm data-disabled:opacity-100 sm:min-h-9"
+                      className="min-h-9 px-2.5 text-sm data-disabled:text-muted-foreground data-disabled:opacity-100 sm:min-h-9"
                       key={`${item.id}-${item.label}`}
                       disabled={item.disabled}
                       onClick={() => {
@@ -1889,7 +1891,7 @@ export default function GitActionsControl({
                 })}
                 {canPublishRepository ? (
                   <MenuItem
-                    className="min-h-9 px-2.5 text-sm data-disabled:opacity-100 sm:min-h-9"
+                    className="min-h-9 px-2.5 text-sm data-disabled:text-muted-foreground data-disabled:opacity-100 sm:min-h-9"
                     disabled={isGitActionRunning}
                     onClick={() => {
                       setIsPublishDialogOpen(true);
