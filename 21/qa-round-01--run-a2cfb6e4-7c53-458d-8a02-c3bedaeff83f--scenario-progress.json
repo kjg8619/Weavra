@@ -1,0 +1,2448 @@
+[
+  {
+    "caseId": "21",
+    "checkId": "theme-content-parity",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -58.203125,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -58.203125,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -58.203125,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -58.203125,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -58.203125,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -58.203125,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "same selected code thread",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Example",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains greeting",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains console.log",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains local fixture only",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Profile",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Isolated",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Paid requests",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "seeded code transcript contains Zero",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme preserves heading code and table order",
+        "actual": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "expected": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ]
+      },
+      {
+        "label": "all content has painted nonzero rectangles",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "code anchor intersects nonblank transcript viewport",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "theme retains same code scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        }
+      },
+      {
+        "label": "theme retains same zoom",
+        "actual": {
+          "css": "1",
+          "scale": 1
+        },
+        "expected": {
+          "css": "1",
+          "scale": 1
+        }
+      },
+      {
+        "label": "complete theme-size matrix",
+        "actual": 15,
+        "expected": 15
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/21/theme-content-parity/code-840-light-1.png",
+        "sha256": "8f9cb7bce11d3e307048ceb2c4f0e66bca212e900abb2e3b2875d4d4daae787f"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-840-light-1.ax.json",
+        "sha256": "1cf05cc038c550d5624f5d2b217ecdf7e8d532caf06e6a264431b3ad74cf70ea"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-840-dark-2.png",
+        "sha256": "b0f6734a0f39a4d6df8f9d99c011f06c590549eb79f9afd0776c157b34384159"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-840-dark-2.ax.json",
+        "sha256": "0fee60d5e89528862451dffdc484103973239e4fdc386263c9f3cff7d087f025"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-840-light-3.png",
+        "sha256": "8f9cb7bce11d3e307048ceb2c4f0e66bca212e900abb2e3b2875d4d4daae787f"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-840-light-3.ax.json",
+        "sha256": "682c4bd9438885ba0ea95d0cf6362894ae6f747de80b8dc93b79ec456aeebd10"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1280-light-4.png",
+        "sha256": "d856ec79bb3d40e85e282f041438255efbb745d5d0196fe08c474973b1f746fa"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1280-light-4.ax.json",
+        "sha256": "14524175b83584d4853f8612eb9847f55637c07b36938b0253dd526c379c98d6"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1280-dark-5.png",
+        "sha256": "953ac2ca95e8d4865819fba8aca8386232abda254519e24e9661bd45b2a294a8"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1280-dark-5.ax.json",
+        "sha256": "5314cc7306b926f1cfda3f2f78c7b639c715e3c8e2314356faceaa927999646e"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1280-light-6.png",
+        "sha256": "d856ec79bb3d40e85e282f041438255efbb745d5d0196fe08c474973b1f746fa"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1280-light-6.ax.json",
+        "sha256": "1e44d5bc5d515c1236585672677e04f93617246f5112ebcebd89151d66c41fd6"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1920-light-7.png",
+        "sha256": "9c3185f497ea61304a20636ef459e1c4fb1782be55b0afbb84dee0c3ba09b12e"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1920-light-7.ax.json",
+        "sha256": "d02620f5acd57bd3bcf6307e9a426aee3a145077b8eedd9597a469df033f9772"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1920-dark-8.png",
+        "sha256": "530478296ff497a64a6b41444842d5fbf8ee26bf914ad97d47b2cca31f9badef"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1920-dark-8.ax.json",
+        "sha256": "413637a12f11e37de6ff19e7574a4a923371fcdaa45b0c268f7c40d1198ffc0e"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1920-light-9.png",
+        "sha256": "9c3185f497ea61304a20636ef459e1c4fb1782be55b0afbb84dee0c3ba09b12e"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-1920-light-9.ax.json",
+        "sha256": "399ea9ad0033964c71b2da2fdf85a4dc02995ad6cdab3d4adb46b05da17d6f59"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-2560-light-10.png",
+        "sha256": "8e3f9cfd8ced189812ad06903ede41f37eb6da8bf19b42196b79c2a4b46d6e9a"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-2560-light-10.ax.json",
+        "sha256": "d9a2c9cfd813a87081f827a090fc80824bd64cc10a7074d9cc0b1f08428bccef"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-2560-dark-11.png",
+        "sha256": "d3af090ad7e9593c23c12d96ed7d48ea11c50e9846ccd4c46235d5867d911b64"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-2560-dark-11.ax.json",
+        "sha256": "216dcd943b6b3c086114cc1f3dd474c7ae5ff823427095e2c0bbb10190eec823"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-2560-light-12.png",
+        "sha256": "8e3f9cfd8ced189812ad06903ede41f37eb6da8bf19b42196b79c2a4b46d6e9a"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-2560-light-12.ax.json",
+        "sha256": "d2f3722d6333a6969528fa7a15da3e7801c03a59ad6dbd5314d6bb85ec959d58"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-390-light-13.png",
+        "sha256": "26a79a42f0457eeb1cc4b6d8862a8d4c525b27757ccdec022fe9682305948241"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-390-light-13.ax.json",
+        "sha256": "a1af6cd5cf798f9d9b03068f760a2556bd3d23cd78d3e0c4daa2bad0d576d8e6"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-390-dark-14.png",
+        "sha256": "ec52eff5b4e8396e8fc1b31762722db3e4371f7cc6ae449e862f4b4c107be1df"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-390-dark-14.ax.json",
+        "sha256": "36d52884fb72888b5e41cf277fbc4c80d15d80cbb4005e481ca239fe60e59203"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-390-light-15.png",
+        "sha256": "26a79a42f0457eeb1cc4b6d8862a8d4c525b27757ccdec022fe9682305948241"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/code-390-light-15.ax.json",
+        "sha256": "10173b6d03cf96fb97dbfed975ab610ac9971a59fd97d33d8d6225fe29f6cc96"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/result.png",
+        "sha256": "82762b1ece6cb43b0c4cb2c268f7aed1f2a4c6b5db05c6c08ba6792df286a285"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/result.ax.json",
+        "sha256": "b352c338680da1aa7eaddec0ca225cd04362066336f5809532c22399e5dd3333"
+      },
+      {
+        "file": "scenarios/21/theme-content-parity/observations.json",
+        "sha256": "455c4a7786c096a0e6b4c1b24e2f37f5752269bd716df5816348d7aa38d6923d"
+      }
+    ]
+  },
+  {
+    "caseId": "21",
+    "checkId": "renderer-electron-parity",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "renderer/native paired corpus",
+        "actual": 6,
+        "expected": 6
+      },
+      {
+        "label": "renderer hash",
+        "actual": "3af0364ae560fb03a62f713673518105fed370d8a5b37e0b7fce5c5af35f9b42",
+        "expected": "3af0364ae560fb03a62f713673518105fed370d8a5b37e0b7fce5c5af35f9b42"
+      },
+      {
+        "label": "Electron hash",
+        "actual": "b402cbb1c03006036c93931834b7346b916f5db259495bb9a78f5ff9098c7756",
+        "expected": "b402cbb1c03006036c93931834b7346b916f5db259495bb9a78f5ff9098c7756"
+      },
+      {
+        "label": "painted code content",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "renderer hash",
+        "actual": "6f5fbe0bd30ac38fe6a19de862737b6ee2f62786dafd538ee9f1ee8c3dcad814",
+        "expected": "6f5fbe0bd30ac38fe6a19de862737b6ee2f62786dafd538ee9f1ee8c3dcad814"
+      },
+      {
+        "label": "Electron hash",
+        "actual": "74243d3f08d467cf352f5cc8cee3dcd22178f41cb3e6ccbac0f39c2a0fd6eae5",
+        "expected": "74243d3f08d467cf352f5cc8cee3dcd22178f41cb3e6ccbac0f39c2a0fd6eae5"
+      },
+      {
+        "label": "painted code content",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "renderer hash",
+        "actual": "f7f59a64469f44f15e7dde37f02d3fac7af99856009d3f53ec876b8af0ca6503",
+        "expected": "f7f59a64469f44f15e7dde37f02d3fac7af99856009d3f53ec876b8af0ca6503"
+      },
+      {
+        "label": "Electron hash",
+        "actual": "dabc6c2e3fa53489d71f8a348786e8d54cd9922d2665c1c0085e8cd3511d2bfa",
+        "expected": "dabc6c2e3fa53489d71f8a348786e8d54cd9922d2665c1c0085e8cd3511d2bfa"
+      },
+      {
+        "label": "painted code content",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "renderer hash",
+        "actual": "ca6bf76610a9e2eefd7f48ea8067d30c7bd65facf0a07d4d212bb862ba33688d",
+        "expected": "ca6bf76610a9e2eefd7f48ea8067d30c7bd65facf0a07d4d212bb862ba33688d"
+      },
+      {
+        "label": "Electron hash",
+        "actual": "a9b369d0814c2db198b933caadb8ba6a9812126f706a0932ada2152970006e01",
+        "expected": "a9b369d0814c2db198b933caadb8ba6a9812126f706a0932ada2152970006e01"
+      },
+      {
+        "label": "painted code content",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "renderer hash",
+        "actual": "8df116cb1dbfd27687d2d2a7c5c64981a554d780f2475a99e38c1636efecf7b0",
+        "expected": "8df116cb1dbfd27687d2d2a7c5c64981a554d780f2475a99e38c1636efecf7b0"
+      },
+      {
+        "label": "Electron hash",
+        "actual": "8f2cf468641708ce01a9fad77307ab101de5f1bef5277971be8e6131fd561f4b",
+        "expected": "8f2cf468641708ce01a9fad77307ab101de5f1bef5277971be8e6131fd561f4b"
+      },
+      {
+        "label": "painted code content",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "renderer hash",
+        "actual": "df6cd86d669ebcbf3e29bf59be8d188d4a7af55043bf3688633d191fbe9fd34c",
+        "expected": "df6cd86d669ebcbf3e29bf59be8d188d4a7af55043bf3688633d191fbe9fd34c"
+      },
+      {
+        "label": "Electron hash",
+        "actual": "7c45ff901d2a8ecd5ea6c3badb17632a32b4248229262828055f3906df75a0fa",
+        "expected": "7c45ff901d2a8ecd5ea6c3badb17632a32b4248229262828055f3906df75a0fa"
+      },
+      {
+        "label": "painted code content",
+        "actual": true,
+        "expected": true
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/21/renderer-electron-parity/result.png",
+        "sha256": "17bf48dd0517e76202fde1a7d7939ae0f0b52e52cef1a0e92143905dc8cc0673"
+      },
+      {
+        "file": "scenarios/21/renderer-electron-parity/result.ax.json",
+        "sha256": "b18dafe415c9eecc55f2b1caaa48ae8bd218605268b0f998d9fb4977c4d12efa"
+      },
+      {
+        "file": "scenarios/21/renderer-electron-parity/observations.json",
+        "sha256": "bd2e4e671d425dad0c8eeb965a2b45981ca548f9899332421f37b1cb3d584aa9"
+      }
+    ]
+  },
+  {
+    "caseId": "21",
+    "checkId": "virtual-anchor",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "theme retains same message and scroll anchor",
+        "actual": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "y": 233.796875,
+          "route": "#/03e301c5-c68a-4e60-bc23-c6b4d77458bf/baseline-code"
+        },
+        "expected": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "y": 233.796875,
+          "route": "#/03e301c5-c68a-4e60-bc23-c6b4d77458bf/baseline-code"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/21/virtual-anchor/result.png",
+        "sha256": "530478296ff497a64a6b41444842d5fbf8ee26bf914ad97d47b2cca31f9badef"
+      },
+      {
+        "file": "scenarios/21/virtual-anchor/result.ax.json",
+        "sha256": "9e743dc1caa71a11975520e88788f91c594b665795244a87f2078fe1329f6b22"
+      },
+      {
+        "file": "scenarios/21/virtual-anchor/observations.json",
+        "sha256": "51772308d0c829b8005ce20778a8f7eb9a2817bd8960f64d3439c688c7926e31"
+      }
+    ]
+  },
+  {
+    "caseId": "21",
+    "checkId": "native-minimum",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "native minimum unchanged",
+        "actual": [
+          840,
+          620
+        ],
+        "expected": [
+          840,
+          620
+        ]
+      },
+      {
+        "label": "native rejects unsupported dimensions",
+        "actual": true,
+        "expected": true
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/21/native-minimum/result.png",
+        "sha256": "4fda15159ae8120743f9bca4857dfc386d6c3f45875e09be0078f8a6cdb39991"
+      },
+      {
+        "file": "scenarios/21/native-minimum/result.ax.json",
+        "sha256": "5dbae8c91e80436d22b7641669db0367c9d198c2dcbee74833c5914f1a7ad967"
+      },
+      {
+        "file": "scenarios/21/native-minimum/observations.json",
+        "sha256": "8f31f008e964527e08069b48108b2ec395626be6631a9bfeae1344cb135edd64"
+      }
+    ]
+  },
+  {
+    "caseId": "21",
+    "checkId": "git-overflow",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "Git action or labelled overflow is available",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Git and panel targets never overlap",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Git action or labelled overflow is available",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Git and panel targets never overlap",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Git action or labelled overflow is available",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Git and panel targets never overlap",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Git action or labelled overflow is available",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Git and panel targets never overlap",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Git action or labelled overflow is available",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Git and panel targets never overlap",
+        "actual": true,
+        "expected": true
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/21/git-overflow/toolbar-840.png",
+        "sha256": "871f302fa1c775f98dd5796ed26c70d984d8af1e1d36ba000f09e92153bcd5c7"
+      },
+      {
+        "file": "scenarios/21/git-overflow/toolbar-840.ax.json",
+        "sha256": "c91d67ca956a684020a58db41bdc7c7bcb5308293b8a323841e1c330cb54f956"
+      },
+      {
+        "file": "scenarios/21/git-overflow/toolbar-1024.png",
+        "sha256": "b1a62fd9f06331b757dfb04a1de83456856901c98a7c70a1a79e36c883c5f2c0"
+      },
+      {
+        "file": "scenarios/21/git-overflow/toolbar-1024.ax.json",
+        "sha256": "f202ffd6158f1ba9aa5239f06382c8fd4d28595aa4665c4697351f05037c6660"
+      },
+      {
+        "file": "scenarios/21/git-overflow/toolbar-1280.png",
+        "sha256": "1a6672f9d39cc4480e61e622242c9f346651b997948e155b438905055f9d2fea"
+      },
+      {
+        "file": "scenarios/21/git-overflow/toolbar-1280.ax.json",
+        "sha256": "f927a0be0b61efad989835e98f660d007e4095222dbad2a1a6e0a24821b8715a"
+      },
+      {
+        "file": "scenarios/21/git-overflow/toolbar-1920.png",
+        "sha256": "4fda15159ae8120743f9bca4857dfc386d6c3f45875e09be0078f8a6cdb39991"
+      },
+      {
+        "file": "scenarios/21/git-overflow/toolbar-1920.ax.json",
+        "sha256": "582c0caae8f48920ac7bccd1753369ae071d2950c8fe32300685a34c8f54c68d"
+      },
+      {
+        "file": "scenarios/21/git-overflow/toolbar-2560.png",
+        "sha256": "271f1666a44693133521128d7e440be85bbb9d405105eba384620ae3b589363f"
+      },
+      {
+        "file": "scenarios/21/git-overflow/toolbar-2560.ax.json",
+        "sha256": "005a04425d709d62093f4b37d8e10c0759c4ee553a664fd9ec8a8319f03c3148"
+      },
+      {
+        "file": "scenarios/21/git-overflow/result.png",
+        "sha256": "4fda15159ae8120743f9bca4857dfc386d6c3f45875e09be0078f8a6cdb39991"
+      },
+      {
+        "file": "scenarios/21/git-overflow/result.ax.json",
+        "sha256": "4f234306746559f88fb1cb0fce682838eb9e77f02183c5069913675e2aea9750"
+      },
+      {
+        "file": "scenarios/21/git-overflow/observations.json",
+        "sha256": "221f2dc2121de3bdc59ae06d16df44cb83d15f412f745c67a98fc2cc6bd55390"
+      }
+    ]
+  },
+  {
+    "caseId": "21",
+    "checkId": "hit-test",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "panel-hit-840: unique visible owner",
+        "actual": 1,
+        "expected": 1
+      },
+      {
+        "label": "panel-hit-840: positive geometry",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "panel-hit-840: five hit points",
+        "actual": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "expected": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "panel icon has desktop minimum hit size",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "panel navigation does not dispatch model",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "panel-hit-1280: unique visible owner",
+        "actual": 1,
+        "expected": 1
+      },
+      {
+        "label": "panel-hit-1280: positive geometry",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "panel-hit-1280: five hit points",
+        "actual": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "expected": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "panel icon has desktop minimum hit size",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "panel navigation does not dispatch model",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "panel-hit-1920: unique visible owner",
+        "actual": 1,
+        "expected": 1
+      },
+      {
+        "label": "panel-hit-1920: positive geometry",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "panel-hit-1920: five hit points",
+        "actual": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "expected": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "panel icon has desktop minimum hit size",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "panel navigation does not dispatch model",
+        "actual": 0,
+        "expected": 0
+      },
+      {
+        "label": "panel-hit-2560: unique visible owner",
+        "actual": 1,
+        "expected": 1
+      },
+      {
+        "label": "panel-hit-2560: positive geometry",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "panel-hit-2560: five hit points",
+        "actual": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "expected": [
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "panel icon has desktop minimum hit size",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "panel navigation does not dispatch model",
+        "actual": 0,
+        "expected": 0
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/21/hit-test/panel-hit-840.png",
+        "sha256": "871f302fa1c775f98dd5796ed26c70d984d8af1e1d36ba000f09e92153bcd5c7"
+      },
+      {
+        "file": "scenarios/21/hit-test/panel-hit-840.ax.json",
+        "sha256": "f36b8a49a9d6927353be053671400d2c1b9841ce7e2f17fb6ce9e5a6f5f11e5d"
+      },
+      {
+        "file": "scenarios/21/hit-test/panel-hit-1280.png",
+        "sha256": "1a6672f9d39cc4480e61e622242c9f346651b997948e155b438905055f9d2fea"
+      },
+      {
+        "file": "scenarios/21/hit-test/panel-hit-1280.ax.json",
+        "sha256": "e16c7ca2d3b126a62b50c4860ed0aa55dc39c3a6595c0c37c8ce6291c8f31e92"
+      },
+      {
+        "file": "scenarios/21/hit-test/panel-hit-1920.png",
+        "sha256": "d4f465515a627ca7fbea676b3847fde6ed309c5256a5359f573c27b1e6b8275e"
+      },
+      {
+        "file": "scenarios/21/hit-test/panel-hit-1920.ax.json",
+        "sha256": "01e6c81ccca182a29c92ed152b4e9368bc69f2adb9e4181d3bfd7a47b0b2554d"
+      },
+      {
+        "file": "scenarios/21/hit-test/panel-hit-2560.png",
+        "sha256": "271f1666a44693133521128d7e440be85bbb9d405105eba384620ae3b589363f"
+      },
+      {
+        "file": "scenarios/21/hit-test/panel-hit-2560.ax.json",
+        "sha256": "70037d42c9e56dbbbbc33f1c3bdf107776c117438801df54181d771651e6216e"
+      },
+      {
+        "file": "scenarios/21/hit-test/result.png",
+        "sha256": "3e56f9a6b3263766032d55de39835a4f6cb2d01009eec27940ac1238515db823"
+      },
+      {
+        "file": "scenarios/21/hit-test/result.ax.json",
+        "sha256": "738633ec834008f1b25ef2aa96d22d768b0e1a9e15a8167da9b7267860602eea"
+      },
+      {
+        "file": "scenarios/21/hit-test/observations.json",
+        "sha256": "cf603c3baf13be1f909c4487541038dc03bff5c6c18b941294f33a7c575719f5"
+      }
+    ]
+  },
+  {
+    "caseId": "21",
+    "checkId": "draft-preserved",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "theme and resize retain draft",
+        "actual": "HIG unsent Korean draft: 저장하지 않은 입력",
+        "expected": "HIG unsent Korean draft: 저장하지 않은 입력"
+      },
+      {
+        "label": "no turn dispatched",
+        "actual": 0,
+        "expected": 0
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/21/draft-preserved/result.png",
+        "sha256": "f32ae364ff64f43507d54d3f535e0f33ac7d44039ddc8cf0316a6becf632c9ea"
+      },
+      {
+        "file": "scenarios/21/draft-preserved/result.ax.json",
+        "sha256": "5310d3a37bc538dd7bac83081d4b5e42c281348b01fa05a6d297b3c0f09dd01d"
+      },
+      {
+        "file": "scenarios/21/draft-preserved/observations.json",
+        "sha256": "0b7a84dcaefe714a0530ad5f4d6c45bb260835a4fad370f06f2dae290fde52ea"
+      }
+    ]
+  }
+]
