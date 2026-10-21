@@ -1,0 +1,26 @@
+51 |   const actual = receipt.checks.map((check) => `${check.caseId}/${check.checkId}`);
+52 |   NodeAssert.equal(new Set(actual).size, actual.length, "Duplicate scenario check");
+53 |   NodeAssert.deepEqual([...actual].sort(), expected.sort(), "Missing or unexpected scenario check");
+54 |   for (const check of receipt.checks) {
+55 |     const key = `${check.caseId}/${check.checkId}`;
+56 |     NodeAssert.equal(
+                    ^
+AssertionError: Scenario failed: 18/raw-diagnostic: AssertionError [ERR_ASSERTION]: provider-raw-diagnostic: expanded
+
+'false' !== 'true'
+
+
+'FAIL' !== 'PASS'
+
+ generatedMessage: false,
+     actual: "FAIL",
+   expected: "PASS",
+   operator: "strictEqual",
+       diff: "simple",
+       code: "ERR_ASSERTION"
+
+      at validateCheckCoverage (/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/assert.mjs:56:16)
+      at verifyScenarioReceipt (/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/assert.mjs:84:17)
+      at verifyPacket (/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig/assert.mjs:576:38)
+
+Bun v1.4.0 (macOS arm64)

@@ -1,0 +1,270 @@
+{
+  "schemaVersion": 1,
+  "selection": "18",
+  "revision": "16955bb57c8c4611823d39e0fa3bf6960beb429e",
+  "asarSha256": "84de85e7bd26789da889425241e1b278183ea9b342313c09a7fdbf0a5b781f1c",
+  "sources": {
+    "assert.mjs": "c6f09884f68f147218743e7f6d0457488967294027d122197f435f9b6f346372",
+    "cases.mjs": "2f625cde8930cc2ee4b08343fe9ca1ce8fee70553d4162575bb772b6795d3b69",
+    "capture.mjs": "529be2847f59e3f59c953d22527cb089f521ad051f863f8518544796a49a8e08",
+    "seed.mjs": "68c839b49a3e5b951ea4b6c432d43044c683d9f03bc1be7206817bb0c6101bcf"
+  },
+  "startedAt": "2026-10-20T23:55:20.793Z",
+  "checks": [
+    {
+      "caseId": "18",
+      "checkId": "status-summary-complete",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "provider statuses observed",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "no clipped required provider summary",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/status-summary-complete/result.png",
+          "sha256": "09960eb4dc765355f2576eddda24ce4be31253c4818fd71cde31c5de66bba1f3"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/status-summary-complete/result.ax.json",
+          "sha256": "834617bd35fc6fa04fadf9d39e99e8dee42658ebebd184946f78c429e58d6bf3"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/status-summary-complete/observations.json",
+          "sha256": "f39fd0f1a55827e82700a41833280dd4e4093c36ec08ccd7e0b29dfaa9e8aa16"
+        }
+      ]
+    },
+    {
+      "caseId": "18",
+      "checkId": "raw-diagnostic",
+      "status": "FAIL",
+      "assertions": [
+        {
+          "label": "provider-raw-diagnostic: disclosure exists",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "provider-raw-diagnostic: expanded",
+          "actual": "false",
+          "expected": "true"
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/raw-diagnostic/result.png",
+          "sha256": "228f66b30ed2d507fa0e423f2aff83aef50e505a298106bc4f91bc5314a695d1"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/raw-diagnostic/result.ax.json",
+          "sha256": "4277eba84711d3ed0bc2e6eeae8ba245f69e463ac11c388d61e19a02caa1f169"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/raw-diagnostic/observations.json",
+          "sha256": "365854d46b4568758cf333c037765b93204e31c93f0af9b806156a5c1bdcc1b2"
+        }
+      ],
+      "error": "AssertionError [ERR_ASSERTION]: provider-raw-diagnostic: expanded\n\n'false' !== 'true'\n"
+    },
+    {
+      "caseId": "18",
+      "checkId": "six-adapters",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "Codex: available or explicitly unavailable adapter",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Claude: available or explicitly unavailable adapter",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Cursor: available or explicitly unavailable adapter",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Grok: available or explicitly unavailable adapter",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "OpenCode: available or explicitly unavailable adapter",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Antigravity: available or explicitly unavailable adapter",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/six-adapters/result.png",
+          "sha256": "ce65436643aa38656d8afb2b5e89d5eb4e20410b7099aef9ec198a7590a128a6"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/six-adapters/result.ax.json",
+          "sha256": "656948dbb52db1a1e7ba98f13535a4abfb3d0a61faaf86c643f713a52cf8e841"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/six-adapters/observations.json",
+          "sha256": "2fd16004d888de934fef46aea0156df37234408b50cfd7167003118c24c14331"
+        }
+      ]
+    },
+    {
+      "caseId": "18",
+      "checkId": "one-scroll-owner",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "one vertical provider scroll owner",
+          "actual": 1,
+          "expected": 1
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/one-scroll-owner/result.png",
+          "sha256": "aa60b204584d1b7b0ffae9d9e5636282929bf638d2552ec0df0414a22de34aa6"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/one-scroll-owner/result.ax.json",
+          "sha256": "322b970d5d730a500df27322ff80846c0bd536fb2f1250cde3b5f7bb635316d7"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/one-scroll-owner/observations.json",
+          "sha256": "7593f6edf3db51bf05edf2605e38601244b857ee43315dcb784031cb5e828a92"
+        }
+      ]
+    },
+    {
+      "caseId": "18",
+      "checkId": "form-actions-reachable",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "form includes field and two actions",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "field label and actions fit current viewport",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "form includes field and two actions",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "field label and actions fit current viewport",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "form includes field and two actions",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "field label and actions fit current viewport",
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/form-actions-reachable/model-form-1280.png",
+          "sha256": "8a6cdf911111d39f9a226f6dae56e36716a07563109382161d9627674439a1d2"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/form-actions-reachable/model-form-1280.ax.json",
+          "sha256": "9a23ed1c0aea3a33b3cddea9b603dc727bd1d9dc31c1486696c41bebc61dbf5e"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/form-actions-reachable/model-form-1920.png",
+          "sha256": "970f5f6e14f8803135e0db583e214d43640b8f08a71613513bdb0e1731c709fc"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/form-actions-reachable/model-form-1920.ax.json",
+          "sha256": "001ac89c258c7c8deb31fa7b20803aabae159653a6a265a22328b22fc1a064b0"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/form-actions-reachable/model-form-840.png",
+          "sha256": "e1cd3b055bd7df5de98350627aebc557d6995cc9d7431848a3b7281c00a31314"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/form-actions-reachable/model-form-840.ax.json",
+          "sha256": "2f99a1632a4d2bbb72edf8a16ab06c16e596cdbafcc566f47cdb82a3204bbb99"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/form-actions-reachable/result.png",
+          "sha256": "970f5f6e14f8803135e0db583e214d43640b8f08a71613513bdb0e1731c709fc"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/form-actions-reachable/result.ax.json",
+          "sha256": "5bb1b9c6575e3a4e9fd3bc5c03ebe90cff1122eb6017efffae04576c6aee0c73"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/form-actions-reachable/observations.json",
+          "sha256": "0791eeebf047f027c6dbb3be8df25bcf541e6119bcc6f9f4b707a090bca56d31"
+        }
+      ]
+    },
+    {
+      "caseId": "18",
+      "checkId": "draft-preserved",
+      "status": "PASS",
+      "assertions": [
+        {
+          "label": "resize and keyboard preserve model draft",
+          "actual": "hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-",
+          "expected": "hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-hig-unsaved-model-"
+        }
+      ],
+      "artifacts": [
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/draft-preserved/result.png",
+          "sha256": "c7e48f0dee51e4169bfeb4c01a1b0dde9ec26950dfdbc810c193724ac14ec07c"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/draft-preserved/result.ax.json",
+          "sha256": "aa15cae87d4bcb274683c32446b20e9c92e834dc34d24faeb462cdd55b7ad642"
+        },
+        {
+          "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/scenarios/18/draft-preserved/observations.json",
+          "sha256": "71ab8504f2f119a39501342176e904e4780d045235b8c2af3554fc9c55adebc2"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "exited": true
+  },
+  "counters": {
+    "model": 0,
+    "runtimeMutation": 0,
+    "blockedOutbound": 0
+  },
+  "completedAt": "2026-10-20T23:56:19.721Z",
+  "capture": {
+    "file": "run-0ec65ef6-02da-42e0-b961-e0b9cd204e12/capture-manifest.json",
+    "sha256": "77634e1561fd7db97f4422a9c5b69ae04d6b04cb74474935f4fae4b9ebdf7455"
+  },
+  "failure": "AssertionError [ERR_ASSERTION]: Scenario failed: 18/raw-diagnostic: AssertionError [ERR_ASSERTION]: provider-raw-diagnostic: expanded\n\n'false' !== 'true'\n\n\n'FAIL' !== 'PASS'\n"
+}

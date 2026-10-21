@@ -1,0 +1,110 @@
+{
+  "revision": "16955bb57c8c4611823d39e0fa3bf6960beb429e",
+  "asarSha256": "84de85e7bd26789da889425241e1b278183ea9b342313c09a7fdbf0a5b781f1c",
+  "scriptSha256": "ca5f4ba3043b5cec535ff0ddff2033c089701263e5eaaa718b9f89fcc956547d",
+  "nativeSample": {
+    "minimum": [
+      840,
+      620
+    ],
+    "bounds": {
+      "x": 206,
+      "y": 37,
+      "width": 840,
+      "height": 620
+    },
+    "content": {
+      "x": 206,
+      "y": 37,
+      "width": 840,
+      "height": 620
+    }
+  },
+  "rows": 2749,
+  "frames": 120,
+  "failures": [],
+  "cleanup": "app.close completed",
+  "counters": {
+    "model": 0,
+    "execution": 0,
+    "externalNetwork": 0
+  },
+  "minTextContrast": 4.783187205191262,
+  "minIconContrast": 4.391840562014776,
+  "minExplanatorySize": 14,
+  "minIconWidth": 36,
+  "minIconHeight": 36,
+  "minTextButtonHeight": 32,
+  "minFocusWidth": 2,
+  "minFocusContrast": 14.318906775932096,
+  "checks": {
+    "i/status-summary": {
+      "total": 12,
+      "failed": 0
+    },
+    "a/target": {
+      "total": 216,
+      "failed": 0
+    },
+    "a/hits": {
+      "total": 192,
+      "failed": 0
+    },
+    "h/icons": {
+      "total": 216,
+      "failed": 0
+    },
+    "h/focus": {
+      "total": 36,
+      "failed": 0
+    },
+    "c/contrast": {
+      "total": 372,
+      "failed": 0
+    },
+    "d/orphan": {
+      "total": 432,
+      "failed": 0
+    },
+    "i/clipping": {
+      "total": 372,
+      "failed": 0
+    },
+    "e-g/diagnostic": {
+      "total": 12,
+      "failed": 0
+    },
+    "b/size": {
+      "total": 156,
+      "failed": 0
+    },
+    "f/one-owner": {
+      "total": 12,
+      "failed": 0
+    },
+    "f/form-contained": {
+      "total": 12,
+      "failed": 0
+    },
+    "f/no-page-overflow": {
+      "total": 12,
+      "failed": 0
+    },
+    "j/control-overlap": {
+      "total": 240,
+      "failed": 0
+    },
+    "e-g/edit-cancel": {
+      "total": 12,
+      "failed": 0
+    },
+    "e-g/add-cancel": {
+      "total": 12,
+      "failed": 0
+    },
+    "no-paid-or-execution": {
+      "total": 1,
+      "failed": 0
+    }
+  }
+}

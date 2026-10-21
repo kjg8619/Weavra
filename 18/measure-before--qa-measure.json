@@ -1,0 +1,996 @@
+{
+  "side": "before",
+  "revision": "c4e04c655ec393a0641dbafbfa204d9580b992bb",
+  "scriptSha256": "5505d38d99b3cd5fe5ddf58d273eccb1e352fc015773824d6abdf58b7e42cadf",
+  "asarSha256": "8aad4d93be48a7767b56d8437d48c41d26ebe6190cf2d1f2a9ef84e8ca8e4a4f",
+  "rows": [
+    {
+      "check": "e-g/add-cancel",
+      "pass": true,
+      "theme": "light",
+      "width": 840,
+      "height": 620,
+      "scale": 100
+    },
+    {
+      "check": "e-g/add-cancel",
+      "pass": true,
+      "theme": "light",
+      "width": 1280,
+      "height": 800,
+      "scale": 100
+    },
+    {
+      "check": "e-g/add-cancel",
+      "pass": true,
+      "theme": "light",
+      "width": 1920,
+      "height": 1080,
+      "scale": 100
+    },
+    {
+      "check": "e-g/add-cancel",
+      "pass": true,
+      "theme": "dark",
+      "width": 840,
+      "height": 620,
+      "scale": 100
+    },
+    {
+      "check": "e-g/add-cancel",
+      "pass": true,
+      "theme": "dark",
+      "width": 1280,
+      "height": 800,
+      "scale": 100
+    },
+    {
+      "check": "e-g/add-cancel",
+      "pass": true,
+      "theme": "dark",
+      "width": 1920,
+      "height": 1080,
+      "scale": 100
+    },
+    {
+      "check": "no-paid-or-execution",
+      "pass": true,
+      "model": 0,
+      "execution": 0,
+      "externalNetwork": 0
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "840x620/light/100-provider-list.png",
+      "sha256": "c5721dd1078f718306976d565a4079194b625b226a8dcf7c81c2699107f48bb5",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/light/100-new-form.png",
+      "sha256": "5221a2ded818adfca5a3cda0e2185d0d6e90fa122f1d620f624203d284986f76",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/light/100-invalid.png",
+      "sha256": "b7b49886907760f4545420924433aa585686fba9ca61352f69cb122b4d0daf78",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/light/100-corrected.png",
+      "sha256": "36917f06a23f7551ab915c7af856206ab60a5e896a3eda30623ef1503332b7a0",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/light/100-edited-form.png",
+      "sha256": "13c42e425ce1ec8f4c24c82735bc480bae2b34b8e7cc57fed17729ae17acb40e",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/light/100-keyboard.png",
+      "sha256": "dd28a60748461637b034d04b3b621887bdad5c1fd3bd06c00aef82093fcde7f0",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/light/100-models-end.png",
+      "sha256": "0126867c55ff7486136258bf493ba9a9869041e1a7dec05f458bc94d3917d96b",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "1280x800/light/100-provider-list.png",
+      "sha256": "bbf431bf207ad3fde4501de0421776f145ad5cd6703dc6f247357d2291dd43fc",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/light/100-new-form.png",
+      "sha256": "9708816367c44c968eebdf0a3a0aaa965a891890ba4404f52413bb9bf1ea38c6",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/light/100-invalid.png",
+      "sha256": "7ef822623d31c01fa49e51b50b698a36b8eb95eef561c47a34a878a22c8b58aa",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/light/100-corrected.png",
+      "sha256": "482d77937bb5f09df4f1d74f8bccc8aac6fc5edfda9e2c43041183086a60c922",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/light/100-edited-form.png",
+      "sha256": "c7f5063f4cc0d57d52d10cecc8921d8982a2745fce7147bd3ddf199e5510d241",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/light/100-keyboard.png",
+      "sha256": "41e4435c6c1676a19d2c3d651f0e7d8bf106eb5463a51a948852c5a2ca52815b",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/light/100-models-end.png",
+      "sha256": "d69ab8e999399c586074a5a6cdc96718ef673a40d6cf79ff78ac35fb90d75b09",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 37,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1920x1080/light/100-provider-list.png",
+      "sha256": "83163195375b556af6c97b4cc49ca70a4dfd03448930a2efec74922abacad4c0",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/light/100-new-form.png",
+      "sha256": "6f3c912ffd5b6f859815a3d7c4a3dc79c64bf1ff90087e6599004bbe60f950ec",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/light/100-invalid.png",
+      "sha256": "924b071fc4bbac18e2bc9480ea60308dca9621e5ba6b2992ce20a55cbcafe765",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/light/100-corrected.png",
+      "sha256": "8e13b1ded828dd4ed4e49b96d7a0695216f5ff6538078a8e7c65e7250dc04e53",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/light/100-edited-form.png",
+      "sha256": "c8ed5d46c4dd316bf96f83d74332c23c57658ed7ad2da10e03a938697376eb3b",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/light/100-keyboard.png",
+      "sha256": "ab293701e717a3337a6b1299a1c9b1aab15a4858bbdd53d815bdfe65fcf0c97c",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/light/100-models-end.png",
+      "sha256": "a061e35ae51eb838cbe499073c3f53bc80129a1acfdf22e2f7bd6df68aea2bd1",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "840x620/dark/100-provider-list.png",
+      "sha256": "525798ac6cd0b86248b1f064f5d74ade1f53f4cc593588c4b08ec7599cabc56b",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/dark/100-new-form.png",
+      "sha256": "679c6ba283a7028c1a2c6479468af431749f5f17a23cce4ca27f86688c9f7a04",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/dark/100-invalid.png",
+      "sha256": "9e3119d2b26d8f6ee70d3df121be5b2bf654ce417f6788ba0e5d2f2c4d0f8f2b",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/dark/100-corrected.png",
+      "sha256": "ef97bcc98a7832e0f09f1b5b94d9e619ae1f3f50bf3e9df2a162d09bfd30a7f5",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/dark/100-edited-form.png",
+      "sha256": "95d6ed4d90fc68e212022599f6ddc5849526bf759299302956ac0cf8861acfe5",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/dark/100-keyboard.png",
+      "sha256": "b2f15328dae6a31bcc33003789d39d322c73b2ed075cc98885eecd3b8b05cbeb",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "840x620/dark/100-models-end.png",
+      "sha256": "f6c007ee5c112381b0fdbba741e0ccca4abc276d7c06a1eca2402ee7e61b8138",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 840,
+          "height": 620
+        }
+      }
+    },
+    {
+      "file": "1280x800/dark/100-provider-list.png",
+      "sha256": "b71e4892a32a2e12a13be0868be6e1d5b9555e65519c2554c4751e88268573d6",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/dark/100-new-form.png",
+      "sha256": "9d843cf7c27193f815c99dc2115d29b3c1497b8362b73c6b625ea3c76e2ac00f",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/dark/100-invalid.png",
+      "sha256": "4ca99c4be44574c60fb9c06ced3e9ec92077ee1ad7b77c3101dd5aa88a421ef0",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/dark/100-corrected.png",
+      "sha256": "ba15a0dde2e151be07753c42a313c156715697fc449521cb7f67f8b7402db277",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/dark/100-edited-form.png",
+      "sha256": "ba86beddbe1f6eefee19600b7c772dc7383277a6f331237555ad3b9a2d66dd17",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/dark/100-keyboard.png",
+      "sha256": "5a664642439f74e638cab1e90176d00d278eb75149e7856194eb05a4a9967933",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1280x800/dark/100-models-end.png",
+      "sha256": "8ff9a234f22a869e435ebd6c747e512a6db8b4ca149d87fcc92a9f1d8d0b95eb",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "file": "1920x1080/dark/100-provider-list.png",
+      "sha256": "67a5255581118dab45cfbc3649bbe3d1d7361dc24b111b3b3133fc521715c8fd",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/dark/100-new-form.png",
+      "sha256": "c1b5d77b5a4ff2e345eaa408327f08dfcdc6ceb61e2e97a1d6580cc33caf324e",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/dark/100-invalid.png",
+      "sha256": "d1dfa57670c88a5c4e60383e8fc311c8ba4df7be382702165dcb587f6c297538",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/dark/100-corrected.png",
+      "sha256": "70fed2649944d1c346769ce52b5c7a92f35c90fe0f7989025babedb37a6caee1",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/dark/100-edited-form.png",
+      "sha256": "e5a5b0de2f6c140650f828a210942a32846977e5cc17bb68c1750f686939ff8f",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/dark/100-keyboard.png",
+      "sha256": "91341db33b66ba502e7a28a6e9a3a8d0415c5e21ffd25b56396e43554cf0e016",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    },
+    {
+      "file": "1920x1080/dark/100-models-end.png",
+      "sha256": "f65ca17364cdc2b1e8822d91ddadd8bddaf83e8bad9c643d935d7af6ee935958",
+      "native": {
+        "minimum": [
+          840,
+          620
+        ],
+        "bounds": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        },
+        "content": {
+          "x": 206,
+          "y": 33,
+          "width": 1920,
+          "height": 871
+        }
+      }
+    }
+  ],
+  "failures": [],
+  "counters": {
+    "model": 0,
+    "execution": 0,
+    "externalNetwork": 0
+  },
+  "cleanup": "app.close completed"
+}
