@@ -1,0 +1,635 @@
+{
+  "parent": "fb97140d6781ff14b680cd56eec95e31fb23841b",
+  "head": "0ae0238b299714d6b07e8514de7a981afeb77aef",
+  "runner": "fa5e1dbcfb12fd51c5ac0d9dd0ca7a6e89f91c4a",
+  "parentAsar": "6a80bc979588694edbccbd75d4017d887c589f900b4b2fe488683f059f726b80",
+  "headAsar": "d06fcfd595913ac826ff438b1636ee62204347a266f84c709a63bba0f7955b23",
+  "captures": {
+    "before": 152,
+    "after": 152,
+    "pairs": 158,
+    "supplementalPairs": 29
+  },
+  "captureProvenance": {
+    "before": {
+      "revision": "fb97140d6781ff14b680cd56eec95e31fb23841b",
+      "appRevision": "fb97140d6781ff14b680cd56eec95e31fb23841b",
+      "executableSha256": "ad321e34b2795d1910ff1a24f2b4249269f556dc7184ea64f353a851339f1582",
+      "trackedDiff": "",
+      "trackedDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "asarSha256": "6a80bc979588694edbccbd75d4017d887c589f900b4b2fe488683f059f726b80",
+      "captureSha256": "bafc2569d965d4c75cceb5dd4fc2bc214226e1ab8ece0d2d13f8f91486b1be20",
+      "fixtureSha256": "68c839b49a3e5b951ea4b6c432d43044c683d9f03bc1be7206817bb0c6101bcf",
+      "registrySha256": "d84976244ca15440d2b143a0f7bf987033cfa2d66fc21a9f7f316e7c6715f198",
+      "fixtureVersion": "hig-offline-projection-v4",
+      "os": "Darwin 27.0.0 arm64",
+      "at": "2026-10-21T01:51:20.453Z",
+      "bundle": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-19/before/app/weavra-desktop.app",
+      "packagedRevision": "fb97140d6781",
+      "version": "0.0.42"
+    },
+    "after": {
+      "revision": "0ae0238b299714d6b07e8514de7a981afeb77aef",
+      "appRevision": "0ae0238b299714d6b07e8514de7a981afeb77aef",
+      "executableSha256": "ad321e34b2795d1910ff1a24f2b4249269f556dc7184ea64f353a851339f1582",
+      "trackedDiff": "",
+      "trackedDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "asarSha256": "d06fcfd595913ac826ff438b1636ee62204347a266f84c709a63bba0f7955b23",
+      "captureSha256": "bafc2569d965d4c75cceb5dd4fc2bc214226e1ab8ece0d2d13f8f91486b1be20",
+      "fixtureSha256": "68c839b49a3e5b951ea4b6c432d43044c683d9f03bc1be7206817bb0c6101bcf",
+      "registrySha256": "d84976244ca15440d2b143a0f7bf987033cfa2d66fc21a9f7f316e7c6715f198",
+      "fixtureVersion": "hig-offline-projection-v4",
+      "os": "Darwin 27.0.0 arm64",
+      "at": "2026-10-21T01:52:17.837Z",
+      "bundle": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-19/after/app/weavra-desktop.app",
+      "packagedRevision": "0ae0238b2997",
+      "version": "0.0.42"
+    }
+  },
+  "measure": {
+    "rows": 2113,
+    "screenshots": 53,
+    "failures": 0,
+    "checks": {
+      "f/one-scroll-owner": {
+        "total": 61,
+        "failed": 0
+      },
+      "f/no-horizontal-overflow": {
+        "total": 61,
+        "failed": 0
+      },
+      "a/target": {
+        "total": 182,
+        "failed": 0
+      },
+      "a/five-point-hit": {
+        "total": 182,
+        "failed": 0
+      },
+      "b/text-size": {
+        "total": 157,
+        "failed": 0
+      },
+      "c/text-contrast": {
+        "total": 157,
+        "failed": 0
+      },
+      "d/orphan": {
+        "total": 157,
+        "failed": 0
+      },
+      "i/no-clipping": {
+        "total": 157,
+        "failed": 0
+      },
+      "h/control-border": {
+        "total": 169,
+        "failed": 0
+      },
+      "h/icons": {
+        "total": 182,
+        "failed": 0
+      },
+      "f/strict-fit": {
+        "total": 182,
+        "failed": 0
+      },
+      "e/selected-wash-check": {
+        "total": 73,
+        "failed": 0
+      },
+      "j/no-overlap": {
+        "total": 181,
+        "failed": 0
+      },
+      "e-g/focus-independent": {
+        "total": 12,
+        "failed": 0
+      },
+      "g-h/focus": {
+        "total": 12,
+        "failed": 0
+      },
+      "e/system-live-selection": {
+        "total": 3,
+        "failed": 0
+      },
+      "e/editor-rendered-palette": {
+        "total": 1,
+        "failed": 0
+      },
+      "g/editor-close-preserves-selection": {
+        "total": 1,
+        "failed": 0
+      },
+      "zero-model-execution-network": {
+        "total": 1,
+        "failed": 0
+      }
+    },
+    "hitFailuresByControl": {},
+    "minimumTextContrast": 14.144710622731107,
+    "minimumBorderContrast": 4.584322056932125,
+    "minimumTextSize": 14,
+    "revision": "0ae0238b299714d6b07e8514de7a981afeb77aef",
+    "cleanup": {
+      "closed": true
+    },
+    "counters": {
+      "model": 0,
+      "execution": 0,
+      "externalNetwork": 0
+    }
+  },
+  "acceptance": {
+    "rounds": [
+      {
+        "name": "qa-round-01",
+        "revision": "0ae0238b299714d6b07e8514de7a981afeb77aef",
+        "checks": [
+          {
+            "caseId": "19",
+            "checkId": "selection-wash-check",
+            "status": "PASS",
+            "assertions": 4
+          },
+          {
+            "caseId": "19",
+            "checkId": "focus-not-selection",
+            "status": "PASS",
+            "assertions": 3
+          },
+          {
+            "caseId": "19",
+            "checkId": "system-live-theme",
+            "status": "PASS",
+            "assertions": 6
+          },
+          {
+            "caseId": "19",
+            "checkId": "custom-theme-preview",
+            "status": "PASS",
+            "assertions": 5
+          }
+        ],
+        "cleanup": {
+          "exited": true
+        },
+        "counters": {
+          "model": 0,
+          "runtimeMutation": 0,
+          "blockedOutbound": 0
+        }
+      },
+      {
+        "name": "qa",
+        "revision": "0ae0238b299714d6b07e8514de7a981afeb77aef",
+        "checks": [
+          {
+            "caseId": "19",
+            "checkId": "selection-wash-check",
+            "status": "PASS",
+            "assertions": 4
+          },
+          {
+            "caseId": "19",
+            "checkId": "focus-not-selection",
+            "status": "PASS",
+            "assertions": 3
+          },
+          {
+            "caseId": "19",
+            "checkId": "system-live-theme",
+            "status": "PASS",
+            "assertions": 6
+          },
+          {
+            "caseId": "19",
+            "checkId": "custom-theme-preview",
+            "status": "PASS",
+            "assertions": 5
+          }
+        ],
+        "cleanup": {
+          "exited": true
+        },
+        "counters": {
+          "model": 0,
+          "runtimeMutation": 0,
+          "blockedOutbound": 0
+        }
+      }
+    ],
+    "firstVerifier": {
+      "authority": "PACKAGED_SCENARIO_ACCEPTANCE",
+      "harness": "PASS",
+      "product": "PASS",
+      "closes": [
+        "W-26"
+      ],
+      "prerequisite": "G-07",
+      "baselineFindings": [
+        {
+          "id": "G-07",
+          "original": "47/48 can duplicate; 46 can omit prepare",
+          "disposition": "repaired-reference; no product change"
+        },
+        {
+          "id": "W-14",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-15",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-13",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-17",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-18",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-19",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-21",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-22",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-23",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-24",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-20",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-25",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-26",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-30",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-33",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-34",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-03",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-27",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-28",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-29",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-06",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-31",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-32",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-01",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-02",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-04",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-05",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-10",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-09",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-16",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-07",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-08",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-11",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-12",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        }
+      ],
+      "images": 152,
+      "pairs": 158,
+      "revision": "0ae0238b299714d6b07e8514de7a981afeb77aef",
+      "harnessOnly": false,
+      "cases": [
+        "19"
+      ],
+      "checks": 4,
+      "receiptSha256": "6cf257999231c2d9b944bc0112c34bcb9fd0507d7e0fb1891e2703536337a892"
+    },
+    "secondVerifier": {
+      "authority": "PACKAGED_SCENARIO_ACCEPTANCE",
+      "harness": "PASS",
+      "product": "PASS",
+      "closes": [
+        "W-26"
+      ],
+      "prerequisite": "G-07",
+      "baselineFindings": [
+        {
+          "id": "G-07",
+          "original": "47/48 can duplicate; 46 can omit prepare",
+          "disposition": "repaired-reference; no product change"
+        },
+        {
+          "id": "W-14",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-15",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-13",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-17",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-18",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-19",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-21",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-22",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-23",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-24",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-20",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-25",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-26",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-30",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-33",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-34",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-03",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-27",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-28",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-29",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-06",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-31",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-32",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-01",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-02",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-04",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-05",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-10",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-09",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-16",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-07",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-08",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-11",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        },
+        {
+          "id": "W-12",
+          "verdict": "NOT_REMEDIATED",
+          "reason": "Harness prerequisite only"
+        }
+      ],
+      "images": 152,
+      "pairs": 158,
+      "revision": "0ae0238b299714d6b07e8514de7a981afeb77aef",
+      "harnessOnly": false,
+      "cases": [
+        "19"
+      ],
+      "checks": 4,
+      "receiptSha256": "573bbbfc3a0d7a71180ceda997fad90f14c9fba517bf2f65e813405d83300a99"
+    }
+  },
+  "commandExits": {
+    "focused": 0,
+    "fmt": 0,
+    "lint": 0,
+    "typecheck": 0,
+    "runnerTests": 0,
+    "buildBefore": 0,
+    "buildAfter": 0,
+    "measureBefore": 0,
+    "measureAfter": 0,
+    "captureBefore": 0,
+    "captureAfter": 0,
+    "diff": 0,
+    "supplementalDiff": 0,
+    "acceptPr19Round1": 0,
+    "acceptPr19Round2": 0,
+    "verifyPacketRound1": 0,
+    "verifyPacketRound2": 0,
+    "diffCheck": 0
+  }
+}
