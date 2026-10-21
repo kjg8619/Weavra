@@ -11,13 +11,13 @@ async function scan(dir){
     else if(file.endsWith(".png"))files.push(file);
   }
 }
-for(const dir of ["before/capture","after/capture","measure-before","measure-after"])await scan(dir);
+for(const dir of ["before/capture","after/capture","measure-before","measure-after","fix2/before","fix2/after","fix2/qa-round-01","qa","../pr-19-fix1-measure"])await scan(dir);
 const frames=files.map((file,index)=>({file,label:file,index}));
 const hotspots=[];
-for(const pair of [...(await json("diff/pairs.json")).pairs,...(await json("supplemental/pairs.json")).pairs.map(p=>({...p,supplemental:true}))])
+for(const pair of [...(await json("diff/pairs.json")).pairs,...(await json("supplemental/pairs.json")).pairs.map(p=>({...p,supplemental:true})),...(await json("fix2/pairs.json")).pairs.map(p=>({...p,variant:true}))])
   for(const [index,region]of pair.result.hotspots.entries())
     for(const side of ["before","after"]){
-      const file=pair.supplemental?`measure-${side}/${pair.file}`:`${side}/capture/${pair.file}`;
+      const file=pair.variant?`fix2/${side}/${pair.file}`:pair.supplemental?`measure-${side}/${pair.file}`:`${side}/capture/${pair.file}`;
       const imageIndex=files.indexOf(file);
       if(imageIndex<0)throw new Error(`Unbound image ${file}`);
       hotspots.push({file,index:imageIndex,region,label:`${file} hotspot ${index+1}`});

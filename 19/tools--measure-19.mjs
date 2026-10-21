@@ -5,7 +5,7 @@ const ruleAOnly = process.argv.includes("--rule-a");
 if (!["before", "after"].includes(side)) throw new Error("Expected before or after");
 const pk = "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-19";
 const wt = `/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-${side === "before" ? "19-before" : "19"}`;
-const qa = "/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-01/scripts/hig";
+const qa = "/Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-19/scripts/hig";
 const out = `${pk}/measure-${ruleAOnly ? "rule-a-" : ""}${side}`;
 const bundle = `${pk}/${side}/app/weavra-desktop.app`;
 const { seed, prepareCaptureProfile, installCaptureNetworkFixture } = await import(`${qa}/seed.mjs`);
