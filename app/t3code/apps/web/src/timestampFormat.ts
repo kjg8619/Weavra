@@ -1,4 +1,7 @@
 import { type TimestampFormat } from "@t3tools/contracts/settings";
+import { ko } from "~/i18n/ko";
+
+const timeCopy = ko.common.time;
 
 function getTimestampFormatOptions(
   timestampFormat: TimestampFormat,
@@ -78,29 +81,10 @@ export function parseTimestampDate(isoDate: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-// Deliberately not the host locale: the tooltip's ordinal suffix and
-// day-before-month order below are English, so a localized month alone would
-// read "4th Juni 2026". Localizing the whole label is a separate change.
-const monthNameFormatter = new Intl.DateTimeFormat("en-US", { month: "long" });
-
-function ordinalSuffix(day: number): string {
-  const lastTwo = day % 100;
-  if (lastTwo >= 11 && lastTwo <= 13) return "th";
-  switch (day % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-}
-
 /**
- * Long-form tooltip label, e.g. `12:04, 4th June`.
- * Renders the wall-clock time without seconds followed by the ordinal day and month name.
+ * Long-form tooltip label, e.g. `2026년 6월 4일 12:04`.
+ * Renders the Korean year, month and day followed by the wall-clock time without seconds;
+ * the date part does not follow the host locale.
  */
 export function formatChatTimestampTooltip(
   isoDate: string,
@@ -109,10 +93,7 @@ export function formatChatTimestampTooltip(
   const date = parseTimestampDate(isoDate);
   if (!date) return "";
   const time = formatShortTimestamp(isoDate, timestampFormat);
-  const day = date.getDate();
-  const month = monthNameFormatter.format(date);
-  const year = date.getFullYear();
-  return `${time}, ${day}${ordinalSuffix(day)} ${month} ${year}`;
+  return timeCopy.dateTimeTooltip(time, date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
 export function formatShortTimestamp(isoDate: string, timestampFormat: TimestampFormat): string {
@@ -133,7 +114,7 @@ const numericDateWithYearFormatter = new Intl.DateTimeFormat(timestampLocale, {
 
 /**
  * Chat timestamp that adds the date once the message is no longer from today:
- * today `12:34 PM`, yesterday `yesterday at 12:34 PM`, older `8/13 12:34 PM`
+ * today `12:34 PM`, yesterday `어제 12:34 PM`, older `8/13 12:34 PM`
  * (locale digit order), with the year included once the calendar year differs.
  * Boundaries are local calendar days, not 24-hour windows.
  */
@@ -153,7 +134,7 @@ export function formatDayAwareTimestamp(
   const dayDiff = Math.round((startOfToday - startOfMessageDay) / 86_400_000);
 
   if (dayDiff <= 0) return time;
-  if (dayDiff === 1) return `yesterday at ${time}`;
+  if (dayDiff === 1) return timeCopy.yesterdayAt(time);
   const dateFormatter =
     date.getFullYear() === now.getFullYear() ? numericDateFormatter : numericDateWithYearFormatter;
   return `${dateFormatter.format(date)} ${time}`;
@@ -179,7 +160,7 @@ export function formatUpcomingTimestamp(
   const dayDiff = Math.round((startOfTargetDay - startOfToday) / 86_400_000);
 
   if (dayDiff <= 0) return time;
-  if (dayDiff === 1) return `tomorrow at ${time}`;
+  if (dayDiff === 1) return timeCopy.tomorrowAt(time);
   const dateFormatter =
     date.getFullYear() === now.getFullYear() ? numericDateFormatter : numericDateWithYearFormatter;
   return `${dateFormatter.format(date)} ${time}`;
@@ -200,15 +181,15 @@ export function formatRelativeTime(isoDate: string): RelativeTimeParts | null {
   const date = parseTimestampDate(isoDate);
   if (!date) return null;
   const diffMs = Date.now() - date.getTime();
-  if (diffMs < 0) return { value: "just now", suffix: null };
+  if (diffMs < 0) return { value: timeCopy.justNow, suffix: null };
   const seconds = Math.floor(diffMs / 1000);
-  if (seconds < 60) return { value: "just now", suffix: null };
+  if (seconds < 60) return { value: timeCopy.justNow, suffix: null };
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return { value: `${minutes}m`, suffix: "ago" };
+  if (minutes < 60) return { value: timeCopy.minutes(minutes), suffix: timeCopy.ago };
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return { value: `${hours}h`, suffix: "ago" };
+  if (hours < 24) return { value: timeCopy.hours(hours), suffix: timeCopy.ago };
   const days = Math.floor(hours / 24);
-  return { value: `${days}d`, suffix: "ago" };
+  return { value: timeCopy.days(days), suffix: timeCopy.ago };
 }
 
 export function formatRelativeTimeLabel(isoDate: string) {
@@ -232,20 +213,20 @@ export function formatElapsedDurationLabel(isoDate: string, nowMs: number = Date
   const date = parseTimestampDate(isoDate);
   if (!date) return "";
   const diffMs = nowMs - date.getTime();
-  if (diffMs <= 0) return "just now";
+  if (diffMs <= 0) return timeCopy.justNow;
 
   const seconds = Math.floor(diffMs / 1000);
-  if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 5) return timeCopy.justNow;
+  if (seconds < 60) return timeCopy.seconds(seconds);
 
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60) return timeCopy.minutes(minutes);
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
+  if (hours < 24) return timeCopy.hours(hours);
 
   const days = Math.floor(hours / 24);
-  return `${days}d`;
+  return timeCopy.days(days);
 }
 
 /**
@@ -256,16 +237,18 @@ export function formatExpiresInLabel(isoDate: string, nowMs: number = Date.now()
   const date = parseTimestampDate(isoDate);
   if (!date) return "";
   const diffMs = date.getTime() - nowMs;
-  if (diffMs <= 0) return "Expired";
+  if (diffMs <= 0) return timeCopy.expired;
 
   const totalSeconds = Math.floor(diffMs / 1000);
-  if (totalSeconds < 5) return "Expires in a moment";
-  if (totalSeconds < 60) return `Expires in ${totalSeconds}s`;
+  if (totalSeconds < 5) return timeCopy.expiresInAMoment;
+  if (totalSeconds < 60) return timeCopy.expiresIn(timeCopy.seconds(totalSeconds));
 
   if (totalSeconds < 3600) {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
-    return seconds === 0 ? `Expires in ${minutes}m` : `Expires in ${minutes}m ${seconds}s`;
+    return seconds === 0
+      ? timeCopy.expiresIn(timeCopy.minutes(minutes))
+      : timeCopy.expiresIn(`${timeCopy.minutes(minutes)} ${timeCopy.seconds(seconds)}`);
   }
 
   if (totalSeconds < 86_400) {
@@ -273,22 +256,22 @@ export function formatExpiresInLabel(isoDate: string, nowMs: number = Date.now()
     const rem = totalSeconds % 3600;
     const minutes = Math.floor(rem / 60);
     const seconds = rem % 60;
-    const parts = [`${hours}h`];
-    if (minutes > 0) parts.push(`${minutes}m`);
-    if (seconds > 0) parts.push(`${seconds}s`);
-    return `Expires in ${parts.join(" ")}`;
+    const parts = [timeCopy.hours(hours)];
+    if (minutes > 0) parts.push(timeCopy.minutes(minutes));
+    if (seconds > 0) parts.push(timeCopy.seconds(seconds));
+    return timeCopy.expiresIn(parts.join(" "));
   }
 
   const days = Math.floor(totalSeconds / 86_400);
   const remAfterDays = totalSeconds % 86_400;
-  if (remAfterDays === 0) return `Expires in ${days}d`;
+  if (remAfterDays === 0) return timeCopy.expiresIn(timeCopy.days(days));
   const hours = Math.floor(remAfterDays / 3600);
   const rem = remAfterDays % 3600;
   const minutes = Math.floor(rem / 60);
   const seconds = rem % 60;
   const tail: string[] = [];
-  if (hours > 0) tail.push(`${hours}h`);
-  if (minutes > 0) tail.push(`${minutes}m`);
-  if (seconds > 0) tail.push(`${seconds}s`);
-  return tail.length > 0 ? `Expires in ${days}d ${tail.join(" ")}` : `Expires in ${days}d`;
+  if (hours > 0) tail.push(timeCopy.hours(hours));
+  if (minutes > 0) tail.push(timeCopy.minutes(minutes));
+  if (seconds > 0) tail.push(timeCopy.seconds(seconds));
+  return timeCopy.expiresIn([timeCopy.days(days), ...tail].join(" "));
 }

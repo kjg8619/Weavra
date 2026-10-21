@@ -15,11 +15,13 @@ import { useEnvironment } from "../../state/environments";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { ko } from "~/i18n/ko";
 import { SettingsGroup } from "./SettingsGroup";
 import { SettingsSection } from "./settingsLayout";
 
 const command = createEnvironmentWeavraFitnessCommand(connectionAtomRuntime);
-const value = (number: number | null) => (number === null ? "UNKNOWN" : number.toLocaleString());
+const value = (number: number | null) =>
+  number === null ? ko.common.unknown : number.toLocaleString();
 const groups = ["correctness", "contract", "tools", "reliability", "efficiency"] as const;
 
 function Evidence({ run }: { run: WeavraFitnessSummary }) {
@@ -34,7 +36,9 @@ function Evidence({ run }: { run: WeavraFitnessSummary }) {
       <p>
         중단 사유:{" "}
         <span className="font-mono">
-          {run.stopReasons === undefined ? "UNKNOWN" : run.stopReasons.join(", ") || "none"}
+          {run.stopReasons === undefined
+            ? ko.common.unknown
+            : run.stopReasons.join(", ") || ko.common.none}
         </span>
       </p>
       {run.fixtureResults === undefined ? (
@@ -80,19 +84,19 @@ function Evidence({ run }: { run: WeavraFitnessSummary }) {
                     <td className="pr-4">{fixture.oracle}</td>
                     <td className="pr-4">
                       {fixture.falseCompletion === null
-                        ? "UNKNOWN"
+                        ? ko.common.unknown
                         : String(fixture.falseCompletion)}
                     </td>
                     <td className="pr-4">
                       {fixture.taskContractAdherence === null
-                        ? "UNKNOWN"
+                        ? ko.common.unknown
                         : String(fixture.taskContractAdherence)}
                     </td>
                     <td className="pr-4">{fixture.usageState}</td>
                     <td className="pr-4">
                       {fixture.integrity === null
-                        ? "UNKNOWN"
-                        : `${fixture.integrity.state} / ${fixture.integrity.reasons.join(", ") || "none"}`}
+                        ? ko.common.unknown
+                        : `${fixture.integrity.state} / ${fixture.integrity.reasons.join(", ") || ko.common.none}`}
                     </td>
                     <td>{value(fixture.latencyMs)}</td>
                   </tr>
@@ -206,13 +210,13 @@ export function WeavraFitness({
     }
   };
   return (
-    <SettingsSection id="weavra-fitness" title="프로바이더 적합성 · 읽기 전용">
+    <SettingsSection id="weavra-fitness" title="공급자 적합성 · 읽기 전용">
       <SettingsGroup divided={false} className="space-y-5 p-4 break-keep text-pretty">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-medium">순위가 아닌 계약 준수 증거</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              기록마다 하나의 프로바이더·모델·endpoint·검증 환경을 나타내요.
+              기록마다 하나의 공급자·모델·엔드포인트·검증 환경을 나타내요.
             </p>
           </div>
           <Button
@@ -279,7 +283,7 @@ export function WeavraFitness({
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm" aria-label="프로바이더 적합성 기록">
+                  <table className="w-full text-left text-sm" aria-label="공급자 적합성 기록">
                     <thead className="text-muted-foreground">
                       <tr>
                         <th scope="col" className="py-2 pr-4">
@@ -379,7 +383,7 @@ export function WeavraFitness({
               <Target run={comparison.left} />
               <Target run={comparison.right} />
             </div>
-            <table className="w-full text-left text-sm" aria-label="프로바이더 적합성 측정값 비교">
+            <table className="w-full text-left text-sm" aria-label="공급자 적합성 측정값 비교">
               <thead className="text-muted-foreground">
                 <tr>
                   <th scope="col" className="py-2">
@@ -414,7 +418,7 @@ export function WeavraFitness({
         )}
         <p className="text-sm text-muted-foreground">
           미확인은 0이 아니에요. 통제된 검토와 수정, 모의 검사는 실제 모델 오류율을 뜻하지 않아요.
-          비용, HTTP 시도 횟수, 상위 backend 식별 정보는 알 수 없을 수 있어요. 프롬프트, 추론, 인증
+          비용, HTTP 시도 횟수, 상위 백엔드 식별 정보는 알 수 없을 수 있어요. 프롬프트, 추론, 인증
           정보, 도구 기록은 전송하지 않아요.
         </p>
       </SettingsGroup>

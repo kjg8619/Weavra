@@ -373,7 +373,7 @@ describe("reviewed task handoff", () => {
       .find((node) =>
         node
           .findAllByType("summary")
-          .some((summary) => summary.children.join("") === "작업 및 checkout 진단"),
+          .some((summary) => summary.children.join("") === "작업 및 체크아웃 진단"),
       );
     expect(disclosure).toBeDefined();
     expect(disclosure?.props.open).toBeUndefined();
@@ -694,7 +694,7 @@ describe("explicit interrupted-task recovery", () => {
 
 describe("ambiguous goal mode", () => {
   const invalidGoal =
-    "PREPARE_REJECTED (INVALID_GOAL): 준비 요청이 거부됐으며 Run 실행을 허용하지 않았어요. 목표만으로는 읽기 전용인지 수정인지 정할 수 없어요.";
+    "PREPARE_REJECTED (INVALID_GOAL): 준비 요청이 거부됐으며 실행을 허용하지 않았어요. 목표만으로는 읽기 전용인지 수정인지 정할 수 없어요.";
   const radios = () => renderer.root.findAllByProps({ type: "radio" });
   const radio = (mode: string) => radios().find((node) => node.props.value === mode)!;
   async function rejectedPrepare(error: string) {
@@ -710,7 +710,7 @@ describe("ambiguous goal mode", () => {
 
   it("offers the choice only after INVALID_GOAL and sends nothing until a mode is chosen", async () => {
     await rejectedPrepare(
-      "PREPARE_REJECTED (INVALID_CRITERIA): 준비 요청이 거부됐으며 Run 실행을 허용하지 않았어요.",
+      "PREPARE_REJECTED (INVALID_CRITERIA): 준비 요청이 거부됐으며 실행을 허용하지 않았어요.",
     );
     expect(radios()).toHaveLength(0);
     expect(button("다시 준비")).toBeUndefined();

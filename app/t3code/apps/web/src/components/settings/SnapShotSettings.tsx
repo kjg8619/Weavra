@@ -55,6 +55,7 @@ import {
   captureSetupShouldDisableOnClose,
   type CaptureSetupStep,
 } from "./SnapShotSetupDialog.logic";
+import { ko } from "~/i18n/ko";
 
 const soundOptionRowClassName =
   "grid grid-cols-[1fr_auto] gap-2 rounded-sm has-data-checked:bg-foreground/[0.08]";
@@ -65,7 +66,10 @@ const captureSwitchClassName =
   "relative h-9 w-16 border border-foreground/70 [--thumb-size:--spacing(8)] data-disabled:opacity-100 sm:[--thumb-size:--spacing(8)]";
 
 function captureSettingsError(title: string, error: unknown) {
-  return { title, message: error instanceof Error ? error.message : "Try again." };
+  return {
+    title,
+    message: error instanceof Error ? error.message : ko.settings.snapshots.tryAgain,
+  };
 }
 
 type ShortcutCheck =
@@ -111,7 +115,11 @@ export function SnapShotSettings() {
     shortcutChanged && candidateConflict === null && shortcutCheck.availability?.available === true;
   const soundSelection = settings.snapShotPlaySound ? settings.snapShotSound : "off";
   const soundLabel =
-    soundSelection === "off" ? "Off" : soundSelection === "soft-pop" ? "Whoosh (Default)" : "Click";
+    soundSelection === "off"
+      ? ko.common.off
+      : soundSelection === "soft-pop"
+        ? ko.settings.snapshots.soundWhooshDefault
+        : ko.settings.snapshots.soundClick;
 
   const refreshState = useCallback(async () => {
     const requestId = ++stateRequestIdRef.current;
@@ -123,7 +131,7 @@ export function SnapShotSettings() {
       }
     } catch (error) {
       if (requestId === stateRequestIdRef.current)
-        setSetupError(captureSettingsError("Couldn't check capture setup", error));
+        setSetupError(captureSettingsError(ko.settings.snapshots.checkSetupFailed, error));
     }
   }, [bridge]);
 
@@ -147,8 +155,8 @@ export function SnapShotSettings() {
         setSetupError(
           captureSettingsError(
             action === "retry-shortcut"
-              ? "Couldn't open shortcut permissions"
-              : "Couldn't complete capture setup",
+              ? ko.settings.snapshots.openShortcutPermissionsFailed
+              : ko.settings.snapshots.completeSetupFailed,
             error,
           ),
         );
@@ -205,7 +213,7 @@ export function SnapShotSettings() {
         await updateSettings(patch);
         return await refreshState();
       } catch (error) {
-        setSetupError(captureSettingsError("Couldn't save capture settings", error));
+        setSetupError(captureSettingsError(ko.settings.snapshots.saveSettingsFailed, error));
       }
     },
     [refreshState, updateSettings],
@@ -218,7 +226,7 @@ export function SnapShotSettings() {
           await bridge?.requestSnapShotPermissions(true);
         await save({ snapShotIncludeAccessibility: includeAccessibility });
       } catch (error) {
-        setSetupError(captureSettingsError("Couldn't allow app text capture", error));
+        setSetupError(captureSettingsError(ko.settings.snapshots.allowAppTextFailed, error));
       }
     },
     [bridge, save, settings.snapShotEnabled],
@@ -242,7 +250,8 @@ export function SnapShotSettings() {
           status: "checked",
           availability: {
             available: false,
-            message: error instanceof Error ? error.message : "Could not check this shortcut.",
+            message:
+              error instanceof Error ? error.message : ko.settings.snapshots.checkShortcutFailed,
           },
         });
       }
@@ -269,19 +278,19 @@ export function SnapShotSettings() {
   });
 
   const shortcutStatus = recording
-    ? "Press your shortcut. Esc cancels."
+    ? ko.settings.snapshots.pressShortcut
     : candidateConflict
-      ? `Weavra already uses this for "${commandLabel(candidateConflict)}".`
+      ? ko.settings.snapshots.alreadyUsedBy(commandLabel(candidateConflict))
       : shortcutCheck.status === "checking"
-        ? "Checking shortcut…"
+        ? ko.settings.snapshots.checkingShortcut
         : shortcutCheck.availability
           ? shortcutCheck.availability.available
-            ? "Ready to save."
+            ? ko.settings.snapshots.readyToSave
             : shortcutCheck.availability.message
           : state?.mode === "portal" &&
               !state.shortcutLabel &&
               isModifierPairShortcut(displayShortcut)
-            ? "Try a shortcut such as Ctrl+Shift+2."
+            ? ko.settings.snapshots.tryShortcutExample
             : snapShotShortcutStatus(state);
 
   const openSetup = async (requested: CaptureSetupStep | "resume" = "resume") => {
@@ -323,7 +332,7 @@ export function SnapShotSettings() {
     try {
       if (state?.macPermissions) {
         saveSnapShotSetupResume(wizard?.wasEnabled ?? settings.snapShotEnabled);
-        if (!bridge?.setupSnapShot) throw new Error("Restart Weavra to finish capture setup.");
+        if (!bridge?.setupSnapShot) throw new Error(ko.settings.snapshots.restartToFinish);
         await bridge.setupSnapShot("test-mac-capture");
       }
       if (state?.mode === "direct")
@@ -334,7 +343,7 @@ export function SnapShotSettings() {
           : await save({ snapShotEnabled: true });
       return nextState !== undefined && captureSetupAccessReady(nextState);
     } catch (error) {
-      setSetupError(captureSettingsError("Couldn't verify capture access", error));
+      setSetupError(captureSettingsError(ko.settings.snapshots.verifyAccessFailed, error));
       return false;
     } finally {
       setSetupBusy(false);
@@ -356,7 +365,7 @@ export function SnapShotSettings() {
       clearSnapShotSetupResume();
       setWizard(null);
     } catch (error) {
-      setSetupError(captureSettingsError("Couldn't close capture setup", error));
+      setSetupError(captureSettingsError(ko.settings.snapshots.closeSetupFailed, error));
     } finally {
       setSetupBusy(false);
     }
@@ -375,16 +384,16 @@ export function SnapShotSettings() {
 
   return (
     <SettingsPageContainer className="[&_h2]:break-keep [&_h2]:text-pretty [&_h2]:text-foreground [&_h3]:break-keep [&_h3]:text-pretty [&_h3]:opacity-100 [&_p]:break-keep [&_p]:text-pretty [&_p]:text-sm [&_p]:text-foreground [&_p]:opacity-100 [&_[data-slot=settings-row]_.pt-0\.5]:text-sm [&_[data-slot=settings-row]_.pt-0\.5]:text-foreground [&_button:not([role=switch])]:min-h-8 [&_button:not([role=switch])]:border-foreground/70 [&_button:not([role=switch])]:px-3 [&_button:not([role=switch])]:text-sm [&_button:not([role=switch])]:text-foreground [&_button:not([role=switch])]:[--control-icon-color:currentColor] [&_button:disabled]:opacity-100 [&_button]:focus-visible:ring-foreground [&_button]:after:absolute [&_button]:after:inset-0 [&_button]:after:rounded-none [&_kbd]:text-foreground">
-      <SettingsSection id="snap-shot" title="활성 창 캡처">
+      <SettingsSection id="snap-shot" title={ko.settings.snapshots.activeWindowCapture}>
         <SettingsUnavailableGroup message={unavailableMessage}>
           <SettingsRow
             {...searchableSetting("snap-shot-enabled")}
-            title="대화 초안에 첨부"
+            title={ko.settings.snapshots.attachToDraft}
             description={snapShotDescription(state)}
             status={
               bridge
                 ? setupBusy && !wizard
-                  ? "Updating capture settings…"
+                  ? ko.settings.snapshots.updatingSettings
                   : snapShotStatus(state, settings.snapShotEnabled)
                 : undefined
             }
@@ -406,7 +415,7 @@ export function SnapShotSettings() {
                   data-icon-control=""
                   checked={settings.snapShotEnabled || Boolean(wizard)}
                   disabled={!captureAvailable || setupBusy}
-                  aria-label="Enable snapshots"
+                  aria-label={ko.settings.snapshots.enable}
                   onCheckedChange={(checked) => {
                     if (!checked) void save({ snapShotEnabled: false });
                     else if (state?.windows) void save({ snapShotEnabled: true });
@@ -420,7 +429,7 @@ export function SnapShotSettings() {
             <>
               <SettingsRow
                 {...searchableSetting("snap-shot-accessibility")}
-                description="Include text and controls when the app makes them available."
+                description={ko.settings.snapshots.accessibilityDescription}
                 status={snapShotAccessibilityUnavailableMessage(state)}
                 control={
                   <Switch
@@ -433,7 +442,7 @@ export function SnapShotSettings() {
                     disabled={
                       !captureAvailable || Boolean(snapShotAccessibilityUnavailableMessage(state))
                     }
-                    aria-label="Include app text in snapshots"
+                    aria-label={ko.settings.snapshots.includeAppText}
                     onCheckedChange={(checked) => void saveIncludeAccessibility(checked)}
                   />
                 }
@@ -442,8 +451,8 @@ export function SnapShotSettings() {
                 {...searchableSetting("snap-shot-shortcut")}
                 description={
                   state?.linuxBackend === "picker"
-                    ? "Choose a window to capture from any app."
-                    : "Capture the window you're using without switching apps."
+                    ? ko.settings.snapshots.pickerShortcutDescription
+                    : ko.settings.snapshots.shortcutDescription
                 }
                 status={managedShortcut ? undefined : shortcutStatus}
                 control={
@@ -454,7 +463,7 @@ export function SnapShotSettings() {
                       disabled={setupBusy}
                       onClick={() => void openSetup("shortcut")}
                     >
-                      Change shortcut
+                      {ko.settings.snapshots.changeShortcut}
                     </Button>
                   ) : (
                     <>
@@ -466,7 +475,7 @@ export function SnapShotSettings() {
                             disabled={!canSaveShortcut || setupBusy}
                             onClick={() => void saveShortcut()}
                           >
-                            {setupBusy ? "Saving…" : "Save"}
+                            {setupBusy ? ko.common.saving : ko.common.save}
                           </Button>
                           <Button
                             size="xs"
@@ -479,7 +488,7 @@ export function SnapShotSettings() {
                               setShortcutCheck({ status: "idle", availability: null });
                             }}
                           >
-                            Cancel
+                            {ko.common.cancel}
                           </Button>
                         </>
                       ) : state?.mode === "portal" &&
@@ -491,7 +500,7 @@ export function SnapShotSettings() {
                           disabled={setupBusy || state.shortcutPending}
                           onClick={() => void setup("retry-shortcut")}
                         >
-                          Shortcut permissions
+                          {ko.settings.snapshots.shortcutPermissions}
                         </Button>
                       ) : null}
                     </>
@@ -500,11 +509,11 @@ export function SnapShotSettings() {
               />
               <SettingsRow
                 {...searchableSetting("snap-shot-sound")}
-                description="Choose the sound played when capture starts."
+                description={ko.settings.snapshots.soundDescription}
                 control={
                   <Menu>
                     <MenuTrigger
-                      aria-label={"Snapshot sound: " + soundLabel}
+                      aria-label={ko.settings.snapshots.soundAria(soundLabel)}
                       className={cn(
                         selectTriggerVariants({ size: "sm" }),
                         "relative w-auto min-w-0",
@@ -513,13 +522,14 @@ export function SnapShotSettings() {
                     >
                       <span className="flex-1 text-left">
                         {soundSelection === "off" ? (
-                          "Off"
+                          ko.common.off
                         ) : soundSelection === "soft-pop" ? (
                           <>
-                            Whoosh <span>(Default)</span>
+                            {ko.settings.snapshots.soundWhoosh}{" "}
+                            <span>{ko.settings.snapshots.soundDefaultSuffix}</span>
                           </>
                         ) : (
-                          "Click"
+                          ko.settings.snapshots.soundClick
                         )}
                       </span>
                       <ChevronDownIcon className="-me-1 size-3 shrink-0 text-foreground" />
@@ -549,7 +559,7 @@ export function SnapShotSettings() {
                         value={soundSelection}
                       >
                         <MenuRadioItem closeOnClick value="off">
-                          Off
+                          {ko.common.off}
                         </MenuRadioItem>
                         <div className={soundOptionRowClassName}>
                           <MenuRadioItem
@@ -557,11 +567,12 @@ export function SnapShotSettings() {
                             closeOnClick
                             value="soft-pop"
                           >
-                            Whoosh <span>(Default)</span>
+                            {ko.settings.snapshots.soundWhoosh}{" "}
+                            <span>{ko.settings.snapshots.soundDefaultSuffix}</span>
                           </MenuRadioItem>
                           <MenuItem
                             data-icon-control=""
-                            aria-label="Play Whoosh"
+                            aria-label={ko.settings.snapshots.playWhoosh}
                             className={soundPreviewClassName}
                             closeOnClick={false}
                             onClick={() => playSnapShotSound("soft-pop")}
@@ -575,11 +586,11 @@ export function SnapShotSettings() {
                             closeOnClick
                             value="camera-shutter"
                           >
-                            Click
+                            {ko.settings.snapshots.soundClick}
                           </MenuRadioItem>
                           <MenuItem
                             data-icon-control=""
-                            aria-label="Play Click"
+                            aria-label={ko.settings.snapshots.playClick}
                             className={soundPreviewClassName}
                             closeOnClick={false}
                             onClick={() => playSnapShotSound("camera-shutter")}
@@ -594,7 +605,7 @@ export function SnapShotSettings() {
               />
               <SettingsRow
                 {...searchableSetting("snap-shot-flash")}
-                description="Show a gentle cue on the captured window."
+                description={ko.settings.snapshots.flashDescription}
                 status={feedbackUnavailable}
                 control={
                   <Switch
@@ -602,14 +613,14 @@ export function SnapShotSettings() {
                     data-icon-control=""
                     checked={!feedbackUnavailable && settings.snapShotFlash}
                     disabled={!captureAvailable || Boolean(feedbackUnavailable)}
-                    aria-label="Flash captured window"
+                    aria-label={ko.settings.snapshots.flash}
                     onCheckedChange={(checked) => void save({ snapShotFlash: checked })}
                   />
                 }
               />
               <SettingsRow
                 {...searchableSetting("snap-shot-animations")}
-                description="Animate captured windows into your draft."
+                description={ko.settings.snapshots.animationsDescription}
                 status={feedbackUnavailable}
                 control={
                   <Switch
@@ -617,7 +628,7 @@ export function SnapShotSettings() {
                     data-icon-control=""
                     checked={!feedbackUnavailable && settings.snapShotAnimations}
                     disabled={!captureAvailable || Boolean(feedbackUnavailable)}
-                    aria-label="Animate snapshots"
+                    aria-label={ko.settings.snapshots.animate}
                     onCheckedChange={(checked) => void save({ snapShotAnimations: checked })}
                   />
                 }

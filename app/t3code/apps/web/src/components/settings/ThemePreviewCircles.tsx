@@ -12,6 +12,7 @@ import {
   type ThemeAppearance,
   type ThemeDefinition,
 } from "../../themePalette";
+import { ko } from "~/i18n/ko";
 
 const THEME_PREVIEW_ROLES = [
   "sidebar",
@@ -184,7 +185,11 @@ export function ThemePreviewCircles({
             <TooltipTrigger
               render={
                 <button
-                  aria-label={`Use ${label} ${mode} mode`}
+                  aria-label={
+                    mode === "light"
+                      ? ko.settings.appearance.labelLightMode(label)
+                      : ko.settings.appearance.labelDarkMode(label)
+                  }
                   aria-pressed={isPicked}
                   className={cn(
                     "relative flex size-[68px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-muted-foreground p-1 text-foreground outline-none hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground",
@@ -217,7 +222,9 @@ export function ThemePreviewCircles({
               }
             />
             <TooltipPopup>
-              {mode === "light" ? "Use for light mode only" : "Use for dark mode only"}
+              {mode === "light"
+                ? ko.settings.appearance.lightModeOnly
+                : ko.settings.appearance.darkModeOnly}
             </TooltipPopup>
           </Tooltip>
         );

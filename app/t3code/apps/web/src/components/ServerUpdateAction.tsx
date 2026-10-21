@@ -2,15 +2,15 @@ import type { EnvironmentId, ServerSelfUpdateCapability } from "@t3tools/contrac
 import type { ServerUpdateStage, ServerUpdateState } from "@t3tools/client-runtime/state/server";
 import { CircleArrowUpIcon } from "lucide-react";
 import type { ComponentProps } from "react";
+import { ko } from "~/i18n/ko";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
-const UPDATE_UNAVAILABLE =
-  "No Weavra update service is configured. Run matching client and server builds from your local checkout.";
+const UPDATE_UNAVAILABLE = ko.common.serverUpdate.unavailableDescription;
 const UPDATE_STAGE_LABELS: Record<ServerUpdateStage, string> = {
-  downloading: "Downloading…",
-  installing: "Downloading…",
-  resuming: "Restarting…",
+  downloading: ko.common.serverUpdate.downloading,
+  installing: ko.common.serverUpdate.downloading,
+  resuming: ko.common.serverUpdate.restarting,
 };
 
 export function serverUpdateStageLabel(stage: ServerUpdateStage): string {
@@ -39,7 +39,7 @@ export function ServerUpdatesAction({
 }: UpdateButtonProps & { readonly targets: ReadonlyArray<ServerUpdateTarget> }) {
   return (
     <Button size={size} variant={variant} className={className} disabled title={UPDATE_UNAVAILABLE}>
-      Updates unavailable
+      {ko.common.serverUpdate.unavailable}
     </Button>
   );
 }
@@ -57,10 +57,14 @@ export function ServerUpdateAction({
       variant={appearance === "icon" ? "ghost" : variant}
       className={className}
       disabled
-      aria-label={`Updates unavailable for ${serverLabel}`}
+      aria-label={ko.common.serverUpdate.unavailableFor(serverLabel)}
       title={UPDATE_UNAVAILABLE}
     >
-      {appearance === "icon" ? <CircleArrowUpIcon className="size-3.5" /> : "Updates unavailable"}
+      {appearance === "icon" ? (
+        <CircleArrowUpIcon className="size-3.5" />
+      ) : (
+        ko.common.serverUpdate.unavailable
+      )}
     </Button>
   );
 }

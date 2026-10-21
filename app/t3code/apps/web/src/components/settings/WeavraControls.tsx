@@ -1,3 +1,4 @@
+import { ko } from "~/i18n/ko";
 import { weavraLabel } from "../weavraLabels";
 import { useAtomValue } from "@effect/atom-react";
 import {
@@ -134,10 +135,10 @@ const plannerFailureText: Record<WeavraPlannerFailureCode, string> = {
     "사용할 수 있는 계획 모델·프로필·인증이 설정되지 않았어요. 다른 모델로 자동 전환하지 않아요.",
   CONTEXT_TOO_LARGE: "계획 참고 자료가 196,608바이트를 초과해요. 모델을 호출하지 않았어요.",
   TIMEOUT: "작업 제한 시간 안에 계획을 끝내지 못했어요.",
-  PROVIDER_ERROR: "모델 프로바이더에 오류가 발생했거나 응답이 비정상적으로 끝났어요.",
+  PROVIDER_ERROR: "모델 공급자에 오류가 발생했거나 응답이 비정상적으로 끝났어요.",
   BUDGET_EXHAUSTED: "유효한 초안을 만들기 전에 모델 호출 3회 또는 토큰 한도에 도달했어요.",
   BUDGET_UNKNOWN:
-    "프로바이더가 사용량을 보고하지 않아 토큰 한도 정책에 따라 추가 계획 호출을 멈췄어요.",
+    "공급자가 사용량을 보고하지 않아 토큰 한도 정책에 따라 추가 계획 호출을 멈췄어요.",
   NO_DRAFT: "한 번 다시 요청했지만 모델이 초안을 제출하지 않고 답변만 보냈어요.",
   DRAFT_INVALID: "수정한 초안도 계획 검사를 통과하지 못했어요.",
   STALE: "계획 중 프로젝트나 설정이 바뀌어 초안을 폐기했어요.",
@@ -152,7 +153,7 @@ const plannerSeconds = (elapsedMs: number | null) =>
   elapsedMs === null ? "확인 안 됨" : `${Math.floor(elapsedMs / 1000)} s`;
 /** The COMPLEX_RERUN.md §7 banner, shown while the editor holds the derived draft unchanged. */
 const derivedBanner = ({ runId, sourceStatus, completedTasks }: DerivedLoadedDraft) =>
-  `초안의 원본 Run: ${runId} (${sourceStatus}): ${
+  `초안의 원본 실행: ${runId} (${sourceStatus}): ${
     completedTasks === 1
       ? "완료한 작업 하나를 읽기 전용 검증 작업으로 바꿔"
       : `${completedTasks}개 완료 작업을 읽기 전용 검증 작업으로 바꿔`
@@ -166,7 +167,7 @@ function rejectionHint(
   switch (request.type) {
     case "workflow.prepare":
       return code === "STALE_PROJECT"
-        ? " 계획 준비 전에 프로젝트 상태가 바뀌었어요. 종료된 소유자의 Run이 INTERRUPTED로 기록된 경우도 해당해요. 준비나 재시도는 하지 않았으니 새 상태를 확인한 뒤 다시 준비해 주세요."
+        ? " 계획 준비 전에 프로젝트 상태가 바뀌었어요. 종료된 소유자의 실행이 INTERRUPTED로 기록된 경우도 해당해요. 준비나 재시도는 하지 않았으니 새 상태를 확인한 뒤 다시 준비해 주세요."
         : request.complexDraft
           ? code === "INVALID_REQUEST"
             ? " 작업 계획은 Runtime이 목표를 COMPLEX로 분류한 경우에만 받아들여요. QUICK이나 STANDARD 목표라면 작업 계획을 비워 주세요."
@@ -182,9 +183,9 @@ function rejectionHint(
         : "";
     case "planner.start":
       return code === "UNSUPPORTED_WORKFLOW"
-        ? " Planner는 Runtime이 COMPLEX로 분류한 목표만 초안으로 만들며 R3는 처리하지 않아요."
+        ? " 계획 담당은 Runtime이 COMPLEX로 분류한 목표만 초안으로 만들며 R3는 처리하지 않아요."
         : code === "PLANNER_BUSY"
-          ? " Runtime에서 계획 또는 Run이 이미 진행 중이에요."
+          ? " Runtime에서 계획 또는 실행이 이미 진행 중이에요."
           : "";
     case "planner.cancel":
       return code === "PLANNER_NOT_FOUND" ? " 해당 계획 요청은 더 이상 실행 중이 아니에요." : "";
@@ -194,11 +195,11 @@ function rejectionHint(
         : "";
     case "workflow.derive":
       return code === "RERUN_NOT_APPLICABLE"
-        ? " 미완료 작업이 남고 BLOCKED·CANCELLED·FAILED·INTERRUPTED로 끝난 최신 COMPLEX Run만 다시 계획할 수 있어요. R3는 제외해요. 초안을 만들지 않았어요."
+        ? " 미완료 작업이 남고 BLOCKED·CANCELLED·FAILED·INTERRUPTED로 끝난 최신 COMPLEX 실행만 다시 계획할 수 있어요. R3는 제외해요. 초안을 만들지 않았어요."
         : code === "RUN_NOT_FOUND"
-          ? " 해당 Run이 더 이상 최신 Run이 아니어서 초안을 만들지 않았어요."
+          ? " 해당 실행이 더 이상 최신 실행이 아니어서 초안을 만들지 않았어요."
           : code === "ACTIVE_RUN"
-            ? " 프로젝트나 Runtime에 활성 Run이 있어 초안을 만들지 않았어요."
+            ? " 프로젝트나 Runtime에 활성 실행이 있어 초안을 만들지 않았어요."
             : code === "STALE_PROJECT"
               ? " 초안을 만들기 전에 프로젝트가 바뀌었어요. 초안을 만들지 않았으니 새 상태가 표시되면 다시 요청해 주세요."
               : "";
@@ -412,7 +413,7 @@ export function WeavraControls({
             : submitting
               ? "현재 요청의 결과를 기다리고 있어요. 중복 요청을 보내지 않아요."
               : !canPrepareWorkflow
-                ? "현재 Run이나 쓰기 잠금이 있어 준비할 수 없어요. 공식 상태를 확인해 주세요."
+                ? "현재 실행이나 쓰기 잠금이 있어 준비할 수 없어요. 공식 상태를 확인해 주세요."
                 : !goal.trim()
                   ? "워크플로 목표를 입력해 주세요."
                   : "Runtime에 계획 미리보기를 요청해요. 준비는 로컬 저장·승인·실행이 아니며, 확인 후 시작하기 전에는 실행하지 않아요.";
@@ -559,7 +560,7 @@ export function WeavraControls({
         if (rows.length > 0 && !plannerDraftUnchanged(loaded, toComplexDraft(rows))) {
           setCommandState({ status: "submitting", message: "명시적인 확인을 기다리고 있어요." });
           const replace = await requestConfirmDialog(
-            `편집기의 ${rows.length}개 작업을 Planner가 제안한 ${loaded.draft.tasks.length}개 작업으로 바꿀까요?\n현재 목록은 보존하지 않아요. 아직 검토하지 않은 제안이니 각 작업·담당 범위·검사를 확인한 뒤 준비해 주세요.`,
+            `편집기의 ${rows.length}개 작업을 계획 담당이 제안한 ${loaded.draft.tasks.length}개 작업으로 바꿀까요?\n현재 목록은 보존하지 않아요. 아직 검토하지 않은 제안이니 각 작업·담당 범위·검사를 확인한 뒤 준비해 주세요.`,
           );
           if (!mounted.current) return;
           if (!replace) {
@@ -576,7 +577,7 @@ export function WeavraControls({
         setCommandState({
           status: "accepted",
           message:
-            "Planner 제안을 편집기로 불러왔어요. 각 작업·파일 담당 범위·검사를 검토한 뒤 준비해 주세요. 아직 준비하거나 실행하지 않았어요.",
+            "계획 담당 제안을 편집기로 불러왔어요. 각 작업·파일 담당 범위·검사를 검토한 뒤 준비해 주세요. 아직 준비하거나 실행하지 않았어요.",
         });
       } else if (response.data.kind === "derived-draft") {
         // Candidate data for the editor only: nothing is prepared, confirmed, stored or run.
@@ -588,7 +589,7 @@ export function WeavraControls({
         if (!derived) {
           setCommandState({
             status: "rejected",
-            message: "Runtime이 요청한 Run과 다른 초안을 반환해 불러오지 않았어요.",
+            message: "Runtime이 요청한 실행과 다른 초안을 반환해 불러오지 않았어요.",
           });
           return;
         }
@@ -612,7 +613,7 @@ export function WeavraControls({
         if (!empty && !derivedDraftUnchanged(derived, editor)) {
           setCommandState({ status: "submitting", message: "명시적인 확인을 기다리고 있어요." });
           const replace = await requestConfirmDialog(
-            `편집기의 목표·수용 기준·작업을 다음 Run에서 만든 초안으로 바꿀까요? Run ${derived.runId} (${derived.sourceStatus})\n현재 편집 내용은 보존하지 않아요. 각 작업·담당 범위·검사를 확인한 뒤 준비해 주세요.`,
+            `편집기의 목표·수용 기준·작업을 다음 실행에서 만든 초안으로 바꿀까요? 실행 ${derived.runId} (${derived.sourceStatus})\n현재 편집 내용은 보존하지 않아요. 각 작업·담당 범위·검사를 확인한 뒤 준비해 주세요.`,
           );
           if (!mounted.current) return;
           if (!replace) {
@@ -632,7 +633,7 @@ export function WeavraControls({
         setLoadedDraft(null);
         setCommandState({
           status: "accepted",
-          message: `다음 Run의 초안을 편집기로 불러왔어요: ${derived.runId}. 남은 변경을 정리하고 각 작업·담당 범위·검사를 검토한 뒤 준비해 주세요. 아직 준비하거나 실행하지 않았어요.`,
+          message: `다음 실행의 초안을 편집기로 불러왔어요: ${derived.runId}. 남은 변경을 정리하고 각 작업·담당 범위·검사를 검토한 뒤 준비해 주세요. 아직 준비하거나 실행하지 않았어요.`,
         });
       } else if (response.data.kind === "prepared") {
         setFactPreview(null);
@@ -719,7 +720,7 @@ export function WeavraControls({
                   ? "계획 생성을 시작했어요. Runtime이 백그라운드에서 후보를 만들며 작업을 실행하지 않아요. 직접 불러오기 전에는 편집기에 반영하지 않아요."
                   : request.type === "planner.cancel"
                     ? "계획 취소 요청을 받았어요. Runtime의 CANCELLED 보고를 기다려 주세요."
-                    : "시작 요청을 받았어요. 공식 Run 상태를 기다리고 있으며 이 응답만으로 성공을 판단하지 않아요.",
+                    : "시작 요청을 받았어요. 공식 실행 상태를 기다리고 있으며 이 응답만으로 성공을 판단하지 않아요.",
         });
       }
     } catch {
@@ -799,13 +800,13 @@ export function WeavraControls({
         previewId: preview.previewId,
         previewDigest: preview.previewDigest,
       },
-      `이 ${preview.workflow} / ${preview.risk} / ${preview.executionMode} 계획을 다음 checkout에서 시작할까요: ${workspaceRoot}?\n목표: ${preview.goal}${
+      `이 ${preview.workflow} / ${preview.risk} / ${preview.executionMode} 계획을 다음 체크아웃에서 시작할까요: ${workspaceRoot}?\n목표: ${preview.goal}${
         plan
           ? `\n${
               plan.schemaVersion === 2 && plan.limits.maxParallel > 1
-                ? `하나의 Run에서 계획 순서대로 작업해요. 선행 작업이 끝난 작업을 최대 ${plan.limits.maxParallel}개까지 동시에 구현한 뒤 하나씩 검사하고 검토해요`
-                : "하나의 Run에서 이 순서로 진행할 작업"
-            }: ${plan.tasks.map((task) => `${task.id} ${task.title}`).join("; ")}\n계획 digest: ${plan.complexPlanDigest}\n확인 후에는 계획을 편집할 수 없어요. 모든 개별 작업이 끝나도 Run 완료 판정은 별도예요.`
+                ? `하나의 실행에서 계획 순서대로 작업해요. 선행 작업이 끝난 작업을 최대 ${plan.limits.maxParallel}개까지 동시에 구현한 뒤 하나씩 검사하고 검토해요`
+                : "하나의 실행에서 이 순서로 진행할 작업"
+            }: ${plan.tasks.map((task) => `${task.id} ${task.title}`).join("; ")}\n계획 다이제스트: ${plan.complexPlanDigest}\n확인 후에는 계획을 편집할 수 없어요. 모든 개별 작업이 끝나도 실행 완료 판정은 별도예요.`
           : ""
       }\n계획 확인은 R3 승인이 아니에요. 자동 커밋·되돌리기·정리는 없어요.`,
     );
@@ -820,7 +821,7 @@ export function WeavraControls({
         runId: run.runId,
         expectedStateRevision: state.stateRevision,
       },
-      `다음 Run을 취소할까요: ${run.runId}?\nRuntime이 활성 worker와 검사를 멈춘 뒤 쓰기 잠금을 해제해요. 일부 변경은 남으며 자동 되돌리기·정리는 없어요.`,
+      `다음 실행을 취소할까요: ${run.runId}?\nRuntime이 활성 워커와 검사를 멈춘 뒤 쓰기 잠금을 해제해요. 일부 변경은 남으며 자동 되돌리기·정리는 없어요.`,
     );
   };
   const resolveApproval = (decision: "approve" | "reject") => {
@@ -836,7 +837,7 @@ export function WeavraControls({
         decision,
       },
       decision === "approve"
-        ? `이 파일의 이번 삭제만 승인할까요: ${approval.path}?\nRun: ${approval.runId}\n승인: ${approval.approvalId}\n파일 지문: ${approval.preconditionDigest}\n자동 되돌리기는 없어요. 다른 동작을 승인하거나 완료로 판정하지 않아요.`
+        ? `이 파일의 이번 삭제만 승인할까요: ${approval.path}?\n실행: ${approval.runId}\n승인: ${approval.approvalId}\n파일 지문: ${approval.preconditionDigest}\n자동 되돌리기는 없어요. 다른 동작을 승인하거나 완료로 판정하지 않아요.`
         : undefined,
     );
   };
@@ -849,7 +850,7 @@ export function WeavraControls({
       setCommandState({
         status: "rejected",
         message:
-          "Planner에 보낼 목표나 수용 기준을 확인해 주세요. 목표는 최대 2,048자, 기준은 각 500자 이내로 1~16개예요.",
+          "계획 담당에 보낼 목표나 수용 기준을 확인해 주세요. 목표는 최대 2,048자, 기준은 각 500자 이내로 1~16개예요.",
       });
     }
   };
@@ -912,7 +913,7 @@ export function WeavraControls({
         previewId: browserPreview.previewId,
         previewDigest: browserPreview.previewDigest,
       },
-      `다음 대상에 이 브라우저 검사를 등록할까요: ${workspaceRoot}?\n검사: ${browserPreview.check.checkId}\n문서: ${browserPreview.check.documentIdentity}\n대상: ${browserPreview.check.target.selector}\n검사 조건: ${JSON.stringify(browserPreview.check.assertion)}\n등록 digest: ${browserPreview.check.registrationDigest}\n예상 결과를 등록할 뿐 PASS 판정이 아니에요. Runtime은 SELF_CHECK와 TEST마다 새 격리 브라우저 캡처를 만들어야 해요. 브라우저 검사 실패 시 자동 수정하지 않아요.`,
+      `다음 대상에 이 브라우저 검사를 등록할까요: ${workspaceRoot}?\n검사: ${browserPreview.check.checkId}\n문서: ${browserPreview.check.documentIdentity}\n대상: ${browserPreview.check.target.selector}\n검사 조건: ${JSON.stringify(browserPreview.check.assertion)}\n등록 다이제스트: ${browserPreview.check.registrationDigest}\n예상 결과를 등록할 뿐 PASS 판정이 아니에요. Runtime은 SELF_CHECK와 TEST마다 새 격리 브라우저 캡처를 만들어야 해요. 브라우저 검사 실패 시 자동 수정하지 않아요.`,
     );
   };
   const prepareFact = () => {
@@ -944,11 +945,11 @@ export function WeavraControls({
         previewId: factPreview.previewId,
         previewDigest: factPreview.previewDigest,
       },
-      `다음 대상에 검토한 참고용 사실을 기록할까요: ${workspaceRoot}?\n출처: ${factPreview.sourceRef}\ndigest: ${factPreview.sourceDigest}\n설명: ${factPreview.statement}\n설명이 출처로 뒷받침되며 비밀값·추론 원문·대화 기록·도구 출력을 포함하지 않는지 확인해 주세요. Policy·승인·검증·완료 판정이 아니에요.`,
+      `다음 대상에 검토한 참고용 사실을 기록할까요: ${workspaceRoot}?\n출처: ${factPreview.sourceRef}\n다이제스트: ${factPreview.sourceDigest}\n설명: ${factPreview.statement}\n설명이 출처로 뒷받침되며 비밀값·추론 원문·대화 기록·도구 출력을 포함하지 않는지 확인해 주세요. 정책·승인·검증·완료 판정이 아니에요.`,
     );
   };
   return (
-    <SettingsSection id="weavra-controls" title="Weavra · 워크플로 제어">
+    <SettingsSection id="weavra-controls" title={ko.runtime.controls.sectionTitle}>
       <SettingsGroup divided={false} className="space-y-5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-medium">Runtime 실행 제어</h3>
@@ -1028,17 +1029,17 @@ export function WeavraControls({
         {run && (
           <div className="space-y-2 rounded-md border border-border p-3 text-xs">
             <p>
-              공식 Run: <code className="break-all">{run.runId}</code>
+              공식 실행: <code className="break-all">{run.runId}</code>
             </p>
             <p>
-              저장된 상태: <strong>{weavraLabel(run.status)}</strong> · Run revision:{" "}
-              {state?.stateRevision ?? "UNKNOWN"} · 프로젝트 revision:{" "}
-              {state?.projectRevision ?? "UNKNOWN"}
+              저장된 상태: <strong>{weavraLabel(run.status)}</strong> · 실행 리비전:{" "}
+              {state?.stateRevision ?? ko.common.unknown} · 프로젝트 리비전:{" "}
+              {state?.projectRevision ?? ko.common.unknown}
             </p>
             <p>
               소유 프로세스 작업:{" "}
-              {state?.busy ? (state.cancelling ? "취소 요청됨; 정리 대기" : "active") : "idle"} ·
-              쓰기 잠금 존재: {String(state?.snapshot.status.writerPresent ?? "UNKNOWN")}
+              {state?.busy ? (state.cancelling ? "취소 요청됨; 정리 대기" : "진행 중") : "대기"} ·
+              쓰기 잠금 존재: {weavraLabel(state?.snapshot.status.writerPresent)}
             </p>
             <p>작업 공간의 일부 변경을 자동으로 되돌리지 않아요.</p>
             <a
@@ -1067,7 +1068,7 @@ export function WeavraControls({
         ) : (
           run?.workflow === "COMPLEX" && (
             <p className="text-xs text-muted-foreground">
-              이 Runtime은 COMPLEX 작업 상세를 제공하지 않아요. 위의 공식 Run 상태만 실행 결과로
+              이 Runtime은 COMPLEX 작업 상세를 제공하지 않아요. 위의 공식 실행 상태만 실행 결과로
               판단해요.
             </p>
           )
@@ -1078,10 +1079,10 @@ export function WeavraControls({
             className="space-y-2 rounded-md border border-border p-3 text-xs"
           >
             <p>
-              Run {run.runId} 종료 상태: {weavraLabel(run.status)} 미완료:{" "}
+              실행 {run.runId} 종료 상태: {weavraLabel(run.status)} 미완료:{" "}
               {state.complexExecution.tasks.filter((task) => task.status !== "COMPLETED").length} /{" "}
               {state.complexExecution.tasks.length} 개 작업이 미완료 상태예요. 다시 계획하면
-              Runtime이 새 Run의 초안을 만들어요. 완료한 작업은 읽기 전용으로 다시 검증하고 미완료
+              Runtime이 새 실행의 초안을 만들어요. 완료한 작업은 읽기 전용으로 다시 검증하고 미완료
               작업은 담당 범위를 유지해요. 이전 작업·증거를 재사용하지 않으며 직접 준비·확인하기
               전에는 시작하지 않아요.
             </p>
@@ -1095,14 +1096,17 @@ export function WeavraControls({
             aria-label="다른 소유자가 사용 중인 프로젝트"
             className="text-xs text-muted-foreground"
           >
-            다른 Runtime 소유자가 이 프로젝트의 활성 Run을 관리하고 있어요. 소유 프로세스가
-            종료됐다면 워크플로 준비 시 해당 Run을 INTERRUPTED로 기록해요. 작업은 재개하지 않고 일부
-            변경을 보존해요. 소유자가 실행 중이거나 종료를 확인할 수 없으면 요청을 거부해요.
+            다른 Runtime 소유자가 이 프로젝트의 활성 실행을 관리하고 있어요. 소유 프로세스가
+            종료됐다면 워크플로 준비 시 해당 실행을 INTERRUPTED로 기록해요. 작업은 재개하지 않고
+            일부 변경을 보존해요. 소유자가 실행 중이거나 종료를 확인할 수 없으면 요청을 거부해요.
           </p>
         )}
         {staleWriter && (
-          <p aria-label="최근 Run 종료 후 남은 쓰기 잠금" className="text-xs text-muted-foreground">
-            최근 Run이 종료됐지만 쓰기 잠금이 남아 있어요: {weavraLabel(run?.status)}. 소유
+          <p
+            aria-label="최근 실행 종료 후 남은 쓰기 잠금"
+            className="text-xs text-muted-foreground"
+          >
+            최근 실행이 종료됐지만 쓰기 잠금이 남아 있어요: {weavraLabel(run?.status)}. 소유
             프로세스가 종료됐다면 워크플로 준비 시 Runtime이 잠금을 해제해요. 프로젝트 상태가 바뀌어
             STALE_PROJECT가 반환되면 새 상태를 확인한 뒤 다시 준비해 주세요. 실행 중이거나 종료를
             확인할 수 없으면 WRITER_PRESENT로 거부해요. 작업을 재개하지 않으며 일부 변경은 보존해요.
@@ -1126,7 +1130,7 @@ export function WeavraControls({
                 setGoal(event.target.value);
               }}
               disabled={submitting || !fresh || !!state?.busy}
-              placeholder="이 checkout에서 수행할 작업을 입력해 주세요"
+              placeholder="이 체크아웃에서 수행할 작업을 입력해 주세요"
             />
           </label>
           <label className="block space-y-1 text-sm">
@@ -1185,7 +1189,7 @@ export function WeavraControls({
                 Runtime이 COMPLEX로 분류한 목표에만 적용해요.{" "}
                 {complexVersion === 2
                   ? "선행 작업이 끝난 작업은 Runtime에 설정된 한도까지 동시에 구현할 수 있어요. 검사와 검토는 계획 순서대로 하나씩 진행해요. 순서를 정하려면 의존성을 추가해 주세요."
-                  : "하나의 Runtime 소유 Run에서 순서대로 하나씩 진행해요."}{" "}
+                  : "하나의 Runtime 소유 실행에서 순서대로 하나씩 진행해요."}{" "}
                 Runtime이 작업 ID를 부여하고 의존성·수용 기준 범위·정확한 파일 담당 범위·등록 검사를
                 검증해요. 확인 후에는 계획을 편집할 수 없어요.
               </p>
@@ -1207,15 +1211,15 @@ export function WeavraControls({
               {loadedDraft && loadedUnchanged && (
                 <div
                   role="note"
-                  aria-label="불러온 Planner 제안"
+                  aria-label="불러온 계획 담당 제안"
                   className="space-y-1 rounded-md border border-warning/50 p-3 text-xs"
                 >
                   <p className="font-medium">
                     준비하기 전에 각 작업·파일 담당 범위·검사를 검토해 주세요.
                   </p>
                   <p className="text-muted-foreground">
-                    아직 편집하지 않은 Planner 제안이에요. 준비 시 다시 검증하며 Runtime 미리보기를
-                    확인하기 전에는 실행하지 않아요.
+                    아직 편집하지 않은 계획 담당 제안이에요. 준비 시 다시 검증하며 Runtime
+                    미리보기를 확인하기 전에는 실행하지 않아요.
                   </p>
                   {loadedCurrent === false && (
                     <p>계획 생성 후 프로젝트나 설정이 바뀌어 현재 상태와 다를 수 있어요.</p>
@@ -1240,14 +1244,14 @@ export function WeavraControls({
                   )}
                   <p className="text-muted-foreground">
                     파일 담당 범위는 초안 생성 시점의 파일을 기준으로 해요. 남은 변경을 직접
-                    커밋하거나 정리한 뒤 초안을 다시 만들어 생성·수정 구분을 checkout과 맞춰 주세요.
-                    일반적인 새 Run이며 이전 작업이나 증거를 재사용하지 않아요.
+                    커밋하거나 정리한 뒤 초안을 다시 만들어 생성·수정 구분을 체크아웃과 맞춰 주세요.
+                    일반적인 새 실행이며 이전 작업이나 증거를 재사용하지 않아요.
                   </p>
                   <div aria-label="남은 변경사항" className="space-y-1">
                     {derivedDraft.leftovers.clean === false ? (
                       <>
                         <p>
-                          이 변경을 직접 커밋하거나 정리하기 전에는 새 Run을 시작할 수 없어요.
+                          이 변경을 직접 커밋하거나 정리하기 전에는 새 실행을 시작할 수 없어요.
                           Runtime은 둘 다 자동으로 하지 않아요.
                         </p>
                         <ul className="space-y-0.5 font-mono">
@@ -1267,7 +1271,7 @@ export function WeavraControls({
                     ) : derivedDraft.leftovers.clean === null ? (
                       <p>
                         작업 공간 상태를 확인할 수 없어요. 초안 생성 시 Git 변경 조회가 실패해 새
-                        Run을 막는 변경이 남아 있을 수 있어요.
+                        실행을 막는 변경이 남아 있을 수 있어요.
                       </p>
                     ) : (
                       <p>초안 생성 시 남은 변경사항이 없었어요.</p>
@@ -1401,9 +1405,9 @@ export function WeavraControls({
                                 }));
                             }}
                           >
-                            <option value="modify">modify</option>
-                            <option value="create">create</option>
-                            <option value="delete">delete</option>
+                            <option value="modify">{weavraLabel("modify")}</option>
+                            <option value="create">{weavraLabel("create")}</option>
+                            <option value="delete">{weavraLabel("delete")}</option>
                           </select>
                           <input
                             aria-label={`작업 ${task} 담당 범위 ${position + 1} 경로`}
@@ -1503,9 +1507,12 @@ export function WeavraControls({
                 )}
               </div>
               {plannerExposed && (
-                <section aria-label="Planner" className="space-y-3 border-t border-border pt-3">
+                <section
+                  aria-label={ko.runtime.controls.planner}
+                  className="space-y-3 border-t border-border pt-3"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h5 className="text-sm font-medium">Planner · 작업 목록 제안</h5>
+                    <h5 className="text-sm font-medium">계획 담당 · 작업 목록 제안</h5>
                     <Badge variant="outline">검토 전 후보</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -1519,11 +1526,11 @@ export function WeavraControls({
                     disabled={!canStartPlanner}
                     onClick={startPlanner}
                   >
-                    Planner로 초안 만들기
+                    계획 담당으로 초안 만들기
                   </Button>
                   {planner?.status === "RUNNING" && (
                     <div
-                      aria-label="Planner 실행 중"
+                      aria-label="계획 담당 실행 중"
                       className="space-y-2 rounded-md border border-border p-3 text-xs"
                     >
                       <p>
@@ -1543,11 +1550,11 @@ export function WeavraControls({
                   )}
                   {plannerProposal && (
                     <section
-                      aria-label="Planner 제안"
+                      aria-label="계획 담당 제안"
                       className="space-y-2 rounded-md border border-warning/50 p-3 text-xs"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h5 className="text-sm font-medium">Planner 제안 — 검토 전</h5>
+                        <h5 className="text-sm font-medium">계획 담당 제안 — 검토 전</h5>
                         <div className="flex flex-wrap gap-2">
                           {!plannerProposal.current && (
                             <Badge variant="warning">현재 정보 아님</Badge>
@@ -1590,7 +1597,7 @@ export function WeavraControls({
                   )}
                   {planner?.status === "READY" && planner.planId === dismissedPlanId && (
                     <p className="text-xs text-muted-foreground">
-                      앱에서 제안을 버렸어요. Runtime은 계획을 다시 만들거나 Run을 확인할 때까지
+                      앱에서 제안을 버렸어요. Runtime은 계획을 다시 만들거나 실행을 확인할 때까지
                       보관해요.{" "}
                       <Button size="sm" variant="outline" onClick={() => setDismissedPlanId(null)}>
                         제안 보기
@@ -1598,8 +1605,8 @@ export function WeavraControls({
                     </p>
                   )}
                   {planner?.status === "FAILED" && planner.failureCode && (
-                    <p aria-label="Planner 실패" className="text-xs">
-                      Planner 실패: <strong>{planner.failureCode}</strong> —{" "}
+                    <p aria-label="계획 담당 실패" className="text-xs">
+                      계획 담당 실패: <strong>{planner.failureCode}</strong> —{" "}
                       {plannerFailureText[planner.failureCode]} 초안을 만들지 못했어요. 준비되면
                       다시 요청해 주세요.
                     </p>
@@ -1639,22 +1646,22 @@ export function WeavraControls({
             <p className="text-sm">{preview.goal}</p>
             <dl className="grid gap-3 text-xs sm:grid-cols-2">
               {[
-                ["Workflow", preview.workflow],
-                ["Risk", preview.risk],
+                [ko.runtime.controls.workflow, preview.workflow],
+                [ko.runtime.controls.risk, preview.risk],
                 ["실행 방식", preview.executionMode],
                 ["허용 범위", preview.allowedPaths.join(", ") || "없음"],
                 [
-                  "Recipe",
+                  ko.runtime.controls.recipe,
                   preview.recipe ? `${preview.recipe.id}@${preview.recipe.version}` : "없음",
                 ],
                 ["만료", new Date(preview.expiresAt).toLocaleString()],
                 [
-                  "Configuration",
+                  ko.runtime.controls.configuration,
                   Object.entries(preview.configuration)
                     .map(([key, value]) => `${key}: ${String(value)}`)
                     .join(" · "),
                 ],
-                ["작업 계약 digest", preview.taskContractDigest],
+                ["작업 계약 다이제스트", preview.taskContractDigest],
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt className="text-muted-foreground">{label}</dt>
@@ -1725,9 +1732,10 @@ export function WeavraControls({
             <Badge variant="outline">참고 자료 전용</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            허용된 로컬 소스 하나와 짧은 설명을 대조해 검토해 주세요. 자동 추출이나 프로바이더
-            호출은 없어요. 비밀값·추론 원문·대화 기록·도구 출력은 넣지 마세요. 사실 정보는 권한을
-            부여하거나 검사·검토를 대신하거나 Run을 완료할 수 없어요. 완료 판정은 Kernel이 담당해요.
+            허용된 로컬 소스 하나와 짧은 설명을 대조해 검토해 주세요. 자동 추출이나 공급자 호출은
+            없어요. 비밀값·추론 원문·대화 기록·도구 출력은 넣지 마세요. 사실 정보는 권한을
+            부여하거나 검사·검토를 대신하거나 실행을 완료할 수 없어요. 완료 판정은 Kernel이
+            담당해요.
           </p>
           <form
             className="space-y-3"
@@ -1785,7 +1793,7 @@ export function WeavraControls({
               </Badge>
               <p className="text-sm">{factPreview.statement}</p>
               <p className="break-all text-xs">출처: {factPreview.sourceRef}</p>
-              <p className="break-all font-mono text-xs">digest: {factPreview.sourceDigest}</p>
+              <p className="break-all font-mono text-xs">다이제스트: {factPreview.sourceDigest}</p>
               <Button size="sm" disabled={!canPrepare || !factPreviewCurrent} onClick={confirmFact}>
                 검토한 사실 확인
               </Button>
@@ -1793,7 +1801,7 @@ export function WeavraControls({
           )}
           <div aria-label="Runtime의 공식 프로젝트 사실" className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Runtime은 관찰하거나 worker에 전달할 때마다 출처 식별 정보와 digest를 확인해요. 같은
+              Runtime은 관찰하거나 워커에 전달할 때마다 출처 식별 정보와 다이제스트를 확인해요. 같은
               출처를 다시 검토하면 사실 ID는 유지하고 검토 내용을 바꿔요. 출처는 최대 16개예요.
             </p>
             {!fresh || state?.projectFacts.status !== "available" ? (
@@ -1801,7 +1809,7 @@ export function WeavraControls({
                 사실 정보를 불러올 수 없거나 관찰이 오래됐어요. 현재 유효한 사실로 판단하지 않아요.
               </p>
             ) : state.projectFacts.entries.length === 0 ? (
-              <p className="text-xs text-muted-foreground">이 checkout에는 검토한 사실이 없어요.</p>
+              <p className="text-xs text-muted-foreground">이 체크아웃에는 검토한 사실이 없어요.</p>
             ) : (
               state.projectFacts.entries.map((fact) => (
                 <article
@@ -1824,7 +1832,7 @@ export function WeavraControls({
                     시점의 상태
                   </p>
                   <p className="break-all font-mono text-xs">ID: {fact.id}</p>
-                  <p className="break-all font-mono text-xs">digest: {fact.sourceDigest}</p>
+                  <p className="break-all font-mono text-xs">다이제스트: {fact.sourceDigest}</p>
                 </article>
               ))
             )}
@@ -1853,7 +1861,7 @@ export function WeavraControls({
           <p className="text-xs text-muted-foreground">
             로컬 정적 문서만 지원해요. 후보는 기록된 관찰일 뿐 검사나 현재 페이지 상태의 증거가
             아니에요. Runtime이 등록과 새 격리 HOME·프로필·CDP-pipe 캡처를 수행하고 Kernel이 완료를
-            판정해요. 브라우저 격리는 OS sandbox가 아니에요. 개인 브라우저 세션·스크립트·상호작용은
+            판정해요. 브라우저 격리는 OS 샌드박스가 아니에요. 개인 브라우저 세션·스크립트·상호작용은
             허용하지 않아요.
           </p>
           {browserInspection && (
@@ -1884,7 +1892,7 @@ export function WeavraControls({
                     </div>
                     <dl className="grid gap-2 text-xs sm:grid-cols-2">
                       {[
-                        ["Origin", item.origin],
+                        [ko.runtime.controls.origin, item.origin],
                         ["문서", item.documentIdentity],
                         ["캡처 시각", new Date(item.capturedAt).toLocaleString()],
                         [
@@ -1893,10 +1901,10 @@ export function WeavraControls({
                             ? (item.observation.value ?? "(속성 없음)")
                             : "(요소 없음)",
                         ],
-                        ["Candidate", item.candidateId],
-                        ["후보 digest", item.candidateDigest],
-                        ["문서 revision", item.pageRevision],
-                        ["관찰기 revision", item.source.readerRevision],
+                        [ko.runtime.controls.candidate, item.candidateId],
+                        ["후보 다이제스트", item.candidateDigest],
+                        ["문서 리비전", item.pageRevision],
+                        ["관찰기 리비전", item.source.readerRevision],
                       ].map(([label, value]) => (
                         <div key={label}>
                           <dt className="text-muted-foreground">{label}</dt>
@@ -2025,12 +2033,15 @@ export function WeavraControls({
                   </div>
                   <dl className="grid gap-2 text-xs sm:grid-cols-2">
                     {[
-                      ["Check", browserPreview.check.checkId],
+                      [ko.runtime.controls.check, browserPreview.check.checkId],
                       ["문서", browserPreview.check.documentIdentity],
                       ["대상", JSON.stringify(browserPreview.check.target)],
-                      ["Expectation", JSON.stringify(browserPreview.check.assertion)],
-                      ["등록 digest", browserPreview.check.registrationDigest],
-                      ["미리보기 digest", browserPreview.previewDigest],
+                      [
+                        ko.runtime.controls.expectation,
+                        JSON.stringify(browserPreview.check.assertion),
+                      ],
+                      ["등록 다이제스트", browserPreview.check.registrationDigest],
+                      ["미리보기 다이제스트", browserPreview.previewDigest],
                       ["만료", new Date(browserPreview.expiresAt).toLocaleString()],
                     ].map(([label, value]) => (
                       <div key={label}>
@@ -2082,13 +2093,13 @@ export function WeavraControls({
                 )}
               </div>
               <div className="space-y-2 text-xs">
-                <h4 className="font-medium">최근 저장된 Run · 기록된 브라우저 증거</h4>
+                <h4 className="font-medium">최근 저장된 실행 · 기록된 브라우저 증거</h4>
                 <p className="text-muted-foreground">
-                  기록된 PASS는 해당 캡처·Run·단계·revision에만 적용돼요. 현재 페이지 상태가
-                  아니에요. 증거가 없거나 불러올 수 없을 때 과거에 통과한 Run으로 대체하지 않아요.
+                  기록된 통과 결과는 해당 캡처·실행·단계·리비전에만 적용돼요. 현재 페이지 상태가
+                  아니에요. 증거가 없거나 불러올 수 없을 때 과거에 통과한 실행으로 대체하지 않아요.
                 </p>
                 {browserInspection.data.evidence.length === 0 && (
-                  <p className="text-muted-foreground">최근 Run에 브라우저 검증 증거가 없어요.</p>
+                  <p className="text-muted-foreground">최근 실행에 브라우저 검증 증거가 없어요.</p>
                 )}
                 {browserInspection.data.evidence.map((entry) => (
                   <div
@@ -2100,7 +2111,7 @@ export function WeavraControls({
                       <strong>{weavraLabel(entry.status)}</strong>
                     </p>
                     <p className="break-all">
-                      Run {entry.runId} · revision {entry.revision}
+                      실행 {entry.runId} · 리비전 {entry.revision}
                     </p>
                     {entry.browser ? (
                       <>
@@ -2142,12 +2153,12 @@ export function WeavraControls({
             <dl className="grid gap-2 text-xs sm:grid-cols-2">
               {[
                 ["대상", approval.path],
-                ["Run", approval.runId],
+                ["실행", approval.runId],
                 ["승인", approval.approvalId],
                 ["작업 / 역할", `${approval.operation} / ${approval.role}`],
                 ["단계", `${approval.step.stepId}@${approval.step.attempt}`],
                 [
-                  "Run / 프로젝트 revision",
+                  "실행 / 프로젝트 리비전",
                   `${approval.stateRevision} / ${approval.projectRevision}`,
                 ],
                 ["바이트", String(approval.bytes)],

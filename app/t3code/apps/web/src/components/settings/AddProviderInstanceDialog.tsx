@@ -10,6 +10,7 @@ import {
   type ProviderInstanceConfig,
 } from "@t3tools/contracts";
 
+import { ko } from "~/i18n/ko";
 import { useEnvironmentSettings, useUpdateEnvironmentSettings } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { normalizeProviderAccentColor } from "../../providerInstances";
@@ -61,6 +62,7 @@ function deriveInstanceId(driver: ProviderDriverKind, label: string): string {
   return slug ? `${driver}_${slug}` : "";
 }
 
+const copy = ko.providers.addInstance;
 const INSTANCE_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
 const DEFAULT_DRIVER_OPTION = DRIVER_OPTIONS[0]!;
@@ -100,12 +102,12 @@ const COMING_SOON_DRIVER_OPTIONS: readonly ComingSoonDriverOption[] = [
  * Returns a user-facing error string, or `null` if valid.
  */
 function validateInstanceId(id: string, existing: ReadonlySet<string>): string | null {
-  if (id.length === 0) return "Instance ID is required.";
-  if (id.length > 64) return "Instance ID must be 64 characters or fewer.";
+  if (id.length === 0) return copy.instanceIdRequired;
+  if (id.length > 64) return copy.instanceIdTooLong;
   if (!INSTANCE_ID_PATTERN.test(id)) {
-    return "Instance ID must start with a letter and use only letters, digits, '-', or '_'.";
+    return copy.instanceIdPattern;
   }
-  if (existing.has(id)) return `An instance named '${id}' already exists.`;
+  if (existing.has(id)) return copy.instanceIdExists(id);
   return null;
 }
 
@@ -150,7 +152,7 @@ export function AddProviderInstanceDialog({
   );
   const instanceIdError = validateInstanceId(instanceId, existingIds);
   const showInstanceIdError = hasAttemptedSubmit && instanceIdError !== null;
-  const previewLabel = label.trim() || `${driverOption.label} Workspace`;
+  const previewLabel = label.trim() || copy.defaultLabel(driverOption.label);
   const wizardStepSummaries = [driverOption.label, previewLabel, null] as const;
 
   const configDraft = configByDriver[driver] ?? EMPTY_CONFIG_DRAFT;
@@ -209,15 +211,15 @@ export function AddProviderInstanceDialog({
       updateSettings({ providerInstances: nextMap });
       toastManager.add({
         type: "success",
-        title: "Provider instance added",
-        description: `${driverOption.label} instance '${instanceId}' was added.`,
+        title: copy.addedTitle,
+        description: copy.addedDescription(driverOption.label, instanceId),
       });
       onOpenChange(false);
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: "Could not add provider instance",
-        description: error instanceof Error ? error.message : "Update failed.",
+        title: copy.addFailedTitle,
+        description: error instanceof Error ? error.message : copy.updateFailed,
       });
     }
   };
@@ -225,15 +227,7 @@ export function AddProviderInstanceDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <WizardPopup>
-        <WizardHeader
-          title="Add provider instance"
-          description={
-            <>
-              Configure an additional provider instance on {environmentLabel} — for example, a
-              second Codex install pointed at a different workspace.
-            </>
-          }
-        >
+        <WizardHeader title={copy.title} description={copy.description(environmentLabel)}>
           <AddProviderInstanceWizardSteps
             currentStep={wizardStep}
             summaries={wizardStepSummaries}
@@ -245,7 +239,7 @@ export function AddProviderInstanceDialog({
         <WizardPanel>
           <div className={cn("grid gap-2", wizardStep !== 0 && "hidden")}>
             <div id="add-instance-driver-label" className="text-sm font-medium text-foreground">
-              Driver
+              {copy.driver}
             </div>
             <RadioGroup
               value={driver}
@@ -295,7 +289,7 @@ export function AddProviderInstanceDialog({
                       {option.label}
                     </span>
                     <Badge variant="warning" size="sm">
-                      Coming Soon
+                      {copy.comingSoon}
                     </Badge>
                   </RadioPrimitive.Root>
                 );
@@ -304,20 +298,18 @@ export function AddProviderInstanceDialog({
           </div>
 
           <label className={cn("grid gap-2", wizardStep !== 1 && "hidden")}>
-            <span className="text-xs font-medium text-foreground">Label</span>
+            <span className="text-xs font-medium text-foreground">{copy.label}</span>
             <Input
               className="bg-background"
-              placeholder="e.g. Work"
+              placeholder={copy.labelPlaceholder}
               value={label}
               onChange={(event) => setLabel(event.target.value)}
             />
-            <span className="text-[11px] text-muted-foreground">
-              Shown in the provider list. Optional.
-            </span>
+            <span className="text-[11px] text-muted-foreground">{copy.labelHint}</span>
           </label>
 
           <label className={cn("grid gap-2", wizardStep !== 1 && "hidden")}>
-            <span className="text-xs font-medium text-foreground">Instance ID</span>
+            <span className="text-xs font-medium text-foreground">{copy.instanceId}</span>
             <Input
               className="bg-background"
               placeholder={`${driver}_work`}
@@ -330,14 +322,12 @@ export function AddProviderInstanceDialog({
             {showInstanceIdError ? (
               <span className="text-[11px] text-destructive">{instanceIdError}</span>
             ) : (
-              <span className="text-[11px] text-muted-foreground">
-                Routing key used by threads and sessions. Letters, digits, '-', or '_'.
-              </span>
+              <span className="text-[11px] text-muted-foreground">{copy.instanceIdHint}</span>
             )}
           </label>
 
           <div className={cn("grid gap-2", wizardStep !== 1 && "hidden")}>
-            <span className="text-xs font-medium text-foreground">Accent color</span>
+            <span className="text-xs font-medium text-foreground">{copy.accentColor}</span>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <ProviderAccentColorPicker
                 displayName={label || driverOption.label}
@@ -360,7 +350,7 @@ export function AddProviderInstanceDialog({
                       )}
                       style={{ backgroundColor: swatch }}
                       onClick={() => setAccentColor(swatch)}
-                      aria-label={`Use ${swatch} accent`}
+                      aria-label={copy.accentSwatch(swatch)}
                     />
                   );
                 })}
@@ -373,13 +363,11 @@ export function AddProviderInstanceDialog({
                   className="text-muted-foreground"
                   onClick={() => setAccentColor("")}
                 >
-                  Clear
+                  {copy.clear}
                 </Button>
               ) : null}
             </div>
-            <span className="text-[11px] text-muted-foreground">
-              Optional marker shown in the picker.
-            </span>
+            <span className="text-[11px] text-muted-foreground">{copy.accentHint}</span>
           </div>
 
           {driverSettingsFields.length > 0 ? (
@@ -394,9 +382,7 @@ export function AddProviderInstanceDialog({
             </div>
           ) : wizardStep === 2 ? (
             <div className="grid gap-2">
-              <p className="text-sm text-muted-foreground">
-                This driver has no required configuration. You can add the instance now.
-              </p>
+              <p className="text-sm text-muted-foreground">{copy.noConfiguration}</p>
             </div>
           ) : null}
         </WizardPanel>
@@ -412,12 +398,12 @@ export function AddProviderInstanceDialog({
               setWizardStep((step) => Math.max(0, step - 1));
             }}
           >
-            {wizardStep === 0 ? "Cancel" : "Back"}
+            {wizardStep === 0 ? ko.common.cancel : ko.common.back}
           </Button>
           {wizardStep < ADD_PROVIDER_WIZARD_STEPS.length - 1 ? (
-            <Button onClick={() => navigateToStep(wizardStep + 1)}>Next</Button>
+            <Button onClick={() => navigateToStep(wizardStep + 1)}>{ko.common.next}</Button>
           ) : (
-            <Button onClick={handleSave}>Add instance</Button>
+            <Button onClick={handleSave}>{copy.addInstance}</Button>
           )}
         </WizardFooter>
       </WizardPopup>

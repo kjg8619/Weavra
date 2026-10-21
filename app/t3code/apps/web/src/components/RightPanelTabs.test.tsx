@@ -3,6 +3,8 @@ import type { DesktopPreviewFavicon, PreviewSessionSnapshot } from "@t3tools/con
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vite-plus/test";
 
+import { ko } from "~/i18n/ko";
+
 import {
   RightPanelTabs,
   resolveDockDestinationReasons,
@@ -223,15 +225,15 @@ describe("RightPanelTabs audio indicator", () => {
   const cases = [
     { audible: false, audioMuted: false, label: null },
     { audible: false, audioMuted: true, label: null },
-    { audible: true, audioMuted: false, label: "Mute Local site" },
-    { audible: true, audioMuted: true, label: "Unmute Local site" },
+    { audible: true, audioMuted: false, label: ko.projects.rightPanel.muteTab("Local site") },
+    { audible: true, audioMuted: true, label: ko.projects.rightPanel.unmuteTab("Local site") },
   ] as const;
 
   it.each(cases)("audible=$audible muted=$audioMuted", ({ audible, audioMuted, label }) => {
     const html = renderTabs(null, undefined, { audible, audioMuted });
     if (label === null) {
-      expect(html).not.toContain("Mute Local site");
-      expect(html).not.toContain("Unmute Local site");
+      expect(html).not.toContain(ko.projects.rightPanel.muteTab("Local site"));
+      expect(html).not.toContain(ko.projects.rightPanel.unmuteTab("Local site"));
     } else {
       expect(html).toContain(`aria-label="${label}"`);
     }
@@ -250,7 +252,7 @@ describe("RightPanelTabs audio indicator", () => {
 
   it("hides the toggle when no runtime tab id can be resolved", () => {
     const html = renderTabs(null, undefined, { audible: true }, null);
-    expect(html).not.toContain("Mute Local site");
+    expect(html).not.toContain(ko.projects.rightPanel.muteTab("Local site"));
   });
 });
 
@@ -356,7 +358,7 @@ describe("dock destination reasons", () => {
   it("with a remote but no PR, only the PR destinations explain themselves", () => {
     const reasons = resolveDockDestinationReasons(base);
     expect(reasons.diff).toBeUndefined();
-    expect(reasons.pullRequest).toBe("이 branch에는 아직 PR이 없어요.");
+    expect(reasons.pullRequest).toBe(ko.projects.rightPanel.branchNoPullRequest);
     expect(reasons.pullRequests).toBe("이 대화에 연결된 PR이 없어요.");
   });
 
@@ -376,7 +378,7 @@ describe("dock destination reasons", () => {
       hasUpstream: undefined,
     });
     expect(reasons.diff).toBeUndefined();
-    expect(reasons.pullRequest).toBe("이 branch에는 아직 PR이 없어요.");
+    expect(reasons.pullRequest).toBe(ko.projects.rightPanel.branchNoPullRequest);
   });
 
   it("explains a draft before it becomes a server thread", () => {

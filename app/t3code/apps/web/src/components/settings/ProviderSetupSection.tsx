@@ -14,6 +14,7 @@ import {
 import { useRef, useState } from "react";
 import { Trash2Icon } from "lucide-react";
 
+import { ko } from "~/i18n/ko";
 import { writeTextToClipboard } from "../../hooks/useCopyToClipboard";
 import { ensureLocalApi } from "../../localApi";
 import { useEnvironmentQuery } from "../../state/query";
@@ -36,26 +37,12 @@ interface ProviderSetupSectionProps {
   readonly onEnable: () => void;
 }
 
-const AUTH_PHASE_LABELS: Record<ProviderAuthState["phase"], string> = {
-  idle: "Sign in with your Google account.",
-  starting: "Starting Google sign-in.",
-  waiting: "Waiting for Google sign-in.",
-  verifying: "Checking Google sign-in and available models.",
-  succeeded: "Google sign-in complete.",
-  failed: "Google sign-in failed.",
-  cancelled: "Google sign-in cancelled.",
-};
+const copy = ko.providers.setup;
+
+const AUTH_PHASE_LABELS: Record<ProviderAuthState["phase"], string> = copy.authPhase;
 
 /** API key methods skip the browser, so the phases read as a credential check. */
-const CREDENTIAL_PHASE_LABELS: Record<ProviderAuthState["phase"], string> = {
-  idle: "Connect with the credentials in the provider settings.",
-  starting: "Checking credentials.",
-  waiting: "Checking credentials.",
-  verifying: "Checking credentials and available models.",
-  succeeded: "Connected.",
-  failed: "Could not connect with the configured credentials.",
-  cancelled: "Connection cancelled.",
-};
+const CREDENTIAL_PHASE_LABELS: Record<ProviderAuthState["phase"], string> = copy.credentialPhase;
 
 /** Read the configured method from the instance config. Unknown values fall back to personal. */
 export function readAntigravityAuthMethod(config: unknown): AntigravityAuthMethod {
@@ -72,13 +59,13 @@ export function readAntigravityAuthMethod(config: unknown): AntigravityAuthMetho
 export function ProviderSetupSection(props: ProviderSetupSectionProps) {
   return (
     <section
-      aria-label="Antigravity setup"
+      aria-label={copy.sectionLabel}
       className="@container/setup divide-y divide-border/50 text-xs"
     >
       <SettingsRow
         className="@max-lg/setup:[&>div:first-child]:flex @max-lg/setup:[&>div:first-child]:items-stretch @max-lg/setup:[&>div:first-child]:gap-3"
-        title="Environment"
-        description="Device that runs this provider."
+        title={copy.environment}
+        description={copy.environmentDescription}
         control={
           <div className="flex min-w-0 flex-col gap-2 sm:items-end">
             <span className="text-muted-foreground [overflow-wrap:anywhere]">
@@ -86,19 +73,16 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
             </span>
             {!props.enabled && !props.readOnly ? (
               <Button size="sm" variant="outline" onClick={props.onEnable}>
-                Enable Antigravity
+                {copy.enableAntigravity}
               </Button>
             ) : null}
           </div>
         }
       />
       {props.readOnly ? (
-        <SettingsRow title="Setup unavailable" description="Provider setup is read-only." />
+        <SettingsRow title={copy.setupUnavailable} description={copy.setupReadOnly} />
       ) : props.provider?.setup === undefined ? (
-        <SettingsRow
-          title="Update required"
-          description="Update this environment to manage Antigravity."
-        />
+        <SettingsRow title={copy.updateRequired} description={copy.updateRequiredDescription} />
       ) : (
         <ProviderSetupActions
           key={`${props.environmentId}:${props.instanceId}`}
@@ -135,7 +119,7 @@ function ProviderSetupActions({
   const phaseLabels = usesBrowser ? AUTH_PHASE_LABELS : CREDENTIAL_PHASE_LABELS;
   const methodLabel =
     ANTIGRAVITY_AUTH_METHODS.find((method) => method.value === authMethod)?.label ??
-    "Google account";
+    copy.googleAccount;
   const authQuery = useEnvironmentQuery(serverEnvironment.providerAuthState(target));
   const installQuery = useEnvironmentQuery(serverEnvironment.providerInstallState(target));
   const auth = authQuery.data;
@@ -169,13 +153,13 @@ function ProviderSetupActions({
   const authenticated = provider.auth.status === "authenticated";
   const authStatusMessage =
     auth === null
-      ? "Reading sign-in status."
+      ? copy.readingSignIn
       : authActive || auth.phase === "failed" || auth.phase === "cancelled"
         ? (auth.message ?? phaseLabels[auth.phase])
         : authenticated
           ? usesBrowser
-            ? "Signed in with Google."
-            : "Connected."
+            ? copy.signedInWithGoogle
+            : copy.connected
           : auth.phase === "idle" && auth.message
             ? auth.message
             : phaseLabels.idle;
@@ -184,20 +168,25 @@ function ProviderSetupActions({
   const actionsDisabled = pendingLabel !== null || queryError !== null;
   const installationStatusMessage =
     installation?.phase === "downloading"
-      ? `Downloading ${(installation.downloadedBytes / 1_000_000).toFixed(1)} MB${installation.totalBytes === null ? "" : ` of ${(installation.totalBytes / 1_000_000).toFixed(1)} MB`}.`
+      ? copy.downloading(
+          (installation.downloadedBytes / 1_000_000).toFixed(1),
+          installation.totalBytes === null
+            ? null
+            : (installation.totalBytes / 1_000_000).toFixed(1),
+        )
       : installation?.phase === "extracting"
-        ? "Extracting Antigravity."
+        ? copy.extracting
         : installation?.phase === "verifying"
-          ? "Checking the downloaded runtime."
+          ? copy.verifyingDownload
           : installed
-            ? "Installed."
+            ? copy.installed
             : usesCustomBinary
               ? enabled
-                ? "The configured Antigravity runtime is unavailable."
-                : "The configured Antigravity runtime has not been checked."
+                ? copy.customRuntimeUnavailable
+                : copy.customRuntimeUnchecked
               : installation?.totalBytes
-                ? `${Math.ceil(installation.totalBytes / 1_000_000)} MB download.`
-                : "Not installed.";
+                ? copy.downloadSize(Math.ceil(installation.totalBytes / 1_000_000))
+                : copy.notInstalled;
 
   async function runCommand<A, E>(
     label: string,
@@ -212,13 +201,13 @@ function ProviderSetupActions({
       if (result._tag === "Failure") {
         if (!isAtomCommandInterrupted(result)) {
           const failure = squashAtomCommandFailure(result);
-          setError(failure instanceof Error ? failure.message : "Provider setup failed.");
+          setError(failure instanceof Error ? failure.message : copy.setupFailed);
         }
         return false;
       }
       return true;
     } catch {
-      setError("Provider setup failed. Try again.");
+      setError(copy.setupFailedRetry);
       return false;
     } finally {
       pendingRef.current = false;
@@ -232,25 +221,25 @@ function ProviderSetupActions({
       await ensureLocalApi().shell.openExternal(authorizationUrl);
       setError(null);
     } catch {
-      setError("Could not open the sign-in page. Copy the link and open it in your browser.");
+      setError(copy.openSignInFailed);
     }
   }
 
   async function copySignInLink() {
     if (!authorizationUrl) return;
     try {
-      await writeTextToClipboard(authorizationUrl, "Google sign-in link");
+      await writeTextToClipboard(authorizationUrl, copy.signInLinkClipboardLabel);
       setCopiedFlowId(auth?.flowId ?? null);
       setError(null);
     } catch {
-      setError("Could not copy the sign-in link. Use Open sign-in page.");
+      setError(copy.copySignInLinkFailed);
     }
   }
 
   async function submitCallback() {
     const flowId = auth?.flowId;
     if (!flowId || !callbackUrl.trim() || auth.phase !== "waiting") return;
-    const accepted = await runCommand("Checking redirect", () =>
+    const accepted = await runCommand(copy.checkingRedirect, () =>
       completeAuth({ environmentId, input: { instanceId, flowId, callbackUrl } }),
     );
     if (accepted) {
@@ -260,39 +249,38 @@ function ProviderSetupActions({
 
   async function signOut() {
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      `${usesBrowser ? "Sign out of Google" : "Disconnect"} for ${provider.displayName ?? "Antigravity"} on ${environmentLabel}? This stops its running threads. Thread history is kept.`,
+      (usesBrowser ? copy.signOutGoogleConfirm : copy.disconnectConfirm)(
+        provider.displayName ?? "Antigravity",
+        environmentLabel,
+      ),
     );
     if (confirmed) {
-      await runCommand("Signing out", () => logoutAuth(target));
+      await runCommand(copy.signingOut, () => logoutAuth(target));
     }
   }
 
   async function removeRuntime() {
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      `Remove the downloaded Antigravity runtime from ${environmentLabel}? Google sign-in and thread history are kept.`,
+      copy.removeRuntimeConfirm(environmentLabel),
     );
     if (confirmed) {
-      await runCommand("Removing runtime", () => removeInstall(target));
+      await runCommand(copy.removingRuntime, () => removeInstall(target));
     }
   }
 
   return (
     <div className="divide-y divide-border/50">
       <SettingsRow
-        title="Runtime"
+        title={copy.runtime}
         className="@max-lg/setup:[&>div:first-child]:flex @max-lg/setup:[&>div:first-child]:items-stretch @max-lg/setup:[&>div:first-child]:gap-3"
-        description="Install and manage Antigravity."
+        description={copy.runtimeDescription}
         status={
           <div className="space-y-2">
             {usesCustomBinary ? (
-              <p className="text-muted-foreground">
-                Uses the custom binary path below. Installation keeps that path.
-              </p>
+              <p className="text-muted-foreground">{copy.customBinaryNote}</p>
             ) : null}
             {!installed && !provider.setup?.canInstall ? (
-              <p className="text-muted-foreground">
-                Automatic installation unavailable. Set a binary path or use another environment.
-              </p>
+              <p className="text-muted-foreground">{copy.automaticInstallUnavailable}</p>
             ) : null}
           </div>
         }
@@ -306,7 +294,7 @@ function ProviderSetupActions({
               installation.totalBytes !== null &&
               installation.totalBytes > 0 ? (
                 <progress
-                  aria-label="Antigravity download"
+                  aria-label={copy.downloadProgress}
                   className="block h-1 w-full accent-foreground"
                   value={installation.downloadedBytes}
                   max={installation.totalBytes}
@@ -330,12 +318,12 @@ function ProviderSetupActions({
                     onClick={() => {
                       const operationId = installation.operationId;
                       if (!operationId) return;
-                      void runCommand("Cancelling installation", () =>
+                      void runCommand(copy.cancellingInstallation, () =>
                         cancelInstall({ environmentId, input: { instanceId, operationId } }),
                       );
                     }}
                   >
-                    Cancel installation
+                    {copy.cancelInstallation}
                   </Button>
                 ) : !installActive && provider.setup?.canInstall ? (
                   <Button
@@ -343,19 +331,19 @@ function ProviderSetupActions({
                     variant="outline"
                     disabled={actionsDisabled || installation === null || authActive}
                     onClick={() =>
-                      void runCommand("Starting installation", () => startInstall(target))
+                      void runCommand(copy.startingInstallation, () => startInstall(target))
                     }
                   >
                     {installation?.installedVersion
                       ? installation.version &&
                         installation.version !== installation.installedVersion
-                        ? "Update Antigravity"
-                        : "Reinstall Antigravity"
+                        ? copy.updateAntigravity
+                        : copy.reinstallAntigravity
                       : installation?.phase === "failed" || installation?.phase === "cancelled"
-                        ? "Retry installation"
+                        ? copy.retryInstallation
                         : installed
-                          ? "Install managed runtime"
-                          : "Install Antigravity"}
+                          ? copy.installManagedRuntime
+                          : copy.installAntigravity}
                   </Button>
                 ) : null}
               </div>
@@ -367,7 +355,7 @@ function ProviderSetupActions({
                         size="icon-sm"
                         variant="ghost"
                         className="col-start-1 row-start-1"
-                        aria-label="Remove downloaded runtime"
+                        aria-label={copy.removeDownloadedRuntime}
                         disabled={actionsDisabled || authActive}
                         onClick={() => void removeRuntime()}
                       />
@@ -375,7 +363,7 @@ function ProviderSetupActions({
                   >
                     <Trash2Icon className="size-3.5" />
                   </TooltipTrigger>
-                  <TooltipPopup>Remove downloaded runtime</TooltipPopup>
+                  <TooltipPopup>{copy.removeDownloadedRuntime}</TooltipPopup>
                 </Tooltip>
               ) : null}
             </div>
@@ -386,9 +374,7 @@ function ProviderSetupActions({
       <SettingsRow
         title={methodLabel}
         className="@max-lg/setup:[&>div:first-child]:flex @max-lg/setup:[&>div:first-child]:items-stretch @max-lg/setup:[&>div:first-child]:gap-3"
-        description={
-          usesBrowser ? "Connect your Google account." : "Connect with the credentials below."
-        }
+        description={usesBrowser ? copy.connectGoogleAccount : copy.connectWithCredentials}
         control={
           <div className="flex min-w-0 flex-col gap-2 sm:max-w-56 sm:items-end sm:text-right xl:max-w-72">
             <p
@@ -404,10 +390,10 @@ function ProviderSetupActions({
             {authorizationUrl ? (
               <div className="flex flex-wrap gap-2 sm:justify-end">
                 <Button size="sm" variant="outline" onClick={() => void openSignInPage()}>
-                  Open sign-in page
+                  {copy.openSignInPage}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => void copySignInLink()}>
-                  {copiedFlowId === auth?.flowId ? "Link copied" : "Copy sign-in link"}
+                  {copiedFlowId === auth?.flowId ? copy.linkCopied : copy.copySignInLink}
                 </Button>
               </div>
             ) : null}
@@ -420,27 +406,27 @@ function ProviderSetupActions({
                   onClick={() => {
                     const flowId = auth.flowId;
                     if (!flowId) return;
-                    void runCommand("Cancelling sign-in", () =>
+                    void runCommand(copy.cancellingSignIn, () =>
                       cancelAuth({ environmentId, input: { instanceId, flowId } }),
                     );
                   }}
                 >
-                  Cancel sign-in
+                  {copy.cancelSignIn}
                 </Button>
               ) : !authActive && !authenticated && provider.setup?.canAuthenticate ? (
                 <Button
                   size="sm"
                   variant="outline"
                   disabled={actionsDisabled || !installed || auth === null || installActive}
-                  onClick={() => void runCommand("Starting sign-in", () => startAuth(target))}
+                  onClick={() => void runCommand(copy.startingSignIn, () => startAuth(target))}
                 >
                   {usesBrowser
                     ? auth?.phase === "failed" || auth?.phase === "cancelled"
-                      ? "Retry Google sign-in"
-                      : "Sign in with Google"
+                      ? copy.retryGoogleSignIn
+                      : copy.signInWithGoogle
                     : auth?.phase === "failed" || auth?.phase === "cancelled"
-                      ? "Retry connection"
-                      : "Connect"}
+                      ? copy.retryConnection
+                      : copy.connect}
                 </Button>
               ) : null}
               {!authActive && provider.setup?.canAuthenticate ? (
@@ -450,7 +436,7 @@ function ProviderSetupActions({
                   disabled={actionsDisabled || auth === null}
                   onClick={() => void signOut()}
                 >
-                  {usesBrowser ? "Sign out of Google" : "Disconnect"}
+                  {usesBrowser ? copy.signOutOfGoogle : copy.disconnect}
                 </Button>
               ) : null}
             </div>
@@ -463,14 +449,14 @@ function ProviderSetupActions({
               <>
                 {auth?.expiresAt ? (
                   <p className="text-muted-foreground">
-                    Link expires at{" "}
+                    {copy.linkExpiresPrefix}
                     <time dateTime={auth.expiresAt}>
                       {new Date(auth.expiresAt).toLocaleTimeString([], {
                         hour: "numeric",
                         minute: "2-digit",
                       })}
                     </time>
-                    .
+                    {copy.linkExpiresSuffix}
                   </p>
                 ) : null}
                 <form
@@ -480,9 +466,7 @@ function ProviderSetupActions({
                     void submitCallback();
                   }}
                 >
-                  <label htmlFor={`provider-callback-${instanceId}`}>
-                    If the final localhost page does not load, paste its full URL here.
-                  </label>
+                  <label htmlFor={`provider-callback-${instanceId}`}>{copy.callbackLabel}</label>
                   <Input
                     id={`provider-callback-${instanceId}`}
                     size="sm"
@@ -504,21 +488,19 @@ function ProviderSetupActions({
                     className="w-fit"
                     disabled={actionsDisabled || !callbackUrl.trim()}
                   >
-                    Continue
+                    {copy.submitCallback}
                   </Button>
                 </form>
               </>
             ) : auth?.phase === "waiting" ? (
-              <p className="text-muted-foreground">
-                Sign-in is open in another client. Complete or cancel it there.
-              </p>
+              <p className="text-muted-foreground">{copy.signInInAnotherClient}</p>
             ) : null}
           </div>
         ) : null}
       </SettingsRow>
 
       <p className="sr-only" role="status">
-        {pendingLabel ? `${pendingLabel}.` : null}
+        {pendingLabel ? copy.pending(pendingLabel) : null}
       </p>
       {error || queryError ? (
         <div className="grid gap-2 px-3 py-3 sm:px-4">
@@ -535,7 +517,7 @@ function ProviderSetupActions({
                 installQuery.refresh();
               }}
             >
-              Retry setup status
+              {copy.retrySetupStatus}
             </Button>
           ) : null}
         </div>

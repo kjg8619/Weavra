@@ -2295,3 +2295,9 @@ code {
 .composer-tiptap li[data-checked] > div > p {
   margin: 0;
 }
+
+/* Korean copy wraps between words; an unbroken token longer than its line still wraps. */
+html {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}

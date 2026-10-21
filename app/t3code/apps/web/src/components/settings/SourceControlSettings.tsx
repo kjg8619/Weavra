@@ -68,6 +68,7 @@ import {
 } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+import { ko } from "~/i18n/ko";
 
 const EMPTY_DISCOVERY_RESULT: SourceControlDiscoveryResult = {
   versionControlSystems: [],
@@ -147,21 +148,21 @@ function authPresentation(auth: SourceControlProviderAuth): {
   readonly label: string;
 } {
   if (auth.status === "authenticated") {
-    return { label: "로그인됨" };
+    return { label: ko.settings.sourceControl.authAuthenticated };
   }
   if (auth.status === "unauthenticated") {
-    return { label: "로그인 필요" };
+    return { label: ko.settings.sourceControl.authUnauthenticated };
   }
-  return { label: "확인 안 됨" };
+  return { label: ko.settings.sourceControl.authUnknown };
 }
 
 function RedactedAccount(props: { readonly account: string | null }) {
   return (
     <RedactedSensitiveText
       value={props.account}
-      ariaLabel="Toggle source control account visibility"
-      revealTooltip="Click to reveal account"
-      hideTooltip="Click to hide account"
+      ariaLabel={ko.settings.sourceControl.toggleAccountVisibility}
+      revealTooltip={ko.settings.sourceControl.revealAccount}
+      hideTooltip={ko.settings.sourceControl.hideAccount}
       className="min-h-9 px-2.5 !text-sm !leading-normal !text-foreground focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-foreground focus-visible:outline-offset-2"
     />
   );
@@ -212,7 +213,7 @@ function itemSummary({
   readonly authAccount: string | null;
 }) {
   if (isVcsNotReady(item)) {
-    return <span>Support for {item.label} is coming soon.</span>;
+    return <span>{ko.settings.sourceControl.comingSoonSupport(item.label)}</span>;
   }
 
   if (auth) {
@@ -220,27 +221,43 @@ function itemSummary({
       <span className="grid gap-2">
         <span className="flex flex-wrap gap-x-6 gap-y-2">
           <span data-source-control-installation={item.status}>
-            도구: {item.status === "available" ? "도구 설치됨" : "설치 필요"}
-            {item.status === "available" && !item.executable ? " (내장 연동)" : null}
+            {ko.settings.sourceControl.toolStatus(
+              item.status === "available"
+                ? ko.settings.sourceControl.toolInstalled
+                : ko.settings.sourceControl.installRequired,
+            )}
+            {item.status === "available" && !item.executable
+              ? ` ${ko.settings.sourceControl.builtInIntegration}`
+              : null}
           </span>
-          <span data-source-control-auth={auth.status}>인증: {authPresentation(auth).label}</span>
+          <span data-source-control-auth={auth.status}>
+            {ko.settings.sourceControl.authStatus(authPresentation(auth).label)}
+          </span>
         </span>
         {authAccount ? <RedactedAccount account={authAccount} /> : null}
         <span>
           {item.status !== "available"
-            ? "서버 호스트에서 도구를 설치한 뒤 다시 확인해 주세요."
+            ? ko.settings.sourceControl.summaryInstallOnHost
             : auth.status === "authenticated"
-              ? "이 서버에서 변경 요청 기능을 사용할 수 있어요."
+              ? ko.settings.sourceControl.summaryReady
               : auth.status === "unauthenticated"
-                ? "도구 준비와 로그인은 별개예요. 설정 안내에서 인증 방법을 확인해 주세요."
-                : "로그인 상태를 확인하지 못했어요. 설정 안내의 원문 진단을 확인해 주세요."}
+                ? ko.settings.sourceControl.summaryAuthSeparate
+                : ko.settings.sourceControl.summaryAuthUnknown}
         </span>
       </span>
     );
   }
 
   return (
-    <span>{item.status === "available" ? "도구 설치됨" : `설치 필요: ${item.installHint}`}</span>
+    <span>
+      {item.status === "available" ? (
+        ko.settings.sourceControl.toolInstalled
+      ) : (
+        <>
+          {ko.settings.sourceControl.installRequiredLabel} <code>{item.installHint}</code>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -286,7 +303,7 @@ function DiscoveryItemRow({
               {version ? <code className="text-xs text-muted-foreground">{version}</code> : null}
               {isVcsNotReady(item) ? (
                 <Badge variant="warning" size="sm">
-                  Coming Soon
+                  {ko.settings.sourceControl.comingSoon}
                 </Badge>
               ) : null}
             </div>
@@ -303,7 +320,11 @@ function DiscoveryItemRow({
                 className="scroll-m-2 border-foreground/70 text-foreground focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-foreground focus-visible:outline-offset-2"
                 onClick={() => setIsExpanded((open) => !open)}
                 aria-expanded={isExpanded}
-                aria-label={auth ? `${item.label} 설정 안내` : `Toggle ${item.label} details`}
+                aria-label={
+                  auth
+                    ? ko.settings.sourceControl.setupGuide(item.label)
+                    : ko.settings.sourceControl.toggleDetails(item.label)
+                }
               >
                 <ChevronDownIcon
                   className={cn("size-3.5 transition-transform", isExpanded && "rotate-180")}
@@ -311,7 +332,11 @@ function DiscoveryItemRow({
               </Button>
             ) : null}
             {!isVcsNotReady(item) && !auth ? (
-              <Switch checked={enabled} disabled aria-label={`${item.label} availability`} />
+              <Switch
+                checked={enabled}
+                disabled
+                aria-label={ko.settings.sourceControl.availability(item.label)}
+              />
             ) : null}
           </div>
         </div>
@@ -323,18 +348,19 @@ function DiscoveryItemRow({
             <div className="space-y-3 break-keep px-3 pb-4 pt-1 text-pretty text-sm leading-relaxed text-foreground sm:px-4">
               {auth ? (
                 <>
-                  <p>
-                    서버 호스트에서 아래 안내를 따라 설정한 뒤 환경을 다시 확인해 주세요. 안내를
-                    열어도 설치나 로그인을 실행하지 않아요.
-                  </p>
+                  <p>{ko.settings.sourceControl.setupGuideIntro}</p>
                   <pre className="whitespace-pre-wrap break-words rounded-lg bg-muted p-3 font-mono text-sm select-text">
                     {item.installHint}
                   </pre>
                   {optionLabel(item.detail) ? (
-                    <p className="select-text break-words">도구 진단: {optionLabel(item.detail)}</p>
+                    <p className="select-text break-words">
+                      {ko.settings.sourceControl.toolDiagnostic(optionLabel(item.detail) ?? "")}
+                    </p>
                   ) : null}
                   {optionLabel(auth.detail) ? (
-                    <p className="select-text break-words">원문 진단: {optionLabel(auth.detail)}</p>
+                    <p className="select-text break-words">
+                      {ko.settings.sourceControl.rawDiagnostic(optionLabel(auth.detail) ?? "")}
+                    </p>
                   ) : null}
                 </>
               ) : null}
@@ -369,11 +395,7 @@ function GitFetchIntervalSettings() {
         <div className="min-w-0 space-y-1">
           <div className="flex min-w-0 items-center gap-1">
             <span className="text-xs font-medium text-foreground">{setting.title}</span>
-            <PolicyTooltip>
-              This interval is configured for Git only. The shared Background activity policy still
-              decides whether Git refreshes may run when the timer fires. Custom intervals appear as
-              Advanced in General settings.
-            </PolicyTooltip>
+            <PolicyTooltip>{ko.settings.sourceControl.fetchIntervalPolicy}</PolicyTooltip>
             <span
               className={cn(
                 "inline-flex size-5 shrink-0 items-center justify-center transition-opacity",
@@ -383,7 +405,7 @@ function GitFetchIntervalSettings() {
             >
               {canResetFetchInterval ? (
                 <SettingResetButton
-                  label="fetch interval"
+                  label={ko.settings.sourceControl.fetchInterval}
                   onClick={() =>
                     updateSettings(
                       backgroundActivityOverrideSettings(settings.backgroundActivity, {
@@ -396,7 +418,7 @@ function GitFetchIntervalSettings() {
             </span>
           </div>
           <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-            Refresh remote branches in the background. Set to 0 to avoid automatic Git prompts.
+            {ko.settings.sourceControl.fetchIntervalDescription}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -415,12 +437,14 @@ function GitFetchIntervalSettings() {
             }
           >
             <NumberFieldGroup>
-              <NumberFieldDecrement aria-label="Decrease fetch interval" />
-              <NumberFieldInput aria-label="Automatic Git fetch interval in seconds" />
-              <NumberFieldIncrement aria-label="Increase fetch interval" />
+              <NumberFieldDecrement aria-label={ko.settings.sourceControl.decreaseFetchInterval} />
+              <NumberFieldInput aria-label={ko.settings.sourceControl.fetchIntervalSeconds} />
+              <NumberFieldIncrement aria-label={ko.settings.sourceControl.increaseFetchInterval} />
             </NumberFieldGroup>
           </NumberField>
-          <span className="text-xs text-muted-foreground">seconds</span>
+          <span className="text-xs text-muted-foreground">
+            {ko.settings.sourceControl.secondsUnit}
+          </span>
         </div>
       </div>
     </SettingsSearchTarget>
@@ -476,25 +500,28 @@ function EmptySourceControlDiscovery({
   const hasError = error !== null;
 
   return (
-    <SettingsSection id={searchableSetting("source-control").id} title="Server environment">
+    <SettingsSection
+      id={searchableSetting("source-control").id}
+      title={ko.settings.sourceControl.serverEnvironment}
+    >
       <Empty className="min-h-88">
         <EmptyMedia variant="icon">
           <PullRequestGlyph.pullRequest />
         </EmptyMedia>
         <EmptyHeader>
           <EmptyTitle>
-            {hasError ? "Could not scan the server environment" : "Nothing detected yet"}
+            {hasError
+              ? ko.settings.sourceControl.scanFailedTitle
+              : ko.settings.sourceControl.emptyTitle}
           </EmptyTitle>
           <EmptyDescription>
-            {hasError
-              ? error
-              : "Install Git on the server, add optional hosting integrations or credentials your workspace needs, then rescan."}
+            {hasError ? error : ko.settings.sourceControl.emptyDescription}
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button size="sm" variant="outline" onClick={onScan} disabled={isPending}>
             <RefreshIcon className="size-3.5" refreshing={isPending} />
-            Scan
+            {ko.settings.sourceControl.scan}
           </Button>
         </EmptyContent>
       </Empty>
@@ -538,13 +565,13 @@ export function SourceControlSettingsPanel() {
             className="scroll-m-2 border-foreground/70 text-foreground disabled:opacity-100 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-foreground focus-visible:outline-offset-2"
             onClick={handleScan}
             disabled={discovery.isPending}
-            aria-label="Rescan server environment"
+            aria-label={ko.settings.sourceControl.rescanServerEnvironment}
           >
             <RefreshIcon refreshing={discovery.isPending} />
           </Button>
         }
       />
-      <TooltipPopup side="top">Rescan Git and hosting integrations</TooltipPopup>
+      <TooltipPopup side="top">{ko.settings.sourceControl.rescanTooltip}</TooltipPopup>
     </Tooltip>
   );
 
@@ -552,25 +579,28 @@ export function SourceControlSettingsPanel() {
     <SettingsPageContainer>
       <ProjectDefaultsSettings category="source-control" />
       {environmentId === null ? (
-        <SettingsSection id={searchableSetting("source-control").id} title="Server environment">
+        <SettingsSection
+          id={searchableSetting("source-control").id}
+          title={ko.settings.sourceControl.serverEnvironment}
+        >
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            Connect an environment to inspect its version control tools and hosting integrations.
+            {ko.settings.sourceControl.connectEnvironmentHint}
           </p>
         </SettingsSection>
       ) : isInitialScanPending ? (
         <>
           <SourceControlSectionSkeleton
-            title={`Version Control${environmentSuffix}`}
+            title={ko.settings.sourceControl.versionControl(environmentSuffix)}
             headerAction={scanButton}
           />
-          <SourceControlSectionSkeleton title="Source Control Providers" />
+          <SourceControlSectionSkeleton title={ko.settings.sourceControl.providers("")} />
         </>
       ) : hasDiscoveryItems ? (
         <>
           {hasVersionControlSystems ? (
             <SettingsSection
               id={searchableSetting("source-control").id}
-              title={`Version Control${environmentSuffix}`}
+              title={ko.settings.sourceControl.versionControl(environmentSuffix)}
               headerAction={scanButton}
             >
               {result.versionControlSystems.map((item) => (
@@ -586,8 +616,8 @@ export function SourceControlSettingsPanel() {
               id={hasVersionControlSystems ? undefined : searchableSetting("source-control").id}
               title={
                 hasVersionControlSystems
-                  ? "Source Control Providers"
-                  : `Source Control Providers${environmentSuffix}`
+                  ? ko.settings.sourceControl.providers("")
+                  : ko.settings.sourceControl.providers(environmentSuffix)
               }
               headerAction={hasVersionControlSystems ? null : scanButton}
             >

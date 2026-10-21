@@ -480,8 +480,8 @@ describe("buildThreadActionItems", () => {
         "thread:thread-older",
         "thread:thread-newer",
       ]);
-      expect(items[0]?.timestamp).toBe("1d ago");
-      expect(items[1]?.timestamp).toBe("5d ago");
+      expect(items[0]?.timestamp).toBe("1일 전");
+      expect(items[1]?.timestamp).toBe("5일 전");
     } finally {
       vi.useRealTimers();
     }

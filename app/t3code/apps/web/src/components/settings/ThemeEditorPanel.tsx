@@ -51,6 +51,7 @@ import {
   showThemeInspectorHover,
   type ThemeElementInspection,
 } from "./themeInspector";
+import { ko } from "~/i18n/ko";
 
 const THEME_EDITOR_SIMPLE_ROLES: ReadonlyArray<ThemeColorRole> = ["canvas", "accent"];
 
@@ -68,36 +69,41 @@ const THEME_EDITOR_ROLE_GROUPS: ReadonlyArray<{
 }> = [
   {
     id: "foundation",
-    title: "Foundation",
+    title: ko.settings.themeEditor.families.foundation,
     families: [
       {
         id: "background",
-        label: "Background",
+        label: ko.settings.themeEditor.families.background,
         role: "canvas",
         roles: ["canvas", "chrome", "toolbar"],
       },
-      { id: "surface", label: "Surface", role: "surface", roles: ["surface"] },
+      {
+        id: "surface",
+        label: ko.settings.themeEditor.families.surface,
+        role: "surface",
+        roles: ["surface"],
+      },
       {
         id: "raised-surface",
-        label: "Raised surface",
+        label: ko.settings.themeEditor.families.raisedSurface,
         role: "surfaceRaised",
         roles: ["surfaceRaised"],
       },
       {
         id: "overlay",
-        label: "Overlay",
+        label: ko.settings.themeEditor.families.overlay,
         role: "surfaceOverlay",
         roles: ["surfaceOverlay"],
       },
       {
         id: "text",
-        label: "Text",
+        label: ko.settings.themeEditor.families.text,
         role: "text",
         roles: ["text", "toolbarForeground", "toolbarControlForeground"],
       },
       {
         id: "muted-text",
-        label: "Muted text",
+        label: ko.settings.themeEditor.families.mutedText,
         role: "mutedForeground",
         roles: [
           "textMuted",
@@ -110,32 +116,37 @@ const THEME_EDITOR_ROLE_GROUPS: ReadonlyArray<{
       },
       {
         id: "border",
-        label: "Border",
+        label: ko.settings.themeEditor.families.border,
         role: "border",
         roles: ["border", "toolbarBorder", "sidebarBorder"],
       },
-      { id: "input", label: "Input", role: "input", roles: ["input"] },
+      {
+        id: "input",
+        label: ko.settings.themeEditor.families.input,
+        role: "input",
+        roles: ["input"],
+      },
     ],
   },
   {
     id: "brand-content",
-    title: "Brand & content",
+    title: ko.settings.themeEditor.families.brandContent,
     families: [
       {
         id: "subtle-surface",
-        label: "Subtle surface",
+        label: ko.settings.themeEditor.families.subtleSurface,
         role: "secondary",
         roles: ["secondary", "secondaryForeground", "muted", "toolbarControl"],
       },
       {
         id: "highlight-surface",
-        label: "Highlight surface",
+        label: ko.settings.themeEditor.families.highlightSurface,
         role: "accentSurface",
         roles: ["accentSurface", "accentSurfaceForeground", "toolbarControlHover"],
       },
       {
         id: "accent",
-        label: "Accent",
+        label: ko.settings.themeEditor.families.accent,
         role: "accent",
         roles: [
           "accent",
@@ -149,19 +160,19 @@ const THEME_EDITOR_ROLE_GROUPS: ReadonlyArray<{
       },
       {
         id: "action",
-        label: "Action",
+        label: ko.settings.themeEditor.families.action,
         role: "messageAction",
         roles: ["messageAction", "messageActionForeground", "messageActionHover"],
       },
       {
         id: "message-surface",
-        label: "Message surface",
+        label: ko.settings.themeEditor.families.messageSurface,
         role: "messageSurface",
         roles: ["messageSurface", "messageForeground"],
       },
       {
         id: "code-surface",
-        label: "Code surface",
+        label: ko.settings.themeEditor.families.codeSurface,
         role: "codeBackground",
         roles: ["codeBackground", "codeForeground"],
       },
@@ -169,29 +180,29 @@ const THEME_EDITOR_ROLE_GROUPS: ReadonlyArray<{
   },
   {
     id: "context",
-    title: "Context",
+    title: ko.settings.themeEditor.families.context,
     families: [
       {
         id: "sidebar-background",
-        label: "Sidebar background",
+        label: ko.settings.themeEditor.families.sidebarBackground,
         role: "sidebar",
         roles: ["sidebar", "sidebarForeground"],
       },
       {
         id: "sidebar-controls",
-        label: "Sidebar controls",
+        label: ko.settings.themeEditor.families.sidebarControls,
         role: "sidebarControlSurface",
         roles: ["sidebarControlSurface"],
       },
       {
         id: "sidebar-selection",
-        label: "Sidebar selection",
+        label: ko.settings.themeEditor.families.sidebarSelection,
         role: "sidebarRowSelected",
         roles: ["sidebarRowHover", "sidebarRowActive", "sidebarRowSelected"],
       },
       {
         id: "terminal-background",
-        label: "Terminal background",
+        label: ko.settings.themeEditor.families.terminalBackground,
         role: "terminalBackground",
         roles: [
           "terminalBackground",
@@ -205,17 +216,17 @@ const THEME_EDITOR_ROLE_GROUPS: ReadonlyArray<{
   },
   {
     id: "status",
-    title: "Status",
+    title: ko.settings.themeEditor.families.status,
     families: [
       {
         id: "error",
-        label: "Error",
+        label: ko.settings.themeEditor.families.error,
         role: "error",
         roles: ["error", "errorForeground", "errorSurface"],
       },
       {
         id: "warning",
-        label: "Warning",
+        label: ko.settings.themeEditor.families.warning,
         role: "warning",
         roles: ["warning", "warningForeground", "warningSurface"],
       },
@@ -442,10 +453,16 @@ export function ThemeEditorPanel({
   // had it (adding one is a create-with-same-name away).
   const appearanceLockReason = (appearance: ThemeAppearance): string | null => {
     if (editableAppearances && !editableAppearances.includes(appearance)) {
-      return `“${editingTheme?.label}” has no ${appearance} palette. Create a theme with the same name to add one.`;
+      return ko.settings.themeEditor.noPalette(
+        editingTheme?.label,
+        appearance === "light" ? ko.settings.appearance.light : ko.settings.appearance.dark,
+      );
     }
     if (!isEditing && takenAppearances.includes(appearance)) {
-      return `“${mergeTarget?.label}” already has a ${appearance} palette.`;
+      return ko.settings.themeEditor.hasPalette(
+        mergeTarget?.label,
+        appearance === "light" ? ko.settings.appearance.light : ko.settings.appearance.dark,
+      );
     }
     return null;
   };
@@ -769,7 +786,7 @@ export function ThemeEditorPanel({
 
   const handleSubmit = () => {
     if (!name.trim()) {
-      setError("Name your theme first.");
+      setError(ko.settings.themeEditor.nameRequired);
       return;
     }
 
@@ -798,7 +815,12 @@ export function ThemeEditorPanel({
         const editedModes = getThemeModes(editingTheme);
         const collision = editedModes.find((mode) => takenAppearances.includes(mode));
         if (collision) {
-          setError(`“${mergeTarget.label}” already has a ${collision} palette. Pick another name.`);
+          setError(
+            ko.settings.themeEditor.paletteCollision(
+              mergeTarget.label,
+              collision === "light" ? ko.settings.appearance.light : ko.settings.appearance.dark,
+            ),
+          );
           return;
         }
         mergedAppearance = editedModes[0] ?? null;
@@ -850,9 +872,7 @@ export function ThemeEditorPanel({
         });
       } else if (mergeTarget) {
         if (takenAppearances.includes(activeAppearance)) {
-          setError(
-            `“${mergeTarget.label}” already has light and dark palettes. Pick another name.`,
-          );
+          setError(ko.settings.themeEditor.bothPalettesTaken(mergeTarget.label));
           return;
         }
         // The new palette joins the existing theme as its other mode; its
@@ -909,7 +929,7 @@ export function ThemeEditorPanel({
             // Storage is failing wholesale; the error below covers it.
           }
         }
-        setError("Theme saved, but it could not be made active. Try again.");
+        setError(ko.settings.themeEditor.savedNotActive);
         return;
       }
       onOpenChange(false);
@@ -918,15 +938,15 @@ export function ThemeEditorPanel({
         cause instanceof Error
           ? cause.message
           : isEditing
-            ? "Could not save the theme."
-            : "Could not create the theme.",
+            ? ko.settings.themeEditor.saveFailed
+            : ko.settings.themeEditor.createFailed,
       );
     }
   };
 
   const renderNameField = () => (
     <label className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-3">
-      <span className="text-sm font-medium">Theme name</span>
+      <span className="text-sm font-medium">{ko.settings.themeEditor.themeName}</span>
       <Input
         autoFocus
         size="sm"
@@ -936,7 +956,9 @@ export function ThemeEditorPanel({
           // the stale message goes with the old name.
           setError(null);
         }}
-        placeholder={isEditing ? "Theme name" : "e.g. Aurora"}
+        placeholder={
+          isEditing ? ko.settings.themeEditor.themeName : ko.settings.themeEditor.namePlaceholder
+        }
         value={name}
       />
     </label>
@@ -952,7 +974,7 @@ export function ThemeEditorPanel({
         value={appearance}
         className={lockReason !== null ? "opacity-50" : undefined}
       >
-        {appearance === "light" ? "Light" : "Dark"}
+        {appearance === "light" ? ko.settings.appearance.light : ko.settings.appearance.dark}
       </Toggle>
     );
     if (lockReason === null) return button;
@@ -966,9 +988,9 @@ export function ThemeEditorPanel({
 
   const renderAppearanceButtons = () => (
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-3">
-      <span className="text-sm font-medium">Appearance</span>
+      <span className="text-sm font-medium">{ko.settings.themeEditor.appearance}</span>
       <ToggleGroup
-        aria-label="Theme appearance"
+        aria-label={ko.settings.themeEditor.themeAppearance}
         variant="segmented"
         value={[activeAppearance]}
         onValueChange={(next) => {
@@ -990,26 +1012,26 @@ export function ThemeEditorPanel({
   const renderColorsHeader = () => (
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-start gap-3">
       <div>
-        <h3 className="text-sm font-medium">Colors</h3>
+        <h3 className="text-sm font-medium">{ko.settings.themeEditor.colors}</h3>
         {isAdvanced ? null : (
-          <p className="text-xs text-muted-foreground">Two colors, rest derived</p>
+          <p className="text-xs text-muted-foreground">{ko.settings.themeEditor.twoColorsHint}</p>
         )}
       </div>
       <div className="flex min-w-0 items-start gap-3">
         {isAdvanced ? (
           <Input
-            aria-label="Filter colors"
+            aria-label={ko.settings.themeEditor.filterColors}
             className="min-w-0 flex-1"
             onChange={(event) => setRoleQuery(event.currentTarget.value)}
-            placeholder="Filter colors"
+            placeholder={ko.settings.themeEditor.filterColors}
             size="sm"
             value={roleQuery}
           />
         ) : null}
         <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-2 pt-0.5 text-sm font-medium">
-          <span>Advanced</span>
+          <span>{ko.settings.themeEditor.advanced}</span>
           <Switch
-            aria-label="Use advanced theme colors"
+            aria-label={ko.settings.themeEditor.advancedColorsToggle}
             checked={isAdvanced}
             onCheckedChange={(checked) => handleAdvancedChange(Boolean(checked))}
           />
@@ -1059,7 +1081,9 @@ export function ThemeEditorPanel({
             {renderRoleFields(group.families, "grid gap-1")}
           </section>
         ))}
-        {groups.length === 0 ? <p className="text-xs text-muted-foreground">No matches.</p> : null}
+        {groups.length === 0 ? (
+          <p className="text-xs text-muted-foreground">{ko.settings.themeEditor.noMatches}</p>
+        ) : null}
       </div>
     ) : (
       <div className="grid gap-1">
@@ -1070,7 +1094,11 @@ export function ThemeEditorPanel({
             onSelect={selectThemeRole}
             onToggleSelected={toggleThemeRole}
             role={role}
-            label={role === "canvas" ? "Background" : "Accent"}
+            label={
+              role === "canvas"
+                ? ko.settings.themeEditor.families.background
+                : ko.settings.themeEditor.families.accent
+            }
             selected={selectedRole === role}
             value={colorsByAppearance[activeAppearance][role]}
           />
@@ -1156,7 +1184,9 @@ export function ThemeEditorPanel({
 
   return (
     <div
-      aria-label={isEditing ? "Edit theme" : "Create theme"}
+      aria-label={
+        isEditing ? ko.settings.themeEditor.editTheme : ko.settings.themeEditor.createTheme
+      }
       className={cn(
         "dialog-glass fixed z-(--layer-inspector-panel) flex max-h-[min(42rem,calc(100dvh-6rem))] w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border text-popover-foreground",
         position === null && "bottom-4 right-4",
@@ -1182,15 +1212,21 @@ export function ThemeEditorPanel({
       >
         <div className="flex min-w-0 flex-1 items-baseline gap-2">
           <h2 className="shrink-0 truncate text-sm font-medium">
-            {isEditing ? "Edit theme" : "Create theme"}
+            {isEditing ? ko.settings.themeEditor.editTheme : ko.settings.themeEditor.createTheme}
           </h2>
           {isMinimized ? null : (
             <p className="truncate text-xs text-muted-foreground">
               {isInspecting
-                ? "Select an element · Esc to cancel"
+                ? ko.settings.themeEditor.inspectingHint
                 : selectedRole
-                  ? `${isAdvanced ? (getThemeEditorColorFamily(selectedRole)?.label ?? getThemeRoleLabel(selectedRole)) : getThemeRoleLabel(selectedRole)} · ${usageCount ?? 0} ${usageCount === 1 ? "use" : "uses"}`
-                  : "Select a color below"}
+                  ? ko.settings.themeEditor.usage(
+                      isAdvanced
+                        ? (getThemeEditorColorFamily(selectedRole)?.label ??
+                            getThemeRoleLabel(selectedRole))
+                        : getThemeRoleLabel(selectedRole),
+                      usageCount ?? 0,
+                    )
+                  : ko.settings.themeEditor.selectColorBelow}
             </p>
           )}
         </div>
@@ -1198,7 +1234,11 @@ export function ThemeEditorPanel({
           <TooltipTrigger
             render={
               <Button
-                aria-label={isInspecting ? "Cancel inspecting app colors" : "Inspect app colors"}
+                aria-label={
+                  isInspecting
+                    ? ko.settings.themeEditor.cancelInspectAppColors
+                    : ko.settings.themeEditor.inspectAppColors
+                }
                 aria-pressed={isInspecting}
                 size="xs"
                 variant={isInspecting ? "secondary" : "ghost"}
@@ -1211,16 +1251,20 @@ export function ThemeEditorPanel({
                 }}
               >
                 <MousePointer2Icon />
-                {isInspecting ? "Cancel" : "Inspect"}
+                {isInspecting ? ko.common.cancel : ko.settings.themeEditor.inspect}
               </Button>
             }
           />
           <TooltipPopup data-theme-editor-panel="">
-            {isInspecting ? "Cancel and clear the selection" : "Pick a color from the app"}
+            {isInspecting
+              ? ko.settings.themeEditor.cancelAndClear
+              : ko.settings.themeEditor.pickFromApp}
           </TooltipPopup>
         </Tooltip>
         <Button
-          aria-label={isMinimized ? "Expand the theme editor" : "Minimize the theme editor"}
+          aria-label={
+            isMinimized ? ko.settings.themeEditor.expand : ko.settings.themeEditor.minimize
+          }
           data-icon-control=""
           size="icon-xs"
           variant="ghost"
@@ -1229,7 +1273,7 @@ export function ThemeEditorPanel({
           {isMinimized ? <ChevronUpIcon /> : <ChevronDownIcon />}
         </Button>
         <Button
-          aria-label="Close the theme editor"
+          aria-label={ko.settings.themeEditor.close}
           data-icon-control=""
           size="icon-xs"
           variant="ghost"
@@ -1258,24 +1302,28 @@ export function ThemeEditorPanel({
           </div>
           <div className="flex items-center justify-end gap-2 border-t border-border/70 px-3 py-2">
             <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
+              {ko.common.cancel}
             </Button>
             <Button disabled={!name.trim()} size="sm" onClick={handleSubmit}>
               {isEditing ? (
                 mergeTarget ? (
-                  `Merge into “${mergeTarget.label}”`
+                  ko.settings.themeEditor.mergeInto(mergeTarget.label)
                 ) : (
-                  "Save changes"
+                  ko.settings.themeEditor.saveChanges
                 )
               ) : mergeTarget ? (
                 <>
                   <PlusIcon />
-                  {`Add ${activeAppearance} palette`}
+                  {ko.settings.themeEditor.addPalette(
+                    activeAppearance === "light"
+                      ? ko.settings.appearance.light
+                      : ko.settings.appearance.dark,
+                  )}
                 </>
               ) : (
                 <>
                   <PaintbrushIcon />
-                  Create theme
+                  {ko.settings.themeEditor.createTheme}
                 </>
               )}
             </Button>

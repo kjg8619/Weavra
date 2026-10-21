@@ -30,6 +30,7 @@ import {
   keybindingValueForCommand,
   decodeProjectScriptKeybindingRule,
 } from "~/lib/projectScriptKeybindings";
+import { ko } from "~/i18n/ko";
 import { keybindingFromKeyboardEvent } from "~/components/settings/KeybindingsSettings.logic";
 import { commandForProjectScript, nextProjectScriptId } from "~/projectScripts";
 import {
@@ -58,12 +59,12 @@ import { Switch } from "./ui/switch";
 import { Textarea } from "./ui/textarea";
 
 const SCRIPT_ICONS: Array<{ id: ProjectScriptIcon; label: string }> = [
-  { id: "play", label: "Play" },
-  { id: "test", label: "Test" },
-  { id: "lint", label: "Lint" },
-  { id: "configure", label: "Configure" },
-  { id: "build", label: "Build" },
-  { id: "debug", label: "Debug" },
+  { id: "play", label: ko.projects.scriptEditor.iconPlay },
+  { id: "test", label: ko.projects.scriptEditor.iconTest },
+  { id: "lint", label: ko.projects.scriptEditor.iconLint },
+  { id: "configure", label: ko.projects.scriptEditor.iconConfigure },
+  { id: "build", label: ko.projects.scriptEditor.iconBuild },
+  { id: "debug", label: ko.projects.scriptEditor.iconDebug },
 ];
 
 export function ScriptIcon({
@@ -230,7 +231,7 @@ export function ProjectScriptEditorDialog({
     if (!request || pendingSubmissionRef.current !== null) return;
     const trimmedName = name.trim();
     const trimmedCommand = command.trim();
-    setValidationError(trimmedName.length === 0 ? "Name is required." : null);
+    setValidationError(trimmedName.length === 0 ? ko.projects.scriptEditor.nameRequired : null);
     setCommandError(trimmedCommand.length === 0 ? "실행할 명령을 입력해 주세요." : null);
     if (trimmedCommand.length === 0) {
       commandRef.current?.focus();
@@ -262,7 +263,9 @@ export function ProjectScriptEditorDialog({
         autoOpenPreview: trimmedPreviewUrl.length > 0 ? autoOpenPreview : false,
       } satisfies NewProjectScriptInput;
     } catch (error) {
-      setValidationError(error instanceof Error ? error.message : "Failed to save action.");
+      setValidationError(
+        error instanceof Error ? error.message : ko.projects.scriptEditor.saveFailed,
+      );
       return;
     }
 
@@ -276,7 +279,9 @@ export function ProjectScriptEditorDialog({
         if (result._tag === "Failure") {
           if (!isAtomCommandInterrupted(result)) {
             const error = squashAtomCommandFailure(result);
-            setValidationError(error instanceof Error ? error.message : "Failed to save action.");
+            setValidationError(
+              error instanceof Error ? error.message : ko.projects.scriptEditor.saveFailed,
+            );
           }
         } else {
           close();
@@ -284,7 +289,9 @@ export function ProjectScriptEditorDialog({
       }
     } catch (error) {
       if (pendingSubmissionRef.current === submission) {
-        setValidationError(error instanceof Error ? error.message : "Failed to save action.");
+        setValidationError(
+          error instanceof Error ? error.message : ko.projects.scriptEditor.saveFailed,
+        );
       }
     }
     if (pendingSubmissionRef.current === submission) {
@@ -305,16 +312,18 @@ export function ProjectScriptEditorDialog({
       >
         <DialogPopup className="break-keep text-pretty">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Action" : "Add Action"}</DialogTitle>
+            <DialogTitle>
+              {isEditing ? ko.projects.scriptEditor.editTitle : ko.projects.scriptEditor.addTitle}
+            </DialogTitle>
             <DialogDescription className="text-foreground">
-              Actions are project-scoped commands you can run from the top bar or keybindings.
+              {ko.projects.scriptEditor.description}
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <form id={formId} onSubmit={submit}>
               <fieldset className="space-y-4" disabled={isSaving}>
                 <div className="space-y-1.5">
-                  <Label htmlFor="script-name">Name</Label>
+                  <Label htmlFor="script-name">{ko.projects.scriptEditor.nameLabel}</Label>
                   <div className="flex items-center gap-2">
                     <Popover onOpenChange={setIconPickerOpen} open={iconPickerOpen}>
                       <PopoverTrigger
@@ -323,7 +332,7 @@ export function ProjectScriptEditorDialog({
                             type="button"
                             variant="outline"
                             className="size-9 shrink-0 border-foreground/60! hover:bg-popover active:bg-popover data-pressed:bg-popover data-pressed:shadow-xs/5 data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] dark:bg-white/[0.035] dark:data-pressed:before:shadow-none"
-                            aria-label="Choose icon"
+                            aria-label={ko.projects.scriptEditor.chooseIcon}
                             data-icon-control=""
                             ref={iconTriggerRef}
                           />
@@ -367,29 +376,33 @@ export function ProjectScriptEditorDialog({
                     <Input
                       id="script-name"
                       autoFocus
-                      placeholder="Test"
+                      placeholder={ko.projects.scriptEditor.namePlaceholder}
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                     />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="script-keybinding">Keybinding</Label>
+                  <Label htmlFor="script-keybinding">
+                    {ko.projects.scriptEditor.keybindingLabel}
+                  </Label>
                   <Input
                     id="script-keybinding"
-                    placeholder="Press shortcut"
+                    placeholder={ko.projects.scriptEditor.keybindingPlaceholder}
                     value={keybinding}
                     readOnly
                     onKeyDown={captureKeybinding}
                   />
                   <p className="text-sm text-foreground">
-                    Press a shortcut. Use <code>Backspace</code> to clear. Shortcuts are
-                    environment-wide. Projects using the same action share its shortcut.
+                    {ko.projects.scriptEditor.keybindingHintBefore}
+                    <code>Backspace</code>
+                    {ko.projects.scriptEditor.keybindingHintAfter}
                   </p>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="script-command">
-                    Command <span className="font-normal text-foreground">(필수)</span>
+                    {ko.projects.scriptEditor.commandLabel}{" "}
+                    <span className="font-normal text-foreground">(필수)</span>
                   </Label>
                   <p
                     id="script-command-hint"
@@ -426,7 +439,9 @@ export function ProjectScriptEditorDialog({
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="script-preview-url">Preview URL (optional)</Label>
+                  <Label htmlFor="script-preview-url">
+                    {ko.projects.scriptEditor.previewUrlLabel}
+                  </Label>
                   <Input
                     id="script-preview-url"
                     placeholder="http://localhost:5173"
@@ -434,18 +449,18 @@ export function ProjectScriptEditorDialog({
                     onChange={(event) => setPreviewUrl(event.target.value)}
                   />
                   <p className="text-sm text-foreground">
-                    Open this URL in the in-app preview when this action runs.
+                    {ko.projects.scriptEditor.previewUrlHint}
                   </p>
                 </div>
                 <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
-                  <span>Run automatically on worktree creation</span>
+                  <span>{ko.projects.scriptEditor.runOnWorktreeCreate}</span>
                   <Switch
                     checked={runOnWorktreeCreate}
                     onCheckedChange={(checked) => setRunOnWorktreeCreate(Boolean(checked))}
                   />
                 </label>
                 <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm text-foreground dark:border-transparent dark:bg-white/[0.035]">
-                  <span>Wait for it to finish before the agent starts</span>
+                  <span>{ko.projects.scriptEditor.waitForSetup}</span>
                   <Switch
                     checked={waitForSetup}
                     disabled={!runOnWorktreeCreate}
@@ -453,7 +468,7 @@ export function ProjectScriptEditorDialog({
                   />
                 </label>
                 <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm text-foreground dark:border-transparent dark:bg-white/[0.035]">
-                  <span>Open preview automatically when this action runs</span>
+                  <span>{ko.projects.scriptEditor.autoOpenPreview}</span>
                   <Switch
                     checked={autoOpenPreview}
                     disabled={previewUrl.trim().length === 0}
@@ -475,7 +490,7 @@ export function ProjectScriptEditorDialog({
                 disabled={isSaving}
                 onClick={() => setDeleteConfirmOpen(true)}
               >
-                Delete
+                {ko.common.delete}
               </Button>
             )}
             <Button
@@ -484,7 +499,7 @@ export function ProjectScriptEditorDialog({
               className="min-h-8 border-foreground/60! px-3 active:scale-100!"
               onClick={close}
             >
-              Cancel
+              {ko.common.cancel}
             </Button>
             <Button
               form={formId}
@@ -492,7 +507,11 @@ export function ProjectScriptEditorDialog({
               className="min-h-8 px-3 hover:bg-primary! active:scale-100! data-pressed:bg-primary! disabled:opacity-100"
               disabled={isSaving}
             >
-              {isSaving ? "Saving…" : isEditing ? "Save changes" : "Save action"}
+              {isSaving
+                ? ko.common.saving
+                : isEditing
+                  ? ko.projects.scriptEditor.saveChanges
+                  : ko.projects.scriptEditor.saveAction}
             </Button>
           </DialogFooter>
         </DialogPopup>
@@ -501,11 +520,15 @@ export function ProjectScriptEditorDialog({
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete action "{name}"?</AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>{ko.projects.scriptEditor.deleteConfirmTitle(name)}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {ko.projects.scriptEditor.deleteConfirmDescription}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {ko.common.cancel}
+            </AlertDialogClose>
             <Button
               variant="destructive"
               disabled={isSaving}
@@ -516,7 +539,7 @@ export function ProjectScriptEditorDialog({
                 onDelete(request.scriptId);
               }}
             >
-              Delete action
+              {ko.projects.scriptEditor.deleteAction}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

@@ -1,4 +1,5 @@
 import { DEFAULT_CLIENT_SETTINGS, type DesktopSnapShotState } from "@t3tools/contracts";
+import { ko } from "~/i18n/ko";
 import { expect, it } from "vite-plus/test";
 import {
   captureSetupAccessReady,
@@ -119,7 +120,7 @@ it("offers manual capture on an unsupported GNOME version instead of trapping se
   expect(captureSetupBackend(state)).toBe("picker");
   expect(captureSetupAccessReady(state)).toBe(true);
   expect(captureSetupInitialStep(state)).toBe("access");
-  expect(captureSetupCheckMessage(state)).toContain("choose a window each time");
+  expect(captureSetupCheckMessage(state)).toBe(ko.settings.snapshotSetupChecks.pickerReady);
 });
 
 it.each(["not-installed", "update-required", "error"] as const)(
@@ -199,33 +200,33 @@ it("acknowledges an unchanged recheck while GNOME still needs a sign-out", () =>
     ...gnome,
     gnomeExtension: { status: "restart-required" as const, message: "Sign out" },
   };
-  expect(captureSetupCheckMessage(state)).toBe("Still waiting for you to sign out and back in.");
+  expect(captureSetupCheckMessage(state)).toBe(ko.settings.snapshotSetupChecks.waitingForSignOut);
   expect(captureSetupAccessReady(state)).toBe(false);
 });
 
 it("only confirms capture access when the rechecked extension is running and reachable", () => {
-  expect(captureSetupCheckMessage(gnome)).toBe("Ready. Continue to choose your shortcut.");
+  expect(captureSetupCheckMessage(gnome)).toBe(ko.settings.snapshotSetupChecks.ready);
   expect(captureSetupCheckMessage({ ...gnome, linuxBackend: "picker" })).toBe(
-    "Not ready yet. Finish the step above.",
+    ko.settings.snapshotSetupChecks.notReady,
   );
   expect(
     captureSetupCheckMessage({
       ...gnome,
       gnomeExtension: { status: "disabled", message: "Enable it" },
     }),
-  ).toBe("Not ready yet. Finish the step above.");
+  ).toBe(ko.settings.snapshotSetupChecks.notReady);
 });
 
 it("does not report a successful check when capture support could not be read", () => {
   expect(captureSetupCheckMessage({ ...gnome, message: "Desktop disconnected" })).toContain(
-    "Still unable to check access",
+    ko.settings.snapshotSetupChecks.unableToCheck,
   );
   expect(
     captureSetupCheckMessage({
       ...gnome,
       gnomeExtension: { status: "error", message: "Could not read extension state" },
     }),
-  ).toContain("Still unable to check access");
+  ).toContain(ko.settings.snapshotSetupChecks.unableToCheck);
 });
 
 it("uses a capable portal without requiring the optional GNOME extension", () => {
@@ -242,7 +243,7 @@ it("uses a capable portal without requiring the optional GNOME extension", () =>
       ...state,
       gnomeExtension: { status: "error", message: "Optional extension failed" },
     }),
-  ).toBe("Ready. Continue to choose your shortcut.");
+  ).toBe(ko.settings.snapshotSetupChecks.ready);
 });
 
 it("lets Niri setup finish with configuration instructions without claiming the binding was verified", () => {
@@ -337,5 +338,5 @@ it.each(["kde", "hyprland"] as const)("ignores errors from inactive helpers on %
     hyprlandHelper: { status: backend === "hyprland" ? "ready" : "error", message: "Hyprland" },
   };
   expect(captureSetupAccessReady(state)).toBe(true);
-  expect(captureSetupCheckMessage(state)).toBe("Ready. Continue to choose your shortcut.");
+  expect(captureSetupCheckMessage(state)).toBe(ko.settings.snapshotSetupChecks.ready);
 });

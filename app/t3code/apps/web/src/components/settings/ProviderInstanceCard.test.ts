@@ -9,6 +9,7 @@ import {
 } from "@t3tools/contracts";
 
 import { deriveProviderModelsForDisplay, ProviderInstanceCard } from "./ProviderInstanceCard";
+import { ko } from "~/i18n/ko";
 
 describe("deriveProviderModelsForDisplay", () => {
   it("uses current config custom models instead of stale live custom rows", () => {
@@ -116,8 +117,8 @@ describe("deriveProviderModelsForDisplay", () => {
       }),
     );
 
-    expect(markup).toContain("Authenticated as");
-    expect(markup).toContain('aria-label="Toggle account email visibility"');
+    expect(markup).toContain(ko.providers.card.authenticatedAs);
+    expect(markup).toContain(`aria-label="${ko.providers.card.toggleEmailVisibility}"`);
     expect(markup).toContain("blur-[2px]");
     expect(markup).not.toContain("developer@example.com");
   });
@@ -156,7 +157,7 @@ describe("deriveProviderModelsForDisplay", () => {
 
     for (const mode of ["list", "editor"] as const) {
       const markup = renderToStaticMarkup(createElement(ProviderInstanceCard, { ...props, mode }));
-      expect(markup).toContain("Unavailable");
+      expect(markup).toContain(ko.common.unavailable);
       expect(markup).toContain("is not a symlink");
     }
   });

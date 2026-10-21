@@ -38,6 +38,7 @@ import {
   type WorktreeSetupSnapshot,
 } from "@t3tools/contracts";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
+import { ko } from "~/i18n/ko";
 
 const TIMELINE_MINIMAP_ITEM_SPACING = 8;
 export const TIMELINE_MINIMAP_MIN_ITEMS = 2;
@@ -64,7 +65,7 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
     const path = formatWorkspaceRelativePath(firstPath, workspaceRoot);
     return entry.changedFiles!.length === 1
       ? path
-      : `${path} +${entry.changedFiles!.length - 1} more`;
+      : ko.chat.timeline.moreFiles(path, entry.changedFiles!.length - 1);
   }
   const heading = normalizeCompactToolLabel(entry.toolTitle || entry.label);
   return `${heading.charAt(0).toUpperCase()}${heading.slice(1)}`;
@@ -83,17 +84,16 @@ export function liveWorkEntryLabel(
   if (toolPresentation) return toolPresentation.displayName;
   const command = entry.command?.trim();
   if (command) {
-    const verb =
-      status === "inProgress"
-        ? "Running"
-        : status === "failed"
-          ? "Failed"
-          : status === "declined"
-            ? "Declined"
-            : status === "stopped"
-              ? "Stopped"
-              : "Ran";
-    return `${verb} ${commandProgramName(command) ?? "command"}`;
+    const program = commandProgramName(command) ?? ko.chat.timeline.commandFallback;
+    return status === "inProgress"
+      ? ko.chat.timeline.commandRunning(program)
+      : status === "failed"
+        ? ko.chat.timeline.commandFailed(program)
+        : status === "declined"
+          ? ko.chat.timeline.commandDeclined(program)
+          : status === "stopped"
+            ? ko.chat.timeline.commandStopped(program)
+            : ko.chat.timeline.commandRan(program);
   }
   return workEntryDisplayLabel(entry, workspaceRoot);
 }
@@ -786,11 +786,11 @@ function deriveTurnFolds(input: {
     const duration = elapsedMs !== null ? formatDuration(elapsedMs) : null;
     const label = isLatestInterruptedTurn
       ? duration
-        ? `You stopped after ${duration}`
-        : "이 응답을 직접 중지했어요"
+        ? ko.chat.timeline.stoppedAfter(duration)
+        : ko.chat.timeline.stoppedByUser
       : duration
-        ? `Worked for ${duration}`
-        : "Worked";
+        ? ko.chat.timeline.workedFor(duration)
+        : ko.chat.timeline.worked;
 
     foldsByAnchorEntryId.set(firstHiddenEntry.id, {
       turnId,

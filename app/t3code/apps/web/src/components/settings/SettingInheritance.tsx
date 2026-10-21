@@ -6,6 +6,7 @@ import {
 import { CheckIcon, LayersIcon } from "lucide-react";
 import * as Equal from "effect/Equal";
 
+import { ko } from "~/i18n/ko";
 import { cn } from "../../lib/utils";
 import type { EnvironmentPresentation } from "../../state/environments";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
@@ -25,30 +26,30 @@ interface InheritanceLayer {
   readonly set: boolean;
 }
 
+const copy = ko.settings.inheritance;
+
 const WRITING_STYLE_LABELS: Record<string, string> = {
-  repo_conventions: "Repository conventions",
-  conventional_commits: "Conventional Commits",
-  custom: "Custom instructions",
+  repo_conventions: copy.writingStyles.repoConventions,
+  conventional_commits: copy.writingStyles.conventionalCommits,
+  custom: copy.writingStyles.custom,
 };
 
 /** Human labels for the values the chain can show; falls back to a type summary. */
 function formatValue(key: keyof ServerSettings, value: unknown): string {
   if (value === null || value === undefined) {
     return key === "pullRequestMergeMethod"
-      ? "Last selected"
+      ? copy.lastSelected
       : key === "sidebarAutoSettleAfterDays"
-        ? "Never"
+        ? copy.never
         : key === "defaultModelSelection"
-          ? "Automatic"
+          ? copy.automatic
           : key === "sourceControlWriterModelSelection"
-            ? "Text generation model"
-            : "Not set";
+            ? copy.textGenerationModel
+            : copy.notSet;
   }
-  if (typeof value === "boolean") return value ? "On" : "Off";
+  if (typeof value === "boolean") return value ? ko.common.on : ko.common.off;
   if (typeof value === "number") {
-    return key === "sidebarAutoSettleAfterDays"
-      ? `${value} ${value === 1 ? "day" : "days"}`
-      : String(value);
+    return key === "sidebarAutoSettleAfterDays" ? copy.days(value) : String(value);
   }
   if (typeof value === "string") {
     if (key === "defaultThreadEnvMode" && (value === "local" || value === "worktree")) {
@@ -59,16 +60,16 @@ function formatValue(key: keyof ServerSettings, value: unknown): string {
         value as keyof typeof PULL_REQUEST_MERGE_METHOD_LABELS
       ];
     }
-    return value === "" ? "Empty" : value;
+    return value === "" ? copy.empty : value;
   }
-  if (Array.isArray(value)) return `${value.length} ${value.length === 1 ? "item" : "items"}`;
+  if (Array.isArray(value)) return copy.items(value.length);
   if (typeof value === "object") {
     if ("model" in value && typeof value.model === "string") return value.model;
     if ("mode" in value && typeof value.mode === "string") {
       return WRITING_STYLE_LABELS[value.mode] ?? value.mode;
     }
   }
-  return "Custom";
+  return copy.custom;
 }
 
 /**
@@ -89,8 +90,8 @@ export function settingInheritanceLayers(
   if (target.projectId !== null && isProjectScopedSettingKey(key)) {
     layers.push({
       key: "project",
-      label: "Project",
-      value: projectSource === "project" ? formatValue(key, target.settings[key]) : "Inherits",
+      label: ko.common.project,
+      value: projectSource === "project" ? formatValue(key, target.settings[key]) : copy.inherits,
       effective: projectSource === "project",
       set: projectSource === "project",
     });
@@ -98,13 +99,13 @@ export function settingInheritanceLayers(
   layers.push({
     key: "environment",
     label: target.label,
-    value: environmentSet ? formatValue(key, environmentValue) : "Inherits",
+    value: environmentSet ? formatValue(key, environmentValue) : copy.inherits,
     effective: projectSource !== "project" && environmentSet,
     set: environmentSet,
   });
   layers.push({
     key: "built-in",
-    label: "Default",
+    label: ko.common.default,
     value: formatValue(key, builtIn),
     effective: projectSource !== "project" && !environmentSet,
     set: true,
@@ -152,7 +153,7 @@ export function SettingInheritance({
   if (!key || targets.length === 0) return null;
   const overrideSummary =
     overridingProjects.length > 0
-      ? `${summary} · ${overridingProjects.length} project ${overridingProjects.length === 1 ? "override" : "overrides"}`
+      ? copy.overrideSummary(summary, overridingProjects.length)
       : summary;
   const chains = targets.flatMap((target) => {
     const environment = environments.find(
@@ -178,7 +179,7 @@ export function SettingInheritance({
                 <Button
                   size="icon-micro"
                   variant="ghost-muted"
-                  aria-label={`${overrideSummary}. Show where this value comes from`}
+                  aria-label={copy.showSource(overrideSummary)}
                   className={cn(
                     "[--control-icon-color:currentColor]",
                     state === "overridden"
@@ -228,7 +229,7 @@ export function SettingInheritance({
                         layer.effective ? "font-medium text-foreground" : "text-muted-foreground",
                       )}
                     >
-                      {layer.key === "environment" ? "Environment" : layer.label}
+                      {layer.key === "environment" ? copy.environment : layer.label}
                     </span>
                     <span
                       className={cn(
@@ -259,13 +260,13 @@ export function SettingInheritance({
                 return (
                   <div className="mt-2 border-t border-border/60 pt-2">
                     <div className="flex items-center justify-between gap-3 px-2 text-xs text-muted-foreground">
-                      <span>Overridden by</span>
+                      <span>{copy.overriddenBy}</span>
                       {onClearOverrides ? (
                         <InlineButton
                           className="font-medium text-foreground underline-offset-2 hover:underline"
                           onClick={() => onClearOverrides(overriding)}
                         >
-                          Reset {overriding.length === 1 ? "it" : "all"}
+                          {overriding.length === 1 ? copy.resetOne : copy.resetAll}
                         </InlineButton>
                       ) : null}
                     </div>

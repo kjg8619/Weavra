@@ -18,6 +18,9 @@ import { updateDeviceHosts } from "./deviceHostsSettings.logic";
 import { DeviceHostEditor } from "./DeviceHostEditor";
 import { useHostConnectionChecks } from "./useHostConnectionChecks";
 import { deviceHostConnectionKey } from "./deviceHostConnectionChecks";
+import { ko } from "~/i18n/ko";
+
+const copy = ko.settings.deviceHosts;
 
 export function DeviceHostsSettings(props: { environmentId: EnvironmentId | null }) {
   const { scope, environments, connectedEnvironments } = useSettingsScope();
@@ -65,8 +68,10 @@ export function DeviceHostsSettings(props: { environmentId: EnvironmentId | null
       } else {
         toastManager.add({
           type: "error",
-          title: "Device hosts not saved on all environments",
-          description: `Could not update ${failed.map((environment) => environment.label).join(", ")}.`,
+          title: copy.saveFailedTitle,
+          description: copy.saveFailedDescription(
+            failed.map((environment) => environment.label).join(", "),
+          ),
         });
       }
     } finally {
@@ -76,10 +81,10 @@ export function DeviceHostsSettings(props: { environmentId: EnvironmentId | null
   return (
     <SettingsRow
       id="device-hosts"
-      title="Device hosts"
+      title={copy.title}
       serverScoped
       settingKeys={["deviceHosts"]}
-      description="Add remote machines with simulator or emulator runtimes installed, and the selected environments will connect over SSH and set up device tools automatically."
+      description={copy.description}
       control={
         <Button
           size="sm"
@@ -90,15 +95,13 @@ export function DeviceHostsSettings(props: { environmentId: EnvironmentId | null
             setEditing({ id: randomUUID(), label: "", target: "" });
           }}
         >
-          <PlusIcon className="size-3.5" /> Add host
+          <PlusIcon className="size-3.5" /> {copy.addHost}
         </Button>
       }
     >
       <div className="pt-3 pb-2">
         {!props.environmentId ? (
-          <p className="text-sm text-muted-foreground">
-            Connect a selected environment to manage device hosts.
-          </p>
+          <p className="text-sm text-muted-foreground">{copy.connectToManage}</p>
         ) : (
           <>
             {connectedEnvironments.map((environment) => (
@@ -122,11 +125,13 @@ export function DeviceHostsSettings(props: { environmentId: EnvironmentId | null
                     toastManager.add({
                       type: failed.length ? "error" : "success",
                       title: failed.length
-                        ? `${host.label}: ${failed.length} of ${targets.length} environments failed`
-                        : `${host.label}: connection checks passed`,
+                        ? copy.checkFailedTitle(host.label, failed.length, targets.length)
+                        : copy.checkPassedTitle(host.label),
                       description: failed.length
-                        ? `Could not connect from ${failed.map((target) => target.label).join(", ")}.`
-                        : "Connected or already available locally on each selected environment.",
+                        ? copy.checkFailedDescription(
+                            failed.map((target) => target.label).join(", "),
+                          )
+                        : copy.checkPassedDescription,
                     });
                     return results;
                   }}
@@ -177,7 +182,7 @@ function DeviceHostList({
   return (
     <>
       {hosts.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">No device hosts.</p>
+        <p className="py-2 text-sm text-muted-foreground">{copy.empty}</p>
       ) : null}
       {hosts.map((host) => {
         const status = state.hostStatuses[host.id];
@@ -188,11 +193,11 @@ function DeviceHostList({
           [];
         const progress =
           check?.status === "pending"
-            ? "Checking connection…"
+            ? copy.checkingConnection
             : status?.status === "installing"
-              ? "Installing device support…"
+              ? copy.installingSupport
               : status?.status === "starting"
-                ? "Connecting…"
+                ? copy.connecting
                 : null;
         const error =
           check?.status === "failed"
@@ -217,7 +222,9 @@ function DeviceHostList({
                             tabIndex={0}
                             role="img"
                             aria-label={
-                              platform.platform === "ios" ? "iOS available" : "Android available"
+                              platform.platform === "ios"
+                                ? copy.iosAvailable
+                                : copy.androidAvailable
                             }
                             className="shrink-0 text-muted-foreground"
                           />
@@ -230,19 +237,19 @@ function DeviceHostList({
                         )}
                       </TooltipTrigger>
                       <TooltipPopup>
-                        {platform.platform === "ios" ? "iOS available" : "Android available"}
+                        {platform.platform === "ios" ? copy.iosAvailable : copy.androidAvailable}
                       </TooltipPopup>
                     </Tooltip>
                   ))}
               </div>
               <p className="truncate text-xs text-muted-foreground">{host.target}</p>
               {check?.status === "local" ? (
-                <p className="mt-1 text-xs text-muted-foreground">Already available locally</p>
+                <p className="mt-1 text-xs text-muted-foreground">{copy.availableLocally}</p>
               ) : null}
               {error ? (
                 <div className="mt-1" role="status">
                   <details className="text-xs text-destructive">
-                    <summary>Connection failed</summary>
+                    <summary>{copy.connectionFailed}</summary>
                     <p className="mt-1 whitespace-pre-wrap break-words">{error}</p>
                   </details>
                 </div>
@@ -264,7 +271,7 @@ function DeviceHostList({
                     size="icon-sm"
                     variant="ghost-muted"
                     disabled={busy}
-                    aria-label={host.label + " options"}
+                    aria-label={copy.hostOptions(host.label)}
                   />
                 }
               >
@@ -276,10 +283,10 @@ function DeviceHostList({
                     onEdit(host);
                   }}
                 >
-                  Edit
+                  {ko.common.edit}
                 </MenuItem>
                 <MenuItem variant="destructive" onClick={() => onRemove(host)}>
-                  Remove
+                  {ko.common.remove}
                 </MenuItem>
               </MenuPopup>
             </Menu>
@@ -289,7 +296,7 @@ function DeviceHostList({
               disabled={busy || progress !== null}
               onClick={() => void testConnection(host)}
             >
-              Test connection
+              {copy.testConnection}
             </Button>
           </div>
         );

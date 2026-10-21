@@ -9,6 +9,7 @@ import {
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { RotateCcwIcon } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { ko } from "../i18n/ko";
 import { useSettingsRestore } from "../components/settings/SettingsPanels";
 
 import { SettingsBreadcrumb } from "../components/settings/SettingsBreadcrumb";
@@ -42,7 +43,7 @@ function RestoreDeviceDefaultsButton({ onRestored }: { onRestored: () => void })
       onClick={() => void restoreDefaults()}
     >
       <RotateCcwIcon className="mx-1 size-3.5" />
-      Restore device defaults
+      {ko.settings.restore.button}
     </Button>
   );
 }
@@ -75,8 +76,8 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
         eligibleEnvironmentIds={autoSettlementAvailability.eligibleEnvironmentIds}
       >
         {autoSettlementAvailability.eligibleEnvironmentIds.length > 0
-          ? `${searchTarget.title} requires a supporting environment. Choose one to continue.`
-          : `${searchTarget.title} requires a supporting environment. Connect or update an environment to continue.`}
+          ? ko.settings.scope.requiresEnvironmentChoose(searchTarget.title)
+          : ko.settings.scope.requiresEnvironmentConnect(searchTarget.title)}
       </SettingsScopeNotice>
     );
   }
@@ -93,7 +94,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
         : "all";
     return (
       <SettingsScopeNotice target={target} targetId={hash}>
-        {`${searchTarget.title} is not available for the selected target. Choose its owning scope to continue.`}
+        {ko.settings.scope.unavailableForTarget(searchTarget.title)}
       </SettingsScopeNotice>
     );
   }
@@ -107,7 +108,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
   if (scope.kind === "environment" && connectedEnvironments.length === 0) {
     return (
       <p className="p-8 text-sm text-muted-foreground">
-        Reconnect {scope.label} to change its settings.
+        {ko.settings.scope.reconnectToChange(scope.label)}
       </p>
     );
   }

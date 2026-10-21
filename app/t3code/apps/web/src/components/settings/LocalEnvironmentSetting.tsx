@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { ko } from "~/i18n/ko";
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
 import {
   AlertDialog,
@@ -18,6 +19,8 @@ import { searchableSetting } from "./settingsSearch";
 
 // Toggling relaunches the desktop app, so the switch only reflects the value
 // this process started with; there is no live state to keep in sync.
+const copy = ko.settings.localEnvironment;
+
 export function LocalEnvironmentSetting() {
   const setEnabled = window.desktopBridge?.setLocalEnvironmentEnabled;
   const [enabled] = useState(() => !isLocalEnvironmentDisabled());
@@ -32,7 +35,7 @@ export function LocalEnvironmentSetting() {
     try {
       await setEnabled(!enabled);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Couldn't change this setting.");
+      setError(cause instanceof Error ? cause.message : copy.changeFailed);
       setIsUpdating(false);
     }
   };
@@ -41,17 +44,13 @@ export function LocalEnvironmentSetting() {
     <>
       <SettingsRow
         {...searchableSetting("local-environment")}
-        description={
-          enabled
-            ? "Run agents on this computer. Turn off to use Weavra only with remote environments."
-            : "Turned off. Agents only run in remote environments."
-        }
+        description={enabled ? copy.descriptionOn : copy.descriptionOff}
         control={
           <Switch
             checked={enabled}
             disabled={isUpdating}
             onCheckedChange={() => setConfirmOpen(true)}
-            aria-label="Local environment"
+            aria-label={copy.switchLabel}
           />
         }
       />
@@ -65,19 +64,15 @@ export function LocalEnvironmentSetting() {
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {enabled ? "Turn off local environment?" : "Turn on local environment?"}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{enabled ? copy.turnOffTitle : copy.turnOnTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              {enabled
-                ? "Weavra will restart without running a server on this computer. Any agents and terminals running here will stop, and other devices will no longer be able to connect to this computer. Your projects, history, and remote environments are unaffected."
-                : "Weavra will restart and start running a server on this computer again."}
+              {enabled ? copy.turnOffDescription : copy.turnOnDescription}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <p className="px-6 pb-4 text-sm text-destructive">{error}</p> : null}
           <AlertDialogFooter>
             <AlertDialogClose disabled={isUpdating} render={<Button variant="outline" />}>
-              Cancel
+              {ko.common.cancel}
             </AlertDialogClose>
             <Button
               variant={enabled ? "destructive" : "default"}
@@ -87,12 +82,12 @@ export function LocalEnvironmentSetting() {
               {isUpdating ? (
                 <>
                   <Spinner className="size-3.5" />
-                  Restarting…
+                  {copy.restarting}
                 </>
               ) : enabled ? (
-                "Restart and turn off"
+                copy.restartAndTurnOff
               ) : (
-                "Restart and turn on"
+                copy.restartAndTurnOn
               )}
             </Button>
           </AlertDialogFooter>

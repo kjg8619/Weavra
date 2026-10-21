@@ -199,21 +199,22 @@ import {
 import type { Project } from "../types";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "~/components/pullRequest/pullRequestListPreferences";
+import { ko } from "~/i18n/ko";
 
 const EMPTY_BROWSE_ENTRIES: FilesystemBrowseResult["entries"] = [];
 
 const APPEARANCE_OPTIONS = [
-  { mode: "system", label: "시스템", icon: MonitorIcon },
-  { mode: "light", label: "라이트", icon: SunIcon },
-  { mode: "dark", label: "다크", icon: MoonIcon },
+  { mode: "system", label: ko.projects.commandPalette.appearanceSystem, icon: MonitorIcon },
+  { mode: "light", label: ko.projects.commandPalette.appearanceLight, icon: SunIcon },
+  { mode: "dark", label: ko.projects.commandPalette.appearanceDark, icon: MoonIcon },
 ] as const;
 
 function notifyThemeSaveFailure(): void {
   toastManager.add(
     stackedThreadToast({
       type: "error",
-      title: "테마를 저장하지 못했어요",
-      description: "다시 시도해 주세요.",
+      title: ko.projects.commandPalette.themeSaveFailed,
+      description: ko.projects.commandPalette.tryAgain,
     }),
   );
 }
@@ -373,9 +374,12 @@ function remoteProjectInputPlaceholder(flow: AddProjectCloneFlow | null): string
   if (!flow) return null;
   if (flow.step === "confirm") return null;
   if (flow.source === "url") {
-    return "Git clone URL을 입력하세요";
+    return ko.projects.commandPalette.gitCloneUrlPlaceholder;
   }
-  return `${remoteProjectSourceLabel(flow.source)} 저장소 경로를 입력하세요 (${remoteProjectSourcePathHint(flow.source)})`;
+  return ko.projects.commandPalette.repositoryPathPlaceholder(
+    remoteProjectSourceLabel(flow.source),
+    remoteProjectSourcePathHint(flow.source),
+  );
 }
 
 function sourceProviderKind(source: AddProjectRemoteSource): AddProjectRemoteProviderKind | null {
@@ -403,7 +407,7 @@ function buildAddProjectRemoteSourceReadiness(
 ): AddProjectRemoteSourceReadiness {
   const unknown = {
     status: "unknown",
-    reason: "Git 공급자 상태를 확인할 수 없어요.",
+    reason: ko.projects.commandPalette.gitProviderStatusUnknown,
   } as const;
   const defaultReadiness: AddProjectRemoteSourceReadiness = {
     url: { status: "ready" },
@@ -430,7 +434,7 @@ function buildAddProjectRemoteSourceReadiness(
     if (!provider) {
       readiness[source] = {
         status: "unsupported",
-        reason: `${remoteProjectSourceLabel(source)} 연동은 이 환경에서 지원되지 않아요. Git URL로 가져올 수 있어요.`,
+        reason: ko.projects.commandPalette.sourceUnsupported(remoteProjectSourceLabel(source)),
       };
       continue;
     }
@@ -443,7 +447,7 @@ function buildAddProjectRemoteSourceReadiness(
         status: "unauthenticated",
         reason:
           Option.getOrNull(provider.auth.detail) ??
-          `${provider.label} 로그인이 필요해요. 설정 > 소스 제어에서 안내를 확인하세요.`,
+          ko.projects.commandPalette.providerLoginRequired(provider.label),
       };
       continue;
     }
@@ -452,7 +456,7 @@ function buildAddProjectRemoteSourceReadiness(
         status: "unknown",
         reason:
           Option.getOrNull(provider.auth.detail) ??
-          `${provider.label} 인증 상태를 확인할 수 없어요. 설정 > 소스 제어에서 다시 검색하세요.`,
+          ko.projects.commandPalette.providerAuthUnknown(provider.label),
       };
       continue;
     }
@@ -466,7 +470,7 @@ function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
   }
-  return "An error occurred.";
+  return ko.projects.commandPalette.genericError;
 }
 
 const OVERLAY_MODE_BY_COMMAND = {
@@ -552,7 +556,9 @@ export function CommandPalette({ children }: { children: ReactNode }) {
         } else {
           toastManager.add({
             id: "appearance-cycle",
-            title: `Appearance: ${APPEARANCE_OPTIONS.find((option) => option.mode === nextMode)?.label}`,
+            title: ko.projects.commandPalette.appearanceToast(
+              APPEARANCE_OPTIONS.find((option) => option.mode === nextMode)?.label,
+            ),
             timeout: 1500,
           });
         }
@@ -659,10 +665,10 @@ function CommandPaletteDialog(props: {
     <CommandDialogPopup
       aria-label={
         props.mode === "files"
-          ? "파일 선택"
+          ? ko.projects.commandPalette.pickFile
           : props.mode === "content"
-            ? "프로젝트 내용 검색"
-            : "명령 팔레트"
+            ? ko.projects.commandPalette.searchProjectContent
+            : ko.projects.commandPalette.commandPalette
       }
       className={cn("overflow-hidden p-0", props.mode === "content" && "h-105")}
       data-command-palette="true"
@@ -773,7 +779,8 @@ function OpenCommandPaletteDialog(props: {
         stackedThreadToast({
           type: "error",
           title: target.failureTitle,
-          description: error instanceof Error ? error.message : "An error occurred.",
+          description:
+            error instanceof Error ? error.message : ko.projects.commandPalette.genericError,
         }),
       );
     }
@@ -879,9 +886,9 @@ function OpenCommandPaletteDialog(props: {
             {
               kind: isLocal ? "local" : "remote",
               label: isPrimary
-                ? "Local"
+                ? ko.projects.commandPalette.localEnvironment
                 : isLocal
-                  ? `${environment.label} (Local)`
+                  ? ko.projects.commandPalette.localEnvironmentNamed(environment.label)
                   : environment.label,
               machine: resolveEnvironmentMachineKind(environment.serverConfig),
             },
@@ -1247,7 +1254,7 @@ function OpenCommandPaletteDialog(props: {
           });
           const location = projectEnvironmentLocationById.get(project.environmentId) ?? {
             kind: "remote" as const,
-            label: "Remote",
+            label: ko.projects.commandPalette.remoteEnvironment,
             machine: "server" as const,
           };
           return (
@@ -1288,7 +1295,7 @@ function OpenCommandPaletteDialog(props: {
           renderDescription: (project) => {
             const location = projectEnvironmentLocationById.get(project.environmentId) ?? {
               kind: "remote",
-              label: "Remote",
+              label: ko.projects.commandPalette.remoteEnvironment,
               machine: "server" as const,
             };
             return (
@@ -1357,7 +1364,8 @@ function OpenCommandPaletteDialog(props: {
               project={projectByKey.get(`${thread.environmentId}:${thread.projectId}`) ?? null}
               projectTitle={projectTitle ?? null}
               environmentLabel={
-                projectEnvironmentLocationById.get(thread.environmentId)?.label ?? "Remote"
+                projectEnvironmentLocationById.get(thread.environmentId)?.label ??
+                ko.projects.commandPalette.remoteEnvironment
               }
               branch={thread.branch}
               worktreePath={thread.worktreePath}
@@ -1511,8 +1519,8 @@ function OpenCommandPaletteDialog(props: {
           kind: "action",
           value: `action:add-project:${environmentId}:local`,
           searchTerms: ["local", "folder", "directory", "browse"],
-          title: "로컬 폴더",
-          description: "디스크에서 폴더 찾아보기",
+          title: ko.projects.localFolder,
+          description: ko.projects.commandPalette.browseLocalFolder,
           icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
           keepOpen: true,
           run: async () => {
@@ -1530,14 +1538,17 @@ function OpenCommandPaletteDialog(props: {
         const label = remoteProjectSourceLabel(source);
         const description =
           source === "url"
-            ? "원격 URL에서 복제"
-            : `${label} ${remoteProjectSourcePathHint(source)} 복제`;
+            ? ko.projects.commandPalette.cloneFromRemoteUrl
+            : ko.projects.commandPalette.cloneFromSource(
+                label,
+                remoteProjectSourcePathHint(source),
+              );
         const readiness = readinessBySource[source];
         const actions = buildProjectImportSourceActions({
           environmentId,
           source,
           label,
-          title: source === "url" ? label : `${label} 저장소`,
+          title: source === "url" ? label : ko.projects.commandPalette.sourceRepository(label),
           description,
           availability: readiness,
           icon: remoteProjectSourceIcon(source, ITEM_ICON_CLASS),
@@ -1570,7 +1581,13 @@ function OpenCommandPaletteDialog(props: {
         });
       }
 
-      return [{ value: `sources:${environmentId}`, label: "가져오기 방식", items: sourceItems }];
+      return [
+        {
+          value: `sources:${environmentId}`,
+          label: ko.projects.commandPalette.importMethod,
+          items: sourceItems,
+        },
+      ];
     },
     [openSourceControlSettings, startAddProjectBrowse, startAddProjectClone],
   );
@@ -1584,8 +1601,10 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "환경을 사용할 수 없어요",
-            description: `${environment?.label ?? "선택한 환경"}이 연결되어 있지 않아요.`,
+            title: ko.projects.commandPalette.environmentUnavailable,
+            description: ko.projects.commandPalette.environmentNotConnected(
+              environment?.label ?? ko.projects.commandPalette.selectedEnvironment,
+            ),
           }),
         );
         return;
@@ -1619,7 +1638,7 @@ function OpenCommandPaletteDialog(props: {
       title: option.label,
       description: option.isConnected
         ? option.isPrimary
-          ? "이 기기"
+          ? ko.projects.commandPalette.thisDevice
           : option.environmentId
         : option.status,
       disabled: !option.isConnected,
@@ -1635,7 +1654,7 @@ function OpenCommandPaletteDialog(props: {
     () => [
       {
         value: "environments",
-        label: "환경",
+        label: ko.projects.commandPalette.environment,
         items: addProjectEnvironmentItems,
       },
     ],
@@ -1714,7 +1733,7 @@ function OpenCommandPaletteDialog(props: {
       groups: [
         {
           value: "projects",
-          label: "프로젝트",
+          label: ko.common.project,
           items: enumerateCommandPaletteItems(prioritized),
         },
       ],
@@ -1743,7 +1762,8 @@ function OpenCommandPaletteDialog(props: {
         searchTerms: ["new thread", "chat", "create", "draft"],
         title: (
           <>
-            <span className="font-semibold">{activeProjectTitle}</span>에서 새 스레드 만들기
+            <span className="font-semibold">{activeProjectTitle}</span>
+            {ko.projects.commandPalette.newThreadInProject}
           </>
         ),
         icon: <SquarePenIcon className={ITEM_ICON_CLASS} />,
@@ -1763,10 +1783,10 @@ function OpenCommandPaletteDialog(props: {
       kind: "submenu",
       value: "action:new-thread-in",
       searchTerms: ["new thread", "project", "pick", "choose", "select"],
-      title: "프로젝트를 선택해 새 스레드 만들기...",
+      title: ko.projects.commandPalette.newThreadPickProject,
       icon: <SquarePenIcon className={ITEM_ICON_CLASS} />,
       addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
-      groups: [{ value: "projects", label: "프로젝트", items: projectThreadItems }],
+      groups: [{ value: "projects", label: ko.common.project, items: projectThreadItems }],
     });
   }
 
@@ -1776,7 +1796,9 @@ function OpenCommandPaletteDialog(props: {
       value: "action:copy-thread-reference",
       searchTerms: ["copy", "pull request", "pr link", "thread id", "reference"],
       title:
-        activeThreadReferenceCopyTarget.kind === "pull-request" ? "PR 링크 복사" : "스레드 ID 복사",
+        activeThreadReferenceCopyTarget.kind === "pull-request"
+          ? ko.projects.commandPalette.copyPullRequestLink
+          : ko.projects.commandPalette.copyThreadId,
       description: activeThreadReferenceCopyTarget.value,
       icon: <LinkIcon className={ITEM_ICON_CLASS} />,
       shortcutCommand: "thread.copyReference",
@@ -1793,7 +1815,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:link-pull-request",
       searchTerms: ["link", "pull request", "pr", "attach", "stack"],
-      title: "스레드에 pull request 연결",
+      title: ko.projects.commandPalette.linkPullRequest,
       icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
       run: async () => {
         openLinkPullRequestDialog(threadRef);
@@ -1804,7 +1826,7 @@ function OpenCommandPaletteDialog(props: {
         kind: "action",
         value: "action:open-thread-pull-requests",
         searchTerms: ["pull requests", "linked", "stack", "prs"],
-        title: "연결된 pull request 보기",
+        title: ko.projects.commandPalette.viewLinkedPullRequests,
         disabled: visibleThreadPullRequests(activeThread.pullRequests).length === 0,
         icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
         run: async () => {
@@ -1818,7 +1840,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:open-file-picker",
     searchTerms: ["go to file", "open file", "file picker", "find file", "quick open"],
-    title: "파일로 이동",
+    title: ko.projects.commandPalette.goToFile,
     icon: <FileSearchIcon className={ITEM_ICON_CLASS} />,
     keepOpen: true,
     shortcutCommand: "filePicker.toggle",
@@ -1831,7 +1853,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:search-project-contents",
     searchTerms: ["search project", "find in files", "grep", "content search", "text search"],
-    title: "프로젝트 내용 검색",
+    title: ko.projects.commandPalette.searchProjectContent,
     icon: <TextSearchIcon className={ITEM_ICON_CLASS} />,
     keepOpen: true,
     shortcutCommand: "projectSearch.toggle",
@@ -1862,7 +1884,7 @@ function OpenCommandPaletteDialog(props: {
       "url",
       "environment",
     ],
-    title: "프로젝트 추가",
+    title: ko.projects.add,
     icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
     keepOpen: true,
     run: async () => {
@@ -1875,7 +1897,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:add-project:wsl-folder",
       searchTerms: ["add project", "open", "wsl", "linux", "folder", "directory"],
-      title: "WSL 폴더 열기",
+      title: ko.projects.commandPalette.openWslFolder,
       description: wslAddProjectEnvironmentOption.label,
       icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
       keepOpen: true,
@@ -1889,28 +1911,32 @@ function OpenCommandPaletteDialog(props: {
     kind: "submenu",
     value: "action:change-theme",
     searchTerms: ["change theme", "appearance", "colors", "palette"],
-    title: "테마 변경",
+    title: ko.projects.commandPalette.changeTheme,
     icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
     addonIcon: <PaletteIcon className={ADDON_ICON_CLASS} />,
     shortcutCommand: "theme.select",
     groups: [
       {
         value: "themes",
-        label: "테마 변경",
+        label: ko.projects.commandPalette.changeTheme,
         items: themeCards.map(({ id, label, previews }) => ({
           kind: "action",
           value: id === null ? "theme:standard" : `theme:palette:${id}`,
           title: label,
           description:
             previews.length === 1
-              ? `${APPEARANCE_OPTIONS.find((option) => option.mode === previews[0]!.mode)!.label} 모드용`
+              ? ko.projects.commandPalette.forMode(
+                  APPEARANCE_OPTIONS.find((option) => option.mode === previews[0]!.mode)!.label,
+                )
               : undefined,
           searchTerms: [label, "theme", "appearance"],
           icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
           titleTrailingContent: (
             <span className="flex shrink-0 items-center gap-2">
               {(themeHalves?.[resolvedTheme] ?? getThemeDefinition(theme)?.id ?? null) === id ? (
-                <span className="text-xs text-muted-foreground/70">현재</span>
+                <span className="text-xs text-muted-foreground/70">
+                  {ko.projects.commandPalette.current}
+                </span>
               ) : null}
               <span className="flex items-center gap-1" aria-hidden>
                 {previews.map((preview) => (
@@ -1941,14 +1967,14 @@ function OpenCommandPaletteDialog(props: {
     kind: "submenu",
     value: "action:change-appearance",
     searchTerms: ["change appearance", "light", "dark", "system", "mode", "toggle"],
-    title: "화면 모드 변경",
+    title: ko.projects.commandPalette.changeAppearanceMode,
     icon: <MonitorIcon className={ITEM_ICON_CLASS} />,
     addonIcon: <MonitorIcon className={ADDON_ICON_CLASS} />,
     shortcutCommand: "appearance.cycle",
     groups: [
       {
         value: "appearance",
-        label: "화면 모드 변경",
+        label: ko.projects.commandPalette.changeAppearanceMode,
         items: APPEARANCE_OPTIONS.map(({ mode, label, icon: Icon }) => ({
           kind: "action",
           value: `appearance:${mode}`,
@@ -1957,7 +1983,9 @@ function OpenCommandPaletteDialog(props: {
           icon: <Icon className={ITEM_ICON_CLASS} />,
           titleTrailingContent:
             appearanceMode === mode ? (
-              <span className="text-xs text-muted-foreground/70">현재</span>
+              <span className="text-xs text-muted-foreground/70">
+                {ko.projects.commandPalette.current}
+              </span>
             ) : undefined,
           run: async () => {
             if (!setAppearanceMode(mode)) notifyThemeSaveFailure();
@@ -1978,7 +2006,7 @@ function OpenCommandPaletteDialog(props: {
     setViewStack([]);
     pushPaletteView({
       addonIcon: <PaletteIcon className={ADDON_ICON_CLASS} />,
-      groups: [{ value: "themes", label: "테마 변경", items: [] }],
+      groups: [{ value: "themes", label: ko.projects.commandPalette.changeTheme, items: [] }],
     });
   }, [browseNavigation, clearOpenIntent, openIntent, pushPaletteView]);
 
@@ -1986,7 +2014,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:theme-editor",
     searchTerms: ["theme", "appearance", "colors", "palette", "customize"],
-    title: "테마 편집기 전환",
+    title: ko.projects.commandPalette.toggleThemeEditor,
     icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
     shortcutCommand: "themeEditor.toggle",
     run: async () => {
@@ -2007,7 +2035,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:pull-requests",
       searchTerms: ["pull requests", "prs", "pr", "github", "review", "merge", "branch"],
-      title: "pull request 열기",
+      title: ko.projects.commandPalette.openPullRequests,
       icon: <PullRequestGlyph.pullRequest className={ITEM_ICON_CLASS} />,
       run: async () => {
         await navigate({ to: "/pull-requests", search: readPullRequestListPreferences() });
@@ -2019,7 +2047,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:usage",
     searchTerms: ["usage", "use", "tokens", "cost", "spend", "limits", "stats", "analytics"],
-    title: "사용량 열기",
+    title: ko.projects.commandPalette.openUsage,
     icon: <ChartNoAxesColumnIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
       await navigate({ to: "/usage" });
@@ -2030,7 +2058,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:settings",
     searchTerms: ["settings", "preferences", "configuration", "keybindings"],
-    title: "설정 열기",
+    title: ko.projects.commandPalette.openSettings,
     icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
       await navigate({ to: "/settings" });
@@ -2063,7 +2091,7 @@ function OpenCommandPaletteDialog(props: {
         "remove",
         "t3.json",
       ],
-      title: "프로젝트 설정",
+      title: ko.projects.commandPalette.projectSettings,
       description: contextualProjectGroup.displayName,
       icon: <FolderIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
@@ -2084,7 +2112,7 @@ function OpenCommandPaletteDialog(props: {
     value: `setting:${item.id}`,
     searchTerms: [item.title, SETTINGS_SECTION_LABELS[item.to], ...(item.searchTerms ?? [])],
     title: item.title,
-    description: `설정 · ${SETTINGS_SECTION_LABELS[item.to]}`,
+    description: ko.projects.commandPalette.settingsSection(SETTINGS_SECTION_LABELS[item.to]),
     ...(item.secondary ? { secondary: true } : {}),
     icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
@@ -2148,8 +2176,10 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "환경을 사용할 수 없어요",
-            description: `${environment?.label ?? "선택한 환경"}이 연결되어 있지 않아요.`,
+            title: ko.projects.commandPalette.environmentUnavailable,
+            description: ko.projects.commandPalette.environmentNotConnected(
+              environment?.label ?? ko.projects.commandPalette.selectedEnvironment,
+            ),
           }),
         );
         return;
@@ -2160,8 +2190,8 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "프로젝트를 추가하지 못했어요",
-            description: "Windows 형식 경로는 Windows에서만 사용할 수 있어요.",
+            title: ko.projects.commandPalette.addProjectFailed,
+            description: ko.projects.commandPalette.windowsPathOnly,
           }),
         );
         return;
@@ -2171,8 +2201,8 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "프로젝트를 추가하지 못했어요",
-            description: "상대 경로를 사용하려면 활성 프로젝트가 필요해요.",
+            title: ko.projects.commandPalette.addProjectFailed,
+            description: ko.projects.commandPalette.relativePathNeedsProject,
           }),
         );
         return;
@@ -2207,8 +2237,9 @@ function OpenCommandPaletteDialog(props: {
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "프로젝트를 열지 못했어요",
-                description: error instanceof Error ? error.message : "오류가 발생했어요.",
+                title: ko.projects.commandPalette.openProjectFailed,
+                description:
+                  error instanceof Error ? error.message : ko.projects.commandPalette.genericError,
               }),
             );
             return;
@@ -2235,8 +2266,9 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "프로젝트를 추가하지 못했어요",
-              description: error instanceof Error ? error.message : "오류가 발생했어요.",
+              title: ko.projects.commandPalette.addProjectFailed,
+              description:
+                error instanceof Error ? error.message : ko.projects.commandPalette.genericError,
             }),
           );
         }
@@ -2251,8 +2283,9 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "프로젝트를 추가하지 못했어요",
-            description: error instanceof Error ? error.message : "오류가 발생했어요.",
+            title: ko.projects.commandPalette.addProjectFailed,
+            description:
+              error instanceof Error ? error.message : ko.projects.commandPalette.genericError,
           }),
         );
         return;
@@ -2303,8 +2336,10 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "환경을 사용할 수 없어요",
-          description: `${browseEnvironment?.label ?? "선택한 환경"}이 연결되어 있지 않아요.`,
+          title: ko.projects.commandPalette.environmentUnavailable,
+          description: ko.projects.commandPalette.environmentNotConnected(
+            browseEnvironment?.label ?? ko.projects.commandPalette.selectedEnvironment,
+          ),
         }),
       );
       return;
@@ -2352,7 +2387,7 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "저장소를 찾지 못했어요",
+              title: ko.projects.commandPalette.repositoryNotFound,
               description: errorMessage(squashAtomCommandFailure(lookupResult)),
             }),
           );
@@ -2387,8 +2422,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "복제하지 못했어요",
-          description: "Windows 형식 경로는 Windows에서만 사용할 수 있어요.",
+          title: ko.projects.commandPalette.cloneFailed,
+          description: ko.projects.commandPalette.windowsPathOnly,
         }),
       );
       return;
@@ -2398,8 +2433,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "복제하지 못했어요",
-          description: "상대 경로를 사용하려면 활성 프로젝트가 필요해요.",
+          title: ko.projects.commandPalette.cloneFailed,
+          description: ko.projects.commandPalette.relativePathNeedsProject,
         }),
       );
       return;
@@ -2430,7 +2465,7 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "복제하지 못했어요",
+              title: ko.projects.commandPalette.cloneFailed,
               description: errorMessage(squashAtomCommandFailure(cloneResult)),
             }),
           );
@@ -2463,7 +2498,7 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "복제하지 못했어요",
+            title: ko.projects.commandPalette.cloneFailed,
             description: errorMessage(squashAtomCommandFailure(startResult)),
           }),
         );
@@ -2482,8 +2517,9 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "프로젝트를 열지 못했어요",
-          description: error instanceof Error ? error.message : "오류가 발생했어요.",
+          title: ko.projects.commandPalette.openProjectFailed,
+          description:
+            error instanceof Error ? error.message : ko.projects.commandPalette.genericError,
         }),
       );
     }
@@ -2557,7 +2593,9 @@ function OpenCommandPaletteDialog(props: {
   const cloneDestinationBrowseGroups = useMemo(
     () =>
       browseGroups.map((group) =>
-        group.value === "directories" ? { ...group, label: "복제 위치 선택" } : group,
+        group.value === "directories"
+          ? { ...group, label: ko.projects.commandPalette.chooseCloneDestination }
+          : group,
       ),
     [browseGroups],
   );
@@ -2591,12 +2629,12 @@ function OpenCommandPaletteDialog(props: {
   // never loses its purpose once the placeholder disappears.
   const inputLabel =
     addProjectCloneFlow?.step === "repository"
-      ? "복제할 저장소"
+      ? ko.projects.commandPalette.repositoryToClone
       : addProjectCloneFlow?.step === "confirm"
-        ? "복제할 위치"
+        ? ko.projects.commandPalette.cloneDestination
         : isBrowsing
-          ? "폴더 경로"
-          : "검색";
+          ? ko.projects.commandPalette.folderPath
+          : ko.common.search;
   const hasHighlightedBrowseItem = highlightedItemValue?.startsWith("browse:") ?? false;
   const canSubmitBrowsePath =
     isBrowsing &&
@@ -2613,16 +2651,16 @@ function OpenCommandPaletteDialog(props: {
   const isCloneDestinationStep = addProjectCloneFlow?.step === "confirm";
   const submitActionLabel = isCloneDestinationStep
     ? willCreateProjectPath
-      ? "만들고 복제"
-      : "복제"
+      ? ko.projects.commandPalette.createAndClone
+      : ko.projects.commandPalette.clone
     : willCreateProjectPath
-      ? "만들고 추가"
-      : "추가";
+      ? ko.projects.commandPalette.createAndAdd
+      : ko.common.add;
   const addShortcutLabel = hasHighlightedBrowseItem ? `${submitModifierLabel} Enter` : "Enter";
   const remoteProjectButtonLabel = addProjectCloneFlow
     ? addProjectCloneFlow.source === "url"
-      ? "계속"
-      : "조회"
+      ? ko.projects.commandPalette.continue
+      : ko.projects.commandPalette.lookUp
     : null;
   const isRemoteProjectPending = isRemoteProjectLookingUp || isRemoteProjectCloning;
   const canSubmitRemoteProjectFlow =
@@ -2741,8 +2779,9 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "명령을 실행할 수 없어요",
-          description: error instanceof Error ? error.message : "예기치 않은 오류가 발생했어요.",
+          title: ko.projects.commandPalette.commandFailed,
+          description:
+            error instanceof Error ? error.message : ko.projects.commandPalette.unexpectedError,
         }),
       );
     });
@@ -2830,8 +2869,8 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "WSL 프로젝트를 추가하지 못했어요",
-            description: "해당 WSL 백엔드를 시작한 다음 폴더를 다시 선택하세요.",
+            title: ko.projects.commandPalette.wslAddFailed,
+            description: ko.projects.commandPalette.wslStartBackendHint,
           }),
         );
         return;
@@ -2869,7 +2908,7 @@ function OpenCommandPaletteDialog(props: {
               size="xs"
               tabIndex={-1}
               className="absolute inset-e-2.5 top-1/2 gap-1.5 pe-1 ps-2 -translate-y-1/2"
-              aria-label={`${remoteProjectButtonLabel ?? "계속"} (Enter)`}
+              aria-label={`${remoteProjectButtonLabel ?? ko.projects.commandPalette.continue} (Enter)`}
               disabled={!canSubmitRemoteProjectFlow}
               onMouseDown={(event) => {
                 event.preventDefault();
@@ -2880,12 +2919,18 @@ function OpenCommandPaletteDialog(props: {
             />
           }
         >
-          <span>{isRemoteProjectPending ? "처리 중" : remoteProjectButtonLabel}</span>
+          <span>
+            {isRemoteProjectPending
+              ? ko.projects.commandPalette.processing
+              : remoteProjectButtonLabel}
+          </span>
           <KbdGroup className="pointer-events-none -me-0.5 items-center gap-1">
             <Kbd>Enter</Kbd>
           </KbdGroup>
         </TooltipTrigger>
-        <TooltipPopup side="top">{remoteProjectButtonLabel ?? "계속"} (Enter)</TooltipPopup>
+        <TooltipPopup side="top">
+          {remoteProjectButtonLabel ?? ko.projects.commandPalette.continue} (Enter)
+        </TooltipPopup>
       </Tooltip>
     ) : isBrowsing ? (
       <Tooltip>
@@ -2922,7 +2967,9 @@ function OpenCommandPaletteDialog(props: {
           }
         >
           <span>
-            {isCloneDestinationStep && isRemoteProjectPending ? "복제 중" : submitActionLabel}
+            {isCloneDestinationStep && isRemoteProjectPending
+              ? ko.projects.commandPalette.cloning
+              : submitActionLabel}
           </span>
           <KbdGroup className="pointer-events-none -me-0.5 items-center gap-1">
             <Kbd>{hasHighlightedBrowseItem ? `${submitModifierLabel} Enter` : "Enter"}</Kbd>
@@ -2936,9 +2983,9 @@ function OpenCommandPaletteDialog(props: {
 
   const footerActionLabel =
     addProjectCloneFlow?.step === "repository"
-      ? (remoteProjectButtonLabel ?? "계속")
+      ? (remoteProjectButtonLabel ?? ko.projects.commandPalette.continue)
       : !canSubmitBrowsePath || hasHighlightedBrowseItem
-        ? "선택"
+        ? ko.projects.commandPalette.select
         : undefined;
 
   const footerTrailing = canOpenProjectFromFileManager ? (
@@ -2948,14 +2995,14 @@ function OpenCommandPaletteDialog(props: {
         void handleOpenProjectFromFileManager();
       }}
     >
-      {`${fileManagerName}에서 열기`}
+      {ko.projects.commandPalette.openInFileManager(fileManagerName)}
     </CommandFooterAction>
   ) : null;
 
   return (
     <CommandPaletteContent
       key={`${viewStack.length}-${browseGeneration}-${isBrowsing}-${addProjectCloneFlow?.step ?? "none"}`}
-      aria-label="명령 팔레트"
+      aria-label={ko.projects.commandPalette.commandPalette}
       autoHighlight={isBrowsing || isRemoteProjectCloneFlow ? false : "always"}
       footerActionLabel={footerActionLabel}
       footerTrailing={footerTrailing}
@@ -2983,7 +3030,7 @@ function OpenCommandPaletteDialog(props: {
                 <button
                   type="button"
                   className="flex cursor-pointer items-center"
-                  aria-label="뒤로"
+                  aria-label={ko.common.back}
                   onClick={popView}
                 >
                   <ArrowLeftIcon />
@@ -3006,7 +3053,9 @@ function OpenCommandPaletteDialog(props: {
     >
       {remoteProjectContext ? (
         <div className="p-2 pb-0">
-          <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">저장소</div>
+          <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
+            {ko.projects.commandPalette.repository}
+          </div>
           <div className="flex min-h-8 items-center gap-2 rounded-sm px-2 py-1.5">
             {remoteProjectContext.icon}
             <span className="flex min-w-0 flex-1 flex-col">
@@ -3028,19 +3077,19 @@ function OpenCommandPaletteDialog(props: {
           ? {
               emptyStateMessage:
                 addProjectCloneFlow.source === "url"
-                  ? "Git clone URL을 입력하고 Enter를 눌러 계속하세요."
-                  : "저장소 경로를 입력하고 Enter를 눌러 조회하세요.",
+                  ? ko.projects.commandPalette.gitCloneUrlEmptyState
+                  : ko.projects.commandPalette.repositoryPathEmptyState,
             }
           : addProjectCloneFlow?.step === "confirm"
-            ? { emptyStateMessage: "대상 경로를 선택하고 Enter를 눌러 복제하세요." }
+            ? { emptyStateMessage: ko.projects.commandPalette.cloneDestinationEmptyState }
             : relativePathNeedsActiveProject
-              ? { emptyStateMessage: "상대 경로를 사용하려면 활성 프로젝트가 필요해요." }
+              ? { emptyStateMessage: ko.projects.commandPalette.relativePathNeedsProject }
               : willCreateProjectPath
                 ? {
-                    emptyStateMessage: "Enter를 눌러 이 폴더를 만들고 프로젝트로 추가하세요.",
+                    emptyStateMessage: ko.projects.commandPalette.createFolderEmptyState,
                   }
                 : threadSearch.isPending
-                  ? { emptyStateMessage: "스레드 메시지를 검색하고 있어요…" }
+                  ? { emptyStateMessage: ko.projects.commandPalette.searchingThreadMessages }
                   : {})}
       />
     </CommandPaletteContent>

@@ -9,6 +9,7 @@ import {
   shouldShowProviderStatusBanner,
 } from "./ProviderStatusBanner";
 import { getThreadErrorBannerKey, shouldShowThreadErrorBanner } from "./ThreadErrorBanner";
+import { ko } from "~/i18n/ko";
 
 function warningProvider(): ServerProvider {
   return {
@@ -176,7 +177,7 @@ describe("getProviderStatusMessage", () => {
         auth: { status: "unauthenticated" },
         message: "",
       }),
-    ).toBe("Open provider setup to install Antigravity on this environment.");
+    ).toBe(ko.providers.banner.installViaSetup("Antigravity"));
   });
 
   it("keeps CLI sign-in advice for a provider without integrated setup", () => {

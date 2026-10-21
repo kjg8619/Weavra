@@ -24,6 +24,7 @@ import {
 import type { WeavraTaskController } from "./useWeavraTask";
 import { WeavraProjectSetup } from "./WeavraProjectSetup";
 import { weavraLabel } from "../weavraLabels";
+import { ko } from "~/i18n/ko";
 import {
   applyChatControlDraft,
   latestChatControlDraft,
@@ -44,15 +45,16 @@ const draftFieldByPath: Readonly<Record<string, string>> = {
   "symptomVerification.criterionIndex": "symptom-criterion",
   "symptomVerification.checkId": "symptom-check",
 };
+const cardCopy = ko.runtime.task.card;
 const draftIssues = SchemaIssue.makeFormatterStandardSchemaV1({
-  leafHook: () => "이 항목의 필수 값과 입력 한도를 확인해 주세요.",
-  checkHook: () => "이 항목의 필수 값과 입력 한도를 확인해 주세요.",
+  leafHook: () => cardCopy.fieldLimitHint,
+  checkHook: () => cardCopy.fieldLimitHint,
 });
 // A goal the Runtime rejects as ambiguous (INVALID_GOAL) is re-prepared with one of these
 // visible leading tags. The mode is never inferred from untagged text.
 const goalModes = [
-  { mode: "read-only", tag: "[읽기 전용] ", label: "읽기 전용 조사" },
-  { mode: "edit", tag: "[수정] ", label: "수정 작업" },
+  { mode: "read-only", tag: cardCopy.goalTagReadOnly, label: cardCopy.goalModeReadOnly },
+  { mode: "edit", tag: cardCopy.goalTagEdit, label: cardCopy.goalModeEdit },
 ] as const;
 const goalModeOf = (goal: string) =>
   goalModes.find(({ tag }) => goal.trimStart().startsWith(tag))?.mode ?? null;
@@ -91,17 +93,17 @@ export function WeavraTaskCard(props: TaskCardProps) {
   const [setupBusy, setSetupBusy] = useState(false);
   const [baselineHead, setBaselineHead] = useState<string | null>(null);
   const reason = !props.connected
-    ? "통제 작업을 사용하려면 환경에 다시 연결해 주세요."
+    ? cardCopy.reconnect
     : !props.supported
-      ? "이 환경은 통제 작업을 지원하지 않아요."
+      ? cardCopy.unsupported
       : !c.canOperate
-        ? "이 세션에는 orchestration:operate 권한이 필요해요."
+        ? cardCopy.permissionRequired("orchestration:operate")
         : !c.discovered
-          ? "이 대화의 통제 작업을 불러오고 있어요..."
+          ? cardCopy.loading
           : (props.entryBlockedReason ?? null);
   return (
     <section
-      aria-label="통제 작업"
+      aria-label={cardCopy.aria}
       data-weavra="controlled-task"
       data-weavra-task-ownership={c.task?.ownership.state}
       data-weavra-run-status={
@@ -115,15 +117,12 @@ export function WeavraTaskCard(props: TaskCardProps) {
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Badge variant="secondary">통제 작업</Badge>
-          <h3 className="font-medium">분석하고 검토한 뒤 구현을 맡겨요</h3>
+          <Badge variant="secondary">{cardCopy.badge}</Badge>
+          <h3 className="font-medium">{cardCopy.title}</h3>
         </div>
         {c.task ? <Badge variant="outline">{weavraLabel(c.task.phase)}</Badge> : null}
       </div>
-      <p className="mt-3 text-muted-foreground">
-        읽기 전용 조사는 참고 자료예요. 확인한 STANDARD 계획은 Runtime만 구현하며, 모델의 설명만으로
-        완료가 인정되지는 않아요. 새 폴더는 첫 시작에서 로컬 Git과 기준 커밋을 준비해요.
-      </p>
+      <p className="mt-3 text-muted-foreground">{cardCopy.intro("STANDARD")}</p>
       {reason ? (
         <p className="mt-3 text-muted-foreground" role="status">
           {reason}
@@ -149,12 +148,12 @@ export function WeavraTaskCard(props: TaskCardProps) {
           role="status"
           data-weavra="dirty-baseline-committed"
         >
-          기준 커밋 {baselineHead.slice(0, 12)}을 만들었어요. 아래 구현 준비를 다시 눌러 주세요.
+          {cardCopy.baselineCommitted(baselineHead.slice(0, 12))}
         </p>
       ) : null}
       {!c.discovered && props.connected && props.supported ? (
         <Button type="button" variant="outline" className="mt-3" onClick={c.refresh}>
-          연결된 작업 다시 불러오기
+          {cardCopy.reloadTask}
         </Button>
       ) : null}
       {!c.task || c.task.ownership.state === "released" ? (
@@ -169,10 +168,7 @@ export function WeavraTaskCard(props: TaskCardProps) {
             enabled={props.connected && props.supported && c.canOperate && !c.busy}
             onSaved={() => c.setError(null)}
           />
-          <p className="text-muted-foreground">
-            이 대화에서 선택한 checkout으로 작업해요. 분석 요청을 보내거나 구현을 명시적으로
-            확인하기 전에는 모델을 호출하지 않아요.
-          </p>
+          <p className="text-muted-foreground">{cardCopy.checkoutNote}</p>
           <Button
             type="button"
             data-weavra-action="start-controlled-task"
@@ -185,19 +181,14 @@ export function WeavraTaskCard(props: TaskCardProps) {
               })
             }
           >
-            {c.busy ? "작업을 만들고 있어요..." : "통제 작업 시작"}
+            {c.busy ? cardCopy.creating : cardCopy.start}
           </Button>
           {c.task?.execution?.confirmCommandId != null ? (
             c.route === "free" ? (
-              <p className="text-xs text-muted-foreground">
-                자유 작업을 선택했어요. 기록된 통제 작업 결과는 바뀌지 않아요.
-              </p>
+              <p className="text-xs text-muted-foreground">{cardCopy.freeChosen}</p>
             ) : (
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  후속 메시지는 프로바이더나 새 Run을 시작하지 않고 저장해요. 새 통제 작업에는
-                  검토와 확인이 필요해요.
-                </p>
+                <p className="text-xs text-muted-foreground">{cardCopy.followupNote}</p>
                 <Button
                   type="button"
                   variant="outline"
@@ -205,7 +196,7 @@ export function WeavraTaskCard(props: TaskCardProps) {
                   disabled={reason !== null || !c.fresh || c.busy}
                   onClick={c.chooseFreeCoding}
                 >
-                  자유 작업으로 돌아가기
+                  {cardCopy.returnToFree}
                 </Button>
               </div>
             )
@@ -263,12 +254,13 @@ function DirtyWorkspaceRefusal(props: {
   );
   return (
     <div data-weavra="dirty-workspace" className="mt-3 space-y-2">
-      <p className="font-medium">커밋하지 않은 변경 파일 {details.files.length}개</p>
+      <p className="font-medium">{cardCopy.dirtyCount(details.files.length)}</p>
       {fileList}
       {details.truncated ? (
         <p className="text-xs text-muted-foreground" data-weavra="dirty-workspace-truncated">
-          파일이 더 있어 일부만 보여요. 전체 목록을 확인할 수 없어서 기준 커밋에 포함할 수 없어요.
-          터미널에서 git status로 정리한 뒤 다시 준비해 주세요.
+          {cardCopy.dirtyTruncated} {cardCopy.dirtyFixBefore}
+          <code>git status</code>
+          {cardCopy.dirtyFixAfter}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
@@ -279,7 +271,7 @@ function DirtyWorkspaceRefusal(props: {
           disabled={disabled || confirming}
           onClick={() => setConfirming(true)}
         >
-          이 변경을 기준 커밋에 포함
+          {cardCopy.includeInBaseline}
         </Button>
         <Button
           type="button"
@@ -292,14 +284,12 @@ function DirtyWorkspaceRefusal(props: {
             )
           }
         >
-          파일 목록 복사
+          {cardCopy.copyFileList}
         </Button>
       </div>
       {copy ? (
         <p className="text-xs text-muted-foreground" role="status">
-          {copy === "copied"
-            ? "파일 목록을 복사했어요."
-            : "복사하지 못했어요. 목록을 직접 선택해 복사해 주세요."}
+          {copy === "copied" ? cardCopy.fileListCopied : cardCopy.fileListCopyFailed}
         </p>
       ) : null}
       {confirming ? (
@@ -310,12 +300,9 @@ function DirtyWorkspaceRefusal(props: {
           className="space-y-2 rounded-xl border border-border bg-background p-3"
         >
           <p id={titleId} className="font-medium">
-            이 파일들을 프로젝트 저장소에 커밋할까요?
+            {cardCopy.baselineConfirmTitle}
           </p>
-          <p className="text-xs text-muted-foreground">
-            이 대화의 프로젝트 저장소에 "Weavra: 작업 시작 전 기준 커밋"으로 아래 파일만 커밋해요.
-            push는 하지 않아요. 커밋한 뒤 구현 준비를 다시 눌러 주세요.
-          </p>
+          <p className="text-xs text-muted-foreground">{cardCopy.baselineConfirmDescription}</p>
           {fileList}
           <div className="flex flex-wrap gap-2">
             <Button
@@ -324,7 +311,7 @@ function DirtyWorkspaceRefusal(props: {
               disabled={disabled}
               onClick={() => void commit()}
             >
-              커밋하기
+              {cardCopy.commit}
             </Button>
             <Button
               type="button"
@@ -332,7 +319,7 @@ function DirtyWorkspaceRefusal(props: {
               data-weavra-action="cancel-dirty-baseline"
               onClick={() => setConfirming(false)}
             >
-              취소
+              {ko.common.cancel}
             </Button>
           </div>
         </div>
@@ -418,14 +405,11 @@ function DraftFields({
     );
   return (
     <>
-      <p className="text-xs text-muted-foreground">
-        준비 전에는 로컬 초안이에요. 검토한 관찰 내용만 참고 자료에 포함하며, 숨겨진 추론·인증
-        정보·도구 기록은 포함하지 않아요. 전체 한도는 8 KiB예요.
-      </p>
+      <p className="text-xs text-muted-foreground">{cardCopy.draftIntro}</p>
       <output
         id={`${id}-context`}
         tabIndex={-1}
-        aria-label="참고 자료 크기"
+        aria-label={cardCopy.contextSizeAria}
         data-weavra="advisory-context-size"
         aria-live="polite"
         aria-invalid={
@@ -436,39 +420,21 @@ function DraftFields({
         aria-describedby={errors.context ? `${id}-context-error` : undefined}
         className="block text-xs text-muted-foreground"
       >
-        {contextBytes === null ? "확인할 수 없음" : contextBytes} /{" "}
-        {WEAVRA_ANALYSIS_CONTEXT_MAX_BYTES} 바이트의 참고 자료
-        {contextBytes === null ? " - 크기를 확인하려면 소스 참조 JSON을 수정해 주세요." : ""}
+        {cardCopy.contextSize(
+          contextBytes === null ? cardCopy.unavailable : String(contextBytes),
+          WEAVRA_ANALYSIS_CONTEXT_MAX_BYTES,
+        )}
+        {contextBytes === null ? cardCopy.contextSizeUnknown : ""}
       </output>
       <DraftFieldError id={id} field="context" errors={errors} />
       {(
         [
-          ["goal", "구현 목표", 2048, "필수 항목이에요. 최대 2,048자까지 입력해 주세요."],
-          ["symptom", "관찰한 증상", 1000, "필수 항목이에요. 최대 1,000자까지 입력해 주세요."],
-          [
-            "hypothesis",
-            "추정 원인(확인된 사실이 아닌 가설)",
-            1000,
-            "선택 항목이에요. 최대 1,000자까지 입력할 수 있어요.",
-          ],
-          [
-            "uncertainties",
-            "불확실한 점",
-            2007,
-            "한 줄에 하나씩, 항목당 최대 250자로 8개까지 입력해 주세요.",
-          ],
-          [
-            "constraints",
-            "제약 조건",
-            2007,
-            "한 줄에 하나씩, 항목당 최대 250자로 8개까지 입력해 주세요. 이 내용으로 권한이 부여되지는 않아요.",
-          ],
-          [
-            "criteria",
-            "수용 기준",
-            8015,
-            "한 줄에 하나씩 1~16개 기준을 입력해 주세요. 기준당 최대 500자이며, 아직 검증된 결과가 아니에요.",
-          ],
+          ["goal", cardCopy.goalLabel, 2048, cardCopy.goalHelp],
+          ["symptom", cardCopy.symptomLabel, 1000, cardCopy.symptomHelp],
+          ["hypothesis", cardCopy.hypothesisLabel, 1000, cardCopy.hypothesisHelp],
+          ["uncertainties", cardCopy.uncertaintiesLabel, 2007, cardCopy.uncertaintiesHelp],
+          ["constraints", cardCopy.constraintsLabel, 2007, cardCopy.constraintsHelp],
+          ["criteria", cardCopy.criteriaLabel, 8015, cardCopy.criteriaHelp],
         ] as const
       ).map(([field, label, cap, help]) => (
         <div key={field} className="space-y-1.5">
@@ -498,14 +464,17 @@ function DraftFields({
         </div>
       ))}
       <div className="space-y-3">
-        <h4 className="font-medium">선택한 관찰 내용 ({fields.observations.length}/8)</h4>
+        <h4 className="font-medium">{cardCopy.selectedFindings(fields.observations.length)}</h4>
         {fields.observations.map((finding, index) => (
           <div key={findingKeys[index]} className="space-y-1.5 rounded-lg bg-muted/50 p-3">
             <label htmlFor={`${id}-finding-${index}`} className="block text-xs">
-              관찰 내용 {index + 1} | {weavraLabel(finding.provenance)} |{" "}
-              {finding.reference.kind === "message"
-                ? finding.reference.messageId
-                : finding.reference.path}
+              {cardCopy.findingLabel(
+                index + 1,
+                weavraLabel(finding.provenance),
+                finding.reference.kind === "message"
+                  ? finding.reference.messageId
+                  : finding.reference.path,
+              )}
             </label>
             <Textarea
               id={`${id}-finding-${index}`}
@@ -539,12 +508,12 @@ function DraftFields({
                 });
               }}
             >
-              관찰 내용 제거 {index + 1}
+              {cardCopy.removeFinding(index + 1)}
             </Button>
           </div>
         ))}
         <label htmlFor={`${id}-message`} className="block text-xs font-medium">
-          화면에 표시된 메시지를 출처로 선택해 주세요
+          {cardCopy.chooseMessage}
         </label>
         <select
           id={`${id}-message`}
@@ -556,7 +525,7 @@ function DraftFields({
             setSelectionError(null);
           }}
         >
-          <option value="">메시지 선택...</option>
+          <option value="">{cardCopy.messagePlaceholder}</option>
           {visible.map(({ message, preview }) => (
             <option key={message.id} value={message.id}>
               {weavraLabel(message.role)} | {preview}
@@ -566,7 +535,7 @@ function DraftFields({
         {selected ? (
           <details className="text-xs text-muted-foreground">
             <summary className="cursor-pointer" data-weavra="read-selected-message">
-              선택한 메시지 읽기
+              {cardCopy.readSelectedMessage}
             </summary>
             <p className="mt-2 font-mono">
               {weavraLabel(selected.role)} | {selected.id}
@@ -575,7 +544,7 @@ function DraftFields({
           </details>
         ) : null}
         <label htmlFor={`${id}-excerpt`} className="block text-xs">
-          화면에 표시된 원문 발췌(최대 500자)
+          {cardCopy.excerptLabel}
         </label>
         <Textarea
           id={`${id}-excerpt`}
@@ -583,10 +552,7 @@ function DraftFields({
           value={excerpt}
           onChange={(event) => setExcerpt(event.target.value)}
         />
-        <p className="text-xs text-muted-foreground">
-          포함할 관찰 내용만 복사해 주세요. 답변을 그대로 발췌하면 MODEL 출처를 유지하고, 선택한
-          내용을 편집하면 USER로 표시해요. 메시지를 자동으로 선택하지 않아요.
-        </p>
+        <p className="text-xs text-muted-foreground">{cardCopy.excerptHelp}</p>
         <Button
           type="button"
           size="sm"
@@ -596,9 +562,7 @@ function DraftFields({
           onClick={() => {
             if (!selected || (selected.role !== "user" && selected.role !== "assistant")) return;
             if (!selected.text.includes(excerpt)) {
-              setSelectionError(
-                "발췌문은 선택한 메시지의 원문과 일치해야 해요. 먼저 추가한 뒤 필요하면 관찰 내용을 편집해 주세요.",
-              );
+              setSelectionError(cardCopy.excerptMismatch);
               return;
             }
             try {
@@ -613,11 +577,11 @@ function DraftFields({
               setExcerpt("");
               setSelectionError(null);
             } catch {
-              setSelectionError("화면에 표시된 원문에서 1~500자를 선택해 주세요.");
+              setSelectionError(cardCopy.excerptInvalid);
             }
           }}
         >
-          선택한 관찰 내용 포함
+          {cardCopy.includeFinding}
         </Button>
         {selectionError ? (
           <p role="alert" className="text-xs text-destructive">
@@ -626,9 +590,9 @@ function DraftFields({
         ) : null}
       </div>
       <details className="min-w-0 space-y-3">
-        <summary className="cursor-pointer font-medium">고급: 출처와 증상 검사</summary>
+        <summary className="cursor-pointer font-medium">{cardCopy.advanced}</summary>
         <label htmlFor={`${id}-sources`} className="block text-xs font-medium">
-          소스 참조(선택 사항, JSON 배열)
+          {cardCopy.sourcesLabel}
         </label>
         <Textarea
           id={`${id}-sources`}
@@ -640,13 +604,9 @@ function DraftFields({
           onChange={(event) => update("sources", event.target.value)}
         />
         <DraftFieldError id={id} field="sources" errors={errors} />
-        <p className="text-xs text-muted-foreground">
-          최초 소스 해시가 없으면 []로 두세요. 상대 경로와 원래 digest(sha256: 및 16진수 64자)를
-          최대 8개 입력할 수 있고 lines의 start/end는 선택 사항이에요. 오래된 관찰을 숨기려고 해시를
-          만들거나 갱신하지 마세요. Host가 현재 소스와 비교해요.
-        </p>
+        <p className="text-xs text-muted-foreground">{cardCopy.sourcesHelp}</p>
         <label htmlFor={`${id}-symptom-criterion`} className="block text-xs font-medium">
-          원래 증상에 대한 수용 기준
+          {cardCopy.symptomCriterionLabel}
         </label>
         <select
           id={`${id}-symptom-criterion`}
@@ -665,7 +625,7 @@ function DraftFields({
             })
           }
         >
-          <option value="">연결하지 않음</option>
+          <option value="">{cardCopy.notLinked}</option>
           {bindingOptionsAvailable &&
             preview?.acceptanceCriteria.map((criterion, index) => (
               <option key={criterion.id} value={String(index + 1)}>
@@ -675,7 +635,7 @@ function DraftFields({
         </select>
         <DraftFieldError id={id} field="symptom-criterion" errors={errors} />
         <label htmlFor={`${id}-symptom-check`} className="block text-xs font-medium">
-          증상을 확인할 필수 등록 검사
+          {cardCopy.symptomCheckLabel}
         </label>
         <select
           id={`${id}-symptom-check`}
@@ -692,7 +652,7 @@ function DraftFields({
             })
           }
         >
-          <option value="">연결하지 않음</option>
+          <option value="">{cardCopy.notLinked}</option>
           {bindingOptionsAvailable &&
             preview?.checks
               .filter((check) => check.required)
@@ -705,21 +665,15 @@ function DraftFields({
         <DraftFieldError id={id} field="symptom-check" errors={errors} />
         {!bindingOptionsAvailable ? (
           <p className="text-xs text-muted-foreground" role="status">
-            새 스냅샷을 준비한 뒤 수용 기준과 필수 등록 검사를 선택해 주세요. 모델·허용 경로·검사는
-            Runtime이 제공하며, 이 화면에서 검사 등록을 만들 수는 없어요.
+            {cardCopy.bindingUnavailable}
           </p>
         ) : null}
         {!fields.symptomCriterion || !fields.symptomCheck ? (
           <p className="text-xs text-muted-foreground" role="status">
-            원래 문제에 검증 검사가 연결되지 않았어요. 작업 완료만으로 보고한 증상이 해결됐다고 볼
-            수는 없어요.
+            {cardCopy.bindingMissing}
           </p>
         ) : null}
-        <p className="text-xs text-muted-foreground">
-          두 항목을 함께 선택하거나 모두 비워 두세요. 선택을 바꾸면 새 스냅샷 준비와 재검토가
-          필요해요. 수용 기준을 편집하거나 순서를 바꾸면 연결이 해제돼요. 등록 digest는 Runtime이
-          제공해요.
-        </p>
+        <p className="text-xs text-muted-foreground">{cardCopy.bindingHelp}</p>
       </details>
     </>
   );
@@ -735,12 +689,9 @@ function GoalModeChooser(props: {
   return (
     <div data-weavra="goal-mode" className="space-y-2 rounded-lg bg-muted/50 p-3">
       <p id={`${props.id}-goal-mode-label`} className="font-medium">
-        이 목표를 어떻게 다룰까요?
+        {cardCopy.goalModeQuestion}
       </p>
-      <p className="text-xs text-muted-foreground">
-        고른 방식은 목표 앞에 [읽기 전용] 또는 [수정] 태그로 보이게 남고 저장 초안에도 포함돼요.
-        태그 없이 방식을 추측하지 않아요.
-      </p>
+      <p className="text-xs text-muted-foreground">{cardCopy.goalModeHelp}</p>
       <div
         role="radiogroup"
         aria-labelledby={`${props.id}-goal-mode-label`}
@@ -770,7 +721,7 @@ function GoalModeChooser(props: {
           if (selected !== null) props.reprepare();
         }}
       >
-        다시 준비
+        {cardCopy.reprepare}
       </Button>
     </div>
   );
@@ -782,12 +733,12 @@ function TaskPreview({ task }: { task: WeavraTask }) {
   return (
     <div className="min-w-0 space-y-4 rounded-lg border border-border bg-background/50 p-3">
       <h4 className="font-medium" data-weavra="prepared-snapshot">
-        준비된 스냅샷 | {preview.workflow} | {preview.executionMode} | {preview.risk}
+        {cardCopy.preparedSnapshot(preview.workflow, preview.executionMode, preview.risk)}
       </h4>
       <p>{preview.goal}</p>
       <dl className="space-y-2 text-xs">
         <div>
-          <dt className="font-medium">대상 checkout / HEAD</dt>
+          <dt className="font-medium">{cardCopy.targetCheckout}</dt>
           <dd className="font-mono">
             {preview.taskBinding.checkout.canonicalCwd}
             <br />
@@ -795,7 +746,7 @@ function TaskPreview({ task }: { task: WeavraTask }) {
           </dd>
         </div>
         <div>
-          <dt className="font-medium">Runtime 모델(확정된 경로)</dt>
+          <dt className="font-medium">{cardCopy.modelRoutes}</dt>
           <dd>
             {preview.modelRoutes
               ? preview.modelRoutes.map((route) => (
@@ -804,11 +755,11 @@ function TaskPreview({ task }: { task: WeavraTask }) {
                     {weavraLabel(route.intent)} | {weavraLabel(route.source)}
                   </p>
                 ))
-              : "확인할 수 없어요. 대화 모델에서 추정하지 않아요"}
+              : cardCopy.modelRoutesUnknown}
           </dd>
         </div>
         <div>
-          <dt className="font-medium">허용 경로</dt>
+          <dt className="font-medium">{cardCopy.allowedPaths}</dt>
           <dd>
             {preview.allowedPaths.length
               ? preview.allowedPaths.map((path) => (
@@ -816,21 +767,22 @@ function TaskPreview({ task }: { task: WeavraTask }) {
                     {path}
                   </p>
                 ))
-              : "없음"}
+              : ko.common.none}
           </dd>
         </div>
         <div>
-          <dt className="font-medium">Host에 등록된 검사</dt>
+          <dt className="font-medium">{cardCopy.hostChecks}</dt>
           <dd>
             {preview.checks.map((check) => (
               <p key={check.id}>
-                {check.id} | {weavraLabel(check.kind)} | {check.required ? "필수" : "선택"}
+                {check.id} | {weavraLabel(check.kind)} |{" "}
+                {check.required ? cardCopy.required : cardCopy.optional}
               </p>
             ))}
           </dd>
         </div>
         <div>
-          <dt className="font-medium">수용 기준</dt>
+          <dt className="font-medium">{cardCopy.criteria}</dt>
           <dd className="space-y-2">
             {preview.acceptanceCriteria.map((criterion) => (
               <div key={criterion.id}>
@@ -838,33 +790,35 @@ function TaskPreview({ task }: { task: WeavraTask }) {
                   {criterion.id}: {criterion.statement}
                 </p>
                 <p className="text-muted-foreground">
-                  검사: {criterion.checkIds.join(", ") || "없음"} | 독립 검토{" "}
-                  {criterion.reviewRequired ? "필수" : "필수 아님"}
+                  {cardCopy.criterionChecks(
+                    criterion.checkIds.join(", ") || ko.common.none,
+                    criterion.reviewRequired,
+                  )}
                 </p>
               </div>
             ))}
           </dd>
         </div>
         <div>
-          <dt className="font-medium">증상 검증 연결</dt>
+          <dt className="font-medium">{cardCopy.symptomBinding}</dt>
           <dd>
             {preview.taskBinding.symptomVerification
               ? `${preview.taskBinding.symptomVerification.criterionId} / ${preview.taskBinding.symptomVerification.checkId} / ${preview.taskBinding.symptomVerification.registrationDigest}`
-              : "연결 없음 - 원래 문제는 미검증 상태예요"}
+              : cardCopy.noSymptomBinding}
           </dd>
         </div>
       </dl>
       <details className="text-xs text-muted-foreground">
-        <summary className="cursor-pointer">스냅샷 식별 정보와 설정</summary>
+        <summary className="cursor-pointer">{cardCopy.snapshotIdentity}</summary>
         <dl className="mt-2 space-y-2 font-mono">
           <div>
-            <dt>실행 / 참고 자료</dt>
+            <dt>{cardCopy.executionContext}</dt>
             <dd>
               {preview.taskBinding.executionId} / {preview.taskBinding.packetVersion}
             </dd>
           </div>
           <div>
-            <dt>미리보기 / 설정 / 참고 자료 digest</dt>
+            <dt>{cardCopy.digests}</dt>
             <dd>
               {preview.previewDigest}
               <br />
@@ -874,11 +828,11 @@ function TaskPreview({ task }: { task: WeavraTask }) {
             </dd>
           </div>
           <div>
-            <dt>작업 공간 digest</dt>
+            <dt>{cardCopy.workspaceDigest}</dt>
             <dd>{preview.taskBinding.checkout.workspaceDigest}</dd>
           </div>
           <div>
-            <dt>프로젝트 revision / 만료</dt>
+            <dt>{cardCopy.projectRevisionExpiry}</dt>
             <dd>
               {preview.projectRevision} / {new Date(preview.expiresAt).toLocaleString()}
             </dd>
@@ -900,13 +854,13 @@ function TaskIdentity({ task, fresh }: { task: WeavraTask; fresh: boolean }) {
   return (
     <div className="space-y-2 text-xs text-muted-foreground">
       <p role="status">
-        {fresh ? "현재 관찰 결과" : "과거 스냅샷 - 작업 전에 동기화해 주세요"}: {taskStatus(task)}
+        {fresh ? cardCopy.currentObservation : cardCopy.staleObservation}: {taskStatus(task)}
       </p>
       <details className="min-w-0">
-        <summary className="cursor-pointer">작업 및 checkout 진단</summary>
+        <summary className="cursor-pointer">{cardCopy.diagnostics}</summary>
         <dl className="mt-2 grid min-w-0 gap-1">
           <div>
-            <dt className="inline font-medium">checkout: </dt>
+            <dt className="inline font-medium">{cardCopy.checkoutLabel}</dt>
             <dd className="inline font-mono">{task.checkout.canonicalCwd}</dd>
           </div>
           <div>
@@ -914,28 +868,28 @@ function TaskIdentity({ task, fresh }: { task: WeavraTask; fresh: boolean }) {
             <dd className="inline font-mono">{task.checkout.headCommit}</dd>
           </div>
           <div>
-            <dt className="inline font-medium">작업: </dt>
+            <dt className="inline font-medium">{cardCopy.taskLabel}</dt>
             <dd className="inline font-mono">
-              {task.id} | revision {task.revision} | 소유권 {weavraLabel(task.ownership.state)}
+              {cardCopy.taskValue(task.id, task.revision, weavraLabel(task.ownership.state))}
             </dd>
           </div>
           {task.execution ? (
             <div>
-              <dt className="inline font-medium">실행: </dt>
+              <dt className="inline font-medium">{cardCopy.executionLabel}</dt>
               <dd className="inline font-mono">{task.execution.binding.executionId}</dd>
             </div>
           ) : null}
           {receipt?.status === "FOUND" && receipt.run ? (
             <div>
-              <dt className="inline font-medium">Run: </dt>
+              <dt className="inline font-medium">{cardCopy.runLabel}</dt>
               <dd className="inline font-mono">
-                {receipt.run.runId} | revision {receipt.run.revision}
+                {cardCopy.runValue(receipt.run.runId, receipt.run.revision)}
               </dd>
             </div>
           ) : null}
         </dl>
       </details>
-      <p>작업 단계는 완료 판정이 아니에요. 이 카드만으로 원래 문제가 검증되지는 않아요.</p>
+      <p>{cardCopy.notVerdict}</p>
     </div>
   );
 }
@@ -1077,7 +1031,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
     if (edited && cached !== fields) saveDraft(draftKey, fields);
   }, [cached, fields, draftKey, saveDraft, edited]);
   const blocker = confirmAttempted
-    ? "확인을 요청했어요. 같은 요청을 다시 보내지 말고 작업 상태를 새로고침해 주세요. 새 시도에는 새 스냅샷이 필요해요."
+    ? cardCopy.confirmRequested
     : taskConfirmBlocker({ task, fresh: c.fresh, canOperate: c.canOperate, edited, reviewed, now });
   const prepare = async () => {
     if (!c.ref || disabled) return;
@@ -1094,7 +1048,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
       saveDraft(draftKey, effective);
     } catch (error) {
       if (error instanceof SyntaxError) {
-        setFieldErrors({ sources: "올바른 소스 참조 JSON 배열을 입력해 주세요." });
+        setFieldErrors({ sources: cardCopy.invalidSources });
       } else if (Schema.isSchemaError(error)) {
         setFieldErrors(
           Object.fromEntries(
@@ -1114,9 +1068,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
       } else {
         throw error;
       }
-      setValidation(
-        "초안을 확인해 주세요. 항목별 한도·소스 참조 JSON·수용 기준과 검사 연결을 확인해 주세요. 전체 참고 자료는 8 KiB 이내여야 해요. 내용을 자르거나 전송하지 않았어요.",
-      );
+      setValidation(cardCopy.draftInvalid);
       return;
     }
     const result = await c.act(
@@ -1167,30 +1119,21 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
       <TaskIdentity task={task} fresh={c.fresh} />
       {task.phase === "analysis" ? (
         <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">
-            조사: Codex 읽기 전용 | 네트워크 차단 | 권한 확대 없음
-          </p>
+          <p className="font-medium text-foreground">{cardCopy.analysisMode}</p>
           <p className="mt-1">
             {props.analysisSupported && props.provider === "codex"
-              ? "메시지 입력창으로 조사하거나, 모델 호출 없이 직접 검토한 초안을 준비할 수 있어요."
-              : "선택한 기능·프로바이더로는 읽기 전용 조사를 사용할 수 없어요. 프로바이더를 바꾸지 않으며, 직접 검토한 초안은 준비할 수 있어요."}
+              ? cardCopy.analysisAvailable
+              : cardCopy.analysisUnavailable}
           </p>
-          <p className="mt-1">
-            프로필·활성 MCP·지원하지 않는 옵션·검증되지 않은 저장 세션 재개는 거부해요. 제한 없는
-            실행으로 전환하지 않아요.
-          </p>
+          <p className="mt-1">{cardCopy.analysisRefusals}</p>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">
-          메시지는 후속 기록으로만 저장돼요. Runtime에 지시하거나 프로바이더·다음 Run을 시작하지
-          않아요.
-        </p>
+        <p className="text-xs text-muted-foreground">{cardCopy.followupOnly}</p>
       )}
       {preview ? <TaskPreview task={task} /> : null}
       {editable && previous && !preview ? (
         <p className="text-xs text-muted-foreground" data-weavra="saved-control-history">
-          빈 항목은 이 대화에 저장된 이전 목표와 수용 기준을 재사용해요. 출처나 실행 승인은 자동으로
-          옮기지 않아요.
+          {cardCopy.savedHistory}
         </p>
       ) : null}
       {editable && chatDraft ? (
@@ -1198,10 +1141,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
           className="space-y-2 text-xs text-muted-foreground"
           data-weavra="chat-control-candidate"
         >
-          <p>
-            채팅에서 작성한 AI 초안이에요. 저장된 내용과 직접 수정한 값은 보존하며, 이 초안은 실행
-            승인이 아니에요.
-          </p>
+          <p>{cardCopy.chatCandidate}</p>
           {chatDraft.messageId !== appliedCandidate ? (
             <Button
               type="button"
@@ -1214,7 +1154,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
                 setAppliedCandidate(chatDraft.messageId);
               }}
             >
-              채팅 제안으로 채우기
+              {cardCopy.applyChatDraft}
             </Button>
           ) : null}
         </div>
@@ -1222,7 +1162,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
       {editable ? (
         <details open={!preview} className="min-w-0">
           <summary className="cursor-pointer font-medium">
-            구현에 넘길 참고 자료 검토 {edited ? "- 변경됐어요. 다시 준비해 주세요" : ""}
+            {cardCopy.reviewHandoff} {edited ? cardCopy.reviewHandoffEdited : ""}
           </summary>
           <fieldset disabled={disabled} className="mt-4 min-w-0 space-y-4 disabled:opacity-60">
             <DraftFields
@@ -1243,21 +1183,17 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
       ) : null}
       {task.execution?.confirmCommandId != null ? (
         <div className="space-y-2 text-xs text-muted-foreground">
-          <p>
-            복구는 이 작업의 Runtime 소유 프로세스가 종료됐는지 확인해요. 구현을 다시 시작하거나
-            변경을 되돌리지 않아요. 일부 변경과 실패한 검사는 보존하며, 정리가 확인되지 않으면
-            checkout 보호를 유지해요.
-          </p>
-          {!c.recoverySupported ? <p>이 환경은 작업 복구 지원을 제공하지 않아요.</p> : null}
+          <p>{cardCopy.recoveryNote}</p>
+          {!c.recoverySupported ? <p>{cardCopy.recoveryUnsupported}</p> : null}
           {task.execution.receipt?.status === "FOUND" &&
           task.execution.receipt.admission.cleanup === "UNCONFIRMED" &&
           task.phase === "attention-required" ? (
             <p role="status">
               {task.execution.receipt.run?.status === "INTERRUPTED" ||
               task.execution.receipt.admission.outcome.status === "INTERRUPTED_BEFORE_START"
-                ? "중단을 기록했어요. "
+                ? cardCopy.interruptionRecorded
                 : null}
-              정리가 확인되지 않아 checkout 보호를 유지해요.
+              {cardCopy.cleanupUnconfirmed}
             </p>
           ) : null}
         </div>
@@ -1277,8 +1213,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
               disabled={disabled}
               onChange={(event) => setConsent(event.target.checked ? consentKey : null)}
             />
-            대상 checkout·모델·허용 경로·등록 검사·수용 기준을 검토했어요. 이 확인은 파괴적 작업의
-            승인이 아니에요.
+            {cardCopy.consent}
           </label>
           {blocker ? <p className="text-xs text-muted-foreground">{blocker}</p> : null}
         </div>
@@ -1293,7 +1228,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
                 disabled={disabled || blocker !== null}
                 onClick={confirm}
               >
-                Runtime 구현 확인
+                {cardCopy.confirmImplementation}
               </Button>
               <Button
                 type="button"
@@ -1302,7 +1237,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
                 disabled={disabled}
                 onClick={() => void prepare()}
               >
-                새 스냅샷 준비
+                {cardCopy.prepareSnapshot}
               </Button>
             </>
           ) : (
@@ -1312,7 +1247,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
               disabled={disabled}
               onClick={() => void prepare()}
             >
-              {c.busy ? "준비하고 있어요..." : "검토한 내용으로 구현 준비"}
+              {c.busy ? cardCopy.preparing : cardCopy.prepareHandoff}
             </Button>
           )
         ) : null}
@@ -1328,7 +1263,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
               void c.act({ type: "reconcile", input: c.ref });
             }}
           >
-            작업 상태 새로고침
+            {cardCopy.refreshTask}
           </Button>
         ) : null}
         {task.execution?.confirmCommandId != null && c.ref ? (
@@ -1352,7 +1287,7 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
               });
             }}
           >
-            중단된 작업 복구 확인
+            {cardCopy.recoverTask}
           </Button>
         ) : null}
         {editable && c.ref ? (
@@ -1369,13 +1304,13 @@ function TaskEditor(props: TaskCardProps & { task: WeavraTask }) {
               });
             }}
           >
-            통제 작업 중단
+            {cardCopy.stopTask}
           </Button>
         ) : null}
       </div>
       {c.busy ? (
         <p role="status" className="text-xs text-muted-foreground">
-          서버 응답을 기다리고 있어요...
+          {cardCopy.waiting}
         </p>
       ) : null}
     </div>

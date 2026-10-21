@@ -1,6 +1,7 @@
 import { type ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
 import { memo } from "react";
 import { InfoIcon, XIcon } from "lucide-react";
+import { ko } from "~/i18n/ko";
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { formatProviderDriverKindLabel } from "../../providerModels";
@@ -39,26 +40,29 @@ export function hasProviderSetup(status: ServerProvider): boolean {
   );
 }
 
-/** Keep the environment's error intact in both the banner and model picker. */
-export function getProviderStatusMessage(status: ServerProvider): string {
-  if (status.message) return status.message;
+const copy = ko.providers.banner;
+
+function getProviderStatusRecovery(status: ServerProvider): string {
   const providerName = status.displayName?.trim() || formatProviderDriverKindLabel(status.driver);
   if (!status.installed && hasProviderSetup(status)) {
-    return `Open provider setup to install ${formatProviderDriverKindLabel(status.driver)} on this environment.`;
+    return copy.installViaSetup(formatProviderDriverKindLabel(status.driver));
   }
   if (status.auth.status === "unauthenticated") {
     if (hasProviderSetup(status)) {
-      return status.driver === "antigravity"
-        ? "공급자 설정을 열어 Google로 로그인해 주세요."
-        : "공급자 설정을 열어 로그인해 주세요.";
+      return status.driver === "antigravity" ? copy.signInWithGoogleViaSetup : copy.signInViaSetup;
     }
-    return "CLI로 다시 로그인해 주세요.";
+    return copy.signInViaCli;
   }
   return status.status === "ready"
-    ? "이 공급자에서 쓸 수 있는 모델이 없어요."
+    ? copy.noModels
     : status.status === "error"
-      ? `${providerName} provider is unavailable.`
-      : `${providerName} provider has limited availability.`;
+      ? copy.unavailable(providerName)
+      : copy.limited(providerName);
+}
+
+/** Keep the environment's error intact in both the banner and model picker. */
+export function getProviderStatusMessage(status: ServerProvider): string {
+  return status.message || getProviderStatusRecovery(status);
 }
 
 export const ProviderStatusBanner = memo(function ProviderStatusBanner({
@@ -77,9 +81,15 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   const providerName = status.displayName?.trim() || formatProviderDriverKindLabel(status.driver);
   const isUnauthenticated = status.status === "error" && status.auth.status === "unauthenticated";
   const title = isUnauthenticated
-    ? `${providerName} is unauthenticated`
-    : `${providerName} provider status`;
-  const message = getProviderStatusMessage(status);
+    ? copy.unauthenticatedTitle(providerName)
+    : copy.statusTitle(providerName);
+  const recovery = getProviderStatusRecovery(status);
+  const message = status.message || null;
+  const needsDiagnosticsAction =
+    message !== null &&
+    status.installed &&
+    status.auth.status !== "unauthenticated" &&
+    status.status !== "ready";
 
   return (
     <div className="mx-auto w-fit max-w-[calc(100%-2rem)] pt-3">
@@ -96,14 +106,25 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
         <InfoIcon className="size-4 shrink-0" aria-hidden />
         <div className="flex min-w-0 flex-col gap-1">
           <div className="font-medium">{title}</div>
-          <Tooltip>
-            <TooltipTrigger
-              render={<div className="line-clamp-3 text-muted-foreground">{message}</div>}
-            />
-            <TooltipPopup side="top" className="max-w-96 whitespace-pre-wrap">
-              {message}
-            </TooltipPopup>
-          </Tooltip>
+          <div className="text-muted-foreground">{recovery}</div>
+          {needsDiagnosticsAction ? (
+            <div className="text-muted-foreground">{copy.unavailableAction}</div>
+          ) : null}
+          {message ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <div className="line-clamp-3 text-muted-foreground">
+                    <span className="font-medium">{ko.common.rawDiagnostics}: </span>
+                    <span className="select-text">{message}</span>
+                  </div>
+                }
+              />
+              <TooltipPopup side="top" className="max-w-96 whitespace-pre-wrap">
+                {message}
+              </TooltipPopup>
+            </Tooltip>
+          ) : null}
           {onOpenProviderSetup && hasProviderSetup(status) ? (
             <Button
               className="self-start px-0 text-foreground"
@@ -111,12 +132,16 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
               size="xs"
               variant="link"
             >
-              공급자 설정 열기
+              {copy.openSetup}
             </Button>
           ) : null}
         </div>
         <Button
-          aria-label={`${providerName} 공급자 ${status.status === "warning" ? "경고" : "오류"} 닫기`}
+          aria-label={
+            status.status === "warning"
+              ? copy.dismissWarning(providerName)
+              : copy.dismissError(providerName)
+          }
           className="absolute top-1 right-1 size-9 text-muted-foreground hover:text-foreground sm:size-9"
           onClick={onDismiss}
           size="icon-xs"

@@ -31,6 +31,7 @@ import {
   readCustomModelEntries,
   toCustomModelSetting,
 } from "@t3tools/shared/model";
+import { ko } from "~/i18n/ko";
 import { cn } from "../../lib/utils";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { normalizeProviderAccentColor } from "../../providerInstances";
@@ -51,10 +52,13 @@ import { SettingsRow, SettingsSection } from "./settingsLayout";
 import {
   getProviderVersionAdvisoryPresentation,
   PROVIDER_STATUS_STYLES,
+  getProviderRecoveryGuidance,
   getProviderSummary,
   getProviderVersionLabel,
   type ProviderStatusKey,
 } from "./providerStatus";
+
+const copy = ko.providers.card;
 
 const ENVIRONMENT_VARIABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
@@ -162,9 +166,9 @@ function ProviderAuthEmail(props: { readonly email: string | undefined }) {
   return (
     <RedactedSensitiveText
       value={email}
-      ariaLabel="Toggle account email visibility"
-      revealTooltip="Click to reveal email"
-      hideTooltip="Click to hide email"
+      ariaLabel={copy.toggleEmailVisibility}
+      revealTooltip={copy.revealEmail}
+      hideTooltip={copy.hideEmail}
       className="max-w-full truncate"
     />
   );
@@ -253,12 +257,12 @@ function ProviderEnvironmentSection(props: {
 
   return (
     <SettingsRow
-      title="Variables"
-      description="API keys, base URLs, and other per-instance CLI settings."
+      title={copy.variables}
+      description={copy.variablesDescription}
       control={
         <Button type="button" size="sm" variant="outline" onClick={addVariable}>
           <PlusIcon className="size-3" />
-          Add variable
+          {copy.addVariable}
         </Button>
       }
     >
@@ -273,7 +277,7 @@ function ProviderEnvironmentSection(props: {
                 onCommit={(name) => updateVariable(variable.id, { name: name.trim() })}
                 placeholder="VARIABLE_NAME"
                 spellCheck={false}
-                aria-label={`Environment variable name ${index + 1}`}
+                aria-label={copy.variableName(index + 1)}
               />
               <span className="hidden text-xs text-muted-foreground sm:inline" aria-hidden>
                 =
@@ -286,10 +290,10 @@ function ProviderEnvironmentSection(props: {
                 type={variable.sensitive ? "password" : undefined}
                 autoComplete="off"
                 placeholder={
-                  variable.valueRedacted ? "Stored secret, enter a new value to replace" : "value"
+                  variable.valueRedacted ? copy.storedSecretPlaceholder : copy.valuePlaceholder
                 }
                 spellCheck={false}
-                aria-label={`Environment variable value ${index + 1}`}
+                aria-label={copy.variableValue(index + 1)}
               />
               <Tooltip>
                 <TooltipTrigger
@@ -312,7 +316,7 @@ function ProviderEnvironmentSection(props: {
                         });
                       }}
                       aria-pressed={variable.sensitive}
-                      aria-label={`Mark environment variable ${variable.name || index + 1} as sensitive`}
+                      aria-label={copy.markSensitive(variable.name || String(index + 1))}
                     >
                       {variable.sensitive ? (
                         <LockIcon className="size-3" />
@@ -323,7 +327,7 @@ function ProviderEnvironmentSection(props: {
                   }
                 />
                 <TooltipPopup side="top">
-                  {variable.sensitive ? "Sensitive, stored separately" : "Plain text"}
+                  {variable.sensitive ? copy.sensitive : copy.plainText}
                 </TooltipPopup>
               </Tooltip>
               <Button
@@ -332,15 +336,13 @@ function ProviderEnvironmentSection(props: {
                 variant="ghost-muted"
                 className="[--control-icon-color:currentColor] hover:text-destructive"
                 onClick={() => removeVariable(variable.id)}
-                aria-label={`Remove environment variable ${variable.name || index + 1}`}
+                aria-label={copy.removeVariable(variable.name || String(index + 1))}
               >
                 <XIcon className="size-3" />
               </Button>
             </div>
           ))}
-          <p className="text-xs text-muted-foreground">
-            Sensitive values are stored separately and never returned to the app.
-          </p>
+          <p className="text-xs text-muted-foreground">{copy.sensitiveNote}</p>
         </div>
       ) : null}
     </SettingsRow>
@@ -434,7 +436,9 @@ export function ProviderInstanceCard({
   const statusStyle = PROVIDER_STATUS_STYLES[statusKey];
   const summary = enabled
     ? getProviderSummary(liveProvider, { concise: true })
-    : { headline: "Disabled", detail: null };
+    : { headline: ko.common.disabled, detail: null };
+  const recoveryGuidance = enabled ? getProviderRecoveryGuidance(liveProvider) : null;
+  const rawDiagnostics = enabled ? (liveProvider?.message ?? null) : null;
   const authEmail = liveProvider?.auth.email?.trim();
   const isAuthenticated = enabled && liveProvider?.auth.status === "authenticated";
   const authLabel =
@@ -452,15 +456,15 @@ export function ProviderInstanceCard({
     onCopy: ({ providerName }) => {
       toastManager.add({
         type: "success",
-        title: `${providerName} update command copied`,
-        description: "Run it in a terminal when you are ready to update.",
+        title: copy.updateCommandCopied(providerName),
+        description: copy.runWhenReady,
       });
     },
     onError: (error, { providerName }) => {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: `Could not copy ${providerName} update command`,
+          title: copy.updateCommandCopyFailed(providerName),
           description: error.message,
         }),
       );
@@ -578,7 +582,7 @@ export function ProviderInstanceCard({
     isAuthenticated && authEmail ? (
       <>
         {needsAttention ? statusDotNode : null}
-        <span>Authenticated as</span>
+        <span>{copy.authenticatedAs}</span>
         <ProviderAuthEmail email={authEmail} />
         {authLabel ? <span>· {authLabel}</span> : null}
       </>
@@ -604,7 +608,7 @@ export function ProviderInstanceCard({
           type="button"
           className="flex min-h-9 min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-md text-left outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground"
           onClick={onSelect}
-          aria-label={`Select ${displayName}`}
+          aria-label={copy.select(displayName)}
           aria-pressed={selected}
         >
           {titleIconNode}
@@ -641,17 +645,17 @@ export function ProviderInstanceCard({
                     size="icon-micro"
                     variant="ghost-muted"
                     className="shrink-0"
-                    aria-label={`Copy ${displayName} update command`}
+                    aria-label={copy.copyUpdateCommandFor(displayName)}
                     onClick={() => copyToClipboard(updateCommand, { providerName: displayName })}
                   >
                     <ArrowUpCircleIcon className="size-3.5" />
                   </Button>
                 }
               />
-              <TooltipPopup side="top">Copy update command</TooltipPopup>
+              <TooltipPopup side="top">{copy.copyUpdateCommand}</TooltipPopup>
             </Tooltip>
           ) : (
-            <span role="img" aria-label="Update available" className="inline-flex shrink-0">
+            <span role="img" aria-label={copy.updateAvailable} className="inline-flex shrink-0">
               <ArrowUpCircleIcon className="size-3.5 text-muted-foreground" />
             </span>
           )
@@ -661,7 +665,7 @@ export function ProviderInstanceCard({
             checked={enabled}
             disabled={readOnly}
             onCheckedChange={(checked) => updateEnabled(Boolean(checked))}
-            aria-label={`Enable ${displayName}`}
+            aria-label={copy.enable(displayName)}
           />
         </span>
       </div>
@@ -695,7 +699,7 @@ export function ProviderInstanceCard({
                       ? "text-warning hover:text-warning"
                       : "text-muted-foreground hover:text-foreground",
                   )}
-                  aria-label="Update available — view details"
+                  aria-label={copy.updateAvailableDetails}
                 >
                   <ArrowUpCircleIcon />
                 </Button>
@@ -709,7 +713,7 @@ export function ProviderInstanceCard({
               <div className="grid min-w-0 gap-3">
                 <div className="grid gap-0.5">
                   <p className="text-[13px] font-semibold leading-tight text-foreground">
-                    Update available
+                    {copy.updateAvailable}
                   </p>
                   <p
                     className={cn(
@@ -732,13 +736,13 @@ export function ProviderInstanceCard({
                     onClick={onRunUpdate}
                   >
                     {isUpdating ? <Spinner /> : <DownloadIcon />}
-                    {isUpdating ? "Updating" : "Update now"}
+                    {isUpdating ? copy.updating : copy.updateNow}
                   </Button>
                 ) : null}
                 {onRunUpdate && updateCommand ? (
                   <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     <span aria-hidden className="h-px flex-1 bg-border" />
-                    or, update manually using
+                    {copy.orUpdateManually}
                     <span aria-hidden className="h-px flex-1 bg-border" />
                   </div>
                 ) : null}
@@ -758,13 +762,13 @@ export function ProviderInstanceCard({
                             onClick={() =>
                               copyToClipboard(updateCommand, { providerName: displayName })
                             }
-                            aria-label="Copy update command"
+                            aria-label={copy.copyUpdateCommand}
                           >
                             <CopyIcon className="size-3" />
                           </Button>
                         }
                       />
-                      <TooltipPopup side="top">Copy command</TooltipPopup>
+                      <TooltipPopup side="top">{copy.copyCommand}</TooltipPopup>
                     </Tooltip>
                   </div>
                 ) : null}
@@ -781,7 +785,7 @@ export function ProviderInstanceCard({
             disabled={readOnly}
             className="[--control-icon-color:currentColor] hover:text-destructive"
             onClick={onDelete}
-            aria-label={`Delete instance ${instanceId}`}
+            aria-label={copy.deleteInstance(instanceId)}
           >
             <Trash2Icon />
           </Button>
@@ -793,29 +797,52 @@ export function ProviderInstanceCard({
   return (
     <>
       <SettingsSection title={displayName} icon={titleIconNode} headerAction={editorHeaderAction}>
-        {summary.detail ? (
+        {summary.detail || recoveryGuidance ? (
           <div className="mx-3 min-w-0 rounded-lg bg-muted/30 p-3 text-sm text-foreground sm:mx-4">
-            <Button
-              variant="ghost"
-              size="default"
-              aria-expanded={diagnosticExpanded}
-              aria-controls={`provider-instance-${instanceId}-diagnostic`}
-              className="h-auto min-h-8 whitespace-normal break-keep text-pretty transition-[opacity,transform] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:ring-0 focus-visible:ring-offset-0 [&:active:not([aria-haspopup])]:scale-100"
-              onClick={() => setDiagnosticExpanded((value) => !value)}
-            >
-              원문 진단 및 복구 안내
-            </Button>
-            <p
-              id={`provider-instance-${instanceId}-diagnostic`}
-              hidden={!diagnosticExpanded}
-              className="mt-2 whitespace-pre-wrap [overflow-wrap:anywhere]"
-            >
-              {summary.detail}
-            </p>
+            {recoveryGuidance ? (
+              <dl className="mb-2 grid gap-1 break-keep text-pretty">
+                <dt className="sr-only">{copy.cause}</dt>
+                <dd className="font-medium">{recoveryGuidance.cause}</dd>
+                <dt className="sr-only">{copy.recovery}</dt>
+                <dd className="text-muted-foreground">{recoveryGuidance.action}</dd>
+              </dl>
+            ) : null}
+            {summary.detail ? (
+              <Button
+                variant="ghost"
+                size="default"
+                aria-expanded={diagnosticExpanded}
+                aria-controls={`provider-instance-${instanceId}-diagnostic`}
+                className="h-auto min-h-8 whitespace-normal break-keep text-pretty transition-[opacity,transform] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:ring-0 focus-visible:ring-offset-0 [&:active:not([aria-haspopup])]:scale-100"
+                onClick={() => setDiagnosticExpanded((value) => !value)}
+              >
+                {copy.diagnosticsDisclosure}
+              </Button>
+            ) : null}
+            {summary.detail ? (
+              <div
+                id={`provider-instance-${instanceId}-diagnostic`}
+                hidden={!diagnosticExpanded}
+                className="mt-2"
+              >
+                {rawDiagnostics ? (
+                  <>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {ko.common.rawDiagnostics}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap font-mono text-xs select-text [overflow-wrap:anywhere]">
+                      {rawDiagnostics}
+                    </p>
+                  </>
+                ) : (
+                  <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{summary.detail}</p>
+                )}
+              </div>
+            ) : null}
           </div>
         ) : null}
         <SettingsRow
-          title="Display name"
+          title={copy.displayName}
           status={
             <div className="flex min-w-0 flex-wrap items-center gap-x-1.5">{editorStatusNode}</div>
           }
@@ -841,7 +868,7 @@ export function ProviderInstanceCard({
                 className="min-w-0 flex-1 @min-[32rem]/settings-row:w-56"
                 value={instance.displayName ?? ""}
                 onCommit={updateDisplayName}
-                placeholder={driverOption?.label ?? "Instance label"}
+                placeholder={driverOption?.label ?? copy.instanceLabelPlaceholder}
                 spellCheck={false}
               />
             </div>
@@ -849,10 +876,10 @@ export function ProviderInstanceCard({
         />
       </SettingsSection>
 
-      {setup ? <SettingsSection title="Setup">{setup}</SettingsSection> : null}
+      {setup ? <SettingsSection title={copy.setup}>{setup}</SettingsSection> : null}
 
       <SettingsSection
-        title="Runtime"
+        title={copy.runtime}
         inert={readOnly}
         aria-disabled={readOnly || undefined}
         className={readOnly ? "opacity-50 select-none" : undefined}
@@ -867,12 +894,12 @@ export function ProviderInstanceCard({
           />
         ) : (
           <SettingsRow
-            title="Driver"
+            title={copy.driver}
             description={
               <span>
-                This instance uses{" "}
-                <code className="text-foreground">{String(instance.driver)}</code>, which is not
-                available in this build. Its configuration is preserved.
+                {copy.driverUnavailablePrefix}
+                <code className="text-foreground">{String(instance.driver)}</code>
+                {copy.driverUnavailableSuffix}
               </span>
             }
           />
@@ -880,7 +907,7 @@ export function ProviderInstanceCard({
       </SettingsSection>
 
       <SettingsSection
-        title="Environment"
+        title={copy.environment}
         inert={readOnly}
         aria-disabled={readOnly || undefined}
         className={readOnly ? "opacity-50 select-none" : undefined}
@@ -893,16 +920,13 @@ export function ProviderInstanceCard({
 
       {driverOption !== undefined ? (
         <SettingsSection
-          title="Models"
+          title={copy.models}
           inert={readOnly}
           aria-disabled={readOnly || undefined}
           className={readOnly ? "opacity-50 select-none" : undefined}
         >
           <div className="px-3 py-3 sm:px-4">
-            <p className="mb-3 text-sm text-muted-foreground">
-              Favorites, visibility, and ordering are saved on this device. Custom models are saved
-              on the selected environment.
-            </p>
+            <p className="mb-3 text-sm text-muted-foreground">{copy.modelsNote}</p>
             <ProviderModelsSection
               instanceId={instanceId}
               driverKind={driverKind}

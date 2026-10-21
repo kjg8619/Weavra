@@ -1,4 +1,7 @@
 import type { ServerProvider, ServerProviderVersionAdvisory } from "@t3tools/contracts";
+import { ko } from "~/i18n/ko";
+
+const copy = ko.providers.status;
 
 /**
  * Visual treatment for each server-reported provider status. Centralized so
@@ -35,53 +38,92 @@ export function getProviderSummary(
 ) {
   if (!provider) {
     return {
-      headline: "Checking provider status",
-      detail: "Waiting for the server to report installation and authentication details.",
+      headline: copy.checking,
+      detail: copy.checkingDetail,
     };
   }
   if (!provider.enabled || provider.status === "disabled") {
     return {
-      headline: "Disabled",
-      detail:
-        provider.message ?? "This provider is installed but disabled for new sessions in Weavra.",
+      headline: ko.common.disabled,
+      detail: provider.message ?? copy.disabledDetail,
     };
   }
   if (!provider.installed) {
     return {
-      headline: "Not found",
-      detail: provider.message ?? "CLI not detected on PATH.",
+      headline: copy.notFound,
+      detail: provider.message ?? copy.notFoundDetail,
     };
   }
   if (provider.auth.status === "unauthenticated") {
     return {
-      headline: "Not authenticated",
+      headline: copy.notAuthenticated,
       detail: provider.message ?? null,
     };
   }
   if (provider.status === "warning") {
     return {
-      headline: "Needs attention",
-      detail:
-        provider.message ?? "The provider is installed, but the server could not fully verify it.",
+      headline: copy.needsAttention,
+      detail: provider.message ?? copy.warningDetail,
     };
   }
   if (provider.status === "error") {
     return {
-      headline: "Unavailable",
-      detail: provider.message ?? "The provider failed its startup checks.",
+      headline: ko.common.unavailable,
+      detail: provider.message ?? copy.errorDetail,
     };
   }
   if (provider.auth.status === "authenticated") {
     const authLabel = provider.auth.label ?? provider.auth.type;
     return {
-      headline: !options?.concise && authLabel ? `Authenticated · ${authLabel}` : "Authenticated",
+      headline:
+        !options?.concise && authLabel ? copy.authenticatedWith(authLabel) : copy.authenticated,
       detail: provider.message ?? null,
     };
   }
   return {
-    headline: "Available",
+    headline: copy.available,
     detail: provider.message ?? null,
   };
+}
+
+/**
+ * Korean cause and recovery for a structured provider failure, derived only
+ * from status fields the server already reports. Shown before the original
+ * diagnostics, which stay untranslated. Null when nothing needs recovery.
+ */
+export function getProviderRecoveryGuidance(
+  provider: ServerProvider | undefined,
+): { readonly cause: string; readonly action: string } | null {
+  if (!provider || !provider.enabled || provider.status === "disabled") return null;
+  const hasSetup = provider.driver === "antigravity" || provider.setup !== undefined;
+  if (!provider.installed) {
+    return {
+      cause: copy.notInstalledCause,
+      action:
+        hasSetup && provider.setup?.canInstall !== false
+          ? copy.notInstalledSetupAction
+          : copy.notInstalledAction,
+    };
+  }
+  if (provider.auth.status === "unauthenticated") {
+    return {
+      cause: copy.unauthenticatedCause,
+      action:
+        hasSetup && provider.setup?.canAuthenticate !== false
+          ? copy.unauthenticatedSetupAction
+          : copy.unauthenticatedAction,
+    };
+  }
+  if (provider.status === "error") {
+    return { cause: copy.errorCause, action: copy.diagnosticsAction };
+  }
+  if (provider.status === "warning") {
+    return { cause: copy.warningCause, action: copy.diagnosticsAction };
+  }
+  if (provider.versionAdvisory?.status === "behind_latest") {
+    return { cause: copy.versionBehindCause, action: copy.versionBehindAction };
+  }
+  return null;
 }
 
 /**
@@ -113,16 +155,13 @@ export function getProviderVersionAdvisoryPresentation(
     return null;
   }
 
-  const label = "Update available";
   const version = advisory.latestVersion;
   const versionLabel = getProviderVersionLabel(version);
 
   return {
     detail:
       advisory.message ??
-      (versionLabel
-        ? `${label}: install ${versionLabel}.`
-        : `${label}: install the latest provider version.`),
+      (versionLabel ? copy.updateInstallVersion(versionLabel) : copy.updateInstallLatest),
     updateCommand: advisory.updateCommand,
     emphasis: "normal" as const,
   };

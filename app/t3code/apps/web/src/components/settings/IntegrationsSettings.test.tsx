@@ -57,6 +57,7 @@ vi.mock("./SettingsScopeContext", () => ({
 }));
 
 import { IntegrationsSettingsPanel } from "./IntegrationsSettings";
+import { ko } from "~/i18n/ko";
 import { platformSetupStatus } from "../device/DeviceSetup";
 
 let renderer: ReactTestRenderer | undefined;
@@ -112,7 +113,9 @@ describe("browser link destination", () => {
   it("updates only the selected browser link destination", async () => {
     await openSettings();
 
-    const trigger = renderer!.root.find((node) => node.props["aria-label"] === "Open links in");
+    const trigger = renderer!.root.find(
+      (node) => node.props["aria-label"] === ko.settings.integrations.openLinksIn,
+    );
 
     let select = trigger.parent;
     while (select && typeof select.props.onValueChange !== "function") {

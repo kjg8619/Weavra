@@ -58,7 +58,7 @@ describe("formatChatTimestampTooltip", () => {
     vi.resetModules();
   });
 
-  it.each(["de-DE", "it-IT"])("keeps the English date label in a %s runtime", async (locale) => {
+  it.each(["de-DE", "it-IT"])("keeps the Korean date label in a %s runtime", async (locale) => {
     const DateTimeFormat = Intl.DateTimeFormat;
     vi.spyOn(Intl, "DateTimeFormat").mockImplementation(function (locales, options) {
       return new DateTimeFormat(locales ?? locale, options);
@@ -67,7 +67,7 @@ describe("formatChatTimestampTooltip", () => {
     const { formatChatTimestampTooltip: format } = await import("./timestampFormat");
     const date = new Date(2026, 5, 4, 14, 4).toISOString();
 
-    expect(format(date, "24-hour")).toBe("14:04, 4th June 2026");
+    expect(format(date, "24-hour")).toBe("2026년 6월 4일 14:04");
   });
 });
 
@@ -82,21 +82,21 @@ describe("formatExpiresInLabel", () => {
   });
 
   it("returns Expired when the instant is in the past", () => {
-    expect(formatExpiresInLabel("2026-04-07T11:59:00.000Z")).toBe("Expired");
+    expect(formatExpiresInLabel("2026-04-07T11:59:00.000Z")).toBe("만료됨");
   });
 
   it("uses sub-minute second count", () => {
-    expect(formatExpiresInLabel("2026-04-07T12:00:45.000Z")).toBe("Expires in 45s");
+    expect(formatExpiresInLabel("2026-04-07T12:00:45.000Z")).toBe("45초 후 만료");
   });
 
   it("uses minutes and seconds under one hour", () => {
-    expect(formatExpiresInLabel("2026-04-07T12:04:12.000Z")).toBe("Expires in 4m 12s");
-    expect(formatExpiresInLabel("2026-04-07T12:15:00.000Z")).toBe("Expires in 15m");
+    expect(formatExpiresInLabel("2026-04-07T12:04:12.000Z")).toBe("4분 12초 후 만료");
+    expect(formatExpiresInLabel("2026-04-07T12:15:00.000Z")).toBe("15분 후 만료");
   });
 
   it("uses hours with minute and second remainder", () => {
-    expect(formatExpiresInLabel("2026-04-07T14:02:03.000Z")).toBe("Expires in 2h 2m 3s");
-    expect(formatExpiresInLabel("2026-04-07T18:00:00.000Z")).toBe("Expires in 6h");
+    expect(formatExpiresInLabel("2026-04-07T14:02:03.000Z")).toBe("2시간 2분 3초 후 만료");
+    expect(formatExpiresInLabel("2026-04-07T18:00:00.000Z")).toBe("6시간 후 만료");
   });
 });
 
@@ -117,7 +117,7 @@ describe("formatDayAwareTimestamp", () => {
     const messageAt = iso(2026, 7, 13, 23, 30);
     const justPastMidnight = new Date(2026, 7, 14, 0, 30).getTime();
     expect(formatDayAwareTimestamp(messageAt, "12-hour", justPastMidnight)).toBe(
-      `yesterday at ${time(messageAt)}`,
+      `어제 ${time(messageAt)}`,
     );
   });
 
@@ -200,8 +200,8 @@ describe("getRelativeTimeState", () => {
   it("returns relative parts for valid timestamps", () => {
     expect(getRelativeTimeState("2026-04-07T11:45:00.000Z")).toEqual({
       status: "relative",
-      value: "15m",
-      suffix: "ago",
+      value: "15분",
+      suffix: "전",
     });
   });
 });
@@ -217,14 +217,14 @@ describe("formatElapsedDurationLabel", () => {
   });
 
   it("returns just now when the instant is current or in the future", () => {
-    expect(formatElapsedDurationLabel("2026-04-07T12:00:00.000Z")).toBe("just now");
-    expect(formatElapsedDurationLabel("2026-04-07T12:01:00.000Z")).toBe("just now");
+    expect(formatElapsedDurationLabel("2026-04-07T12:00:00.000Z")).toBe("방금");
+    expect(formatElapsedDurationLabel("2026-04-07T12:01:00.000Z")).toBe("방금");
   });
 
   it("formats seconds, minutes, hours, and days", () => {
-    expect(formatElapsedDurationLabel("2026-04-07T11:59:45.000Z")).toBe("15s");
-    expect(formatElapsedDurationLabel("2026-04-07T11:45:00.000Z")).toBe("15m");
-    expect(formatElapsedDurationLabel("2026-04-07T06:00:00.000Z")).toBe("6h");
-    expect(formatElapsedDurationLabel("2026-04-03T12:00:00.000Z")).toBe("4d");
+    expect(formatElapsedDurationLabel("2026-04-07T11:59:45.000Z")).toBe("15초");
+    expect(formatElapsedDurationLabel("2026-04-07T11:45:00.000Z")).toBe("15분");
+    expect(formatElapsedDurationLabel("2026-04-07T06:00:00.000Z")).toBe("6시간");
+    expect(formatElapsedDurationLabel("2026-04-03T12:00:00.000Z")).toBe("4일");
   });
 });

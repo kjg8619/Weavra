@@ -16,6 +16,7 @@ import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { shortcutToKeybindingInput } from "./KeybindingsSettings.logic";
 import { useSnapShotShortcutRecorder } from "./useSnapShotShortcutRecorder";
+import { ko } from "~/i18n/ko";
 
 const DEFAULT_SHORTCUT = parseKeybindingShortcut("Ctrl+Shift+2")!;
 
@@ -105,7 +106,7 @@ export function CaptureShortcutConfig({
       );
     } catch (cause) {
       setError({
-        message: "Couldn't prepare the changes. Check Advanced for help.",
+        message: ko.settings.captureShortcut.prepareFailed,
         ...(cause instanceof Error ? { detail: cause.message } : {}),
       });
     } finally {
@@ -122,14 +123,14 @@ export function CaptureShortcutConfig({
       if (!applied.warning && preview.operation === "install" && onComplete) {
         toastManager.add({
           type: "success",
-          title: "Shortcut saved",
-          description: `Use ${preview.shortcut} from another app.`,
+          title: ko.settings.captureShortcut.savedToastTitle,
+          description: ko.settings.captureShortcut.savedToastDescription(preview.shortcut),
         });
         await onComplete();
       }
     } catch (cause) {
       setError({
-        message: "Couldn't save your shortcut. Review the changes and try again.",
+        message: ko.settings.captureShortcut.saveFailed,
         ...(cause instanceof Error ? { detail: cause.message } : {}),
       });
       setPreview(null);
@@ -142,38 +143,38 @@ export function CaptureShortcutConfig({
     <div className="space-y-4 text-sm">
       {!result ? (
         <div className="flex items-center justify-between gap-3">
-          <span>Shortcut</span>
+          <span>{ko.settings.captureShortcut.shortcutLabel}</span>
           {recorder.input}
         </div>
       ) : null}
       {recorder.recording ? (
         <p role="status" className="text-xs text-muted-foreground">
-          Press your shortcut. Esc cancels.
+          {ko.settings.captureShortcut.recordingHint}
         </p>
       ) : null}
       {result ? (
         <p role="status">
           {result.warning
-            ? "Saved, but the shortcut needs attention. Check Advanced for help."
+            ? ko.settings.captureShortcut.savedNeedsAttention
             : preview?.operation === "remove"
-              ? "Shortcut removed."
-              : `Use ${preview?.shortcut} from another app to capture a window.`}
+              ? ko.settings.captureShortcut.removed
+              : ko.settings.captureShortcut.savedUseShortcut(`${preview?.shortcut}`)}
         </p>
       ) : preview ? (
         <>
           <p className="text-muted-foreground">
             {changed
               ? preview.operation === "remove"
-                ? "Review the change below to remove your shortcut."
-                : "Review the change below, then save your shortcut."
+                ? ko.settings.captureShortcut.reviewToRemove
+                : ko.settings.captureShortcut.reviewToSave
               : preview.operation === "remove"
-                ? "There's no capture shortcut to remove."
-                : "This shortcut is already set up."}
+                ? ko.settings.captureShortcut.nothingToRemove
+                : ko.settings.captureShortcut.alreadySetUp}
           </p>
           {diff ? (
             <div
               className="max-h-80 overflow-auto rounded-lg border text-xs"
-              aria-label="Shortcut changes"
+              aria-label={ko.settings.captureShortcut.changesLabel}
             >
               <FileDiff
                 fileDiff={diff}
@@ -187,7 +188,7 @@ export function CaptureShortcutConfig({
           ) : null}
           {changed ? (
             <p className="text-xs text-muted-foreground">
-              Only these changes will be saved. We'll keep a backup.
+              {ko.settings.captureShortcut.onlyTheseChanges}
             </p>
           ) : null}
           <div className="flex gap-2">
@@ -201,35 +202,34 @@ export function CaptureShortcutConfig({
                 onClick={() => void apply()}
               >
                 {working === "writing"
-                  ? "Saving…"
+                  ? ko.common.saving
                   : changed
                     ? preview.operation === "install"
-                      ? "Save shortcut"
-                      : "Remove shortcut"
-                    : "Done"}
+                      ? ko.settings.captureShortcut.saveShortcut
+                      : ko.settings.captureShortcut.removeShortcut
+                    : ko.common.done}
               </Button>
             ) : null}
             <Button variant="ghost" disabled={actionBusy} onClick={() => setPreview(null)}>
-              Cancel
+              {ko.common.cancel}
             </Button>
           </div>
         </>
       ) : (
         <>
-          <p className="text-muted-foreground">
-            Allow Weavra to read your desktop settings. You'll review any changes here before
-            saving.
-          </p>
+          <p className="text-muted-foreground">{ko.settings.captureShortcut.allowRead}</p>
           <Button
             disabled={actionBusy || !supported}
             aria-busy={working === "reading"}
             onClick={() => void read()}
           >
-            {working === "reading" ? "Preparing changes…" : "Review changes"}
+            {working === "reading"
+              ? ko.settings.captureShortcut.preparingChanges
+              : ko.settings.captureShortcut.reviewChanges}
           </Button>
           {!supported ? (
             <p className="text-xs text-muted-foreground">
-              A matching Weavra build is required to finish setting up your shortcut.
+              {ko.settings.captureShortcut.buildRequired}
             </p>
           ) : null}
         </>
@@ -242,29 +242,35 @@ export function CaptureShortcutConfig({
       {state.shortcutActionRegistered === false && state.shortcutMessage ? (
         <p role="status" className="text-muted-foreground">
           {state.shortcutPending
-            ? "Connecting to your desktop…"
-            : "Restart Weavra to finish connecting your shortcut."}
+            ? ko.settings.captureShortcut.connectingDesktop
+            : ko.settings.captureShortcut.restartToConnect}
         </p>
       ) : null}
       <details className="text-xs text-muted-foreground">
-        <summary className="cursor-pointer">Advanced</summary>
+        <summary className="cursor-pointer">{ko.settings.captureShortcut.advanced}</summary>
         <div className="mt-3 space-y-3">
           {error?.detail || result?.warning ? (
             <div className="space-y-1">
-              <p className="font-medium text-foreground">Troubleshooting</p>
+              <p className="font-medium text-foreground">
+                {ko.settings.captureShortcut.troubleshooting}
+              </p>
               <p className="break-words">{error?.detail ?? result?.warning}</p>
             </div>
           ) : null}
           <div className="space-y-1">
-            <p className="font-medium text-foreground">Settings file</p>
+            <p className="font-medium text-foreground">
+              {ko.settings.captureShortcut.settingsFile}
+            </p>
             <p className="break-all font-mono">
               {preview?.path ??
                 state.shortcutConfigPath ??
                 (niri ? "~/.config/niri/config.kdl" : "~/.config/hypr/hyprland.conf")}
             </p>
-            {niri ? <p>Weavra also reads any files included by this file.</p> : null}
+            {niri ? <p>{ko.settings.captureShortcut.niriIncludes}</p> : null}
             {preview && preview.resolvedPath !== preview.path ? (
-              <p className="break-all">Linked to {preview.resolvedPath}. The link will be kept.</p>
+              <p className="break-all">
+                {ko.settings.captureShortcut.linkedTo(preview.resolvedPath)}
+              </p>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -274,7 +280,7 @@ export function CaptureShortcutConfig({
               disabled={actionBusy || !supported}
               onClick={() => void read(true)}
             >
-              Choose a different file…
+              {ko.settings.captureShortcut.chooseDifferentFile}
             </Button>
             <Button
               size="sm"
@@ -282,7 +288,7 @@ export function CaptureShortcutConfig({
               disabled={actionBusy || !supported}
               onClick={() => void read(customFile, "remove")}
             >
-              Remove shortcut…
+              {ko.settings.captureShortcut.removeShortcutEllipsis}
             </Button>
             {result ? (
               <Button
@@ -291,23 +297,23 @@ export function CaptureShortcutConfig({
                 disabled={actionBusy || !supported}
                 onClick={() => void read()}
               >
-                Review changes
+                {ko.settings.captureShortcut.reviewChanges}
               </Button>
             ) : null}
           </div>
           <p>
-            Use your desktop's shortcut settings file.{" "}
+            {ko.settings.captureShortcut.desktopSettingsFileHint}{" "}
             {niri
-              ? "A custom --config or NIRI_CONFIG can change its location."
-              : "On Omarchy, use your own bindings file, not its defaults."}
+              ? ko.settings.captureShortcut.niriConfigLocation
+              : ko.settings.captureShortcut.omarchyBindings}
           </p>
-          {result?.backupPath ? <p className="break-all">Backup: {result.backupPath}</p> : null}
-          <p className="font-medium text-foreground">Manual setup</p>
+          {result?.backupPath ? (
+            <p className="break-all">{ko.settings.captureShortcut.backup(result.backupPath)}</p>
+          ) : null}
+          <p className="font-medium text-foreground">{ko.settings.captureShortcut.manualSetup}</p>
           <p>
-            {niri
-              ? "Paste this inside binds { … } in your Niri config, then save."
-              : "Add this binding to your Hyprland config, then save."}{" "}
-            Change the keys if needed.
+            {niri ? ko.settings.captureShortcut.niriPaste : ko.settings.captureShortcut.hyprlandAdd}{" "}
+            {ko.settings.captureShortcut.changeKeysIfNeeded}
           </p>
           <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-muted/50 p-3">
             {state.shortcutBinding}
@@ -320,12 +326,9 @@ export function CaptureShortcutConfig({
               if (state.shortcutBinding) copyToClipboard(state.shortcutBinding);
             }}
           >
-            {isCopied ? "Copied" : "Copy shortcut"}
+            {isCopied ? ko.common.copied : ko.settings.captureShortcut.copyShortcut}
           </Button>
-          <p>
-            Turn capture off in Weavra to stop it. Remove the shortcut from {desktop} to free up the
-            keys.
-          </p>
+          <p>{ko.settings.captureShortcut.turnOffAndRemove(desktop)}</p>
           {state.shortcutActionRegistered === false ? (
             <p role="status">{state.shortcutMessage}</p>
           ) : null}
@@ -336,7 +339,7 @@ export function CaptureShortcutConfig({
               disabled={actionBusy || state.shortcutActionRegistered === false}
               onClick={() => void onComplete()}
             >
-              I've added the shortcut
+              {ko.settings.captureShortcut.addedShortcut}
             </Button>
           ) : null}
         </div>

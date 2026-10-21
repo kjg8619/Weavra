@@ -76,6 +76,7 @@ import { Dialog } from "../ui/dialog";
 import { toastManager } from "../ui/toast";
 import { cn } from "../../lib/utils";
 import { formatRelativeTime } from "../../timestampFormat";
+import { ko } from "~/i18n/ko";
 
 /**
  * First-run welcome wizard. Rendered over the workspace at `/welcome` on a
@@ -90,9 +91,8 @@ type WizardStep = "connection" | "agents" | "import";
 const NO_ENVIRONMENTS: readonly EnvironmentId[] = [];
 
 const AGENT_ONBOARDING_THREAD_ID = ThreadId.make("onboarding-agent-setup");
-const ONBOARDING_STAGES = ["연결", "에이전트", "프로젝트"] as const;
-const SCAN_LIMIT_MESSAGE =
-  "검색 한도에 도달했어요. 일부 프로젝트나 대화가 표시되지 않을 수 있어요.";
+const ONBOARDING_STAGES = [ko.common.connection, ko.devices.agents, ko.common.project] as const;
+const SCAN_LIMIT_MESSAGE = ko.onboarding.wizard.scanLimitReached;
 
 export function WelcomeWizard({
   localAvailable,
@@ -161,8 +161,8 @@ export function WelcomeWizard({
         .catch(() => {
           const errorToast = {
             type: "error",
-            title: "설정을 완료하지 못했어요",
-            description: "설정을 저장하지 못했어요. 다시 시도해 주세요.",
+            title: ko.onboarding.wizard.setupFailedTitle,
+            description: ko.onboarding.wizard.setupSaveFailed,
           } as const;
           if (completionErrorToastIdRef.current === null) {
             completionErrorToastIdRef.current = toastManager.add(errorToast);
@@ -190,7 +190,7 @@ export function WelcomeWizard({
         initialFocus={() => document.getElementById("onboarding-pairing-url") ?? true}
       >
         <WizardHeader
-          title="Weavra 설정하기"
+          title={ko.onboarding.wizard.setupWeavra}
           identity={
             <div className="flex items-baseline gap-1.5" role="img" aria-label="Weavra">
               <T3Wordmark className="h-4 w-auto shrink-0" aria-hidden />
@@ -299,13 +299,15 @@ function ConnectionStep({
   }, [ready]);
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground">컴퓨터 연결하기</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+        {ko.onboarding.connectComputer}
+      </h1>
       <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
-        컴퓨터를 하나 이상 선택해 주세요. 각 컴퓨터에 에이전트와 프로젝트를 설정해요.
+        {ko.onboarding.wizard.chooseComputers}
       </p>
       {directEnvironments.length > 0 ? (
         <fieldset className="mt-5 space-y-2">
-          <legend className="sr-only">설정할 컴퓨터</legend>
+          <legend className="sr-only">{ko.onboarding.wizard.computersToSetUp}</legend>
           {directEnvironments.map((environment) => (
             <div
               key={environment.environmentId}
@@ -328,19 +330,24 @@ function ConnectionStep({
                       {environment.label}
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {environment.connection.phase === "connected" ? "연결됨" : "연결 중…"}
+                      {environment.connection.phase === "connected"
+                        ? ko.onboarding.wizard.connected
+                        : ko.onboarding.wizard.connecting}
                     </span>
                   </span>
                 </span>
               </label>
               <details className="mt-2 text-sm">
                 <summary className="cursor-pointer rounded-sm py-2 text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">
-                  연결 진단 정보
+                  {ko.onboarding.wizard.connectionDiagnostics}
                 </summary>
                 <dl className="space-y-2 pt-2">
                   {[
-                    ["연결 주소", environment.displayUrl ?? "확인 안 됨"],
-                    ["환경 ID", environment.environmentId],
+                    [
+                      ko.onboarding.wizard.connectionAddress,
+                      environment.displayUrl ?? ko.common.unknown,
+                    ],
+                    [ko.onboarding.wizard.environmentId, environment.environmentId],
                   ].map(([label, value]) => (
                     <div key={label} className="min-w-0">
                       <dt className="text-muted-foreground">{label}</dt>
@@ -377,7 +384,7 @@ function ConnectionStep({
             }
           >
             <LinkIcon className="size-4 text-muted-foreground" />
-            <span className="flex-1">컴퓨터 추가하기</span>
+            <span className="flex-1">{ko.onboarding.wizard.addComputer}</span>
             <ChevronRightIcon
               className={cn("size-4 text-muted-foreground", pairingOpen && "rotate-90")}
             />
@@ -404,7 +411,7 @@ function ConnectionStep({
           disabled={!ready || isPairing}
           onClick={onContinue}
         >
-          계속하기
+          {ko.onboarding.continue}
           <ArrowRightIcon className="size-3.5" />
         </Button>
       </div>
@@ -456,11 +463,11 @@ function ConnectAccountOption({
         <span className="flex-1">T3 Connect</span>
         <span className="text-xs text-muted-foreground">
           {!isLoaded
-            ? "로그인 정보를 불러오는 중…"
+            ? ko.onboarding.wizard.loadingSignIn
             : !isSignedIn
-              ? "로그인"
+              ? ko.onboarding.wizard.signIn
               : !discoveryReady
-                ? "컴퓨터를 불러오는 중…"
+                ? ko.onboarding.wizard.loadingComputers
                 : null}
         </span>
         <ChevronRightIcon
@@ -479,13 +486,15 @@ function ConnectAccountOption({
                 selection={{ selectedIds, onChange: onToggleEnvironment, autoSelectedComputers }}
                 refreshWhileEmpty
                 empty={
-                  <p className="py-3 text-sm text-muted-foreground">연결된 컴퓨터가 없어요.</p>
+                  <p className="py-3 text-sm text-muted-foreground">
+                    {ko.onboarding.wizard.noConnectedComputers}
+                  </p>
                 }
               />
             ) : null}
           </div>
           <p className="text-sm text-muted-foreground">
-            호스팅 계정 연결을 사용할 수 없어요. 직접 페어링 링크를 사용해 주세요.
+            {ko.onboarding.wizard.hostedConnectionUnavailable}
           </p>
         </div>
       </CollapsiblePanel>
@@ -532,7 +541,7 @@ function PairingForm({
     }
     if (isAtomCommandInterrupted(result)) return;
     const cause = squashAtomCommandFailure(result);
-    setErrorMessage(cause instanceof Error ? cause.message : "페어링에 실패했어요.");
+    setErrorMessage(cause instanceof Error ? cause.message : ko.onboarding.wizard.pairingFailed);
   };
 
   return (
@@ -546,7 +555,7 @@ function PairingForm({
       >
         <div>
           <label className="block text-sm text-muted-foreground" htmlFor="onboarding-pairing-url">
-            페어링 링크
+            {ko.onboarding.wizard.pairingLink}
           </label>
           <Input
             id="onboarding-pairing-url"
@@ -590,19 +599,23 @@ function PairingForm({
               className="group flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               <ChevronRightIcon className="size-3.5 group-data-panel-open:rotate-90" />
-              페어링 링크가 필요하신가요?
+              {ko.onboarding.wizard.needPairingLink}
             </CollapsibleTrigger>
             <Button type="submit" disabled={isPairing || pairingUrl.trim().length === 0}>
-              {isPairing ? "페어링 중..." : "페어링"}
+              {isPairing ? ko.onboarding.wizard.pairing : ko.onboarding.wizard.pair}
             </Button>
           </div>
           <CollapsiblePanel className="pt-3">
-            <p className="text-sm text-muted-foreground">코드가 있는 컴퓨터에서 실행해 주세요.</p>
+            <p className="text-sm text-muted-foreground">
+              {ko.onboarding.wizard.runOnComputerWithCode}
+            </p>
             <CommandBlock command="weavra-server pair" className="mt-2" />
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              먼저 Weavra를 시작하거나 <code className="font-mono">weavra-server serve</code>를
-              실행해 주세요. tailnet을 사용하려면 <code className="font-mono">--tailscale</code>을
-              추가해 주세요.
+              {ko.onboarding.wizard.tailscaleHintStart}
+              <code className="font-mono">weavra-server serve</code>
+              {ko.onboarding.wizard.tailscaleHintMiddle}
+              <code className="font-mono">--tailscale</code>
+              {ko.onboarding.wizard.tailscaleHintEnd}
             </p>
           </CollapsiblePanel>
         </Collapsible>
@@ -642,7 +655,7 @@ function AgentsStep({
 }) {
   const { environments } = useEnvironments();
   return (
-    <StepShell title="에이전트" description="선택한 컴퓨터에서 사용할 수 있는 에이전트예요.">
+    <StepShell title={ko.devices.agents} description={ko.onboarding.availableAgents}>
       <ScrollArea
         scrollFade
         className="mt-5 h-auto max-h-96 [&_[data-slot=scroll-area-scrollbar]]:opacity-100"
@@ -654,7 +667,7 @@ function AgentsStep({
               environmentId={environmentId}
               machineLabel={
                 environments.find((environment) => environment.environmentId === environmentId)
-                  ?.label ?? "컴퓨터"
+                  ?.label ?? ko.onboarding.wizard.computer
               }
             />
           ))}
@@ -662,7 +675,7 @@ function AgentsStep({
       </ScrollArea>
       <div className="mt-6 flex justify-end">
         <Button autoFocus onClick={onContinue}>
-          계속하기
+          {ko.onboarding.continue}
           <ArrowRightIcon className="size-3.5" />
         </Button>
       </div>
@@ -779,12 +792,12 @@ function AgentCard({
         {providerState === "ready" ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
             <CheckIcon className="size-3.5" />
-            준비됨
+            {ko.onboarding.wizard.ready}
           </span>
         ) : providerState === "checking" ? (
-          <span className="text-xs text-muted-foreground">확인 중...</span>
+          <span className="text-xs text-muted-foreground">{ko.onboarding.wizard.checking}</span>
         ) : providerState === "disabled" ? (
-          <span className="text-xs text-muted-foreground">사용 안 함</span>
+          <span className="text-xs text-muted-foreground">{ko.common.disabled}</span>
         ) : providerState === "attention" ? (
           <span className="text-xs text-muted-foreground">{summary.headline}</span>
         ) : (
@@ -795,7 +808,7 @@ function AgentCard({
             disabled={terminalOpen || !terminalAvailable}
           >
             <TerminalIcon className="size-3.5" />
-            {providerState === "signIn" ? "로그인" : "설치"}
+            {providerState === "signIn" ? ko.onboarding.wizard.signIn : ko.common.install}
           </Button>
         )}
       </div>
@@ -908,25 +921,26 @@ function AgentInstallTerminal({
         <span className="text-[11px] font-medium text-muted-foreground">
           {setupState === "writeFailed" ? (
             <>
-              이 터미널에서 <code className="rounded bg-muted px-1 font-mono">{command}</code>을
-              실행해 주세요.
+              {ko.onboarding.wizard.runInTerminalStart}
+              <code className="rounded bg-muted px-1 font-mono">{command}</code>
+              {ko.onboarding.wizard.runInTerminalEnd}
             </>
           ) : setupState === "ready" ? (
-            "명령을 확인한 다음 Enter를 눌러 실행해 주세요."
+            ko.onboarding.wizard.confirmAndPressEnter
           ) : setupState === "openFailed" ? (
-            "설정 터미널을 열지 못했어요."
+            ko.onboarding.wizard.setupTerminalOpenFailed
           ) : (
-            "명령을 준비하고 있어요..."
+            ko.onboarding.wizard.preparingCommand
           )}
         </span>
         <div className="flex items-center gap-1">
           {setupState === "openFailed" ? (
             <Button size="xs" variant="ghost" onClick={() => setSetupAttempt((value) => value + 1)}>
-              다시 시도
+              {ko.common.retry}
             </Button>
           ) : null}
           <Button size="xs" variant="ghost-muted" onClick={onClose}>
-            닫기
+            {ko.common.close}
           </Button>
         </div>
       </div>
@@ -936,7 +950,9 @@ function AgentInstallTerminal({
             threadRef={threadRef}
             threadId={AGENT_ONBOARDING_THREAD_ID}
             terminalId={terminalId}
-            terminalLabel={`${driver === "claudeAgent" ? "Claude Code" : "Codex"} 설치`}
+            terminalLabel={ko.onboarding.wizard.installAgent(
+              driver === "claudeAgent" ? "Claude Code" : "Codex",
+            )}
             cwd={cwd}
             providerInstanceId={providerInstanceId}
             advancedTypography={advancedTypography}
@@ -1145,17 +1161,13 @@ function ImportStep({
     setIsImporting(false);
     if (importedProjectsCount < selection.length) {
       if (importedThreadCount > 0 && skippedThreadCount > 0) {
-        setImportError(
-          `대화 ${importedThreadCount}개를 가져왔어요. 대화 ${skippedThreadCount}개는 가져오지 못했어요.`,
-        );
+        setImportError(ko.onboarding.wizard.importPartial(importedThreadCount, skippedThreadCount));
       } else if (skippedThreadCount > 0) {
-        setImportError(`대화 ${skippedThreadCount}개를 가져오지 못했어요.`);
+        setImportError(ko.onboarding.wizard.importSkipped(skippedThreadCount));
       } else if (importedThreadCount > 0) {
-        setImportError(
-          `대화 ${importedThreadCount}개를 가져왔어요. 일부 대화 기록은 가져오지 못했어요.`,
-        );
+        setImportError(ko.onboarding.wizard.importHistoryPartial(importedThreadCount));
       } else {
-        setImportError("대화 기록을 가져오지 못했어요.");
+        setImportError(ko.onboarding.wizard.importHistoryFailed);
       }
       return;
     }
@@ -1165,16 +1177,18 @@ function ImportStep({
   if (scans.every((scan) => scan.data === null) && scans.some((scan) => scan.isPending)) {
     return (
       <div className="flex h-full min-h-40 flex-col">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">프로젝트</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          {ko.common.project}
+        </h1>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6">
           <Spinner className="size-5 text-muted-foreground" />
           <p className="text-center text-sm text-muted-foreground">
-            Claude Code와 Codex 프로젝트를 찾고 있어요…
+            {ko.onboarding.wizard.scanningAgentProjects}
           </p>
         </div>
         <div className="flex justify-end">
           <Button variant="ghost-muted" onClick={() => void onDone()}>
-            프로젝트 가져오지 않기
+            {ko.onboarding.skipProject}
           </Button>
         </div>
       </div>
@@ -1183,13 +1197,13 @@ function ImportStep({
 
   return (
     <StepShell
-      title="프로젝트 선택하기"
-      description="선택한 컴퓨터에서 프로젝트와 대화를 가져와요."
+      title={ko.onboarding.chooseProject}
+      description={ko.onboarding.wizard.importDescription}
     >
       {candidates.length > 0 ? (
         <div className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
           <span role="status">
-            총 {candidates.length}개 중 {selected.length}개 선택됨
+            {ko.onboarding.wizard.selectedOfTotal(candidates.length, selected.length)}
           </span>
           <div className="flex items-center gap-1">
             <Button
@@ -1198,7 +1212,7 @@ function ImportStep({
               disabled={isImporting || selected.length === candidates.length}
               onClick={() => setSelectedPaths(new Set(candidates.map((item) => item.key)))}
             >
-              모두 선택
+              {ko.onboarding.wizard.selectAll}
             </Button>
             <Button
               variant="ghost"
@@ -1206,7 +1220,7 @@ function ImportStep({
               disabled={isImporting || selected.length === 0}
               onClick={() => setSelectedPaths(new Set())}
             >
-              선택 해제
+              {ko.onboarding.wizard.clearSelection}
             </Button>
           </div>
         </div>
@@ -1222,7 +1236,7 @@ function ImportStep({
             );
             const label =
               environments.find((environment) => environment.environmentId === scan.environmentId)
-                ?.label ?? "컴퓨터";
+                ?.label ?? ko.onboarding.wizard.computer;
             return (
               <fieldset
                 key={scan.environmentId}
@@ -1235,21 +1249,21 @@ function ImportStep({
                 {scan.isPending && scan.data === null ? (
                   <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
                     <Spinner className="size-4" />
-                    프로젝트를 찾고 있어요…
+                    {ko.onboarding.wizard.scanningProjects}
                   </div>
                 ) : scan.error !== null ? (
                   <div
                     role="alert"
                     className="flex items-center justify-between gap-3 text-sm text-muted-foreground"
                   >
-                    <span>프로젝트를 확인하지 못했어요. {scan.error}</span>
+                    <span>{ko.onboarding.wizard.scanFailed(scan.error)}</span>
                     <Button variant="ghost" size="sm" onClick={scan.refresh}>
-                      다시 시도
+                      {ko.common.retry}
                     </Button>
                   </div>
                 ) : scanCandidates.length === 0 ? (
                   <p className="py-2 text-sm text-muted-foreground">
-                    기존 Claude Code 또는 Codex 프로젝트를 찾지 못했어요.
+                    {ko.onboarding.wizard.noAgentProjects}
                   </p>
                 ) : null}
                 {scan.data?.truncated ? (
@@ -1274,14 +1288,16 @@ function ImportStep({
           disabled={isImporting}
           onClick={importError ? finishAfterImport : () => void onDone()}
         >
-          {importError ? "나머지는 건너뛰기" : "프로젝트 가져오지 않기"}
+          {importError ? ko.onboarding.wizard.skipRest : ko.onboarding.skipProject}
         </Button>
         <Button
           autoFocus
           disabled={isImporting || selected.length === 0}
           onClick={() => void runImport(selected)}
         >
-          {isImporting ? "가져오는 중…" : `프로젝트 ${selected.length}개 가져오기`}
+          {isImporting
+            ? ko.onboarding.wizard.importing
+            : ko.onboarding.wizard.importProjects(selected.length)}
         </Button>
       </div>
     </StepShell>
@@ -1344,9 +1360,11 @@ function ImportCandidateList({
             />
             <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-left">
               <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
-              <span className="truncate text-sm text-muted-foreground">기타 폴더</span>
+              <span className="truncate text-sm text-muted-foreground">
+                {ko.onboarding.wizard.otherFolders}
+              </span>
               <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
-                폴더 {other.length}개
+                {ko.onboarding.wizard.folderCount(other.length)}
               </span>
             </CollapsibleTrigger>
           </div>
@@ -1489,7 +1507,12 @@ function ImportRowMeta({
 }) {
   const relative = lastActiveAt === null ? null : formatRelativeTime(lastActiveAt);
   // "just now" does not fit the fixed column, so collapse it.
-  const age = relative === null ? "" : relative.suffix === null ? "지금" : relative.value;
+  const age =
+    relative === null
+      ? ""
+      : relative.suffix === null
+        ? ko.onboarding.wizard.nowShort
+        : relative.value;
   return (
     <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
       <span className="flex size-4 items-center justify-center">
@@ -1556,7 +1579,7 @@ function CommandBlock({
       <Button
         size="icon-xs"
         variant="ghost"
-        aria-label="명령 복사"
+        aria-label={ko.onboarding.wizard.copyCommand}
         onClick={() => copyToClipboard(command, undefined)}
       >
         {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}

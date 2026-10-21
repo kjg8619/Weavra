@@ -19,45 +19,45 @@ import {
   captureSetupShortcutReady,
   type CaptureSetupStep,
 } from "./SnapShotSetupDialog.logic";
+import { ko } from "~/i18n/ko";
 
 const SETUP_STEPS = [
-  { id: "access", label: "Access" },
-  { id: "shortcut", label: "Shortcut" },
+  { id: "access", label: ko.settings.snapshots.setup.stepAccess },
+  { id: "shortcut", label: ko.settings.snapshots.setup.stepShortcut },
 ] as const;
 
 const GNOME_ACCESS_COPY = {
   "not-installed": {
-    title: "Install the extension",
-    description:
-      "The Weavra GNOME extension lets you capture other windows and bring them into your draft. Sign out once after installing.",
+    title: ko.settings.snapshots.setup.gnome.notInstalledTitle,
+    description: ko.settings.snapshots.setup.gnome.notInstalledDescription,
   },
   "restart-required": {
-    title: "Extension installed",
-    description: "Save your work, then sign out and back in. Your setup will be waiting here.",
+    title: ko.settings.snapshots.setup.gnome.restartRequiredTitle,
+    description: ko.settings.snapshots.setup.gnome.restartRequiredDescription,
   },
   "update-required": {
-    title: "Update the extension",
-    description: "Install the update, then sign out and back in.",
+    title: ko.settings.snapshots.setup.gnome.updateRequiredTitle,
+    description: ko.settings.snapshots.setup.gnome.updateRequiredDescription,
   },
   "extensions-disabled": {
-    title: "Allow GNOME extensions",
-    description: "Open GNOME Extensions and turn on extensions, then check again.",
+    title: ko.settings.snapshots.setup.gnome.extensionsDisabledTitle,
+    description: ko.settings.snapshots.setup.gnome.extensionsDisabledDescription,
   },
   disabled: {
-    title: "Enable the extension",
-    description: "Enable Weavra SnapShots to start capturing windows.",
+    title: ko.settings.snapshots.setup.gnome.disabledTitle,
+    description: ko.settings.snapshots.setup.gnome.disabledDescription,
   },
   enabled: {
-    title: "Capture is ready",
-    description: "Next, choose your shortcut.",
+    title: ko.settings.snapshots.setup.readyTitle,
+    description: ko.settings.snapshots.setup.readyDescription,
   },
   unsupported: {
-    title: "Automatic capture isn't available",
-    description: "Use Take snapshot from the command palette to choose a window.",
+    title: ko.settings.snapshots.setup.gnome.unsupportedTitle,
+    description: ko.settings.snapshots.setup.gnome.unsupportedDescription,
   },
   error: {
-    title: "Couldn't set up the extension",
-    description: "Check Weavra SnapShots in GNOME Extensions, then try again.",
+    title: ko.settings.snapshots.setup.gnome.errorTitle,
+    description: ko.settings.snapshots.setup.gnome.errorDescription,
   },
 };
 
@@ -179,7 +179,8 @@ export function SnapShotSetupDialog({
   const permissionStatus = usePermissionStatus(
     async () => {
       const refreshed = await onRefresh();
-      if (!refreshed?.macPermissions) throw new Error("Permission status unavailable");
+      if (!refreshed?.macPermissions)
+        throw new Error(ko.settings.snapshots.setup.permissionStatusUnavailable);
       return refreshed.macPermissions;
     },
     state.macPermissions ?? { screenRecording: false, accessibility: false },
@@ -212,66 +213,65 @@ export function SnapShotSetupDialog({
   const accessCopy =
     state.message && !macPermissions
       ? {
-          title: "Let's try that again",
-          description: "Couldn't check snapshots. Try again to continue.",
+          title: ko.settings.snapshots.setup.retryTitle,
+          description: ko.settings.snapshots.setup.retryDescription,
         }
       : backend === "gnome" && extension
         ? extension.status === "enabled" && !accessReady
           ? {
-              title: "Check capture access",
-              description: "The extension isn't ready yet. Try again in a moment.",
+              title: ko.settings.snapshots.setup.checkAccessTitle,
+              description: ko.settings.snapshots.setup.checkAccessDescription,
             }
           : GNOME_ACCESS_COPY[extension.status]
         : helperBackend
           ? helper?.status === "ready"
             ? {
-                title: "Capture is ready",
-                description: "Next, choose your shortcut.",
+                title: ko.settings.snapshots.setup.readyTitle,
+                description: ko.settings.snapshots.setup.readyDescription,
               }
             : helper?.status === "error"
               ? {
-                  title: "Let's fix capture access",
-                  description: "Try reinstalling the capture helper, then check again.",
+                  title: ko.settings.snapshots.setup.fixAccessTitle,
+                  description: ko.settings.snapshots.setup.fixAccessDescription,
                 }
               : {
                   title:
                     helper?.status === "update-required"
-                      ? "Update the capture helper"
-                      : "Allow snapshots",
-                  description:
-                    "Weavra's capture helper lets you capture other apps and return to your draft. It's included with Weavra.",
+                      ? ko.settings.snapshots.setup.updateHelperTitle
+                      : ko.settings.snapshots.setup.allowTitle,
+                  description: ko.settings.snapshots.setup.helperDescription,
                 }
           : backend === "niri"
             ? {
-                title: "Capture is ready",
-                description: "Next, choose your shortcut.",
+                title: ko.settings.snapshots.setup.readyTitle,
+                description: ko.settings.snapshots.setup.readyDescription,
               }
             : backend === "picker"
               ? {
-                  title: "Choose a window each time",
-                  description:
-                    "Your desktop doesn't support automatic capture. You'll choose the window to capture instead.",
+                  title: ko.settings.snapshots.setup.pickerTitle,
+                  description: ko.settings.snapshots.setup.pickerDescription,
                 }
               : {
-                  title: "Allow snapshots",
+                  title: ko.settings.snapshots.setup.allowTitle,
                   description:
                     backend === "portal"
-                      ? "Your desktop may ask for permission when you first capture."
+                      ? ko.settings.snapshots.setup.portalDescription
                       : macPermissions
                         ? macPermissionsReady
-                          ? "Test a snapshot of the current window. If macOS asks to bypass its window picker, choose Allow. The test image is discarded."
-                          : "Allow each permission, then continue."
-                        : "Allow access when prompted to start capturing windows.",
+                          ? ko.settings.snapshots.setup.macTestDescription
+                          : ko.settings.snapshots.setup.macAllowDescription
+                        : ko.settings.snapshots.setup.directDescription,
                 };
-  const title = step === "access" ? accessCopy.title : "Choose your shortcut";
+  const title =
+    step === "access" ? accessCopy.title : ko.settings.snapshots.setup.chooseShortcutTitle;
   const description =
     step === "access"
       ? accessCopy.description
       : configShortcut
-        ? "Click the shortcut, then press the keys you want."
+        ? ko.settings.snapshots.setup.configShortcutDescription
         : state.mode === "portal"
-          ? "Choose your keys, then approve the permission prompt if asked."
-          : "Use both Shift keys, or record a different shortcut.";
+          ? ko.settings.snapshots.setup.portalShortcutDescription
+          : ko.settings.snapshots.setup.directShortcutDescription;
   const stepIndex = SETUP_STEPS.findIndex(({ id }) => id === step);
   const details = [
     ...new Set(
@@ -299,7 +299,13 @@ export function SnapShotSetupDialog({
       }}
     >
       <WizardPopup showCloseButton={!busy}>
-        <WizardHeader title={desktop ? `Set up snapshots for ${desktop}` : "Set up snapshots"}>
+        <WizardHeader
+          title={
+            desktop
+              ? ko.settings.snapshots.setup.titleForDesktop(desktop)
+              : ko.settings.snapshots.setup.title
+          }
+        >
           <WizardSteps
             steps={SETUP_STEPS.map((item) => item.label)}
             currentStep={stepIndex}
@@ -334,18 +340,18 @@ export function SnapShotSetupDialog({
                       {
                         id: "screenRecording",
                         icon: <ScreenRecordingIcon />,
-                        title: "Screen Recording",
-                        description: "Capture the window you're using.",
+                        title: ko.settings.snapshots.setup.screenRecording,
+                        description: ko.settings.snapshots.setup.screenRecordingDescription,
                         granted: macPermissions.screenRecording,
                         onAllow: () => void onAction("allow-screen-recording"),
                       },
                       {
                         id: "accessibility",
                         icon: <AccessibilityPermissionIcon />,
-                        title: "Accessibility",
+                        title: ko.settings.snapshots.setup.accessibility,
                         description: includeAccessibility
-                          ? "Include text and controls from the captured app."
-                          : "Optional. Include text and controls from the captured app.",
+                          ? ko.settings.snapshots.setup.accessibilityDescription
+                          : ko.settings.snapshots.setup.accessibilityOptionalDescription,
                         granted: macPermissions.accessibility,
                         onAllow: () => void onAction("allow-accessibility"),
                       },
@@ -364,7 +370,7 @@ export function SnapShotSetupDialog({
                     disabled={busy}
                     onClick={() => void onAction(installHelper)}
                   >
-                    Reinstall helper
+                    {ko.settings.snapshots.setup.reinstallHelper}
                   </Button>
                 ) : null}
               </>
@@ -395,24 +401,26 @@ export function SnapShotSetupDialog({
                     disabled={busy}
                     onClick={() => void onAction("retry-shortcut")}
                   >
-                    {state.mode === "portal" ? "Shortcut permissions" : "Try again"}
+                    {state.mode === "portal"
+                      ? ko.settings.snapshots.setup.shortcutPermissions
+                      : ko.common.retry}
                   </Button>
                 ) : null}
               </div>
             )}
             {step === "shortcut" && !accessReady ? (
               <p role="alert" className="text-destructive">
-                Capture needs attention. Go back to check access.
+                {ko.settings.snapshots.setup.needsAttention}
               </p>
             ) : null}
             {error ? (
               <p role="alert" className="text-destructive">
-                Couldn't finish this step. Try again or check Advanced for help.
+                {ko.settings.snapshots.setup.stepFailed}
               </p>
             ) : null}
             {details.length > 0 || (step === "access" && (backend === "gnome" || helperBackend)) ? (
               <details className="text-xs text-muted-foreground">
-                <summary className="cursor-pointer">Advanced</summary>
+                <summary className="cursor-pointer">{ko.settings.snapshots.setup.advanced}</summary>
                 <div className="mt-3 space-y-3">
                   {details.map((detail) => (
                     <p key={detail} className="break-words">
@@ -420,7 +428,7 @@ export function SnapShotSetupDialog({
                     </p>
                   ))}
                   {step === "access" && (backend === "gnome" || helperBackend) ? (
-                    <p>Included with Weavra. No download needed.</p>
+                    <p>{ko.settings.snapshots.setup.includedWithWeavra}</p>
                   ) : null}
                   {step === "access" && backend === "gnome" && extension?.status === "enabled" ? (
                     <Button
@@ -429,7 +437,7 @@ export function SnapShotSetupDialog({
                       disabled={busy}
                       onClick={() => void onAction("disable-extension")}
                     >
-                      Disable extension
+                      {ko.settings.snapshots.setup.disableExtension}
                     </Button>
                   ) : null}
                   {step === "access" && helperBackend && helper?.status !== "not-installed" ? (
@@ -439,7 +447,7 @@ export function SnapShotSetupDialog({
                       disabled={busy}
                       onClick={() => void onAction(removeHelper)}
                     >
-                      Remove capture helper
+                      {ko.settings.snapshots.setup.removeHelper}
                     </Button>
                   ) : null}
                 </div>
@@ -450,11 +458,11 @@ export function SnapShotSetupDialog({
         <WizardFooter>
           {step !== "access" ? (
             <Button variant="ghost" disabled={busy} onClick={() => changeStep("access")}>
-              Back
+              {ko.common.back}
             </Button>
           ) : null}
           <Button variant="ghost" disabled={busy} onClick={() => void onClose(false)}>
-            {wasEnabled ? "Close" : "Finish later"}
+            {wasEnabled ? ko.common.close : ko.settings.snapshots.setup.finishLater}
           </Button>
           {step === "access" ? (
             helperBackend && !accessReady && helper?.status !== "ready" ? (
@@ -466,14 +474,14 @@ export function SnapShotSetupDialog({
                 }
               >
                 {checking
-                  ? "Checking…"
+                  ? ko.settings.snapshots.setup.checking
                   : busy
-                    ? "Installing…"
+                    ? ko.settings.snapshots.setup.installing
                     : helper?.status === "error"
-                      ? "Check again"
+                      ? ko.settings.snapshots.setup.checkAgain
                       : helper?.status === "update-required"
-                        ? "Update helper"
-                        : "Install helper"}
+                        ? ko.settings.snapshots.setup.updateHelper
+                        : ko.settings.snapshots.setup.installHelper}
               </Button>
             ) : backend === "gnome" && !accessReady && extension?.status !== "enabled" ? (
               <Button
@@ -488,20 +496,20 @@ export function SnapShotSetupDialog({
                 }
               >
                 {checking
-                  ? "Checking…"
+                  ? ko.settings.snapshots.setup.checking
                   : busy
                     ? install
-                      ? "Installing…"
+                      ? ko.settings.snapshots.setup.installing
                       : enable
-                        ? "Enabling…"
-                        : "Working…"
+                        ? ko.settings.snapshots.setup.enabling
+                        : ko.settings.snapshots.setup.working
                     : install
                       ? extension?.status === "update-required"
-                        ? "Update extension"
-                        : "Install extension"
+                        ? ko.settings.snapshots.setup.updateExtension
+                        : ko.settings.snapshots.setup.installExtension
                       : enable
-                        ? "Enable extension"
-                        : "Check again"}
+                        ? ko.settings.snapshots.setup.enableExtension
+                        : ko.settings.snapshots.setup.checkAgain}
               </Button>
             ) : (
               <PermissionContinueButton
@@ -512,14 +520,14 @@ export function SnapShotSetupDialog({
                 }}
               >
                 {busy
-                  ? "Working…"
+                  ? ko.settings.snapshots.setup.working
                   : macPermissions
-                    ? "Test capture and continue"
+                    ? ko.settings.snapshots.setup.testAndContinue
                     : backend === "direct"
-                      ? "Allow capture"
+                      ? ko.settings.snapshots.setup.allowCapture
                       : !accessReady && !macPermissions
-                        ? "Try again"
-                        : "Continue"}
+                        ? ko.common.retry
+                        : ko.settings.snapshots.setup.continue}
               </PermissionContinueButton>
             )
           ) : !configShortcut ? (
@@ -531,7 +539,11 @@ export function SnapShotSetupDialog({
                 if (!shortcutChanged || (await onSaveShortcut())) await onClose(true);
               }}
             >
-              {busy ? "Saving…" : shortcutChanged ? "Save and finish" : "Done"}
+              {busy
+                ? ko.common.saving
+                : shortcutChanged
+                  ? ko.settings.snapshots.setup.saveAndFinish
+                  : ko.common.done}
             </Button>
           ) : null}
         </WizardFooter>

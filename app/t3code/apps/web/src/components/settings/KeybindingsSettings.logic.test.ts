@@ -23,6 +23,7 @@ import {
   whenNodeRemoveLabel,
   WHEN_VARIABLE_LABELS,
 } from "./KeybindingsSettings.logic";
+import { ko } from "~/i18n/ko";
 
 describe("KeybindingsSettings.logic", () => {
   it.each([true, false])("keeps a literal plus key as one cap with mod=%s", (modKey) => {
@@ -168,7 +169,7 @@ describe("KeybindingsSettings.logic", () => {
       });
     }
   });
-  it.each(["pu", "pull request", "copy link", "thread id"])(
+  it.each(["풀", "풀 리퀘스트", "링크", "대화 id"])(
     "finds the copy link shortcut with %s",
     (query) => {
       const rows = buildKeybindingRows(DEFAULT_RESOLVED_KEYBINDINGS, query);
@@ -302,7 +303,7 @@ describe("KeybindingsSettings.logic", () => {
     });
     expect(parseWhenExpressionDraft("editorFocus &&")).toEqual({
       ok: false,
-      message: "Use variables with !, &&, ||, and parentheses.",
+      message: ko.settings.keybindings.whenSyntaxError,
     });
 
     expect(parseWhenExpressionDraft("!(terminalFocus || modelPickerOpen)")).toEqual({
@@ -324,17 +325,17 @@ describe("KeybindingsSettings.logic", () => {
     const group = { type: "and", left: condition, right: negatedCondition } as const;
     const negatedGroup = { type: "not", node: group } as const;
 
-    expect(whenNodeRemoveLabel(group, 0)).toBe("Clear all conditions");
-    expect(whenNodeRemoveLabel(condition, 1)).toBe("Remove condition");
-    expect(whenNodeRemoveLabel(negatedCondition, 1)).toBe("Remove condition");
-    expect(whenNodeRemoveLabel(group, 1)).toBe("Remove group and its conditions");
-    expect(whenNodeRemoveLabel(negatedGroup, 1)).toBe("Remove group and its conditions");
+    expect(whenNodeRemoveLabel(group, 0)).toBe(ko.settings.keybindings.clearAllConditions);
+    expect(whenNodeRemoveLabel(condition, 1)).toBe(ko.settings.keybindings.removeCondition);
+    expect(whenNodeRemoveLabel(negatedCondition, 1)).toBe(ko.settings.keybindings.removeCondition);
+    expect(whenNodeRemoveLabel(group, 1)).toBe(ko.settings.keybindings.removeGroup);
+    expect(whenNodeRemoveLabel(negatedGroup, 1)).toBe(ko.settings.keybindings.removeGroup);
   });
 
   it("formats static and project script command labels", () => {
-    expect(commandLabel("commandPalette.toggle")).toBe("Command Palette: Toggle");
-    expect(commandLabel("themeEditor.toggle")).toBe("Theme Editor: Toggle");
-    expect(commandLabel("script.setup-db.run")).toBe("Run Script: Setup Db");
+    expect(commandLabel("commandPalette.toggle")).toBe("명령 팔레트: 전환");
+    expect(commandLabel("themeEditor.toggle")).toBe("테마 편집기: 전환");
+    expect(commandLabel("script.setup-db.run")).toBe("작업 실행: Setup Db");
   });
 
   it("builds known when variable options from defaults without frontend labels", () => {
@@ -466,13 +467,13 @@ describe("KeybindingsSettings.logic", () => {
       "",
     );
 
-    expect(rows[0]?.conflicts).toEqual(["Chat: New Local"]);
+    expect(rows[0]?.conflicts).toEqual(["대화: 새 로컬 대화"]);
     expect(
       keybindingConflictLabels(rows, {
         rowId: rows[0]?.id ?? "",
         key: "mod+n",
         when: "",
       }),
-    ).toEqual(["Chat: New Local"]);
+    ).toEqual(["대화: 새 로컬 대화"]);
   });
 });

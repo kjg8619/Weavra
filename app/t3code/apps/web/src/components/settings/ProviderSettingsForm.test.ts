@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 import { ProviderDriverKind } from "@t3tools/contracts";
 
+import { ko } from "~/i18n/ko";
+
 import { DRIVER_OPTION_BY_VALUE } from "./providerDriverMeta";
 import {
   deriveProviderSettingsFields,
@@ -29,8 +31,8 @@ describe("ProviderSettingsForm helpers", () => {
     );
 
     expect(serverPassword).toMatchObject({
-      label: "Server password",
-      description: "Stored in plain text on disk.",
+      label: ko.providers.form.titles["Server password"],
+      description: ko.providers.form.descriptions["Stored in plain text on disk."],
       control: "password",
     });
   });
@@ -149,5 +151,21 @@ describe("ProviderSettingsForm helpers", () => {
     );
 
     expect(next).toEqual({ experimental: false });
+  });
+
+  it("has Korean copy for every annotated provider setting", () => {
+    const titles = new Set(Object.values(ko.providers.form.titles));
+    const descriptions = new Set(Object.values(ko.providers.form.descriptions));
+    const options = new Set(Object.values(ko.providers.form.options));
+    for (const definition of Object.values(DRIVER_OPTION_BY_VALUE)) {
+      expect(definition).toBeDefined();
+      for (const field of deriveProviderSettingsFields(definition!)) {
+        expect(titles.has(field.label), field.label).toBe(true);
+        if (field.description)
+          expect(descriptions.has(field.description), field.description).toBe(true);
+        for (const option of field.options ?? [])
+          expect(options.has(option.label), option.label).toBe(true);
+      }
+    }
   });
 });

@@ -2,6 +2,7 @@ import type { ServerProcessSignal } from "@t3tools/contracts";
 
 import { InlineButton } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ko } from "~/i18n/ko";
 
 /** Process ownership and confirmation stay with the diagnostics view. */
 export function ProcessSignalActions({
@@ -18,7 +19,7 @@ export function ProcessSignalActions({
           render={
             <InlineButton
               disabled={disabled}
-              aria-label="Send SIGINT"
+              aria-label={ko.settings.processSignals.sendSignal("SIGINT")}
               className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               onClick={() => onSignal("SIGINT")}
             >
@@ -26,14 +27,14 @@ export function ProcessSignalActions({
             </InlineButton>
           }
         />
-        <TooltipPopup side="top">Send SIGINT</TooltipPopup>
+        <TooltipPopup side="top">{ko.settings.processSignals.sendSignal("SIGINT")}</TooltipPopup>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger
           render={
             <InlineButton
               disabled={disabled}
-              aria-label="Send SIGKILL"
+              aria-label={ko.settings.processSignals.sendSignal("SIGKILL")}
               className="text-[11px] font-medium text-destructive underline-offset-2 hover:underline"
               onClick={() => onSignal("SIGKILL")}
             >
@@ -41,7 +42,7 @@ export function ProcessSignalActions({
             </InlineButton>
           }
         />
-        <TooltipPopup side="top">Send SIGKILL</TooltipPopup>
+        <TooltipPopup side="top">{ko.settings.processSignals.sendSignal("SIGKILL")}</TooltipPopup>
       </Tooltip>
     </div>
   );

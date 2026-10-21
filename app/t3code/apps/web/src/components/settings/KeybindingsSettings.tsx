@@ -54,6 +54,7 @@ import {
   buildKeybindingCommandOptions,
   buildWhenVariableOptions,
   commandLabel,
+  spokenShortcutLabel,
   groupKeybindingRows,
   DEFAULT_WHEN_VARIABLE,
   isKnownWhenVariable,
@@ -73,6 +74,7 @@ import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsL
 import { keybindingSearchAnchorId, searchableSetting } from "./settingsSearch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { ko } from "~/i18n/ko";
 
 function KeybindingPill({ value }: { value: KeybindingShortcut }) {
   // Keep literal keys separate from the input format's "+" separators.
@@ -134,13 +136,13 @@ function ExpandableHeaderSearch({
                 size="icon-xs"
                 variant="ghost-muted"
                 onClick={() => onOpenChange(true)}
-                aria-label="Search keybindings"
+                aria-label={ko.settings.keybindings.search}
               >
                 <SearchIcon />
               </Button>
             }
           />
-          <TooltipPopup side="top">Search keybindings</TooltipPopup>
+          <TooltipPopup side="top">{ko.settings.keybindings.search}</TooltipPopup>
         </Tooltip>
       </>
     );
@@ -165,8 +167,8 @@ function ExpandableHeaderSearch({
             onOpenChange(false);
           }
         }}
-        placeholder="Search keybindings"
-        aria-label="Search keybindings"
+        placeholder={ko.settings.keybindings.search}
+        aria-label={ko.settings.keybindings.search}
         className="w-44 [&_[data-slot=input]]:pl-7"
         size="sm"
       />
@@ -282,13 +284,12 @@ function UnknownWhenVariableWarning({
   if (identifiers.length === 0) return null;
   const label =
     identifiers.length === 1
-      ? `Unknown condition: ${identifiers[0]}`
-      : `Unknown conditions: ${identifiers.join(", ")}`;
+      ? ko.settings.keybindings.unknownCondition(identifiers[0])
+      : ko.settings.keybindings.unknownConditions(identifiers.join(", "));
 
   return (
     <WarningTooltipIcon label={label} focusable={focusable} className="size-4.5">
-      Weavra does not recognize this condition yet. It can still be saved, but it may not match
-      unless the runtime provides it.
+      {ko.settings.keybindings.unknownConditionHint}
     </WarningTooltipIcon>
   );
 }
@@ -297,12 +298,12 @@ function KeybindingConflictWarning({ labels }: { labels: ReadonlyArray<string> }
   if (labels.length === 0) return null;
   const description =
     labels.length === 1
-      ? `Conflicts with ${labels[0]}.`
-      : `Conflicts with ${labels.slice(0, 3).join(", ")}${labels.length > 3 ? ", and more" : ""}.`;
+      ? ko.settings.keybindings.conflictsWith(labels[0]!, false)
+      : ko.settings.keybindings.conflictsWith(labels.slice(0, 3).join(", "), labels.length > 3);
 
   return (
     <WarningTooltipIcon label={description}>
-      {description} The most recent matching binding wins when both conditions can apply.
+      {description} {ko.settings.keybindings.conflictHint}
     </WarningTooltipIcon>
   );
 }
@@ -325,7 +326,7 @@ function WhenVariableSelect({
   return (
     <Select value={value} onValueChange={(nextValue) => nextValue && onChange(nextValue)}>
       <SelectTrigger size="compact" className="min-w-0 flex-1 font-mono">
-        <SelectValue placeholder="Condition" className="leading-7" />
+        <SelectValue placeholder={ko.settings.keybindings.condition} className="leading-7" />
         {unknownIdentifiers && unknownIdentifiers.length > 0 ? (
           <UnknownWhenVariableWarning identifiers={unknownIdentifiers} focusable={false} />
         ) : null}
@@ -406,12 +407,12 @@ function WhenExpressionNodeEditor({
         <Toggle
           pressed={condition.negated}
           onPressedChange={(pressed) => onChange(setConditionNegated(node, pressed))}
-          aria-label={`Negate ${condition.identifier}`}
+          aria-label={ko.settings.keybindings.negateCondition(condition.identifier)}
           variant="outline"
           size="compact"
           className="min-w-10"
         >
-          Not
+          {ko.settings.keybindings.not}
         </Toggle>
         <WhenVariableSelect
           value={condition.identifier}
@@ -441,12 +442,12 @@ function WhenExpressionNodeEditor({
           <Toggle
             pressed
             onPressedChange={(pressed) => onChange(pressed ? node : node.node)}
-            aria-label="Negate group"
+            aria-label={ko.settings.keybindings.negateGroup}
             variant="outline"
             size="compact"
             className="min-w-10"
           >
-            Not
+            {ko.settings.keybindings.not}
           </Toggle>
           {onRemove ? (
             <WhenExpressionRemoveButton
@@ -551,20 +552,20 @@ function WhenExpressionNodeEditor({
             className="w-fit min-w-24"
           >
             <SelectItem value="and" className="min-h-7 py-1 font-mono text-[12px]">
-              and
+              {ko.settings.keybindings.and}
             </SelectItem>
             <SelectItem value="or" className="min-h-7 py-1 font-mono text-[12px]">
-              or
+              {ko.settings.keybindings.or}
             </SelectItem>
           </SelectContent>
         </Select>
         <Button type="button" variant="outline" size="compact" onClick={addCondition}>
           <PlusIcon className="size-3.5" />
-          Condition
+          {ko.settings.keybindings.condition}
         </Button>
         <Button type="button" variant="outline" size="compact" onClick={addGroup}>
           <PlusIcon className="size-3.5" />
-          Group
+          {ko.settings.keybindings.group}
         </Button>
         {onRemove ? (
           <WhenExpressionRemoveButton
@@ -660,23 +661,23 @@ function WhenExpressionBuilder({
     return (
       <div className="w-full min-w-0 space-y-2 text-sm text-foreground">
         <label className="flex flex-col gap-2">
-          조건 원문
+          {ko.settings.keybindings.rawExpressionLabel}
           <Input
             value={expressionDraft}
             onChange={(event) => updateExpressionDraft(event.currentTarget.value)}
-            aria-label="When expression"
+            aria-label={ko.settings.keybindings.whenExpression}
             aria-invalid={Boolean(parseError)}
             className="min-h-9 border-foreground/70 font-mono text-sm text-foreground"
           />
         </label>
         {parseError ? (
           <p role="alert" className="break-keep text-pretty text-sm text-destructive-foreground">
-            변수와 !, &amp;&amp;, ||, 괄호를 사용하세요.
+            {ko.settings.keybindings.parseErrorHint}
           </p>
         ) : null}
         {unknownIdentifiers.length > 0 ? (
           <p className="break-keep text-pretty text-sm text-foreground">
-            사용자 정의 조건은 원문 그대로 유지돼요. 이 화면에서는 의미를 추측하지 않아요.
+            {ko.settings.keybindings.customPreserved}
           </p>
         ) : null}
       </div>
@@ -687,16 +688,16 @@ function WhenExpressionBuilder({
     <div className="w-[min(34rem,calc(100vw-2rem))] space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-medium text-foreground">When</div>
+          <div className="text-sm font-medium text-foreground">{ko.settings.keybindings.when}</div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button type="button" variant="outline" size="compact" onClick={addRootCondition}>
             <PlusIcon className="size-3.5" />
-            Condition
+            {ko.settings.keybindings.condition}
           </Button>
           <Button type="button" variant="outline" size="compact" onClick={addRootGroup}>
             <PlusIcon className="size-3.5" />
-            Group
+            {ko.settings.keybindings.group}
           </Button>
         </div>
       </div>
@@ -706,9 +707,9 @@ function WhenExpressionBuilder({
           <Input
             value={expressionDraft}
             onChange={(event) => updateExpressionDraft(event.currentTarget.value)}
-            placeholder="Always"
+            placeholder={ko.settings.keybindings.always}
             aria-invalid={Boolean(parseError)}
-            aria-label="When expression"
+            aria-label={ko.settings.keybindings.whenExpression}
             className={cn(
               "h-7 rounded-md font-mono text-[12px] leading-7 sm:h-7 sm:leading-7",
               unknownIdentifiers.length > 0 && "pr-9",
@@ -742,18 +743,18 @@ function WhenExpressionBuilder({
             <div className="flex flex-wrap gap-2">
               <Button type="button" size="compact" onClick={addRootCondition}>
                 <PlusIcon className="size-3.5" />
-                Condition
+                {ko.settings.keybindings.condition}
               </Button>
               <Button type="button" variant="outline" size="compact" onClick={addRootGroup}>
                 <PlusIcon className="size-3.5" />
-                Group
+                {ko.settings.keybindings.group}
               </Button>
             </div>
           </div>
         )}
         {parseError ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border border-destructive/30 bg-background/75 p-4 text-center text-xs text-destructive backdrop-blur-[1px]">
-            Fix the expression above to continue editing visually.
+            {ko.settings.keybindings.fixExpression}
           </div>
         ) : null}
       </div>
@@ -889,14 +890,17 @@ function KeybindingKeyControl({
           disabled={isSaving || keyDraft.trim().length === 0 || !isWhenDraftValid}
           onClick={save}
         >
-          {isSaving ? "Saving" : "Save"}
+          {isSaving ? ko.common.saving : ko.common.save}
         </Button>
       ) : null}
       {showPill ? (
         <button
           type="button"
           onClick={() => setDraft({ isRecording: true })}
-          aria-label={`Edit shortcut for ${commandLabel(row.command)}: ${formatShortcutLabel(row.binding.shortcut)}`}
+          aria-label={ko.settings.keybindings.editShortcutFor(
+            commandLabel(row.command),
+            spokenShortcutLabel(formatShortcutLabel(row.binding.shortcut)),
+          )}
           className={cn(
             "inline-flex min-h-8 cursor-pointer items-center rounded-md border border-foreground/70 px-2.5 text-foreground outline-none transition-colors hover:bg-accent focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring",
             pillClassName,
@@ -908,9 +912,11 @@ function KeybindingKeyControl({
         <Input
           data-keybinding-capture=""
           autoFocus={isRecording}
-          aria-label={`Keybinding for ${commandLabel(row.command)}`}
+          aria-label={ko.settings.keybindings.keybindingFor(commandLabel(row.command))}
           value={isRecording ? "" : keyDraft}
-          placeholder={isRecording ? "Press shortcut" : "Unassigned"}
+          placeholder={
+            isRecording ? ko.settings.keybindings.pressShortcut : ko.settings.keybindings.unassigned
+          }
           size="sm"
           className={cn("w-44 font-mono", isRecording && "border-primary/70 bg-primary/5")}
           onFocus={() => setDraft({ isRecording: true })}
@@ -949,9 +955,9 @@ function WhenClauseControl({
             className="h-auto min-h-8 shrink-0 border-foreground/70 px-2.5 text-sm text-foreground"
           />
         }
-        aria-label={`Edit when clause for ${label}`}
+        aria-label={ko.settings.keybindings.editWhenFor(label)}
       >
-        <span>고급 조건</span>
+        <span>{ko.settings.keybindings.advancedCondition}</span>
         <ChevronDownIcon className="size-3.5 shrink-0" />
       </DialogTrigger>
       <DialogContent
@@ -961,13 +967,14 @@ function WhenClauseControl({
         viewportClassName="grid-rows-1 items-center"
       >
         <DialogTitle className="mb-3 break-keep text-pretty text-sm font-medium">
-          고급 조건
+          {ko.settings.keybindings.advancedCondition}
         </DialogTitle>
         <p className="mb-3 break-keep text-pretty text-sm font-normal text-foreground">
-          {whenAstToKoreanExplanation(value)}. 조건을 바꾸려면 원문을 편집한 뒤 저장하세요.
+          {ko.settings.keybindings.advancedDescription(whenAstToKoreanExplanation(value))}
         </p>
         <p className="mb-3 break-keep text-pretty text-sm font-normal text-foreground">
-          원문: <code className="break-all select-text">{expression || "true"}</code>
+          {ko.settings.keybindings.rawExpressionPrefix}{" "}
+          <code className="break-all select-text">{expression || "true"}</code>
         </p>
         <WhenExpressionBuilder
           rawOnly
@@ -984,7 +991,7 @@ function WhenClauseControl({
             />
           }
         >
-          닫기
+          {ko.common.close}
         </DialogClose>
       </DialogContent>
     </Dialog>
@@ -1017,7 +1024,7 @@ function KeybindingRowMenu({
             data-icon-control=""
             className="border-foreground/70 text-foreground hover:text-foreground"
             disabled={isSaving}
-            aria-label={`Actions for ${commandLabel(row.command)}`}
+            aria-label={ko.settings.keybindings.actionsFor(commandLabel(row.command))}
           />
         }
       >
@@ -1026,12 +1033,12 @@ function KeybindingRowMenu({
       <MenuPopup align="end" className="min-w-36">
         {canReset ? (
           <MenuItem disabled={isSaving} onClick={() => onReset(row)}>
-            Reset to default
+            {ko.settings.keybindings.resetToDefault}
           </MenuItem>
         ) : null}
         {canRemove ? (
           <MenuItem variant="destructive" disabled={isSaving} onClick={() => onRemove(row)}>
-            Remove
+            {ko.common.remove}
           </MenuItem>
         ) : null}
       </MenuPopup>
@@ -1043,7 +1050,9 @@ function KeybindingSourceBadge({ source }: { source: KeybindingRow["source"] }) 
   if (source === "Default") return null;
   return (
     <Badge variant="outline" size="sm" className="font-normal text-muted-foreground">
-      {source}
+      {source === "Custom"
+        ? ko.settings.keybindings.sourceCustom
+        : ko.settings.keybindings.sourceProject}
     </Badge>
   );
 }
@@ -1129,7 +1138,7 @@ function KeybindingSettingsRow({
           </span>
           {aliases.length > 1 ? (
             <span className="block break-keep text-pretty text-sm font-normal text-foreground">
-              같은 동작을 실행하는 단축키 {aliases.length}개
+              {ko.settings.keybindings.aliasCount(aliases.length)}
             </span>
           ) : null}
         </>
@@ -1167,7 +1176,9 @@ function useNewKeybindingDraft({
     key: keyDraft,
     when: whenDraftExpression,
   });
-  const commandLabelText = commandDraft ? commandLabel(commandDraft) : "new keybinding";
+  const commandLabelText = commandDraft
+    ? commandLabel(commandDraft)
+    : ko.settings.keybindings.newKeybinding;
   const canSave = Boolean(commandDraft) && keyDraft.trim().length > 0 && isWhenDraftValid;
 
   const save = () => {
@@ -1233,7 +1244,7 @@ function NewKeybindingCommandSelect({
       onValueChange={(value) => draft.setCommandDraft(value as KeybindingCommand)}
     >
       <SelectTrigger size="sm" className={className}>
-        <SelectValue placeholder="Command" />
+        <SelectValue placeholder={ko.settings.keybindings.command} />
       </SelectTrigger>
       <SelectContent
         alignItemWithTrigger={false}
@@ -1263,9 +1274,13 @@ function NewKeybindingKeyInput({
     <Input
       data-keybinding-capture=""
       autoFocus={autoFocus}
-      aria-label={`Keybinding for ${draft.commandLabelText}`}
+      aria-label={ko.settings.keybindings.keybindingFor(draft.commandLabelText)}
       value={draft.isRecording ? "" : draft.keyDraft}
-      placeholder={draft.isRecording ? "Press shortcut" : "Unassigned"}
+      placeholder={
+        draft.isRecording
+          ? ko.settings.keybindings.pressShortcut
+          : ko.settings.keybindings.unassigned
+      }
       size="sm"
       className={cn("font-mono", draft.isRecording && "border-primary/70 bg-primary/5", className)}
       onFocus={() => draft.setDraft({ isRecording: true })}
@@ -1312,14 +1327,14 @@ function NewKeybindingCancelIcon({
             size="icon-sm"
             className="text-muted-foreground hover:text-foreground"
             disabled={isSaving}
-            aria-label="Cancel new keybinding"
+            aria-label={ko.settings.keybindings.cancelNew}
             onClick={onCancel}
           />
         }
       >
         <XIcon className="size-3.5" />
       </TooltipTrigger>
-      <TooltipPopup side="top">Cancel</TooltipPopup>
+      <TooltipPopup side="top">{ko.common.cancel}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -1332,10 +1347,12 @@ function NewKeybindingSettingsRow(props: NewKeybindingProps) {
   return (
     <SettingsRow
       className="rounded-none bg-muted/15"
-      title="New keybinding"
+      title={ko.settings.keybindings.newKeybinding}
       description={
         <span className="flex h-6 items-center gap-1.5">
-          <span className="text-[12px] leading-none text-muted-foreground/70">When</span>
+          <span className="text-[12px] leading-none text-muted-foreground/70">
+            {ko.settings.keybindings.when}
+          </span>
           <NewKeybindingWhen draft={draft} variables={variables} />
         </span>
       }
@@ -1349,7 +1366,7 @@ function NewKeybindingSettingsRow(props: NewKeybindingProps) {
           <KeybindingConflictWarning labels={draft.conflictLabels} />
           <NewKeybindingKeyInput draft={draft} className="w-44" />
           <Button size="sm" disabled={isSaving || !draft.canSave} onClick={draft.save}>
-            {isSaving ? "Saving" : "Save"}
+            {isSaving ? ko.common.saving : ko.common.save}
           </Button>
           <NewKeybindingCancelIcon isSaving={isSaving} onCancel={onCancel} />
         </div>
@@ -1403,7 +1420,7 @@ function KeybindingsList(props: KeybindingsListProps) {
       ))}
       {rows.length === 0 && !isAddingBinding ? (
         <div className="px-4 py-12 text-center text-sm text-muted-foreground">
-          No keybindings match your search.
+          {ko.settings.keybindings.noMatches}
         </div>
       ) : null}
     </div>
@@ -1415,10 +1432,7 @@ function BrowserKeybindingNotice() {
   return (
     <div className="flex items-center gap-2 px-3 py-2.5 text-[12px] leading-[1.45] text-muted-foreground sm:px-4">
       <TriangleAlertIcon className="size-3.5 shrink-0 text-warning" aria-hidden />
-      <span>
-        Some shortcuts may be claimed by the browser before Weavra sees them. Use the desktop app
-        for better keybinding support.
-      </span>
+      <span>{ko.settings.keybindings.browserNotice}</span>
     </div>
   );
 }
@@ -1498,9 +1512,8 @@ export function KeybindingsSettingsPanel() {
       }
       const error = squashAtomCommandFailure(result);
       toastManager.add({
-        title: "Unable to open keybindings file",
-        description:
-          error instanceof Error ? error.message : "The keybindings file was not opened.",
+        title: ko.settings.keybindings.openFileFailed,
+        description: error instanceof Error ? error.message : ko.settings.keybindings.fileNotOpened,
         type: "error",
       });
     })();
@@ -1531,8 +1544,8 @@ export function KeybindingsSettingsPanel() {
         if (!isAtomCommandInterrupted(failed)) {
           const error = squashAtomCommandFailure(failed);
           toastManager.add({
-            title: "Unable to save keybinding",
-            description: error instanceof Error ? error.message : "The keybinding was not saved.",
+            title: ko.settings.keybindings.saveFailed,
+            description: error instanceof Error ? error.message : ko.settings.keybindings.notSaved,
             type: "error",
           });
         }
@@ -1559,8 +1572,9 @@ export function KeybindingsSettingsPanel() {
         if (result?._tag === "Failure" && !isAtomCommandInterrupted(result)) {
           const error = squashAtomCommandFailure(result);
           toastManager.add({
-            title: "Unable to remove keybinding",
-            description: error instanceof Error ? error.message : "The keybinding was not removed.",
+            title: ko.settings.keybindings.removeFailed,
+            description:
+              error instanceof Error ? error.message : ko.settings.keybindings.notRemoved,
             type: "error",
           });
         }
@@ -1590,8 +1604,7 @@ export function KeybindingsSettingsPanel() {
 
   const bindingsCount = (
     <span className="text-[11px] text-muted-foreground">
-      {rows.length + (isAddingBinding ? 1 : 0)}{" "}
-      {rows.length + (isAddingBinding ? 1 : 0) === 1 ? "binding" : "bindings"}
+      {ko.settings.keybindings.bindingCount(rows.length + (isAddingBinding ? 1 : 0))}
     </span>
   );
 
@@ -1630,13 +1643,13 @@ export function KeybindingsSettingsPanel() {
                     size="icon-xs"
                     variant="ghost-muted"
                     onClick={() => setIsAddingBinding(true)}
-                    aria-label="Add keybinding"
+                    aria-label={ko.settings.keybindings.add}
                   >
                     <PlusIcon />
                   </Button>
                 }
               />
-              <TooltipPopup side="top">Add keybinding</TooltipPopup>
+              <TooltipPopup side="top">{ko.settings.keybindings.add}</TooltipPopup>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger
@@ -1647,13 +1660,13 @@ export function KeybindingsSettingsPanel() {
                     variant="ghost-muted"
                     disabled={!keybindingsConfigPath}
                     onClick={openKeybindingsFile}
-                    aria-label="Open keybindings.json"
+                    aria-label={ko.settings.keybindings.openJson}
                   >
                     <FileJsonIcon />
                   </Button>
                 }
               />
-              <TooltipPopup side="top">Open keybindings.json</TooltipPopup>
+              <TooltipPopup side="top">{ko.settings.keybindings.openJson}</TooltipPopup>
             </Tooltip>
           </div>
         }

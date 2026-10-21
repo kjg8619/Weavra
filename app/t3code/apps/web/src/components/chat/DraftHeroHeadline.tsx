@@ -6,6 +6,7 @@ import { FolderPlusIcon } from "lucide-react";
 import { useCallback, useMemo } from "react";
 
 import { openCommandPalette } from "~/commandPaletteBus";
+import { ko } from "~/i18n/ko";
 import { useClientSettings } from "~/hooks/useSettings";
 import { hasExplicitComposerModelSelection } from "~/lib/chatThreadActions";
 import { selectProjectGroupingSettings } from "~/logicalProject";
@@ -187,12 +188,16 @@ export function DraftHeroHeadline({
         <TooltipTrigger
           render={
             <MenuTrigger
-              aria-label={hasResolvedProject ? "프로젝트 변경" : "프로젝트 선택"}
+              aria-label={
+                hasResolvedProject
+                  ? ko.chat.draftHero.changeProject
+                  : ko.chat.draftHero.chooseProject
+              }
               className="pointer-events-auto inline-block max-w-64 truncate border-foreground/60 border-b border-dotted align-baseline text-foreground transition-colors hover:border-foreground/80 focus-visible:rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             />
           }
         >
-          {activeProjectDisplayName ?? "프로젝트 선택"}
+          {activeProjectDisplayName ?? ko.chat.draftHero.chooseProject}
           {activeProjectDetail ? (
             <span className="ms-2 font-normal text-muted-foreground text-sm">
               {activeProjectDetail}
@@ -282,7 +287,7 @@ export function DraftHeroHeadline({
         <MenuSeparator />
         <MenuItem onClick={openAddProject}>
           <FolderPlusIcon />
-          새 프로젝트
+          {ko.chat.draftHero.newProject}
         </MenuItem>
       </MenuPopup>
     </Menu>
@@ -292,18 +297,24 @@ export function DraftHeroHeadline({
       onClick={openAddProject}
       className="pointer-events-auto inline cursor-pointer border-muted-foreground/35 border-b border-dotted text-muted-foreground/60 transition-colors hover:border-muted-foreground/60 hover:text-muted-foreground/80 focus-visible:rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {activeProjectTitle ?? "프로젝트 추가"}
+      {activeProjectTitle ?? ko.projects.add}
     </button>
   );
 
   return (
     <h1 className="mx-auto w-full max-w-5xl text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl">
       {hasResolvedProject ? (
-        <>{projectSelector}에서 무엇을 만들어 볼까요?</>
+        <>
+          {projectSelector}
+          {ko.chat.draftHero.whatToBuildSuffix}
+        </>
       ) : canChooseProject ? (
-        <>{projectSelector}에서 시작해 보세요</>
+        <>
+          {projectSelector}
+          {ko.chat.draftHero.startHereSuffix}
+        </>
       ) : (
-        <>시작하려면 프로젝트를 추가하세요</>
+        <>{ko.chat.draftHero.addProjectToStart}</>
       )}
     </h1>
   );

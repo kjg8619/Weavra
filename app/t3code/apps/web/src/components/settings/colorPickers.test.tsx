@@ -18,6 +18,11 @@ vi.mock("../ui/tooltip", () => ({
 
 import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
 import { ThemeColorField } from "./ThemeColorPicker";
+import { ko } from "~/i18n/ko";
+
+const accent = ko.providers.accentColor;
+const themeAccent = ko.settings.themeColors.roles.accent;
+const themeAccentHue = ko.settings.themeColors.hue(themeAccent);
 
 let renderer: ReactTestRenderer | undefined;
 let nextFrameId = 0;
@@ -88,9 +93,15 @@ describe("shared color controls in settings", () => {
         <ProviderAccentColorPicker displayName="Codex" value="#ff0000" onCommit={onCommit} />,
       );
     });
-    const hue = "Accent color hue";
-    const saturation = "Accent color saturation";
-    const brightness = "Accent color brightness";
+    const hue = accent.hue;
+    const saturation = ko.common.colorPicker.axisValue(
+      accent.label,
+      ko.common.colorPicker.saturation,
+    );
+    const brightness = ko.common.colorPicker.axisValue(
+      accent.label,
+      ko.common.colorPicker.brightness,
+    );
     expect(await key(hue, "ArrowLeft")).toHaveBeenCalledOnce();
     expect(slider(hue).props["aria-valuenow"]).toBe(359);
     await key(hue, "ArrowRight");
@@ -128,8 +139,14 @@ describe("shared color controls in settings", () => {
         <ProviderAccentColorPicker displayName="Codex" value="#ff0000" onCommit={onCommit} />,
       );
     });
-    const saturation = "Accent color saturation";
-    const brightness = "Accent color brightness";
+    const saturation = ko.common.colorPicker.axisValue(
+      accent.label,
+      ko.common.colorPicker.saturation,
+    );
+    const brightness = ko.common.colorPicker.axisValue(
+      accent.label,
+      ko.common.colorPicker.brightness,
+    );
     await key(saturation, "Home");
     await key(saturation, "ArrowLeft");
     expect(slider(saturation).props.value).toBe(0);
@@ -154,8 +171,14 @@ describe("shared color controls in settings", () => {
     await act(async () => {
       renderer = create(<ThemeColorField role="accent" value="#ff000080" onChange={onChange} />);
     });
-    const saturation = "Accent color saturation";
-    const brightness = "Accent color brightness";
+    const saturation = ko.common.colorPicker.axisValue(
+      themeAccent,
+      ko.common.colorPicker.saturation,
+    );
+    const brightness = ko.common.colorPicker.axisValue(
+      themeAccent,
+      ko.common.colorPicker.brightness,
+    );
     await act(async () =>
       slider(saturation).props.onChange({ currentTarget: { valueAsNumber: 50 } }),
     );
@@ -177,7 +200,7 @@ describe("shared color controls in settings", () => {
     await act(async () => {
       renderer = create(<ThemeColorField role="accent" value="#ff000080" onChange={onChange} />);
     });
-    const hue = "Accent color hue";
+    const hue = themeAccentHue;
     await act(async () => slider(hue).props.onPointerDown(pointer(25)));
     await act(async () => slider(hue).props.onPointerMove(pointer(50)));
     expect(onChange).not.toHaveBeenCalled();
@@ -198,7 +221,7 @@ describe("shared color controls in settings", () => {
     await act(async () => {
       renderer = create(<ThemeColorField role="accent" value="#ff000080" onChange={onChange} />);
     });
-    const planeLabel = "Accent color saturation and brightness";
+    const planeLabel = ko.common.colorPicker.saturationAndBrightness(themeAccent);
     await act(async () => plane(planeLabel).props.onPointerDown(pointer(-50, -50)));
     await act(async () => plane(planeLabel).props.onPointerCancel(pointer(-50, -50)));
     expect(onChange).toHaveBeenLastCalledWith("accent", "#ffffff80");
@@ -217,8 +240,8 @@ describe("shared color controls in settings", () => {
     await act(async () => {
       renderer = create(render("#ff0000"));
     });
-    const hue = "Accent color hue";
-    const planeLabel = "Accent color saturation and brightness";
+    const hue = themeAccentHue;
+    const planeLabel = ko.common.colorPicker.saturationAndBrightness(themeAccent);
     await key(hue, "ArrowRight", true);
     await act(async () => plane(planeLabel).props.onPointerDown(pointer(0, 0)));
     await frame();
@@ -240,7 +263,7 @@ describe("shared color controls in settings", () => {
         />,
       );
     });
-    const hue = "Accent color hue";
+    const hue = accent.hue;
     await key(hue, "ArrowRight", true);
     await key(hue, "ArrowRight", true);
     expect(onCommit).not.toHaveBeenCalled();

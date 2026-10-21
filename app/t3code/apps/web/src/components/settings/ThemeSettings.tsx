@@ -53,6 +53,7 @@ import {
   type ThemeMode,
 } from "./ThemePreviewCircles";
 import { ThemeWireframe } from "./ThemeWireframe";
+import { ko } from "~/i18n/ko";
 
 const MAINTAINER_THEMES: ReadonlyArray<ThemeDefinition> = [
   T3_CHAT_THEME,
@@ -163,7 +164,7 @@ function ThemeLibraryCard({
             <div className="relative">
               {variantNavigation ? (
                 <div
-                  aria-label="Light and dark theme variants"
+                  aria-label={ko.settings.appearance.variantsGroup}
                   className="relative h-24"
                   role="group"
                   onBlurCapture={(event) => {
@@ -194,15 +195,23 @@ function ThemeLibraryCard({
                     const rootOffsetX = mode === "light" ? -52 : 52;
                     const isOpen = radialModeOpen === mode;
                     const isActive = selected.option.activeModes.includes(mode);
-                    const modeLabel = mode === "light" ? "Light" : "Dark";
+                    const modeLabel =
+                      mode === "light" ? ko.settings.appearance.light : ko.settings.appearance.dark;
                     return (
                       <div className="contents" key={mode}>
                         <ThemeVariantTooltip label={`${modeLabel}: ${selected.option.label}`}>
                           <button
                             aria-label={
                               options.length > 1
-                                ? `Choose ${mode} variant, ${options.length} options, currently ${selected.option.label}`
-                                : `Use ${mode} variant, currently ${selected.option.label}`
+                                ? ko.settings.appearance.chooseVariant(
+                                    modeLabel,
+                                    options.length,
+                                    selected.option.label,
+                                  )
+                                : ko.settings.appearance.variantForMode(
+                                    modeLabel,
+                                    selected.option.label,
+                                  )
                             }
                             aria-pressed={isActive}
                             className={cn(
@@ -262,10 +271,23 @@ function ThemeLibraryCard({
                               return (
                                 <ThemeVariantTooltip
                                   key={option.label}
-                                  label={`Use ${option.label} for ${mode} mode`}
+                                  label={ko.settings.appearance.optionForMode(
+                                    option.label,
+                                    modeLabel,
+                                  )}
                                 >
                                   <button
-                                    aria-label={`Use ${option.label} for ${mode} mode${optionIsActive ? ", currently active" : ""}`}
+                                    aria-label={
+                                      optionIsActive
+                                        ? ko.settings.appearance.optionForModeActive(
+                                            option.label,
+                                            modeLabel,
+                                          )
+                                        : ko.settings.appearance.optionForMode(
+                                            option.label,
+                                            modeLabel,
+                                          )
+                                    }
                                     aria-pressed={optionIsActive}
                                     className={cn(
                                       "absolute left-1/2 top-1 z-30 flex size-9 items-center justify-center rounded-full border border-muted-foreground bg-background text-foreground outline-none transition-[transform,opacity] duration-(--motion-feedback) motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground",
@@ -324,7 +346,15 @@ function ThemeLibraryCard({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <button
-                    aria-label={`Use ${variantNavigation ? `${variantNavigation.collectionLabel}, ${theme.label} variant` : `${theme.label} theme`}${isActive ? ", currently active" : ""}`}
+                    aria-label={
+                      variantNavigation
+                        ? ko.settings.appearance.collectionVariant(
+                            variantNavigation.collectionLabel,
+                            theme.label,
+                            isActive,
+                          )
+                        : ko.settings.appearance.themeChoice(theme.label, isActive)
+                    }
                     aria-pressed={isActive}
                     className="min-h-9 min-w-0 cursor-pointer rounded-sm px-2.5 text-left text-sm font-medium break-words text-foreground outline-none [word-break:keep-all] [text-wrap:pretty] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground"
                     type="button"
@@ -344,7 +374,7 @@ function ThemeLibraryCard({
                       <TooltipTrigger
                         render={
                           <Button
-                            aria-label={`Duplicate ${theme.label}`}
+                            aria-label={ko.settings.appearance.duplicateNamed(theme.label)}
                             size="icon-xs"
                             variant="ghost"
                             onClick={(event) => {
@@ -356,7 +386,7 @@ function ThemeLibraryCard({
                           </Button>
                         }
                       />
-                      <TooltipPopup>Duplicate theme</TooltipPopup>
+                      <TooltipPopup>{ko.settings.appearance.duplicateTheme}</TooltipPopup>
                     </Tooltip>
                   ) : null}
                   {onEdit ? (
@@ -364,7 +394,7 @@ function ThemeLibraryCard({
                       <TooltipTrigger
                         render={
                           <Button
-                            aria-label={`Edit ${theme.label}`}
+                            aria-label={ko.settings.appearance.editNamed(theme.label)}
                             size="icon-xs"
                             variant="ghost"
                             onClick={(event) => {
@@ -376,7 +406,7 @@ function ThemeLibraryCard({
                           </Button>
                         }
                       />
-                      <TooltipPopup>Edit theme</TooltipPopup>
+                      <TooltipPopup>{ko.settings.appearance.editTheme}</TooltipPopup>
                     </Tooltip>
                   ) : null}
                   {onDownload ? (
@@ -384,7 +414,7 @@ function ThemeLibraryCard({
                       <TooltipTrigger
                         render={
                           <Button
-                            aria-label={`Export ${theme.label}`}
+                            aria-label={ko.settings.appearance.exportNamed(theme.label)}
                             size="icon-xs"
                             variant="ghost"
                             onClick={(event) => {
@@ -396,7 +426,7 @@ function ThemeLibraryCard({
                           </Button>
                         }
                       />
-                      <TooltipPopup>Export theme file</TooltipPopup>
+                      <TooltipPopup>{ko.settings.appearance.exportThemeFile}</TooltipPopup>
                     </Tooltip>
                   ) : null}
                   {onRemove ? (
@@ -406,8 +436,10 @@ function ThemeLibraryCard({
                           <Button
                             aria-label={
                               variantNavigation
-                                ? `Remove themes from ${variantNavigation.collectionLabel}`
-                                : `Remove ${theme.label}`
+                                ? ko.settings.appearance.removeFromCollection(
+                                    variantNavigation.collectionLabel,
+                                  )
+                                : ko.settings.appearance.removeNamed(theme.label)
                             }
                             size="icon-xs"
                             variant="ghost"
@@ -422,7 +454,9 @@ function ThemeLibraryCard({
                         }
                       />
                       <TooltipPopup>
-                        {variantNavigation ? "Remove themes" : "Remove theme"}
+                        {variantNavigation
+                          ? ko.settings.appearance.removeThemes
+                          : ko.settings.appearance.removeTheme}
                       </TooltipPopup>
                     </Tooltip>
                   ) : null}
@@ -434,10 +468,12 @@ function ThemeLibraryCard({
       />
       <TooltipPopup>
         {variantNavigation
-          ? "Use the first variants for light and dark"
+          ? ko.settings.appearance.firstVariantsChoice
           : cardModes.length > 1
-            ? "Use for both light and dark"
-            : `Use for ${cardModes[0]} mode only`}
+            ? ko.settings.appearance.bothModesChoice
+            : cardModes[0] === "light"
+              ? ko.settings.appearance.lightModeOnly
+              : ko.settings.appearance.darkModeOnly}
       </TooltipPopup>
     </Tooltip>
   );
@@ -570,8 +606,8 @@ export function ThemeLibrary({
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Couldn’t save theme selection",
-        description: "Try again.",
+        title: ko.settings.appearance.saveSelectionFailed,
+        description: ko.settings.appearance.tryAgain,
       }),
     );
   }, []);
@@ -580,8 +616,8 @@ export function ThemeLibrary({
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Couldn’t remove theme",
-        description: "Try again.",
+        title: ko.settings.appearance.removeFailed,
+        description: ko.settings.appearance.tryAgain,
       }),
     );
   }, []);
@@ -743,12 +779,22 @@ export function ThemeLibrary({
 
   // Keep rounded paint, with a square hit surface that cannot add scroll overflow.
   const renderModeTiles = () => (
-    <div aria-label="Appearance mode" className="grid w-full grid-cols-3 gap-3" role="group">
+    <div
+      aria-label={ko.settings.appearance.modeGroup}
+      className="grid w-full grid-cols-3 gap-3"
+      role="group"
+    >
       {(["system", "light", "dark"] as const).map((mode) => {
         const isActive = appearanceMode === mode;
         return (
           <button
-            aria-label={mode === "system" ? "Follow the system appearance" : `Use ${mode} mode`}
+            aria-label={
+              mode === "system"
+                ? ko.settings.appearance.followSystem
+                : mode === "light"
+                  ? ko.settings.appearance.lightModeChoice
+                  : ko.settings.appearance.darkModeChoice
+            }
             aria-pressed={isActive}
             className={cn(
               "relative min-w-0 flex cursor-pointer flex-col items-stretch gap-1.5 rounded-xl border border-muted-foreground p-2 text-foreground outline-none after:absolute after:inset-0 after:rounded-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground",
@@ -763,7 +809,11 @@ export function ThemeLibrary({
               {isActive ? (
                 <CheckIcon aria-hidden className="size-4 shrink-0" data-slot="selection-check" />
               ) : null}
-              {mode === "system" ? "System" : mode === "light" ? "Light" : "Dark"}
+              {mode === "system"
+                ? ko.settings.appearance.system
+                : mode === "light"
+                  ? ko.settings.appearance.light
+                  : ko.settings.appearance.dark}
             </span>
           </button>
         );
@@ -804,7 +854,7 @@ export function ThemeLibrary({
               openThemeEditor({
                 editingThemeId: null,
                 seedThemeId: null,
-                seedName: `${standardTheme.label} copy`,
+                seedName: ko.settings.appearance.copyName(standardTheme.label),
                 initialAppearance,
               })
             }
@@ -824,7 +874,7 @@ export function ThemeLibrary({
                 openThemeEditor({
                   editingThemeId: null,
                   seedThemeId: maintainerTheme.id,
-                  seedName: `${maintainerTheme.label} copy`,
+                  seedName: ko.settings.appearance.copyName(maintainerTheme.label),
                   initialAppearance,
                 })
               }
@@ -852,7 +902,7 @@ export function ThemeLibrary({
                 openThemeEditor({
                   editingThemeId: null,
                   seedThemeId: environmentTheme.id,
-                  seedName: `${environmentTheme.label} copy`,
+                  seedName: ko.settings.appearance.copyName(environmentTheme.label),
                   initialAppearance,
                 })
               }
@@ -876,7 +926,7 @@ export function ThemeLibrary({
               openThemeEditor({
                 editingThemeId: null,
                 seedThemeId: customTheme.id,
-                seedName: `${customTheme.label} copy`,
+                seedName: ko.settings.appearance.copyName(customTheme.label),
                 initialAppearance,
               })
             }
@@ -926,11 +976,11 @@ export function ThemeLibrary({
             }
           >
             <PaintbrushIcon />
-            Create theme
+            {ko.settings.appearance.createTheme}
           </Button>
           <Button size="xs" variant="outline" onClick={() => onImportOpenChange(true)}>
             <PlusIcon />
-            Add theme
+            {ko.settings.appearance.addTheme}
           </Button>
         </div>
       </div>
@@ -940,14 +990,17 @@ export function ThemeLibrary({
           // Re-apply after collection updates. The update may remove the
           // selected variant, in which case the theme hook falls back safely.
           if (updated) refreshTheme();
-          const verb = updated ? "updated" : "added";
           toastManager.add(
             stackedThreadToast({
               type: "success",
               title:
                 importedThemes.length === 1
-                  ? `${importedThemes[0]!.label} ${verb}`
-                  : `${importedThemes.length} themes ${verb}`,
+                  ? updated
+                    ? ko.settings.appearance.themeUpdated(importedThemes[0]!.label)
+                    : ko.settings.appearance.themeAdded(importedThemes[0]!.label)
+                  : updated
+                    ? ko.settings.appearance.themesUpdated(importedThemes.length)
+                    : ko.settings.appearance.themesAdded(importedThemes.length),
               description: importedThemes.map((imported) => imported.label).join(", "),
             }),
           );
@@ -961,8 +1014,10 @@ export function ThemeLibrary({
             toastManager.add(
               stackedThreadToast({
                 type: "success",
-                title: `${importedTheme.label} added`,
-                description: `It’s now your ${modes[0]!} theme.`,
+                title: ko.settings.appearance.themeAdded(importedTheme.label),
+                description: ko.settings.appearance.nowModeTheme(
+                  modes[0] === "light" ? ko.settings.appearance.light : ko.settings.appearance.dark,
+                ),
               }),
             );
             return true;
@@ -971,8 +1026,8 @@ export function ThemeLibrary({
           toastManager.add(
             stackedThreadToast({
               type: "success",
-              title: `${importedTheme.label} added`,
-              description: "It’s now active.",
+              title: ko.settings.appearance.themeAdded(importedTheme.label),
+              description: ko.settings.appearance.nowActive,
             }),
           );
           return true;
@@ -985,13 +1040,13 @@ export function ThemeLibrary({
           <AlertDialogHeader>
             <AlertDialogTitle>
               {canRemoveCollection
-                ? `Remove themes from “${removeDialogCollectionLabel}”?`
-                : `Remove “${removeDialogTheme?.label}”?`}
+                ? ko.settings.appearance.removeFromCollectionTitle(removeDialogCollectionLabel)
+                : ko.settings.appearance.removeThemeTitle(removeDialogTheme?.label)}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {canRemoveCollection
-                ? "Select the variants you want to remove. You can restore them by importing the extension again."
-                : "You can bring it back anytime by importing its JSON file."}
+                ? ko.settings.appearance.removeVariantsDescription
+                : ko.settings.appearance.removeThemeDescription}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {canRemoveCollection ? (
@@ -1045,15 +1100,17 @@ export function ThemeLibrary({
             </div>
           ) : null}
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {ko.common.cancel}
+            </AlertDialogClose>
             <Button
               disabled={themeIdsToRemove.length === 0}
               variant="destructive"
               onClick={handleConfirmRemoveTheme}
             >
               {canRemoveCollection
-                ? `Remove selected${themeIdsToRemove.length > 0 ? ` (${themeIdsToRemove.length})` : ""}`
-                : "Remove theme"}
+                ? ko.settings.appearance.removeSelected(themeIdsToRemove.length)
+                : ko.settings.appearance.removeTheme}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

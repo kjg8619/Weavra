@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { visitElements } from "../../test/reactElementTree";
 import { reactHookHarness as hooks } from "../../test/reactHookHarness";
+import { ko } from "~/i18n/ko";
 
 const setup = vi.hoisted(() => ({
   auth: null as ProviderAuthState | null,
@@ -233,7 +234,10 @@ describe("Antigravity setup", () => {
     });
     let view = renderSetup();
     expect(
-      visitElements(view, (element) => element.props.children === "Signed in with Google."),
+      visitElements(
+        view,
+        (element) => element.props.children === ko.providers.setup.signedInWithGoogle,
+      ),
     ).toBeNull();
     expect(
       visitElements(view, (element) => element.props.id === `provider-callback-${instanceId}`)
@@ -244,7 +248,7 @@ describe("Antigravity setup", () => {
     expect(
       visitElements(
         renderSetup(),
-        (element) => element.props.children === "Signed in with Google.",
+        (element) => element.props.children === ko.providers.setup.signedInWithGoogle,
       ),
     ).toBeNull();
     setup.auth = authState({ phase: "succeeded", authorizationUrl: null });
@@ -252,7 +256,10 @@ describe("Antigravity setup", () => {
       provider: { ...provider, status: "ready", auth: { status: "authenticated" } },
     });
     expect(
-      visitElements(view, (element) => element.props.children === "Signed in with Google."),
+      visitElements(
+        view,
+        (element) => element.props.children === ko.providers.setup.signedInWithGoogle,
+      ),
     ).not.toBeNull();
   });
 
@@ -266,9 +273,12 @@ describe("Antigravity setup", () => {
       provider: { ...provider, status: "ready", auth: { status: "authenticated" } },
     });
     const expired = renderSetup();
-    expect(button(expired, "Sign in with Google")).not.toBeNull();
+    expect(button(expired, ko.providers.setup.signInWithGoogle)).not.toBeNull();
     expect(
-      visitElements(expired, (element) => element.props.children === "Signed in with Google."),
+      visitElements(
+        expired,
+        (element) => element.props.children === ko.providers.setup.signedInWithGoogle,
+      ),
     ).toBeNull();
     expect(
       visitElements(expired, (element) => element.props.children === "Google sign-in complete."),
@@ -295,8 +305,8 @@ describe("Antigravity setup", () => {
     });
     setup.startAuth.mockReturnValueOnce(pending);
     const view = renderSetup();
-    click(view, "Sign in with Google");
-    click(view, "Sign in with Google");
+    click(view, ko.providers.setup.signInWithGoogle);
+    click(view, ko.providers.setup.signInWithGoogle);
 
     expect(setup.startAuth).toHaveBeenCalledTimes(1);
     expect(setup.startAuth).toHaveBeenCalledWith({ environmentId, input: { instanceId } });
@@ -309,14 +319,14 @@ describe("Antigravity setup", () => {
       ...setup.installation!,
       operationId: "install-1",
       phase: "verifying",
-      message: "Checking the downloaded runtime.",
+      message: ko.providers.setup.verifyingDownload,
     };
 
     const view = renderSetup();
     expect(
       countElements(
         view,
-        (element) => element.props.children === "Checking the downloaded runtime.",
+        (element) => element.props.children === ko.providers.setup.verifyingDownload,
       ),
     ).toBe(1);
   });
@@ -330,12 +340,12 @@ describe("Antigravity setup", () => {
       installedVersion: null,
     };
     const view = renderSetup();
-    click(view, "Remove downloaded runtime");
+    click(view, ko.providers.setup.removeDownloadedRuntime);
     await flushPromises();
     expect(setup.removeInstall).not.toHaveBeenCalled();
 
     setup.confirm.mockResolvedValue(true);
-    click(view, "Remove downloaded runtime");
+    click(view, ko.providers.setup.removeDownloadedRuntime);
     await flushPromises();
     expect(setup.removeInstall).toHaveBeenCalledWith({ environmentId, input: { instanceId } });
   });
@@ -355,7 +365,7 @@ describe("Antigravity setup", () => {
           auth: { status: "unknown" },
         },
       });
-      click(view, "Sign out of Google");
+      click(view, ko.providers.setup.signOutOfGoogle);
       await flushPromises();
       expect(setup.logoutAuth).toHaveBeenCalledWith({ environmentId, input: { instanceId } });
     },
@@ -372,7 +382,7 @@ describe("Antigravity setup", () => {
       provider: { ...provider, installed: false },
       binaryPath: "/missing/antigravity",
     });
-    expect(button(view, "Sign in with Google")?.props.disabled).toBe(true);
+    expect(button(view, ko.providers.setup.signInWithGoogle)?.props.disabled).toBe(true);
     expect(setup.startAuth).not.toHaveBeenCalled();
   });
 

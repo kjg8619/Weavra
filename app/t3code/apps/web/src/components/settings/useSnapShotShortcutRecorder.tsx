@@ -14,6 +14,7 @@ import { SnapShotShortcutKeys } from "../desktop/SnapShotShortcutKeys";
 import { Button } from "../ui/button";
 import { keybindingFromKeyboardEvent } from "./KeybindingsSettings.logic";
 import { createRecordingRequestTracker } from "./SnapShotSettings.logic";
+import { ko } from "~/i18n/ko";
 
 const MODIFIER_FROM_KEY: Readonly<Record<string, SnapShotModifier>> = {
   Shift: "shift",
@@ -71,7 +72,7 @@ export function useSnapShotShortcutRecorder({
     } catch (error) {
       if (!requests.owns(request)) return;
       requests.clear();
-      onError(error instanceof Error ? error.message : "Could not start shortcut recording.");
+      onError(error instanceof Error ? error.message : ko.settings.shortcutRecorder.startFailed);
     }
   };
   useEffect(
@@ -96,7 +97,7 @@ export function useSnapShotShortcutRecorder({
       const [left, right] = MODIFIER_CODES[modifier];
       if (held.has(left) && held.has(right)) {
         if (!allowModifierPairs) {
-          onError("Add a letter, number, or function key to your shortcut.");
+          onError(ko.settings.shortcutRecorder.needsKey);
           return;
         }
         stopRecording();
@@ -125,8 +126,10 @@ export function useSnapShotShortcutRecorder({
         disabled={disabled}
         aria-label={
           displayShortcut
-            ? `Record snapshot shortcut, currently ${formatSnapShotShortcutLabel(displayShortcut)}`
-            : "Change snapshot shortcut"
+            ? ko.settings.shortcutRecorder.recordAriaLabel(
+                formatSnapShotShortcutLabel(displayShortcut),
+              )
+            : ko.settings.shortcutRecorder.changeAriaLabel
         }
         aria-pressed={recording}
         data-keybinding-capture=""
@@ -136,11 +139,11 @@ export function useSnapShotShortcutRecorder({
         onBlur={stopRecording}
       >
         {recording ? (
-          "Press shortcut…"
+          ko.settings.shortcutRecorder.pressShortcut
         ) : !displayShortcut ? (
-          "Change shortcut"
+          ko.settings.shortcutRecorder.changeShortcut
         ) : !allowModifierPairs && isModifierPairShortcut(displayShortcut) ? (
-          "Choose shortcut"
+          ko.settings.shortcutRecorder.chooseShortcut
         ) : (
           <SnapShotShortcutKeys shortcut={displayShortcut} />
         )}

@@ -5,6 +5,7 @@ import { openCommandPalette } from "../commandPaletteBus";
 import { Button } from "./ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./ui/empty";
 import { SidebarInset } from "./ui/sidebar";
+import { ko } from "~/i18n/ko";
 
 export function NoProjectsHero() {
   const openAddProject = useCallback(() => openCommandPalette({ open: "add-project" }), []);
@@ -16,15 +17,15 @@ export function NoProjectsHero() {
           <div className="w-full max-w-lg px-8 py-12">
             <EmptyHeader className="max-w-none">
               <EmptyTitle className="text-foreground text-2xl sm:text-3xl">
-                무엇을 함께 해볼까요?
+                {ko.projects.hero.title}
               </EmptyTitle>
               <EmptyDescription className="mt-2 text-sm text-muted-foreground/78">
-                첫 스레드를 시작하려면 프로젝트를 추가하세요.
+                {ko.projects.hero.description}
               </EmptyDescription>
               <div className="mt-6 flex justify-center">
                 <Button size="sm" onClick={openAddProject}>
                   <PlusIcon className="size-4" />
-                  프로젝트 추가
+                  {ko.projects.add}
                 </Button>
               </div>
             </EmptyHeader>

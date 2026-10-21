@@ -21,14 +21,15 @@ import {
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 
 import { previewBridge } from "./previewBridge";
+import { ko } from "~/i18n/ko";
 
 const COLOR_SCHEME_OPTIONS: ReadonlyArray<{
   value: DesktopPreviewColorScheme;
   label: string;
 }> = [
-  { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+  { value: "system", label: ko.chat.previewMenu.system },
+  { value: "light", label: ko.chat.previewMenu.light },
+  { value: "dark", label: ko.chat.previewMenu.dark },
 ];
 
 interface Props {
@@ -99,32 +100,39 @@ export function PreviewMoreMenu({
           render={
             <MenuTrigger
               render={
-                <Button variant="ghost" size="icon-xs" type="button" aria-label="Preview menu" />
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  type="button"
+                  aria-label={ko.chat.previewMenu.menuLabel}
+                />
               }
             />
           }
         >
           <MoreVertical />
         </TooltipTrigger>
-        <TooltipPopup>More</TooltipPopup>
+        <TooltipPopup>{ko.common.more}</TooltipPopup>
       </Tooltip>
       <MenuPopup align="end" sideOffset={6} className="min-w-56">
         <MenuItem onClick={callTab(bridge.hardReload)} disabled={tabDisabled}>
-          Hard reload
+          {ko.chat.previewMenu.hardReload}
         </MenuItem>
         <MenuItem onClick={callTab(bridge.openDevTools)} disabled={tabDisabled}>
-          Open DevTools
+          {ko.chat.previewMenu.openDevTools}
         </MenuItem>
         <MenuItem onClick={onNativePictureInPicture} disabled={tabDisabled}>
           {nativePictureInPicture
-            ? "Close separate preview window"
-            : "Open separate preview window"}
+            ? ko.chat.previewMenu.closeSeparateWindow
+            : ko.chat.previewMenu.openSeparateWindow}
         </MenuItem>
         <MenuItem onClick={onToggleDeviceToolbar} disabled={tabDisabled}>
-          {deviceToolbarVisible ? "Hide device toolbar" : "Show device toolbar"}
+          {deviceToolbarVisible
+            ? ko.chat.previewMenu.hideDeviceToolbar
+            : ko.chat.previewMenu.showDeviceToolbar}
         </MenuItem>
         <MenuSub>
-          <MenuSubTrigger disabled={tabDisabled}>Appearance</MenuSubTrigger>
+          <MenuSubTrigger disabled={tabDisabled}>{ko.chat.previewMenu.appearance}</MenuSubTrigger>
           <MenuSubPopup className="min-w-32">
             <MenuRadioGroup
               value={colorScheme}
@@ -154,14 +162,14 @@ export function PreviewMoreMenu({
           className="justify-between"
           disabled={tabDisabled}
         >
-          <span>Zoom</span>
+          <span>{ko.chat.previewMenu.zoom}</span>
           <span className="flex items-center gap-1">
             <Button
               variant="outline"
               size="icon-xs"
               type="button"
               onClick={callTab(bridge.zoomOut)}
-              aria-label="Zoom out"
+              aria-label={ko.chat.previewMenu.zoomOut}
               disabled={tabDisabled}
             >
               <Minus />
@@ -174,7 +182,7 @@ export function PreviewMoreMenu({
               size="icon-xs"
               type="button"
               onClick={callTab(bridge.zoomIn)}
-              aria-label="Zoom in"
+              aria-label={ko.chat.previewMenu.zoomIn}
               disabled={tabDisabled}
             >
               <PlusIcon />
@@ -184,7 +192,7 @@ export function PreviewMoreMenu({
               size="icon-xs"
               type="button"
               onClick={callTab(bridge.resetZoom)}
-              aria-label="Reset zoom"
+              aria-label={ko.chat.previewMenu.resetZoom}
               className="[:hover,[data-pressed]]:bg-foreground/10"
               disabled={tabDisabled}
             >
@@ -209,19 +217,21 @@ export function PreviewMoreMenu({
             // Truncation sits on the label itself: it renders a block box, so
             // `text-overflow` on an inline child inside it never applies and a
             // long name would push the popup past its width instead.
-            <MenuGroupLabel className="max-w-64 truncate">Profile: {profileName}</MenuGroupLabel>
+            <MenuGroupLabel className="max-w-64 truncate">
+              {ko.chat.previewMenu.profile(profileName)}
+            </MenuGroupLabel>
           ) : null}
           <MenuItem
             onClick={() =>
               void bridge.clearCookies(environmentId, profileId).catch(() => undefined)
             }
           >
-            Clear cookies
+            {ko.chat.previewMenu.clearCookies}
           </MenuItem>
           <MenuItem
             onClick={() => void bridge.clearCache(environmentId, profileId).catch(() => undefined)}
           >
-            Clear cache
+            {ko.chat.previewMenu.clearCache}
           </MenuItem>
         </MenuGroup>
       </MenuPopup>

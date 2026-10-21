@@ -4,6 +4,7 @@ import {
   type ProviderOptionDescriptor,
 } from "@t3tools/contracts";
 import { type CustomModelDefinition, createModelCapabilities } from "@t3tools/shared/model";
+import { ko } from "~/i18n/ko";
 
 /** Editable mirror of a `ProviderOptionChoice`. `key` is only a React key. */
 export interface EditorChoice {
@@ -193,22 +194,23 @@ export function descriptorsFromCapabilities(
  * order so the message is actionable, or `null` when the draft is sound.
  */
 export function validateDraft(draft: CustomModelDraft): string | null {
+  const copy = ko.providers.customModelValidation;
   const seenIds = new Set<string>();
   for (const [index, descriptor] of draft.descriptors.entries()) {
-    const position = `Option ${index + 1}`;
+    const position = index + 1;
     const id = descriptor.id.trim();
-    if (!id) return `${position} needs an id.`;
-    if (seenIds.has(id)) return `${position}: id "${id}" is used twice.`;
+    if (!id) return copy.needsId(position);
+    if (seenIds.has(id)) return copy.duplicateId(position, id);
     seenIds.add(id);
-    if (!descriptor.label.trim()) return `${position} needs a label.`;
+    if (!descriptor.label.trim()) return copy.needsLabel(position);
     if (descriptor.type !== "select") continue;
-    if (descriptor.choices.length === 0) return `${position} needs at least one choice.`;
+    if (descriptor.choices.length === 0) return copy.needsChoice(position);
     const seenChoices = new Set<string>();
     for (const choice of descriptor.choices) {
       const choiceId = choice.id.trim();
-      if (!choiceId) return `${position} has a choice without a value.`;
+      if (!choiceId) return copy.choiceWithoutValue(position);
       if (seenChoices.has(choiceId)) {
-        return `${position}: choice "${choiceId}" is used twice.`;
+        return copy.duplicateChoice(position, choiceId);
       }
       seenChoices.add(choiceId);
     }

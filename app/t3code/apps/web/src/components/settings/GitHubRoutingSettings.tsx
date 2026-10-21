@@ -15,14 +15,17 @@ import { toastManager } from "../ui/toast";
 import { EnvironmentRow, environmentTransportLabel } from "./EnvironmentRow";
 import { FoldedSettingsSection } from "./FoldedSettingsSection";
 import { searchableSetting } from "./settingsSearch";
+import { ko } from "~/i18n/ko";
+
+const copy = ko.settings.githubRouting;
 
 const options: ReadonlyArray<{ value: GitHubRoutingPermission; label: string }> = [
-  { value: "off", label: "Off" },
-  { value: "read", label: "Read PRs" },
-  { value: "read-write", label: "Read and act" },
+  { value: "off", label: ko.common.off },
+  { value: "read", label: copy.readPrs },
+  { value: "read-write", label: copy.readAndAct },
 ];
 
-const summaryLabels = { "read-write": "read and act", read: "read PRs" } as const;
+const summaryLabels = { "read-write": copy.readAndAct, read: copy.readPrs } as const;
 
 /**
  * Closed-header summary: the machines that share, grouped by permission.
@@ -35,7 +38,12 @@ export function summarizeGitHubRouting(
     const labels = entries.filter((entry) => entry.permission === permission);
     return labels.length === 0
       ? []
-      : [`${labels.map((entry) => entry.label).join(", ")} ${summaryLabels[permission]}`];
+      : [
+          copy.summaryGroup(
+            labels.map((entry) => entry.label).join(", "),
+            summaryLabels[permission],
+          ),
+        ];
   });
   return groups.length === 0 ? null : groups.join(" · ");
 }
@@ -69,14 +77,10 @@ export function GitHubRoutingSettings({
             label: environment.label,
             permission: gitHubRoutingPermissionFor(environment.entry, permissions),
           })),
-        ) ?? "Off"
+        ) ?? ko.common.off
       }
     >
-      <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-        Machines you trust here can read PR data through each other's GitHub access. Enable both
-        machines. Read and act may use broader permissions than the machine that owns them. This
-        applies only to this device.
-      </p>
+      <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">{copy.description}</p>
       {environments.map((environment) => (
         <EnvironmentRow
           key={environment.environmentId}
@@ -99,7 +103,7 @@ export function GitHubRoutingSettings({
                   if (result._tag === "Failure")
                     toastManager.add({
                       type: "error",
-                      title: "Could not save GitHub routing permission",
+                      title: copy.saveFailed,
                     });
                 },
               );
@@ -108,7 +112,7 @@ export function GitHubRoutingSettings({
             <SelectTrigger
               size="xs"
               className="w-32"
-              aria-label={`${environment.label} GitHub routing`}
+              aria-label={copy.selectAria(environment.label)}
             >
               <SelectValue />
             </SelectTrigger>
