@@ -65,7 +65,7 @@
         "17"
       ],
       "backendDOMNodeId": 5,
-      "frameId": "B5C57667126F6929C4B9FBD3FEAA6C68"
+      "frameId": "A0C7267E97C24967715325BCA159A786"
     },
     {
       "nodeId": "17",
@@ -7867,7 +7867,8 @@
       "properties": [],
       "parentId": "4898",
       "childIds": [
-        "4889"
+        "5697",
+        "5691"
       ],
       "backendDOMNodeId": 4895
     },
@@ -8319,7 +8320,8 @@
       "properties": [],
       "parentId": "4933",
       "childIds": [
-        "4924"
+        "5700",
+        "5695"
       ],
       "backendDOMNodeId": 4930
     },
@@ -12376,72 +12378,15 @@
       "backendDOMNodeId": 5039
     },
     {
-      "nodeId": "4889",
-      "ignored": true,
-      "ignoredReasons": [
-        {
-          "name": "uninteresting",
-          "value": {
-            "type": "boolean",
-            "value": true
-          }
-        }
-      ],
-      "role": {
-        "type": "role",
-        "value": "none"
-      },
-      "chromeRole": {
-        "type": "internalRole",
-        "value": 0
-      },
-      "parentId": "4895",
-      "childIds": [
-        "5036",
-        "4888"
-      ],
-      "backendDOMNodeId": 4889
-    },
-    {
-      "nodeId": "5036",
+      "nodeId": "5697",
       "ignored": false,
       "role": {
         "type": "role",
-        "value": "generic"
+        "value": "combobox"
       },
       "chromeRole": {
         "type": "internalRole",
-        "value": 88
-      },
-      "name": {
-        "type": "computedString",
-        "value": "",
-        "sources": [
-          {
-            "type": "relatedElement",
-            "attribute": "aria-labelledby"
-          },
-          {
-            "type": "attribute",
-            "attribute": "aria-label"
-          }
-        ]
-      },
-      "properties": [],
-      "parentId": "4889",
-      "childIds": [],
-      "backendDOMNodeId": 5036
-    },
-    {
-      "nodeId": "4888",
-      "ignored": false,
-      "role": {
-        "type": "role",
-        "value": "textbox"
-      },
-      "chromeRole": {
-        "type": "internalRole",
-        "value": 170
+        "value": 21
       },
       "name": {
         "type": "computedString",
@@ -12472,31 +12417,12 @@
             "type": "attribute",
             "attribute": "title",
             "superseded": true
-          },
-          {
-            "type": "placeholder",
-            "value": {
-              "type": "computedString",
-              "value": "SF Pro"
-            },
-            "attribute": "placeholder",
-            "attributeValue": {
-              "type": "string",
-              "value": "SF Pro"
-            },
-            "superseded": true
-          },
-          {
-            "type": "placeholder",
-            "attribute": "aria-placeholder",
-            "superseded": true
-          },
-          {
-            "type": "attribute",
-            "attribute": "title",
-            "superseded": true
           }
         ]
+      },
+      "value": {
+        "type": "string",
+        "value": "SF Pro"
       },
       "properties": [
         {
@@ -12514,31 +12440,10 @@
           }
         },
         {
-          "name": "editable",
+          "name": "hasPopup",
           "value": {
             "type": "token",
-            "value": "plaintext"
-          }
-        },
-        {
-          "name": "settable",
-          "value": {
-            "type": "booleanOrUndefined",
-            "value": true
-          }
-        },
-        {
-          "name": "multiline",
-          "value": {
-            "type": "boolean",
-            "value": false
-          }
-        },
-        {
-          "name": "readonly",
-          "value": {
-            "type": "boolean",
-            "value": false
+            "value": "dialog"
           }
         },
         {
@@ -12547,14 +12452,50 @@
             "type": "boolean",
             "value": false
           }
+        },
+        {
+          "name": "expanded",
+          "value": {
+            "type": "booleanOrUndefined",
+            "value": false
+          }
         }
       ],
-      "parentId": "4889",
+      "parentId": "4895",
       "childIds": [
-        "4973",
-        "4972"
+        "5702",
+        "5689"
       ],
-      "backendDOMNodeId": 4888
+      "backendDOMNodeId": 5697
+    },
+    {
+      "nodeId": "5691",
+      "ignored": true,
+      "ignoredReasons": [
+        {
+          "name": "ariaHiddenSubtree",
+          "value": {
+            "type": "idref",
+            "relatedNodes": [
+              {
+                "backendDOMNodeId": 5698,
+                "idref": "base-ui-_r_kf_-hidden-input"
+              }
+            ]
+          }
+        }
+      ],
+      "role": {
+        "type": "role",
+        "value": "none"
+      },
+      "chromeRole": {
+        "type": "internalRole",
+        "value": 0
+      },
+      "parentId": "4895",
+      "childIds": [],
+      "backendDOMNodeId": 5691
     },
     {
       "nodeId": "4892",
@@ -12802,72 +12743,15 @@
       "backendDOMNodeId": 5050
     },
     {
-      "nodeId": "4924",
-      "ignored": true,
-      "ignoredReasons": [
-        {
-          "name": "uninteresting",
-          "value": {
-            "type": "boolean",
-            "value": true
-          }
-        }
-      ],
-      "role": {
-        "type": "role",
-        "value": "none"
-      },
-      "chromeRole": {
-        "type": "internalRole",
-        "value": 0
-      },
-      "parentId": "4930",
-      "childIds": [
-        "5047",
-        "4923"
-      ],
-      "backendDOMNodeId": 4924
-    },
-    {
-      "nodeId": "5047",
+      "nodeId": "5700",
       "ignored": false,
       "role": {
         "type": "role",
-        "value": "generic"
+        "value": "combobox"
       },
       "chromeRole": {
         "type": "internalRole",
-        "value": 88
-      },
-      "name": {
-        "type": "computedString",
-        "value": "",
-        "sources": [
-          {
-            "type": "relatedElement",
-            "attribute": "aria-labelledby"
-          },
-          {
-            "type": "attribute",
-            "attribute": "aria-label"
-          }
-        ]
-      },
-      "properties": [],
-      "parentId": "4924",
-      "childIds": [],
-      "backendDOMNodeId": 5047
-    },
-    {
-      "nodeId": "4923",
-      "ignored": false,
-      "role": {
-        "type": "role",
-        "value": "textbox"
-      },
-      "chromeRole": {
-        "type": "internalRole",
-        "value": 170
+        "value": 21
       },
       "name": {
         "type": "computedString",
@@ -12898,31 +12782,12 @@
             "type": "attribute",
             "attribute": "title",
             "superseded": true
-          },
-          {
-            "type": "placeholder",
-            "value": {
-              "type": "computedString",
-              "value": "Menlo"
-            },
-            "attribute": "placeholder",
-            "attributeValue": {
-              "type": "string",
-              "value": "Menlo"
-            },
-            "superseded": true
-          },
-          {
-            "type": "placeholder",
-            "attribute": "aria-placeholder",
-            "superseded": true
-          },
-          {
-            "type": "attribute",
-            "attribute": "title",
-            "superseded": true
           }
         ]
+      },
+      "value": {
+        "type": "string",
+        "value": "Menlo"
       },
       "properties": [
         {
@@ -12940,31 +12805,10 @@
           }
         },
         {
-          "name": "editable",
+          "name": "hasPopup",
           "value": {
             "type": "token",
-            "value": "plaintext"
-          }
-        },
-        {
-          "name": "settable",
-          "value": {
-            "type": "booleanOrUndefined",
-            "value": true
-          }
-        },
-        {
-          "name": "multiline",
-          "value": {
-            "type": "boolean",
-            "value": false
-          }
-        },
-        {
-          "name": "readonly",
-          "value": {
-            "type": "boolean",
-            "value": false
+            "value": "dialog"
           }
         },
         {
@@ -12973,14 +12817,50 @@
             "type": "boolean",
             "value": false
           }
+        },
+        {
+          "name": "expanded",
+          "value": {
+            "type": "booleanOrUndefined",
+            "value": false
+          }
         }
       ],
-      "parentId": "4924",
+      "parentId": "4930",
       "childIds": [
-        "4975",
-        "4974"
+        "5704",
+        "5693"
       ],
-      "backendDOMNodeId": 4923
+      "backendDOMNodeId": 5700
+    },
+    {
+      "nodeId": "5695",
+      "ignored": true,
+      "ignoredReasons": [
+        {
+          "name": "ariaHiddenSubtree",
+          "value": {
+            "type": "idref",
+            "relatedNodes": [
+              {
+                "backendDOMNodeId": 5701,
+                "idref": "base-ui-_r_ki_-hidden-input"
+              }
+            ]
+          }
+        }
+      ],
+      "role": {
+        "type": "role",
+        "value": "none"
+      },
+      "chromeRole": {
+        "type": "internalRole",
+        "value": 0
+      },
+      "parentId": "4930",
+      "childIds": [],
+      "backendDOMNodeId": 5695
     },
     {
       "nodeId": "4927",
@@ -15947,23 +15827,7 @@
       "childIds": []
     },
     {
-      "nodeId": "4973",
-      "ignored": true,
-      "ignoredReasons": [],
-      "role": {
-        "type": "role",
-        "value": "none"
-      },
-      "chromeRole": {
-        "type": "internalRole",
-        "value": 0
-      },
-      "parentId": "4888",
-      "childIds": [],
-      "backendDOMNodeId": 4973
-    },
-    {
-      "nodeId": "4972",
+      "nodeId": "5702",
       "ignored": false,
       "role": {
         "type": "role",
@@ -15987,18 +15851,67 @@
           }
         ]
       },
-      "properties": [
+      "properties": [],
+      "parentId": "5697",
+      "childIds": [],
+      "backendDOMNodeId": 5702
+    },
+    {
+      "nodeId": "5689",
+      "ignored": true,
+      "ignoredReasons": [
         {
-          "name": "editable",
+          "name": "uninteresting",
           "value": {
-            "type": "token",
-            "value": "plaintext"
+            "type": "boolean",
+            "value": true
           }
         }
       ],
-      "parentId": "4888",
-      "childIds": [],
-      "backendDOMNodeId": 4972
+      "role": {
+        "type": "role",
+        "value": "none"
+      },
+      "chromeRole": {
+        "type": "internalRole",
+        "value": 0
+      },
+      "parentId": "5697",
+      "childIds": [
+        "5703"
+      ],
+      "backendDOMNodeId": 5689
+    },
+    {
+      "nodeId": "5703",
+      "ignored": false,
+      "role": {
+        "type": "internalRole",
+        "value": "StaticText"
+      },
+      "chromeRole": {
+        "type": "internalRole",
+        "value": 158
+      },
+      "name": {
+        "type": "computedString",
+        "value": "SF Pro",
+        "sources": [
+          {
+            "type": "contents",
+            "value": {
+              "type": "computedString",
+              "value": "SF Pro"
+            }
+          }
+        ]
+      },
+      "properties": [],
+      "parentId": "5689",
+      "childIds": [
+        "-1000001574"
+      ],
+      "backendDOMNodeId": 5703
     },
     {
       "nodeId": "-1000001414",
@@ -16123,23 +16036,7 @@
       "childIds": []
     },
     {
-      "nodeId": "4975",
-      "ignored": true,
-      "ignoredReasons": [],
-      "role": {
-        "type": "role",
-        "value": "none"
-      },
-      "chromeRole": {
-        "type": "internalRole",
-        "value": 0
-      },
-      "parentId": "4923",
-      "childIds": [],
-      "backendDOMNodeId": 4975
-    },
-    {
-      "nodeId": "4974",
+      "nodeId": "5704",
       "ignored": false,
       "role": {
         "type": "role",
@@ -16163,18 +16060,67 @@
           }
         ]
       },
-      "properties": [
+      "properties": [],
+      "parentId": "5700",
+      "childIds": [],
+      "backendDOMNodeId": 5704
+    },
+    {
+      "nodeId": "5693",
+      "ignored": true,
+      "ignoredReasons": [
         {
-          "name": "editable",
+          "name": "uninteresting",
           "value": {
-            "type": "token",
-            "value": "plaintext"
+            "type": "boolean",
+            "value": true
           }
         }
       ],
-      "parentId": "4923",
-      "childIds": [],
-      "backendDOMNodeId": 4974
+      "role": {
+        "type": "role",
+        "value": "none"
+      },
+      "chromeRole": {
+        "type": "internalRole",
+        "value": 0
+      },
+      "parentId": "5700",
+      "childIds": [
+        "5705"
+      ],
+      "backendDOMNodeId": 5693
+    },
+    {
+      "nodeId": "5705",
+      "ignored": false,
+      "role": {
+        "type": "internalRole",
+        "value": "StaticText"
+      },
+      "chromeRole": {
+        "type": "internalRole",
+        "value": 158
+      },
+      "name": {
+        "type": "computedString",
+        "value": "Menlo",
+        "sources": [
+          {
+            "type": "contents",
+            "value": {
+              "type": "computedString",
+              "value": "Menlo"
+            }
+          }
+        ]
+      },
+      "properties": [],
+      "parentId": "5693",
+      "childIds": [
+        "-1000001575"
+      ],
+      "backendDOMNodeId": 5705
     },
     {
       "nodeId": "-1000001428",
@@ -17755,6 +17701,25 @@
       "childIds": []
     },
     {
+      "nodeId": "-1000001574",
+      "ignored": false,
+      "role": {
+        "type": "internalRole",
+        "value": "InlineTextBox"
+      },
+      "chromeRole": {
+        "type": "internalRole",
+        "value": 101
+      },
+      "name": {
+        "type": "computedString",
+        "value": "SF Pro"
+      },
+      "properties": [],
+      "parentId": "5703",
+      "childIds": []
+    },
+    {
       "nodeId": "5065",
       "ignored": false,
       "role": {
@@ -17821,7 +17786,7 @@
       "properties": [],
       "parentId": "5064",
       "childIds": [
-        "5081"
+        "5089"
       ],
       "backendDOMNodeId": 5061
     },
@@ -17892,7 +17857,7 @@
       "properties": [],
       "parentId": "5064",
       "childIds": [
-        "5085"
+        "5078"
       ],
       "backendDOMNodeId": 5062
     },
@@ -17963,7 +17928,7 @@
       "properties": [],
       "parentId": "5064",
       "childIds": [
-        "5089"
+        "5082"
       ],
       "backendDOMNodeId": 5063
     },
@@ -18006,6 +17971,25 @@
         "-1000001423"
       ],
       "backendDOMNodeId": 5068
+    },
+    {
+      "nodeId": "-1000001575",
+      "ignored": false,
+      "role": {
+        "type": "internalRole",
+        "value": "InlineTextBox"
+      },
+      "chromeRole": {
+        "type": "internalRole",
+        "value": 101
+      },
+      "name": {
+        "type": "computedString",
+        "value": "Menlo"
+      },
+      "properties": [],
+      "parentId": "5705",
+      "childIds": []
     },
     {
       "nodeId": "-1000001532",
@@ -18805,7 +18789,7 @@
       "childIds": []
     },
     {
-      "nodeId": "5081",
+      "nodeId": "5089",
       "ignored": false,
       "role": {
         "type": "role",
@@ -18887,9 +18871,9 @@
       ],
       "parentId": "5061",
       "childIds": [
-        "5080"
+        "5088"
       ],
-      "backendDOMNodeId": 5081
+      "backendDOMNodeId": 5089
     },
     {
       "nodeId": "-1000001420",
@@ -18919,7 +18903,7 @@
       "childIds": []
     },
     {
-      "nodeId": "5085",
+      "nodeId": "5078",
       "ignored": false,
       "role": {
         "type": "role",
@@ -18987,10 +18971,10 @@
       ],
       "parentId": "5062",
       "childIds": [
-        "5265",
-        "5084"
+        "5268",
+        "5077"
       ],
-      "backendDOMNodeId": 5085
+      "backendDOMNodeId": 5078
     },
     {
       "nodeId": "-1000001421",
@@ -19020,7 +19004,7 @@
       "childIds": []
     },
     {
-      "nodeId": "5089",
+      "nodeId": "5082",
       "ignored": false,
       "role": {
         "type": "role",
@@ -19088,10 +19072,10 @@
       ],
       "parentId": "5063",
       "childIds": [
-        "5268",
-        "5088"
+        "5265",
+        "5081"
       ],
-      "backendDOMNodeId": 5089
+      "backendDOMNodeId": 5082
     },
     {
       "nodeId": "-1000001422",
@@ -19224,7 +19208,7 @@
       "childIds": []
     },
     {
-      "nodeId": "5080",
+      "nodeId": "5088",
       "ignored": true,
       "ignoredReasons": [
         {
@@ -19243,11 +19227,11 @@
         "type": "internalRole",
         "value": 0
       },
-      "parentId": "5081",
+      "parentId": "5089",
       "childIds": [
         "5269"
       ],
-      "backendDOMNodeId": 5080
+      "backendDOMNodeId": 5088
     },
     {
       "nodeId": "5269",
@@ -19274,14 +19258,14 @@
         ]
       },
       "properties": [],
-      "parentId": "5080",
+      "parentId": "5088",
       "childIds": [
         "-1000001416"
       ],
       "backendDOMNodeId": 5269
     },
     {
-      "nodeId": "5265",
+      "nodeId": "5268",
       "ignored": true,
       "ignoredReasons": [
         {
@@ -19290,7 +19274,7 @@
             "type": "idref",
             "relatedNodes": [
               {
-                "backendDOMNodeId": 5083
+                "backendDOMNodeId": 5076
               }
             ]
           }
@@ -19304,12 +19288,12 @@
         "type": "internalRole",
         "value": 0
       },
-      "parentId": "5085",
+      "parentId": "5078",
       "childIds": [],
-      "backendDOMNodeId": 5265
+      "backendDOMNodeId": 5268
     },
     {
-      "nodeId": "5084",
+      "nodeId": "5077",
       "ignored": true,
       "ignoredReasons": [
         {
@@ -19328,11 +19312,11 @@
         "type": "internalRole",
         "value": 0
       },
-      "parentId": "5085",
+      "parentId": "5078",
       "childIds": [
         "5270"
       ],
-      "backendDOMNodeId": 5084
+      "backendDOMNodeId": 5077
     },
     {
       "nodeId": "5270",
@@ -19359,14 +19343,14 @@
         ]
       },
       "properties": [],
-      "parentId": "5084",
+      "parentId": "5077",
       "childIds": [
         "-1000001417"
       ],
       "backendDOMNodeId": 5270
     },
     {
-      "nodeId": "5268",
+      "nodeId": "5265",
       "ignored": true,
       "ignoredReasons": [
         {
@@ -19375,7 +19359,7 @@
             "type": "idref",
             "relatedNodes": [
               {
-                "backendDOMNodeId": 5087
+                "backendDOMNodeId": 5080
               }
             ]
           }
@@ -19389,12 +19373,12 @@
         "type": "internalRole",
         "value": 0
       },
-      "parentId": "5089",
+      "parentId": "5082",
       "childIds": [],
-      "backendDOMNodeId": 5268
+      "backendDOMNodeId": 5265
     },
     {
-      "nodeId": "5088",
+      "nodeId": "5081",
       "ignored": true,
       "ignoredReasons": [
         {
@@ -19413,11 +19397,11 @@
         "type": "internalRole",
         "value": 0
       },
-      "parentId": "5089",
+      "parentId": "5082",
       "childIds": [
         "5271"
       ],
-      "backendDOMNodeId": 5088
+      "backendDOMNodeId": 5081
     },
     {
       "nodeId": "5271",
@@ -19444,7 +19428,7 @@
         ]
       },
       "properties": [],
-      "parentId": "5088",
+      "parentId": "5081",
       "childIds": [
         "-1000001418"
       ],

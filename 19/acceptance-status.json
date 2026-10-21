@@ -1,9 +1,9 @@
 {
   "parent": "fb97140d6781ff14b680cd56eec95e31fb23841b",
-  "head": "14914ad09237ab6d89e6c21b11b0e2e008fa42d5",
+  "head": "b4de3b5dbdf441925ac2c5d64b9276737af2f1b3",
   "runner": "fa5e1dbcfb12fd51c5ac0d9dd0ca7a6e89f91c4a",
   "parentAsar": "6a80bc979588694edbccbd75d4017d887c589f900b4b2fe488683f059f726b80",
-  "headAsar": "a6600f48f09202257bdb8ff1f9aecff1dd9aa09b9e40d20a29b27330ba7dc9a1",
+  "headAsar": "05a2a75650d7022953156ac03b69c139febbb7662a1bbe9ca370c506085e518f",
   "captures": {
     "before": 152,
     "after": 152,
@@ -29,20 +29,20 @@
       "version": "0.0.42"
     },
     "after": {
-      "revision": "14914ad09237ab6d89e6c21b11b0e2e008fa42d5",
-      "appRevision": "14914ad09237ab6d89e6c21b11b0e2e008fa42d5",
+      "revision": "b4de3b5dbdf441925ac2c5d64b9276737af2f1b3",
+      "appRevision": "b4de3b5dbdf441925ac2c5d64b9276737af2f1b3",
       "executableSha256": "ad321e34b2795d1910ff1a24f2b4249269f556dc7184ea64f353a851339f1582",
       "trackedDiff": "",
       "trackedDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "asarSha256": "a6600f48f09202257bdb8ff1f9aecff1dd9aa09b9e40d20a29b27330ba7dc9a1",
-      "captureSha256": "a7ba4976d7eefd0aab37461b52139adc2def12ebd4d8a8a5e8c278c9cb1c8e25",
+      "asarSha256": "05a2a75650d7022953156ac03b69c139febbb7662a1bbe9ca370c506085e518f",
+      "captureSha256": "bafc2569d965d4c75cceb5dd4fc2bc214226e1ab8ece0d2d13f8f91486b1be20",
       "fixtureSha256": "68c839b49a3e5b951ea4b6c432d43044c683d9f03bc1be7206817bb0c6101bcf",
-      "registrySha256": "a99485e55a27d6c39288dc58a82232927fdb5bf51a0f732d54a1cdb2e7544356",
+      "registrySha256": "d84976244ca15440d2b143a0f7bf987033cfa2d66fc21a9f7f316e7c6715f198",
       "fixtureVersion": "hig-offline-projection-v4",
       "os": "Darwin 27.0.0 arm64",
-      "at": "2026-10-21T03:13:36.384Z",
+      "at": "2026-10-21T06:38:50.165Z",
       "bundle": "/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-19/after/app/weavra-desktop.app",
-      "packagedRevision": "14914ad09237",
+      "packagedRevision": "b4de3b5dbdf4",
       "version": "0.0.42"
     }
   },
@@ -132,7 +132,7 @@
     "minimumTextContrast": 14.144710622731107,
     "minimumBorderContrast": 4.584322056932125,
     "minimumTextSize": 14,
-    "revision": "14914ad09237ab6d89e6c21b11b0e2e008fa42d5",
+    "revision": "b4de3b5dbdf441925ac2c5d64b9276737af2f1b3",
     "cleanup": {
       "closed": true
     },
@@ -143,8 +143,8 @@
     }
   },
   "fix1": {
-    "revision": "14914ad09237ab6d89e6c21b11b0e2e008fa42d5",
-    "asarSha256": "a6600f48f09202257bdb8ff1f9aecff1dd9aa09b9e40d20a29b27330ba7dc9a1",
+    "revision": "b4de3b5dbdf441925ac2c5d64b9276737af2f1b3",
+    "asarSha256": "05a2a75650d7022953156ac03b69c139febbb7662a1bbe9ca370c506085e518f",
     "koreanContexts": 12,
     "focusContexts": 24,
     "orphans": 0,
@@ -161,11 +161,77 @@
       "closed": true
     }
   },
+  "fix2": {
+    "before": {
+      "contexts": 12,
+      "labels": 24,
+      "failures": 12,
+      "maximumTextPreviewOverlap": 660.65625,
+      "maximumTextBadgeOverlap": 250.484375,
+      "counters": {
+        "model": 0,
+        "execution": 0,
+        "externalNetwork": 0
+      }
+    },
+    "after": {
+      "contexts": 12,
+      "labels": 24,
+      "failures": 0,
+      "maximumTextPreviewOverlap": 0,
+      "maximumTextBadgeOverlap": 0,
+      "counters": {
+        "model": 0,
+        "execution": 0,
+        "externalNetwork": 0
+      }
+    },
+    "baselineRevision": "14914ad09237ab6d89e6c21b11b0e2e008fa42d5",
+    "revision": "b4de3b5dbdf441925ac2c5d64b9276737af2f1b3"
+  },
   "acceptance": {
     "rounds": [
       {
+        "name": "fix2/qa-round-01",
+        "revision": "b4de3b5dbdf441925ac2c5d64b9276737af2f1b3",
+        "checks": [
+          {
+            "caseId": "19",
+            "checkId": "selection-wash-check",
+            "status": "PASS",
+            "assertions": 4
+          },
+          {
+            "caseId": "19",
+            "checkId": "focus-not-selection",
+            "status": "PASS",
+            "assertions": 3
+          },
+          {
+            "caseId": "19",
+            "checkId": "system-live-theme",
+            "status": "PASS",
+            "assertions": 6
+          },
+          {
+            "caseId": "19",
+            "checkId": "custom-theme-preview",
+            "status": "PASS",
+            "assertions": 5
+          }
+        ],
+        "cleanup": {
+          "exited": true
+        },
+        "counters": {
+          "model": 0,
+          "runtimeMutation": 0,
+          "blockedOutbound": 0
+        }
+      },
+      {
         "name": "qa",
-        "revision": "14914ad09237ab6d89e6c21b11b0e2e008fa42d5",
+        "revision": "b4de3b5dbdf441925ac2c5d64b9276737af2f1b3",
         "checks": [
           {
             "caseId": "19",
@@ -389,13 +455,13 @@
       ],
       "images": 152,
       "pairs": 158,
-      "revision": "14914ad09237ab6d89e6c21b11b0e2e008fa42d5",
+      "revision": "b4de3b5dbdf441925ac2c5d64b9276737af2f1b3",
       "harnessOnly": false,
       "cases": [
         "19"
       ],
       "checks": 4,
-      "receiptSha256": "a66905c24e9d368e8b2205b07a5e2d925abafa66449aa54e9d58ba5f1cfe6ad2"
+      "receiptSha256": "2bf5591499c1a3902415881eb66e40105b98ca8b7e4b26e6c55f202af6f1dec8"
     }
   },
   "commandExits": {
@@ -404,13 +470,17 @@
     "lint": 0,
     "typecheck": 0,
     "buildAfter": 0,
-    "fix1Measure": 0,
+    "koreanFocusMeasure": 0,
+    "variantLabelBefore": 1,
+    "variantLabelAfter": 0,
     "measureAfter": 0,
     "captureAfter": 0,
     "diff": 0,
     "supplementalDiff": 0,
-    "acceptPr19Fix1": 0,
-    "verifyPacketFix1": 0,
+    "acceptPr19Fix2Round01": 0,
+    "acceptPr19Fix2Round02": 0,
+    "verifyPacketFix2Round01": 0,
+    "verifyPacketFix2Round02": 0,
     "diffCheck": 0
   }
 }
