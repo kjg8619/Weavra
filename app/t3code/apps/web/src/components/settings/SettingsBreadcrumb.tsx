@@ -8,6 +8,7 @@ import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import type { EnvironmentPresentation } from "../../state/environments";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { ProjectFavicon } from "../ProjectFavicon";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   Menu,
   MenuPopup,
@@ -118,9 +119,12 @@ function ScopeMenu({
         )}
       >
         {icon}
-        <span className="min-w-0 truncate" data-ellipsis="identity" title={label}>
-          {label}
-        </span>
+        <Tooltip>
+          <TooltipTrigger render={<span className="min-w-0 truncate" data-ellipsis="identity" />}>
+            {label}
+          </TooltipTrigger>
+          <TooltipPopup side="bottom">{label}</TooltipPopup>
+        </Tooltip>
       </MenuTrigger>
       <MenuPopup align="start" className="w-64 max-w-[calc(100vw-2rem)]">
         {children}
