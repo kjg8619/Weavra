@@ -30,7 +30,7 @@ The independent 82px drift came from reinserting a previously dismissed, unchang
 - [Read-only parent bootstrap observations](https://raw.githubusercontent.com/kjg8619/Weavra/refs/heads/hig-evidence/21/21/diagnosis-parent--probe--observations.json)
 - [Final round 1 receipt](https://raw.githubusercontent.com/kjg8619/Weavra/refs/heads/hig-evidence/21/21/qa-round-01--scenario-receipt.json)
 - [Final round 2 receipt](https://raw.githubusercontent.com/kjg8619/Weavra/refs/heads/hig-evidence/21/21/qa--scenario-receipt.json)
-- [All 15 final cycle observations](https://raw.githubusercontent.com/kjg8619/Weavra/refs/heads/hig-evidence/21/21/qa--run-604d95d4-ce27-4b72-acdf-7cc2c1e204bb--scenarios--21--theme-content-parity--observations.json)
+- [All 15 final cycle observations](https://raw.githubusercontent.com/kjg8619/Weavra/refs/heads/hig-evidence/21/21/qa--run-467729e7-2507-4847-bfe7-dec57479efb6--scenarios--21--theme-content-parity--observations.json)
 
 The diagnosis parent bundle has app.asar 0385a57b7203aaec8be0a94fe8257b2aa85f45468ce5060b0a08e6e60b51b5ef. The fresh paired parent build has ac879d51d6317a0d1d4bf34dbe0b905bf2ca1f86e485dab25992d3629f8d9c90; both record source d81bc594, but they are distinct actual packages, not claimed byte-identical. Final head app.asar is 81debd18a2c3d7332ed2588c824b59db8f273e122efc2e6402b8400c2af92f65.
 
