@@ -1,0 +1,48 @@
+[1m[2mnote:[0m[0m You are running [94m`vp test`[39m as a Vite+ built-in command. If you meant to run the test npm script, use [94m`vpr test`[39m instead.
+
+ RUN  v4.1.11 /Users/kangjingoo/Workspace/tool/Weavra-worktrees/hig-22/app/t3code/apps/web
+
+stderr | src/components/ThreadNotificationCoordinator.badge.test.tsx > shows in-app alerts without adding a badge while focused
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+ ❯ |unit| src/components/ThreadNotificationCoordinator.badge.test.tsx (13 tests | 1 failed) 47ms
+   × shows in-app alerts without adding a badge while focused 4ms
+ ❯ |unit| src/components/settings/ProviderInstanceCard.test.ts (4 tests | 1 failed) 27ms
+     × surfaces a failed probe message in both the list row and the editor 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| src/components/ThreadNotificationCoordinator.badge.test.tsx > shows in-app alerts without adding a badge while focused
+AssertionError: expected "vi.fn()" to be called once, but got 0 times
+ ❯ src/components/ThreadNotificationCoordinator.badge.test.tsx:246:23
+    244|   complete();
+    245|   await render();
+    246|   expect(state.toast).toHaveBeenCalledOnce();
+       |                       ^
+    247|   expect(TestNotification.sent).toHaveLength(0);
+    248|   expect(state.badge.mock.calls.every(([count]) => count === 0)).toBe(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |unit| src/components/settings/ProviderInstanceCard.test.ts > deriveProviderModelsForDisplay > surfaces a failed probe message in both the list row and the editor
+AssertionError: expected '<div data-slot="settings-row" class="…' to contain 'is not a symlink'
+
+Expected: "is not a symlink"
+Received: "<div data-slot="settings-row" class="group flex min-h-18 items-center gap-3 px-3 py-3 transition-colors sm:px-4 hover:bg-muted/25"><button type="button" class="flex min-h-9 min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-md text-left outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground" aria-label="codex 선택" aria-pressed="false"><span class="relative isolate z-30 inline-flex shrink-0 items-center justify-center overflow-visible size-5"><svg aria-hidden="true" preserveAspectRatio="xMidYMid" viewBox="0 0 256 260" class="fill-black dark:fill-white shrink-0 size-4 text-foreground/80"><path d="M239.184 106.203a64.716 64.716 0 0 0-5.576-53.103C219.452 28.459 191 15.784 163.213 21.74A65.586 65.586 0 0 0 52.096 45.22a64.716 64.716 0 0 0-43.23 31.36c-14.31 24.602-11.061 55.634 8.033 76.74a64.665 64.665 0 0 0 5.525 53.102c14.174 24.65 42.644 37.324 70.446 31.36a64.72 64.72 0 0 0 48.754 21.744c28.481.025 53.714-18.361 62.414-45.481a64.767 64.767 0 0 0 43.229-31.36c14.137-24.558 10.875-55.423-8.083-76.483Zm-97.56 136.338a48.397 48.397 0 0 1-31.105-11.255l1.535-.87 51.67-29.825a8.595 8.595 0 0 0 4.247-7.367v-72.85l21.845 12.636c.218.111.37.32.409.563v60.367c-.056 26.818-21.783 48.545-48.601 48.601Zm-104.466-44.61a48.345 48.345 0 0 1-5.781-32.589l1.534.921 51.722 29.826a8.339 8.339 0 0 0 8.441 0l63.181-36.425v25.221a.87.87 0 0 1-.358.665l-52.335 30.184c-23.257 13.398-52.97 5.431-66.404-17.803ZM23.549 85.38a48.499 48.499 0 0 1 25.58-21.333v61.39a8.288 8.288 0 0 0 4.195 7.316l62.874 36.272-21.845 12.636a.819.819 0 0 1-.767 0L41.353 151.53c-23.211-13.454-31.171-43.144-17.804-66.405v.256Zm179.466 41.695-63.08-36.63L161.73 77.86a.819.819 0 0 1 .768 0l52.233 30.184a48.6 48.6 0 0 1-7.316 87.635v-61.391a8.544 8.544 0 0 0-4.4-7.213Zm21.742-32.69-1.535-.922-51.619-30.081a8.39 8.39 0 0 0-8.492 0L99.98 99.808V74.587a.716.716 0 0 1 .307-.665l52.233-30.133a48.652 48.652 0 0 1 72.236 50.391v.205ZM88.061 139.097l-21.845-12.585a.87.87 0 0 1-.41-.614V65.685a48.652 48.652 0 0 1 79.757-37.346l-1.535.87-51.67 29.825a8.595 8.595 0 0 0-4.246 7.367l-.051 72.697Zm11.868-25.58 28.138-16.217 28.188 16.218v32.434l-28.086 16.218-28.188-16.218-.052-32.434Z"></path></svg></span><span class="min-w-0 flex-1"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-sm font-medium text-foreground">codex</span><code class="min-w-0 truncate rounded bg-muted/60 px-1 py-0.5 text-[10px] text-muted-foreground">codex_work</code></span><span class="mt-0.5 flex items-start gap-1.5 text-sm leading-normal text-muted-foreground"><span class="flex h-[1.45em] shrink-0 items-center"><span class="size-1.5 shrink-0 rounded-full bg-destructive" aria-hidden="true"></span></span><span class="break-keep text-pretty">사용할 수 없음</span></span></span></button><span class="flex h-5 shrink-0 items-center"><span data-checked="" role="switch" tabindex="0" id="base-ui-_R_3_" data-size="default" data-slot="switch" aria-label="codex 사용" class="inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 cursor-pointer items-center rounded-full p-[2px] outline-none transition-[background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background data-checked:bg-primary data-unchecked:bg-input data-disabled:cursor-not-allowed data-disabled:opacity-64 data-[mixed]:bg-input [--thumb-size:--spacing(5)] sm:[--thumb-size:--spacing(4)]"><span data-checked="" data-slot="switch-thumb" class="pointer-events-none block size-[calc(var(--thumb-size)-2px)] shrink-0 origin-left in-[[role=switch]:active,[data-slot=label]:active,[data-slot=field-label]:active]:not-data-disabled:scale-x-110 in-[[role=switch]:active,[data-slot=label]:active,[data-slot=field-label]:active]:rounded-[var(--thumb-size)/calc(var(--thumb-size)*1.1)] rounded-(--thumb-size) bg-background shadow-sm/5 will-change-transform [transition:translate_.15s,border-radius_.15s,scale_.1s_.1s,transform-origin_.15s] data-checked:origin-right data-checked:translate-x-[calc(var(--thumb-size)-4px)]"></span></span><input id="base-ui-_R_3H1_" style="clip-path:inset(50%);overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;position:fixed;top:0;left:0" tabindex="-1" type="checkbox" aria-hidden="true" checked=""/></span></div>"
+
+ ❯ src/components/settings/ProviderInstanceCard.test.ts:161:22
+    159|       const markup = renderToStaticMarkup(createElement(ProviderInstan…
+    160|       expect(markup).toContain(ko.common.unavailable);
+    161|       expect(markup).toContain("is not a symlink");
+       |                      ^
+    162|     }
+    163|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 414 passed (416)
+      Tests  2 failed | 5696 passed (5698)
+   Start at  11:58:56
+   Duration  21.81s (transform 18.75s, setup 16.63s, import 198.55s, tests 36.28s, environment 86ms)
+
