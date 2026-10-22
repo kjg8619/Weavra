@@ -42,6 +42,8 @@ import {
   panelMenuItem,
   localeSources,
   LOCALE_FIXTURE_VALUES,
+  PRODUCT_VERSION,
+  readLocaleLabels,
   NAMED_ROW_PATTERNS,
   namedRowSubject,
 } from "./cases.mjs";
@@ -922,6 +924,178 @@ describe("authored locale audit", () => {
         expect(english.has(literal.slice(1, -1))).toBe(true);
     }
   });
+
+  // Runner fix 7: rows sampled from a real DOM, as the renderer does.
+  const modelSources = localeSources({
+    keybindingsConfigPath: "/tmp/home/.weavra/keybindings.json",
+    providers: [
+      { instanceId: "codex", driver: "codex", models: [{ slug: "gpt-5.6-luna" }] },
+      { instanceId: "claudeAgent", driver: "claudeAgent", models: [{ slug: "claude-fable-5-1" }] },
+    ],
+  });
+  async function readDom(fixtures: string[]) {
+    await using view = new WebView({ backend: "chrome" });
+    await view.navigate("about:blank");
+    const rows = [];
+    for (const html of fixtures)
+      rows.push(
+        await view.evaluate(`(() => {
+          document.body.innerHTML = ${JSON.stringify(`<main>${html}</main>`)};
+          return (${readLocaleLabels.toString()})("main");
+        })()`),
+      );
+    return rows as Record<string, unknown>[][];
+  }
+  const domAudit = async (html: string[], from = modelSources) =>
+    (await readDom(html)).map((labels) => auditLocaleLabels(labels, from));
+
+  test("code data is split from prose and audited as its own data class", async () => {
+    const [version, provider, slug] = await domAudit([
+      '<h3><span class="x"><span>버전</span><code>development</code></span></h3>',
+      '<button>Codex<span role="group" aria-label="Codex 버전"><code>v0.149.1</code></span>로그인 필요</button>',
+      "<label>모델 <code>gpt-5.6-luna</code></label>",
+    ]);
+    for (const result of [version, provider, slug]) expect(result.unclassified).toEqual([]);
+    expect(version.exceptions).toEqual([
+      expect.objectContaining({
+        prose: "버전",
+        field: "code",
+        text: "development",
+        segments: [
+          {
+            segment: "development",
+            class: "version",
+            source: "packages/shared/src/product.ts WEAVRA_PRODUCT_VERSION",
+          },
+        ],
+      }),
+    ]);
+    expect(provider.exceptions.map((r) => [r.field, r.prose, r.text, r.segments])).toEqual([
+      [
+        "text",
+        "Codex로그인 필요",
+        "Codex로그인 필요",
+        [{ segment: "Codex", class: "product/brand", source: "lead allowlist" }],
+      ],
+      [
+        "code",
+        "Codex로그인 필요",
+        "v0.149.1",
+        [{ segment: "v0.149.1", class: "version", source: "semver" }],
+      ],
+    ]);
+    expect(slug.exceptions[0].segments).toEqual([
+      {
+        segment: "gpt-5.6-luna",
+        class: "model id",
+        source: "serverConfig.providers[].models[].slug",
+      },
+    ]);
+    passes({ text: "경로", codes: ["~/.codex-t3/personal", "OPENAI_API_KEY", "codex --version"] });
+    passes({ text: "열기", codes: ["keybindings.json", "http://127.0.0.1:4096", "03 Code blocks"] });
+    const product = await NodeFSP.readFile(
+      new URL("../../app/t3code/packages/shared/src/product.ts", import.meta.url),
+      "utf8",
+    );
+    expect(product).toContain(`export const WEAVRA_PRODUCT_VERSION = "${PRODUCT_VERSION}";`);
+  }, 15_000);
+  test("code-wrapped unknown English fails, and so does English prose beside code", async () => {
+    const results = await domAudit([
+      "<h3>버전<code>preview build</code></h3>",
+      "<button>설정 <code>hello</code></button>",
+      "<label>모델 <code>Fable</code></label>",
+      "<label>모델 <code>Codex</code></label>",
+      "<button>실행 <code>codex development</code></button>",
+    ]);
+    expect(results.map((r) => r.unclassified.map((u) => [u.field, u.text]))).toEqual([
+      [["code", "preview build"]],
+      [["code", "hello"]],
+      [["code", "Fable"]],
+      [["code", "Codex"]],
+      [["code", "codex development"]],
+    ]);
+    const [prose, both] = await domAudit([
+      "<h3>Version<code>v1.2.3</code></h3>",
+      "<button>Open <code>notes</code></button>",
+    ]);
+    expect(prose.unclassified.map((u) => [u.field, u.text])).toEqual([["text", "Version"]]);
+    expect(both.unclassified.map((u) => [u.field, u.text])).toEqual([
+      ["text", "Open"],
+      ["code", "notes"],
+    ]);
+    // A model slug or the product version is data only when its source agrees.
+    fails({ text: "모델", codes: ["gpt-5.6-luna"] });
+    fails({ text: "버전", codes: ["Development"] });
+    fails({ text: "버전", codes: ["1.2"] });
+  }, 15_000);
+  test("aria-hidden decorative initials are not part of the label", async () => {
+    const [hidden] = await domAudit([
+      '<button><span aria-hidden="true">BP</span><span>baseline-project</span></button>',
+    ]);
+    expect(hidden.unclassified).toEqual([]);
+    expect(hidden.exceptions[0]).toEqual(
+      expect.objectContaining({
+        text: "baseline-project",
+        segments: [{ segment: "baseline-project", class: "fixture value", source: "seed.mjs" }],
+      }),
+    );
+  }, 15_000);
+  test("initials that are not aria-hidden still fail beside a seeded value", async () => {
+    const results = await domAudit([
+      "<button><span>BP</span><span>baseline-project</span></button>",
+      '<button><span aria-hidden="false">BP</span>baseline-project</button>',
+      '<button><span aria-hidden>BP</span>baseline-project</button>',
+      '<button><span aria-hidden="true">BP</span>Settings</button>',
+    ]);
+    expect(results.map((r) => r.unclassified.map((u) => u.text))).toEqual([
+      ["BPbaseline-project"],
+      ["BPbaseline-project"],
+      ["BPbaseline-project"],
+      ["Settings"],
+    ]);
+  }, 15_000);
+  test("model names pass only on a model picker, exactly as their source has them", async () => {
+    const results = await domAudit([
+      '<button data-chat-provider-model-picker="true"><span aria-hidden="true">CF</span><span>Claude Fable 5.1</span></button>',
+      '<button data-chat-provider-model-picker="true"><span data-chat-provider-model-picker-label="true">gpt-5.6-luna</span></button>',
+      '<div data-model-picker-content="true"><button>gpt-5.6-luna</button></div>',
+    ]);
+    expect(results.map((r) => r.unclassified)).toEqual([[], [], []]);
+    expect(results.map((r) => r.exceptions[0].segments[0])).toEqual([
+      { segment: "Claude Fable 5.1", class: "model", source: "runner fixture LABELS.model" },
+      {
+        segment: "gpt-5.6-luna",
+        class: "model",
+        source: "serverConfig.providers[].models[].slug",
+      },
+      {
+        segment: "gpt-5.6-luna",
+        class: "model",
+        source: "serverConfig.providers[].models[].slug",
+      },
+    ]);
+  }, 15_000);
+  test("a model name outside the source list or outside a picker fails", async () => {
+    const results = await domAudit([
+      '<button data-chat-provider-model-picker="true"><span>Claude Fable 6</span></button>',
+      '<button data-chat-provider-model-picker="true"><span>gpt-5.6-lunar</span></button>',
+      '<button data-chat-provider-model-picker="true"><span>Claude Fable 5.1 설정</span></button>',
+      '<button data-chat-provider-model-picker="true"><span>Settings</span></button>',
+      "<button>Claude Fable 5.1</button>",
+      "<button>gpt-5.6-luna</button>",
+      '<div data-model-picker="true"><button>gpt-5.6-luna</button></div>',
+    ]);
+    for (const result of results) expect(result.unclassified.length).toBeGreaterThan(0);
+    // The slug is data only while serverConfig lists it.
+    const [unlisted] = await domAudit(
+      [
+        '<button data-chat-provider-model-picker="true"><span>gpt-5.6-luna</span></button>',
+      ],
+      localeSources({ providers: [{ instanceId: "codex", driver: "codex", models: [] }] }),
+    );
+    expect(unlisted.unclassified.map((u) => u.text)).toEqual(["gpt-5.6-luna"]);
+    fails({ tag: "INPUT", placeholder: "gpt-5.6-luna", modelScope: true }, modelSources);
+  }, 15_000);
 });
 
 describe("named row controls", () => {
