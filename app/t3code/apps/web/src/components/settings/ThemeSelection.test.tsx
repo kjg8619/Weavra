@@ -11,6 +11,7 @@ import {
   parseThemeFile,
 } from "../../themePalette";
 import { ThemeLibrary } from "./ThemeSettings";
+import { ko } from "~/i18n/ko";
 
 vi.mock("../../hooks/useEnvironmentTheme", () => ({
   useEnvironmentThemeDefinitions: () => [],
@@ -25,6 +26,8 @@ vi.mock("../ui/tooltip", () => ({
   TooltipPopup: () => null,
 }));
 
+const modeLabel = (mode: "light" | "dark") =>
+  mode === "light" ? ko.settings.appearance.light : ko.settings.appearance.dark;
 const storage = new Map<string, string>();
 const writes = vi.fn((key: string, value: string) => storage.set(key, value));
 const appearanceListeners = new Set<() => void>();
@@ -102,13 +105,13 @@ describe("Appearance selection", () => {
     writes.mockClear();
 
     // When the mode control is activated (including native keyboard activation).
-    await act(() => button("Use dark mode").props.onClick());
+    await act(() => button(ko.settings.appearance.darkModeChoice).props.onClick());
 
     // Then the saved mode and rendered selection change, but the mix survives.
     expect(writes).toHaveBeenCalledExactlyOnceWith(THEME_APPEARANCE_MODE_STORAGE_KEY, "dark");
     expect(storage.get(THEME_HALVES_STORAGE_KEY)).toBe(halves);
-    expect(button("Use dark mode").props["aria-pressed"]).toBe(true);
-    expect(button("Use light mode").props["aria-pressed"]).toBe(false);
+    expect(button(ko.settings.appearance.darkModeChoice).props["aria-pressed"]).toBe(true);
+    expect(button(ko.settings.appearance.lightModeChoice).props["aria-pressed"]).toBe(false);
   });
 
   it("assigns only the activated preview half", async () => {
@@ -117,14 +120,16 @@ describe("Appearance selection", () => {
 
     // When a palette's light preview is activated.
     await act(() =>
-      button("Use Grove light mode").props.onClick({ stopPropagation: () => undefined }),
+      button(ko.settings.appearance.labelLightMode("Grove")).props.onClick({
+        stopPropagation: () => undefined,
+      }),
     );
 
     // Then only light changes, and the default dark preview stays selected.
     expect(snapshot.themeHalves?.light).toBe("grove");
     expect(snapshot.themeHalves?.dark).toBe(darkOwner);
-    expect(button("Use Grove light mode").props["aria-pressed"]).toBe(true);
-    expect(button("Use Weavra dark mode").props["aria-pressed"]).toBe(true);
+    expect(button(ko.settings.appearance.labelLightMode("Grove")).props["aria-pressed"]).toBe(true);
+    expect(button(ko.settings.appearance.labelDarkMode("Weavra")).props["aria-pressed"]).toBe(true);
   });
 
   it("keeps System saved through light dark light appearance events", async () => {
@@ -140,7 +145,7 @@ describe("Appearance selection", () => {
 
       // Then content resolves live without rewriting the user's choice.
       expect(snapshot.resolvedTheme).toBe(dark ? "dark" : "light");
-      expect(button("Follow the system appearance").props["aria-pressed"]).toBe(true);
+      expect(button(ko.settings.appearance.followSystem).props["aria-pressed"]).toBe(true);
     }
     expect(writes).not.toHaveBeenCalled();
     expect(storage.get(THEME_APPEARANCE_MODE_STORAGE_KEY)).toBe("system");
@@ -165,10 +170,15 @@ describe("Appearance selection", () => {
     writes.mockClear();
 
     // When focus opens the choices and Escape dismisses them.
-    await act(() => button("Choose light variant, 2 options, currently one").props.onFocus());
+    await act(() =>
+      button(
+        ko.settings.appearance.chooseVariant(ko.settings.appearance.light, 2, "one"),
+      ).props.onFocus(),
+    );
     if (!renderer) throw new Error("Theme library is not mounted");
     const group = renderer.root.find(
-      (node) => node.type === "div" && node.props["aria-label"] === "Light and dark theme variants",
+      (node) =>
+        node.type === "div" && node.props["aria-label"] === ko.settings.appearance.variantsGroup,
     );
     await act(() =>
       group.props.onKeyDown({
@@ -182,7 +192,10 @@ describe("Appearance selection", () => {
     // Then focus and dismissal have no persistence effect.
     expect([...storage]).toEqual(saved);
     expect(writes).not.toHaveBeenCalled();
-    expect(button("Use one for light mode").props.tabIndex).toBe(-1);
+    expect(
+      button(ko.settings.appearance.optionForMode("one", ko.settings.appearance.light)).props
+        .tabIndex,
+    ).toBe(-1);
   });
 
   it.each(["light", "dark"] as const)(
@@ -201,9 +214,11 @@ describe("Appearance selection", () => {
         ),
       );
       await act(() => renderer?.update(<Library />));
-      const opener = button(`Choose ${mode} variant, 2 options, currently one`);
+      const opener = button(ko.settings.appearance.chooseVariant(modeLabel(mode), 2, "one"));
       await act(() => opener.props.onFocus());
-      await act(() => button(`Use two for ${mode} mode`).props.onFocus());
+      await act(() =>
+        button(ko.settings.appearance.optionForMode("two", modeLabel(mode))).props.onFocus(),
+      );
       writes.mockClear();
       // Native focus synchronously dispatches the opener's focus handler.
       const focus = vi.fn(() => opener.props.onFocus());
@@ -213,7 +228,7 @@ describe("Appearance selection", () => {
       if (!renderer) throw new Error("Theme library is not mounted");
       const group = renderer.root.find(
         (node) =>
-          node.type === "div" && node.props["aria-label"] === "Light and dark theme variants",
+          node.type === "div" && node.props["aria-label"] === ko.settings.appearance.variantsGroup,
       );
 
       await act(() =>
@@ -231,8 +246,12 @@ describe("Appearance selection", () => {
       expect(focus).toHaveBeenCalledOnce();
       expect(preventDefault).toHaveBeenCalledOnce();
       expect(stopPropagation).toHaveBeenCalledOnce();
-      expect(button(`Use two for ${mode} mode`).props.disabled).toBe(true);
-      expect(button(`Use two for ${mode} mode`).props.tabIndex).toBe(-1);
+      expect(
+        button(ko.settings.appearance.optionForMode("two", modeLabel(mode))).props.disabled,
+      ).toBe(true);
+      expect(
+        button(ko.settings.appearance.optionForMode("two", modeLabel(mode))).props.tabIndex,
+      ).toBe(-1);
       expect(writes).not.toHaveBeenCalled();
     },
   );

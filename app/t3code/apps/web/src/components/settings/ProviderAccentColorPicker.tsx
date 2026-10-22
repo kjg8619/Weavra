@@ -10,6 +10,9 @@ import { Button } from "../ui/button";
 import { Popover, PopoverClose, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { normalizeProviderAccentColor } from "../../providerInstances";
 import { cn } from "../../lib/utils";
+import { ko } from "~/i18n/ko";
+
+const copy = ko.providers.accentColor;
 
 const FALLBACK_ACCENT_COLOR = "#2563eb";
 
@@ -33,17 +36,13 @@ function ProviderCustomColorPanel(props: {
   return (
     <div className="w-56 bg-popover">
       <ColorSaturationValuePlane
-        label="Accent color"
+        label={copy.label}
         value={hsv}
         onChange={commitHsv}
         variant="edge"
       />
       <div className="grid gap-3 p-3">
-        <ColorHueSlider
-          label="Accent color hue"
-          value={hsv.h}
-          onChange={(h) => commitHsv({ ...hsv, h })}
-        />
+        <ColorHueSlider label={copy.hue} value={hsv.h} onChange={(h) => commitHsv({ ...hsv, h })} />
         <Input
           nativeInput
           size="sm"
@@ -57,7 +56,7 @@ function ProviderCustomColorPanel(props: {
           }}
           onBlur={() => setHexDraft(null)}
           className="font-mono text-xs"
-          aria-label="Custom hex accent color"
+          aria-label={copy.customHex}
           spellCheck={false}
         />
       </div>
@@ -84,7 +83,7 @@ function ProviderCustomColorPicker(props: {
               "hover:scale-105 hover:border-ring/60",
             )}
             style={{ backgroundColor: normalized }}
-            aria-label={`Choose accent color for ${props.displayName}`}
+            aria-label={copy.chooseFor(props.displayName)}
           >
             <PipetteIcon className="size-3 text-white/70 drop-shadow-sm" aria-hidden />
           </button>
@@ -108,7 +107,7 @@ function ProviderCustomColorPicker(props: {
               disabled={!props.value}
             >
               <XIcon className="size-3.5" aria-hidden />
-              Clear color
+              {copy.clear}
             </Button>
           }
         />
@@ -207,7 +206,7 @@ export function ProviderAccentColorPicker(props: {
 
   return (
     <div className="grid gap-2">
-      <span className="text-xs font-medium text-foreground">Accent color</span>
+      <span className="text-xs font-medium text-foreground">{copy.label}</span>
       {picker}
       {description ? <span className="text-xs text-muted-foreground">{description}</span> : null}
     </div>

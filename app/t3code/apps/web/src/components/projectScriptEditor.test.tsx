@@ -4,6 +4,8 @@ import { act, StrictMode, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
+import { ko } from "~/i18n/ko";
+
 vi.mock("./ui/dialog", () => ({
   Dialog: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? children : null),
   DialogDescription: "p",
@@ -133,7 +135,7 @@ describe("project action editor save lifecycle", () => {
     expect(renderer!.root.findByType("fieldset").props.disabled).toBe(true);
     const cancel = renderer!.root
       .findAllByType("button")
-      .find((button) => button.children.includes("Cancel"))!;
+      .find((button) => button.children.includes(ko.common.cancel))!;
     expect(cancel.props.disabled).not.toBe(true);
 
     await act(async () => {
@@ -238,7 +240,7 @@ describe("project action editor save lifecycle", () => {
       if (exit === "cancel") {
         renderer!.root
           .findAllByType("button")
-          .find((button) => button.children.includes("Cancel"))!
+          .find((button) => button.children.includes(ko.common.cancel))!
           .props.onClick();
       } else {
         renderer!.unmount();
@@ -326,7 +328,7 @@ describe("project action command validation", () => {
     changeCommand("replacement-command");
     const cancel = renderer!.root
       .findAllByType("button")
-      .find((button) => button.children.includes("Cancel"))!;
+      .find((button) => button.children.includes(ko.common.cancel))!;
 
     act(() => {
       cancel.props.onClick();

@@ -6,6 +6,7 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { reactHookHarness as hooks } from "../../test/reactHookHarness";
 import { visitElements } from "../../test/reactElementTree";
+import { ko } from "~/i18n/ko";
 
 const effects = vi.hoisted(() => [] as (() => void)[]);
 vi.mock("react", async (original) => {
@@ -121,7 +122,7 @@ it.each(["niri", "hyprland"] as const)(
     state = { ...state, linuxBackend: desktop };
     const tree = await mount();
     expect(wizard(tree)).toBeNull();
-    button(tree, "Change shortcut").onClick();
+    button(tree, ko.settings.snapshots.changeShortcut).onClick();
     await finish(bridge.getSnapShotState.mock.results[1]!.value);
     const opened = render();
     expect(visitElements(opened, (element) => element.type === CaptureShortcutConfig)).toBeNull();
@@ -138,7 +139,7 @@ it.each(["niri", "hyprland"] as const)(
 it("returns to Access if the Hyprland helper needs attention before changing keys", async () => {
   const tree = await mount();
   state = { ...state, hyprlandHelper: { status: "not-installed", message: "Install helper" } };
-  button(tree, "Change shortcut").onClick();
+  button(tree, ko.settings.snapshots.changeShortcut).onClick();
   await finish(bridge.getSnapShotState.mock.results[1]!.value);
   expect(wizard(render())?.props.initialStep).toBe("access");
   expect(bridge.previewSnapShotConfig).not.toHaveBeenCalled();
@@ -161,7 +162,9 @@ it.each(["direct", "gnome-extension", "kde"] as const)(
       return control.props;
     };
     if (backend !== "direct") {
-      expect(recorder(tree)["aria-label"]).toBe("Record snapshot shortcut, currently Ctrl+Shift+2");
+      expect(recorder(tree)["aria-label"]).toBe(
+        ko.settings.shortcutRecorder.recordAriaLabel("Ctrl+Shift+2"),
+      );
       const keycaps = visitElements(tree, (element) => element.type === SnapShotShortcutKeys);
       expect(keycaps?.props.shortcut).toMatchObject({ key: "2", ctrlKey: true, shiftKey: true });
       expect(
@@ -183,8 +186,10 @@ it.each(["direct", "gnome-extension", "kde"] as const)(
     });
     await finish(bridge.checkSnapShotShortcut.mock.results[0]!.value);
     expect(recorder(render()).size).toBe("xs");
-    expect(recorder(render())["aria-label"]).toBe("Record snapshot shortcut, currently Ctrl+Alt+Y");
-    button(render(), "Save").onClick();
+    expect(recorder(render())["aria-label"]).toBe(
+      ko.settings.shortcutRecorder.recordAriaLabel("Ctrl+Alt+Y"),
+    );
+    button(render(), ko.common.save).onClick();
     await finish(settingsStore.update.mock.results[0]!.value);
     expect(settingsStore.update).toHaveBeenCalledWith({
       snapShotShortcut: expect.objectContaining({ key: "y", modKey: true, altKey: true }),
@@ -200,7 +205,7 @@ it("turns capture on directly on Windows without opening setup", async () => {
   const tree = await mount();
   const toggle = visitElements(
     tree,
-    (element) => element.props["aria-label"] === "Enable snapshots",
+    (element) => element.props["aria-label"] === ko.settings.snapshots.enable,
   );
   if (!toggle) throw new Error("Missing capture toggle");
   (toggle.props.onCheckedChange as (checked: boolean) => void)(true);
@@ -208,7 +213,10 @@ it("turns capture on directly on Windows without opening setup", async () => {
   expect(settingsStore.update).toHaveBeenCalledWith({ snapShotEnabled: true });
   expect(wizard(renderWithEffects())).toBeNull();
   expect(
-    visitElements(renderWithEffects(), (element) => element.props.children === "Manage capture"),
+    visitElements(
+      renderWithEffects(),
+      (element) => element.props.children === ko.settings.snapshots.manageCapture,
+    ),
   ).toBeNull();
 });
 
@@ -221,7 +229,7 @@ it("keeps the approved desktop shortcut when recording is cancelled in setup", a
     shortcutLabel: "Press <Control><Alt>8",
   };
   const tree = await mount();
-  button(tree, "Manage capture").onClick();
+  button(tree, ko.settings.snapshots.manageCapture).onClick();
   await finish(bridge.getSnapShotState.mock.results[1]!.value);
   const shortcut = () => {
     const input = visitElements(
@@ -231,16 +239,16 @@ it("keeps the approved desktop shortcut when recording is cancelled in setup", a
     if (!input) throw new Error("Missing setup shortcut recorder");
     return input.props;
   };
-  expect(shortcut()["aria-label"]).toBe("Record snapshot shortcut, currently Ctrl+Alt+8");
+  expect(shortcut()["aria-label"]).toBe(ko.settings.shortcutRecorder.recordAriaLabel("Ctrl+Alt+8"));
   (shortcut().onClick as () => void)();
   await finish(bridge.setSnapShotShortcutSuppressed.mock.results.at(-1)!.value);
-  expect(shortcut().children).toBe("Press shortcut…");
+  expect(shortcut().children).toBe(ko.settings.shortcutRecorder.pressShortcut);
   (shortcut().onKeyDown as (event: object) => void)({
     key: "Escape",
     preventDefault: vi.fn(),
     stopPropagation: vi.fn(),
   });
-  expect(shortcut()["aria-label"]).toBe("Record snapshot shortcut, currently Ctrl+Alt+8");
+  expect(shortcut()["aria-label"]).toBe(ko.settings.shortcutRecorder.recordAriaLabel("Ctrl+Alt+8"));
   expect(settingsStore.update).not.toHaveBeenCalled();
   expect(bridge.checkSnapShotShortcut).not.toHaveBeenCalled();
 });
@@ -269,7 +277,7 @@ function usePortalShortcut(shortcutCanRetry: boolean) {
 it("keeps older portal shortcuts editable without offering unsupported permissions", async () => {
   usePortalShortcut(false);
   const tree = await mount();
-  expect(() => button(tree, "Shortcut permissions")).toThrow("Missing button");
+  expect(() => button(tree, ko.settings.snapshots.shortcutPermissions)).toThrow("Missing button");
   expect(bridge.setupSnapShot).not.toHaveBeenCalled();
   const recorder = visitElements(tree, (element) => "data-keybinding-capture" in element.props);
   (recorder!.props.onClick as () => void)();
@@ -277,23 +285,23 @@ it("keeps older portal shortcuts editable without offering unsupported permissio
   expect(
     visitElements(render(), (element) => "data-keybinding-capture" in element.props)?.props
       .children,
-  ).toBe("Press shortcut…");
+  ).toBe(ko.settings.shortcutRecorder.pressShortcut);
 });
 
 it("shows permission errors once in a toast and allows retrying", async () => {
   usePortalShortcut(true);
   bridge.setupSnapShot.mockRejectedValueOnce(new Error("The desktop service disconnected."));
-  button(await mount(), "Shortcut permissions").onClick();
+  button(await mount(), ko.settings.snapshots.shortcutPermissions).onClick();
   await finish(bridge.setupSnapShot.mock.results[0]!.value.catch(() => undefined));
   const tree = renderWithEffects();
   expect(toastManager.add).toHaveBeenCalledExactlyOnceWith({
     type: "error",
-    title: "Couldn't open shortcut permissions",
+    title: ko.settings.snapshots.openShortcutPermissionsFailed,
     description: "The desktop service disconnected.",
   });
   expect(visitElements(tree, (element) => element.props.role === "alert")).toBeNull();
   expect(state.shortcutRegistered).toBe(true);
-  button(renderWithEffects(), "Shortcut permissions").onClick();
+  button(renderWithEffects(), ko.settings.snapshots.shortcutPermissions).onClick();
   await finish(bridge.setupSnapShot.mock.results[1]!.value);
   renderWithEffects();
   expect(bridge.setupSnapShot).toHaveBeenCalledTimes(2);
@@ -305,7 +313,7 @@ it("keeps a failed preference unchanged and reports the save error in a toast", 
   const flash = (tree: ReturnType<typeof render>) => {
     const control = visitElements(
       tree,
-      (element) => element.props["aria-label"] === "Flash captured window",
+      (element) => element.props["aria-label"] === ko.settings.snapshots.flash,
     );
     if (!control) throw new Error("Missing flash control");
     return control.props as { onCheckedChange: (checked: boolean) => void; checked: boolean };
@@ -316,7 +324,7 @@ it("keeps a failed preference unchanged and reports the save error in a toast", 
   expect(flash(renderWithEffects()).checked).toBe(true);
   expect(toastManager.add).toHaveBeenCalledExactlyOnceWith({
     type: "error",
-    title: "Couldn't save capture settings",
+    title: ko.settings.snapshots.saveSettingsFailed,
     description: "The settings file is read-only.",
   });
   flash(renderWithEffects()).onCheckedChange(false);
@@ -327,7 +335,7 @@ it("keeps a failed preference unchanged and reports the save error in a toast", 
 
 it("keeps setup errors in the wizard and does not toast them after closing it", async () => {
   usePortalShortcut(true);
-  button(await mount(), "Manage capture").onClick();
+  button(await mount(), ko.settings.snapshots.manageCapture).onClick();
   await finish(bridge.getSnapShotState.mock.results[1]!.value);
   bridge.setupSnapShot.mockRejectedValueOnce(new Error("The desktop service disconnected."));
   const action = wizard(render())!.props.onAction as (action: "retry-shortcut") => Promise<void>;
@@ -364,7 +372,7 @@ it.each([false, true])(
     const tree = await mount();
     const toggle = visitElements(
       tree,
-      (element) => element.props["aria-label"] === "Enable snapshots",
+      (element) => element.props["aria-label"] === ko.settings.snapshots.enable,
     );
     (toggle!.props.onCheckedChange as (checked: boolean) => void)(true);
     await finish(bridge.getSnapShotState.mock.results[1]!.value);
@@ -402,7 +410,7 @@ it("requires a successful macOS test capture before enabling and allows retry", 
   const tree = await mount();
   const toggle = visitElements(
     tree,
-    (element) => element.props["aria-label"] === "Enable snapshots",
+    (element) => element.props["aria-label"] === ko.settings.snapshots.enable,
   );
   (toggle!.props.onCheckedChange as (checked: boolean) => void)(true);
   await finish(bridge.getSnapShotState.mock.results[1]!.value);

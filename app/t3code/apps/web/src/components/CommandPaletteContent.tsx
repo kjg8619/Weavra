@@ -1,5 +1,6 @@
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { type ComponentProps, type ReactNode, useId, useLayoutEffect, useRef } from "react";
+import { ko } from "~/i18n/ko";
 
 import { Command, CommandFooter, CommandInput, CommandPanel } from "./ui/command";
 import { Kbd, KbdGroup } from "./ui/kbd";
@@ -25,7 +26,7 @@ type CommandPaletteContentProps = Omit<ComponentProps<typeof Command>, "children
  */
 export function CommandPaletteContent({
   children,
-  escapeLabel = "닫기",
+  escapeLabel = ko.common.close,
   footerActionLabel,
   footerTrailing,
   inputAccessory,
@@ -72,7 +73,7 @@ export function CommandPaletteContent({
               <Kbd>
                 <ArrowDownIcon />
               </Kbd>
-              <span>이동</span>
+              <span>{ko.projects.commandPalette.navigate}</span>
             </KbdGroup>
             {footerActionLabel !== undefined ? (
               <KbdGroup className="items-center gap-1.5">
@@ -83,7 +84,7 @@ export function CommandPaletteContent({
             {showBackHint ? (
               <KbdGroup className="items-center gap-1.5">
                 <Kbd>Backspace</Kbd>
-                <span>뒤로</span>
+                <span>{ko.common.back}</span>
               </KbdGroup>
             ) : null}
             <KbdGroup className="items-center gap-1.5">

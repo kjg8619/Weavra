@@ -219,7 +219,7 @@ export function WeavraFactCandidates({
       const preview = response.data.preview;
       done("명시적인 확인을 기다리고 있어요.");
       const approved = await requestConfirmDialog(
-        `다음 대상에 검토한 참고용 사실을 기록할까요: ${workspaceRoot}?\n출처: ${preview.sourceRef}\ndigest: ${preview.sourceDigest}\n설명: ${preview.statement}\n설명이 출처로 뒷받침되며 비밀값·추론 원문·대화 기록·도구 출력을 포함하지 않는지 확인해 주세요. Policy·승인·검증·완료 판정이 아니에요.`,
+        `다음 대상에 검토한 참고용 사실을 기록할까요: ${workspaceRoot}?\n출처: ${preview.sourceRef}\n다이제스트: ${preview.sourceDigest}\n설명: ${preview.statement}\n설명이 출처로 뒷받침되며 비밀값·추론 원문·대화 기록·도구 출력을 포함하지 않는지 확인해 주세요. 정책·승인·검증·완료 판정이 아니에요.`,
       );
       if (!mounted.current) return;
       if (!approved) return done("기록하지 않았어요. 후보는 그대로 남아 있어요.");

@@ -983,6 +983,7 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { serverEnvironment } from "../../state/server";
 import type { ReviewCommentContext } from "../../reviewCommentContext";
+import { ko } from "~/i18n/ko";
 
 const WORKSPACE_SNAPSHOT_RETRY_COOLDOWN_MS = 10_000;
 
@@ -1064,16 +1065,16 @@ const ComposerInputHelp = memo(function ComposerInputHelp(props: { onClosed: () 
         }
       >
         <CircleHelpIcon aria-hidden className="size-3.5" />
-        입력 도움말
+        {ko.chat.composer.inputHelp}
       </PopoverTrigger>
       <PopoverPopup side="top" align="end" className="max-w-72" finalFocus={false}>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
           <dt className="font-mono font-medium">@</dt>
-          <dd>파일이나 폴더를 대화에 붙여요.</dd>
+          <dd>{ko.chat.composer.attachPathHelp}</dd>
           <dt className="font-mono font-medium">$</dt>
-          <dd>스킬을 골라 사용해요.</dd>
+          <dd>{ko.chat.composer.skillHelp}</dd>
           <dt className="font-mono font-medium">/</dt>
-          <dd>명령을 실행해요.</dd>
+          <dd>{ko.chat.composer.commandHelp}</dd>
         </dl>
       </PopoverPopup>
     </Popover>
@@ -1096,8 +1097,8 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   const RuntimeModeIcon = runtimeModeOption.icon;
   const interactionModeTooltip =
     props.interactionMode === "plan"
-      ? "계획 모드예요. 클릭하면 기본 작업 모드로 돌아가요."
-      : "기본 작업 모드예요. 클릭하면 계획 모드로 전환해요.";
+      ? ko.chat.composer.planModeTooltip
+      : ko.chat.composer.buildModeTooltip;
 
   const interactionModeToggle = props.showInteractionModeToggle ? (
     <>
@@ -1135,7 +1136,9 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
             />
           )}
           <span className="sr-only sm:not-sr-only">
-            {props.interactionMode === "plan" ? "계획" : "Build"}
+            {props.interactionMode === "plan"
+              ? ko.chat.composer.planMode
+              : ko.chat.composer.buildMode}
           </span>
         </TooltipTrigger>
         <TooltipPopup side="top">{interactionModeTooltip}</TooltipPopup>
@@ -1160,7 +1163,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
                 data-composer-shortcut="composer.mode"
                 size={size}
                 className={size === "xs" ? undefined : "font-medium"}
-                aria-label="실행 모드"
+                aria-label={ko.runtime.executionMode}
               />
             }
           >
@@ -1742,14 +1745,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     (questionAttachmentTarget &&
     !supportsQuestionAttachments &&
     (composerImages.length > 0 || composerFiles.length > 0)
-      ? "질문 답변과 함께 파일을 보내려면 이 서버를 업데이트해 주세요"
+      ? ko.chat.composer.updateServerForQuestionFiles
       : null) ??
     fileCapabilityBlockReason ??
     (supportsAttachmentUploads
       ? needsReattachFileCount > 0
         ? needsReattachFileCount === 1
-          ? "중단된 파일을 다시 첨부하거나 빼 주세요"
-          : "중단된 파일들을 다시 첨부하거나 빼 주세요"
+          ? ko.chat.composer.reattachInterruptedFile
+          : ko.chat.composer.reattachInterruptedFiles
         : attachmentUploadBlockReason({
             imageIds: [...composerImages, ...composerFiles].map((attachment) => attachment.id),
             uploadsByImageId,
@@ -1927,7 +1930,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         : undefined))
     : undefined;
   const resolvedCompactDisabledReason =
-    compactDisabledReason ?? (noProviderAvailable ? "지금은 압축할 수 없어요" : null);
+    compactDisabledReason ?? (noProviderAvailable ? ko.chat.composer.compactUnavailable : null);
   // The driver kind follows the instance that will actually run the turn,
   // which can differ from the persisted selection when that selection is
   // disabled.
@@ -1949,7 +1952,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
   const sendDisabledReason =
     externalSendDisabledReason ??
-    (multipleModelSelections?.length === 0 ? "모델을 하나 이상 골라 주세요." : null) ??
+    (multipleModelSelections?.length === 0 ? ko.chat.composer.chooseAtLeastOneModel : null) ??
     (activePendingProgress
       ? attachmentBlockReason
       : (attachmentBlockReason ??
@@ -2382,7 +2385,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           type: "slash-command",
           command: "model",
           label: "/model",
-          description: "이 대화의 응답 모델 바꾸기",
+          description: ko.chat.composer.changeModelDescription,
         },
         ...(planModeUiEnabled
           ? ([
@@ -2391,14 +2394,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 type: "slash-command",
                 command: "plan",
                 label: "/plan",
-                description: "이 대화를 계획 모드로 바꾸기",
+                description: ko.chat.composer.planModeDescription,
               },
               {
                 id: "slash:default",
                 type: "slash-command",
                 command: "default",
                 label: "/default",
-                description: "이 대화를 일반 구현 모드로 되돌리기",
+                description: ko.chat.composer.defaultModeDescription,
               },
             ] as const)
           : []),
@@ -2416,7 +2419,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         provider: selectedProvider,
         command,
         label: `/${command.name}`,
-        description: command.description ?? command.input?.hint ?? "공급자 명령 실행",
+        description:
+          command.description ?? command.input?.hint ?? ko.chat.composer.runProviderCommand,
       }));
       const query = composerTrigger.query.trim().toLowerCase();
       const skillItems = slashMenuSkills.map((skill) => ({
@@ -2426,7 +2430,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         skill,
         label: `/skill:${skill.name}`,
         description:
-          skill.shortDescription ?? skill.description ?? (skill.scope ? `${skill.scope} 스킬` : ""),
+          skill.shortDescription ??
+          skill.description ??
+          (skill.scope ? ko.chat.composer.scopedSkill(skill.scope) : ""),
       }));
       const visibleProviderSlashCommandItems = providerSlashCommandItems.filter(
         (item) => item.command.name !== "compact" || compactSlashCommandAvailable,
@@ -2447,7 +2453,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         description:
           skill.shortDescription ??
           skill.description ??
-          (skill.scope ? `${skill.scope} 스킬` : "공급자 스킬 실행"),
+          (skill.scope
+            ? ko.chat.composer.scopedSkill(skill.scope)
+            : ko.chat.composer.runProviderSkill),
       }));
     }
     if (
@@ -2598,25 +2606,25 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         exactPullRequestLookup.isPending));
   const composerMenuEmptyState = useMemo(() => {
     if (composerTriggerKind === "skill") {
-      return "No skills found. Try / to browse provider commands.";
+      return ko.chat.composer.skillsEmpty;
     }
     if (composerTriggerKind === "pull-request") {
       if (pullRequestProjectId === null || pullRequestRepository === null) {
-        return "이 프로젝트에서는 PR을 쓸 수 없어요.";
+        return ko.chat.composer.prUnavailableInProject;
       }
       if (
         pullRequestLookup.error !== null ||
         pullRequestLookup.data?.errors.some((error) => error.projectId === pullRequestProjectId)
       ) {
-        return "이 프로젝트의 PR을 읽지 못했어요.";
+        return ko.chat.composer.prReadFailed;
       }
       return composerTrigger?.query
-        ? `No pull request matches ${composerTrigger.query}.`
-        : "이 저장소에서 PR을 찾지 못했어요.";
+        ? ko.chat.composer.pullRequestNoMatch(composerTrigger.query)
+        : ko.chat.composer.prNotFound;
     }
     return composerTriggerKind === "path"
-      ? "일치하는 파일이나 폴더가 없어요."
-      : "일치하는 명령이 없어요.";
+      ? ko.chat.composer.noMatchingPaths
+      : ko.chat.composer.noMatchingCommands;
   }, [
     composerTrigger,
     composerTriggerKind,
@@ -2708,7 +2716,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     projectSelectionRequired ||
     environmentUnavailable !== null ||
     !composerSendState.hasSendableContent;
-  const collapsedComposerPrimaryActionLabel = "메시지 보내기";
+  const collapsedComposerPrimaryActionLabel = ko.chat.send;
   const showMobilePendingAnswerActions =
     isMobileViewport && !isComposerCollapsedMobile && pendingPrimaryAction !== null;
 
@@ -2859,13 +2867,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       const fail = (reason: string) => {
         toastManager.add({
           type: "error",
-          title: `${record.name}을(를) 이 메시지에 넣지 못했어요`,
-          description: `${reason} 칩을 빼거나 파일을 다시 첨부해 주세요.`,
+          title: ko.chat.composer.restoreAttachmentFailed(record.name),
+          description: ko.chat.composer.removeChipOrReattach(reason),
         });
       };
       const sourceConnection = readPreparedConnection(sourceEnvironmentId);
       if (!sourceConnection) {
-        fail("파일을 가져온 환경이 연결되어 있지 않아요.");
+        fail(ko.chat.composer.sourceEnvironmentDisconnected);
         return;
       }
       const result = await createAssetUrl({
@@ -2877,7 +2885,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           ? resolveAssetUrl(sourceConnection.httpBaseUrl, result.value.relativeUrl)
           : null;
       if (!url) {
-        fail("원래 첨부를 더 이상 쓸 수 없어요.");
+        fail(ko.chat.composer.originalAttachmentGone);
         return;
       }
       let blob: Blob;
@@ -2886,7 +2894,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         blob = await response.blob();
       } catch {
-        fail("원본에서 내려받지 못했어요.");
+        fail(ko.chat.composer.sourceDownloadFailed);
         return;
       }
       const file = new File([blob], record.name, { type: record.mimeType || blob.type });
@@ -2903,8 +2911,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           previewUrl: URL.createObjectURL(file),
           file,
         });
-        if (!accepted.includes(localId))
-          fail("The draft rejected this attachment (duplicate or attachment limit reached).");
+        if (!accepted.includes(localId)) fail(ko.chat.composer.draftRejectedAttachment);
       } else {
         const accepted = addComposerFilesToDraft([
           {
@@ -2916,8 +2923,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             file,
           },
         ]);
-        if (!accepted.includes(localId))
-          fail("The draft rejected this attachment (duplicate or attachment limit reached).");
+        if (!accepted.includes(localId)) fail(ko.chat.composer.draftRejectedAttachment);
       }
     },
     [addComposerFilesToDraft, addComposerImage, attachmentTargetKey, createAssetUrl],
@@ -3828,8 +3834,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         event?.preventDefault();
         toastManager.add({
           type: "info",
-          title: "붙여 넣은 이미지를 아직 압축하고 있어요.",
-          description: "썸네일이 보이면 다시 보내 주세요.",
+          title: ko.chat.composer.pastedImageCompressing,
+          description: ko.chat.composer.sendAfterThumbnail,
         });
         return;
       }
@@ -3839,8 +3845,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         event?.preventDefault();
         toastManager.add({
           type: "info",
-          title: "붙여 넣은 첨부를 아직 이 메시지에 넣고 있어요.",
-          description: "첨부 칩이 준비되면 다시 보내 주세요.",
+          title: ko.chat.composer.pastedAttachmentPending,
+          description: ko.chat.composer.sendAfterChipReady,
         });
         return;
       }
@@ -4124,8 +4130,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (filesToVerify.some((file) => file.environmentId !== environmentId)) {
         toastManager.add({
           type: "error",
-          title: "보관한 파일은 다른 환경에 속해 있어요",
-          description: "파일을 받은 환경에서 이 프롬프트를 복원해 주세요.",
+          title: ko.chat.composer.stashOtherEnvironmentTitle,
+          description: ko.chat.composer.stashOtherEnvironmentDescription,
         });
         return;
       }
@@ -4164,9 +4170,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!durable) {
         toastManager.add({
           type: "warning",
-          title: "복원한 프롬프트가 보관함에 다시 나타날 수 있어요",
-          description:
-            "Browser storage rejected the update, so this entry could still be there after a reload.",
+          title: ko.chat.composer.restoredPromptMayReappear,
+          description: ko.chat.composer.stashRestoreNotDurable,
           data: { hideCopyButton: true },
         });
       }
@@ -4366,33 +4371,37 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       const missingImageReasons: string[] = [];
       if (entry.droppedImageNames.length > 0) {
         missingImageReasons.push(
-          `${entry.droppedImageNames.join(", ")} exceeded the stash size limit when this prompt was saved.`,
+          ko.chat.composer.stashDroppedImages(entry.droppedImageNames.join(", ")),
         );
       }
       if (entry.unreadableImageNames && entry.unreadableImageNames.length > 0) {
         missingImageReasons.push(
-          `${entry.unreadableImageNames.join(", ")} could not be read when this prompt was saved.`,
+          ko.chat.composer.stashUnreadableImages(entry.unreadableImageNames.join(", ")),
         );
       }
       if (unrestoredImageNames.length > 0) {
         missingImageReasons.push(
-          `${unrestoredImageNames.join(", ")} could not be restored: the composer is at its ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS}-attachment limit.`,
+          ko.chat.composer.stashAttachmentLimit(
+            unrestoredImageNames.join(", "),
+            PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
+          ),
         );
       }
       if (unrestoredFileNames.length > 0) {
         missingImageReasons.push(
-          `${unrestoredFileNames.join(", ")} could not be restored: the composer is at its ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS}-attachment limit.`,
+          ko.chat.composer.stashAttachmentLimit(
+            unrestoredFileNames.join(", "),
+            PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
+          ),
         );
       }
       if (expiredFileNames.length > 0) {
-        missingImageReasons.push(
-          `${expiredFileNames.join(", ")}: stashed files are kept for 24 hours and this upload expired. Attach the file again.`,
-        );
+        missingImageReasons.push(ko.chat.composer.stashExpiredFiles(expiredFileNames.join(", ")));
       }
       if (missingImageReasons.length > 0) {
         toastManager.add({
           type: "warning",
-          title: "일부 첨부를 복원하지 못했어요",
+          title: ko.chat.composer.someAttachmentsRestoreFailed,
           description: missingImageReasons.join(" "),
         });
       }
@@ -4437,9 +4446,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!durable) {
         toastManager.add({
           type: "warning",
-          title: "보관 항목이 다시 나타날 수 있어요",
-          description:
-            "Browser storage rejected the delete, so this prompt could reappear after a reload.",
+          title: ko.chat.composer.stashMayReappear,
+          description: ko.chat.composer.stashDeleteNotDurable,
           data: { hideCopyButton: true },
         });
       }
@@ -4451,7 +4459,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     if (getComposerDraft(composerDraftTarget)?.rejectedTurn) {
       toastManager.add({
         type: "info",
-        title: "보관하기 전에 복구한 초안을 보내거나 버려 주세요.",
+        title: ko.chat.composer.sendOrDiscardRecoveredDraft,
       });
       return;
     }
@@ -4460,8 +4468,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     if (pendingDraftWork.has(attachmentTargetKeyRef.current)) {
       toastManager.add({
         type: "info",
-        title: "붙여 넣은 첨부를 아직 이 메시지에 넣고 있어요.",
-        description: "첨부 칩이 준비되면 다시 보관해 주세요.",
+        title: ko.chat.composer.pastedAttachmentPending,
+        description: ko.chat.composer.stashAfterChipReady,
       });
       return;
     }
@@ -4496,7 +4504,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (composerFileNeedsReattach(file)) {
         toastManager.add({
           type: "error",
-          title: "보관하기 전에 끌어 놓은 파일을 다시 첨부하거나 빼 주세요",
+          title: ko.chat.composer.reattachDroppedFiles,
         });
         return;
       }
@@ -4504,7 +4512,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (upload?.status !== "ready" || upload.environmentId !== environmentId) {
         toastManager.add({
           type: "error",
-          title: "이 프롬프트를 보관하기 전에 파일 업로드를 기다려 주세요",
+          title: ko.chat.composer.waitForUploadsBeforeStash,
         });
         return;
       }
@@ -4558,9 +4566,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!written) {
         toastManager.add({
           type: "error",
-          title: "이 프롬프트를 보관하지 못했어요",
-          description:
-            "Browser storage rejected the write, so the composer was left as-is. Free up site data and try again.",
+          title: ko.chat.composer.stashFailed,
+          description: ko.chat.composer.stashWriteRejected,
           data: { hideCopyButton: true },
         });
         return;
@@ -4571,9 +4578,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!durable) {
         toastManager.add({
           type: "warning",
-          title: "보관한 프롬프트는 새로고침하면 사라져요",
-          description:
-            "Browser storage is unavailable, so this stash is kept in memory only for this session.",
+          title: ko.chat.composer.stashLostOnRefresh,
+          description: ko.chat.composer.stashMemoryOnly,
           data: { hideCopyButton: true },
         });
       }
@@ -4607,8 +4613,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         }
         toastManager.add({
           type: "warning",
-          title: "가장 오래된 보관 프롬프트를 버렸어요",
-          description: `보관함에는 프롬프트를 ${MAX_STASH_ENTRIES}개까지 둘 수 있어요. 자리를 만들려고 가장 오래된 것을 지웠어요.`,
+          title: ko.chat.composer.oldestStashDropped,
+          description: ko.chat.composer.stashLimit(MAX_STASH_ENTRIES),
           data: { hideCopyButton: true },
         });
       }
@@ -4658,9 +4664,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (!imagesDurable && durable && images.length > 0) {
           toastManager.add({
             type: "warning",
-            title: "보관한 이미지를 저장하지 못했어요",
-            description:
-              "The prompt was stashed, but browser storage rejected its images. They will be missing if you reload.",
+            title: ko.chat.composer.stashImagesSaveFailed,
+            description: ko.chat.composer.stashImagesRejected,
             data: { hideCopyButton: true },
           });
         }
@@ -4670,8 +4675,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         // them evaporate.
         toastManager.add({
           type: "warning",
-          title: "보관한 이미지를 첨부하지 못했어요",
-          description: `이미지 ${kept.length}개를 저장하기 전에 그 프롬프트가 복원되거나 삭제되었어요. 아직 필요하면 다시 첨부해 주세요.`,
+          title: ko.chat.composer.stashImagesAttachFailed,
+          description: ko.chat.composer.stashImagesOrphaned(kept.length),
           data: { hideCopyButton: true },
         });
       }
@@ -4801,7 +4806,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             key={image.id}
             type="button"
             className="relative size-7 shrink-0 cursor-zoom-in overflow-hidden rounded-md border border-border/70 bg-muted/60"
-            aria-label={`${image.name} 미리보기`}
+            aria-label={ko.chat.composer.imagePreview(image.name)}
             onPointerDown={(event) => event.preventDefault()}
             onClick={() => {
               const preview = buildExpandedImagePreview(composerImages, image.id);
@@ -4836,7 +4841,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           <button
             type="button"
             className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border/70 bg-muted/60 font-medium text-secondary-label text-xs tabular-nums outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
-            aria-label={`이미지 첨부 ${String(restingImagePreviewCounts.overflowCount)}개 더 보기`}
+            aria-label={ko.chat.composer.moreImages(
+              String(restingImagePreviewCounts.overflowCount),
+            )}
             onPointerDown={(event) => event.preventDefault()}
             onClick={() => {
               if (isComposerCollapsedMobile) {
@@ -5022,7 +5029,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       className="shrink-0 gap-2 px-2 text-secondary-label sm:px-3"
     >
       <CircleAlertIcon className="size-4" />
-      {providerSetupInstanceId ? "공급자 설정 열기" : "사용할 수 있는 공급자가 없어요"}
+      {providerSetupInstanceId
+        ? ko.chat.composer.openProviderSettings
+        : ko.chat.composer.noProviderAvailable}
     </Button>
   ) : (
     <>
@@ -5319,7 +5328,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     ) {
       toastManager.add({
         type: "error",
-        title: "이 질문에는 첨부를 넣을 수 없어요.",
+        title: ko.chat.composer.questionAttachmentsUnsupported,
       });
       return false;
     }
@@ -5364,24 +5373,24 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         replacedReattachMarkerIds.add(matchingReattachMarker.id);
       }
       if (!matchingReattachMarker && reservedCount >= PROVIDER_SEND_TURN_MAX_ATTACHMENTS) {
-        error = `You can attach up to ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} files per message.`;
+        error = ko.chat.composer.attachmentLimit(PROVIDER_SEND_TURN_MAX_ATTACHMENTS);
         // Keep scanning: a later file in this batch can still replace a
         // needs-reattach marker without needing a free slot.
         continue;
       }
       if (attachmentKind === "unsupported-image") {
-        error = `'${file.name}' is not a supported image type. Attach GIF, HEIC, HEIF, JPEG, PNG, or WebP images.`;
+        error = ko.chat.composer.unsupportedImageType(file.name);
         continue;
       }
       if (attachmentKind === "image") {
         acceptedImages.push(normalizeComposerImageFileMimeType(file));
       } else {
         if (fileStagingLimit === null) {
-          error = "이 서버는 파일 첨부를 지원하지 않아요.";
+          error = ko.chat.composer.attachmentsUnsupported;
           continue;
         }
         if (file.size <= 0) {
-          error = `'${file.name}' is empty or could not be read.`;
+          error = ko.chat.composer.emptyOrUnreadableFile(file.name);
           continue;
         }
         if (file.size > fileStagingLimit) {
@@ -5423,7 +5432,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         const attached = storedFiles[0]!;
         toastManager.add({
           type: "info",
-          title: `긴 붙여 넣기를 ${attached.name}(으)로 첨부했어요`,
+          title: ko.chat.composer.longPasteAttached(attached.name),
           description: `${formatAttachmentSize(attached.sizeBytes)} · Use ${
             isMacPlatform(navigator.platform) ? "⌘⇧V" : "Ctrl+Shift+V"
           } to keep a large paste inline.`,
@@ -5452,8 +5461,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (!compressed.ok) {
           compressionError =
             compressed.reason === "unreadable"
-              ? `'${file.name}' could not be read as an image.`
-              : `'${file.name}' is too large to attach, even after compression.`;
+              ? ko.chat.composer.unreadableImage(file.name)
+              : ko.chat.composer.imageTooLarge(file.name);
           continue;
         }
         const attachmentFile = compressed.file;
@@ -5542,7 +5551,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       return;
     }
     const confirmation = requestConfirmDialog(
-      `Remove ${image?.name ?? "this image"} from the message?\nIt is referenced in your text; removing it also removes every reference.`,
+      ko.chat.composer.removeReferencedImageConfirm(image?.name),
       { variant: "destructive" },
     );
     if (!confirmation) {
@@ -5597,8 +5606,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       }
       toastManager.add({
         type: "error",
-        title: "붙여 넣은 텍스트가 이 메시지에 너무 커요",
-        description: "텍스트나 첨부를 조금 줄인 뒤 다시 붙여 넣어 주세요.",
+        title: ko.chat.composer.pasteTooLargeForMessage,
+        description: ko.chat.composer.pasteTooLargeForMessageHint,
         data: { hideCopyButton: true },
       });
       return true;
@@ -5619,8 +5628,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!wouldExceedInputLimit) return false;
       toastManager.add({
         type: "error",
-        title: "붙여 넣은 텍스트가 첨부하기에 너무 커요",
-        description: "클립보드 내용을 줄이거나 더 작은 부분을 파일로 저장해 주세요.",
+        title: ko.chat.composer.pasteTooLargeToAttach,
+        description: ko.chat.composer.pasteTooLargeToAttachHint,
         data: { hideCopyButton: true },
       });
       return true;
@@ -5759,8 +5768,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onInsertRejected: () => {
       toastManager.add({
         type: "error",
-        title: "채팅에 추가하지 못했어요",
-        description: "작성기가 사용 중이에요. 준비되면 다시 시도해 주세요.",
+        title: ko.chat.composer.addToChatFailed,
+        description: ko.chat.composer.composerBusy,
       });
     },
   });
@@ -5891,7 +5900,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (target === "remote") {
           toastManager.add({
             type: "error",
-            title: "원격 환경에는 폴더를 끌어 놓을 수 없어요",
+            title: ko.chat.composer.remoteFolderDropUnsupported,
           });
           return;
         }
@@ -5900,8 +5909,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           if (path === null) {
             toastManager.add({
               type: "error",
-              title: `"${folder.name}" 경로를 가져오지 못했어요`,
-              description: "대신 @와 함께 폴더 경로를 입력해 주세요.",
+              title: ko.chat.composer.folderPathFailed(folder.name),
+              description: ko.chat.composer.typeFolderPathInstead,
             });
             continue;
           }
@@ -6127,10 +6136,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       >
         <label htmlFor={controlledMessageId} className="block text-sm font-medium">
           {controlledTask.mode === "analysis"
-            ? "읽기 전용 분석 요청"
+            ? ko.chat.composer.analysisRequestLabel
             : controlledTask.mode === "blocked"
-              ? "통제 작업 메시지"
-              : "후속 메시지 저장"}
+              ? ko.chat.composer.controlledMessageLabel
+              : ko.chat.composer.saveFollowUp}
         </label>
         <Textarea
           id={controlledMessageId}
@@ -6155,15 +6164,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           <p id={`${controlledMessageId}-help`} className="min-w-0 text-xs text-muted-foreground">
             {controlledTask.disabledReason ??
               (controlledTask.mode === "analysis"
-                ? "Codex 읽기 전용 분석이에요. 첨부 파일이나 도구 참고 자료는 보내지 않아요. Ctrl/⌘ Enter로 보내세요."
-                : "이 대화에만 저장해요. 프로바이더 호출·터미널 실행·다음 Run 자동 시작은 없어요. Ctrl/⌘ Enter로 저장하세요.")}
+                ? ko.chat.composer.controlledAnalysisHelp
+                : ko.chat.composer.controlledSaveHelp)}
           </p>
           <Button type="submit" disabled={disabled || !prompt.trim()}>
             {controlledTask.busy
-              ? "저장 중…"
+              ? ko.common.saving
               : controlledTask.mode === "analysis"
-                ? "분석 요청 보내기"
-                : "후속 메시지 저장"}
+                ? ko.chat.composer.sendAnalysisRequest
+                : ko.chat.composer.saveFollowUp}
           </Button>
         </div>
       </form>
@@ -6359,9 +6368,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               )}
                               onPointerDown={(event) => event.preventDefault()}
                               onClick={expandMobileComposer}
-                              aria-label="직접 답변 작성"
+                              aria-label={ko.chat.composer.writeCustomAnswer}
                             >
-                              {activePendingProgress?.customAnswer || "직접 답변 작성"}
+                              {activePendingProgress?.customAnswer ||
+                                ko.chat.composer.writeCustomAnswer}
                             </button>
                           ) : null}
                           {activePendingProgress?.activeQuestion?.multiSelect ? (
@@ -6459,17 +6469,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={isChoiceOnlyPendingQuestion ? undefined : expandMobileComposer}
                   disabled={isChoiceOnlyPendingQuestion}
-                  aria-label="메시지 입력창 펼치기"
+                  aria-label={ko.chat.composer.expandComposer}
                 >
                   {activePendingProgress
                     ? isChoiceOnlyPendingQuestion
-                      ? "위에서 항목을 선택해 주세요"
+                      ? ko.chat.composer.chooseOptionAbove
                       : activePendingProgress.customAnswer ||
-                        "직접 답변을 입력하거나, 선택한 항목을 사용하려면 비워 두세요"
+                        ko.chat.composer.customAnswerPlaceholder
                     : prompt.trim() ||
                       (showProviderUnavailable
-                        ? "설정에서 프로바이더를 활성화해 주세요"
-                        : "무엇이든 물어보세요…")}
+                        ? ko.chat.composer.enableProviderHint
+                        : ko.chat.composer.askAnythingEllipsis)}
                 </button>
                 {collapsedComposerImagePreviews}
                 <button
@@ -6592,7 +6602,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               <button
                                 type="button"
                                 className="h-full w-full cursor-zoom-in"
-                                aria-label={`${image.name} 미리보기`}
+                                aria-label={ko.chat.composer.imagePreview(image.name)}
                                 onClick={() => {
                                   const preview = buildExpandedImagePreview(
                                     composerImages,
@@ -6633,7 +6643,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                   render={
                                     <span
                                       role="img"
-                                      aria-label="초안 첨부가 유지되지 않을 수 있어요"
+                                      aria-label={ko.chat.composer.draftAttachmentNotPersisted}
                                       className="absolute left-1 top-1 inline-flex items-center justify-center rounded bg-background/85 p-0.5 text-amber-600"
                                     >
                                       <CircleAlertIcon className="size-3" />
@@ -6644,8 +6654,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                   side="top"
                                   className="max-w-64 whitespace-normal leading-tight"
                                 >
-                                  초안 첨부를 로컬에 저장하지 못해 다른 화면으로 이동하면 사라질 수
-                                  있어요.
+                                  {ko.chat.composer.draftAttachmentNotPersistedTooltip}
                                 </TooltipPopup>
                               </Tooltip>
                             )}
@@ -6670,7 +6679,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                           draftTarget: attachmentDraftTarget,
                                         })
                                       }
-                                      aria-label={`${image.name} 업로드 다시 시도`}
+                                      aria-label={ko.chat.composer.retryUpload(image.name)}
                                     />
                                   }
                                 >
@@ -6693,7 +6702,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                   "opacity-0 transition-opacity pointer-coarse:opacity-100 focus-visible:opacity-100 group-hover/attachment:opacity-100 group-focus-within/attachment:opacity-100",
                               )}
                               onClick={() => removeComposerImage(image.id)}
-                              aria-label={`${image.name} 빼기`}
+                              aria-label={ko.chat.composer.removeAttachment(image.name)}
                             >
                               <XIcon />
                             </Button>
@@ -6731,7 +6740,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           <button
                             type="button"
                             className="flex h-full w-full cursor-zoom-in flex-col items-center justify-center gap-1 px-1 text-white"
-                            aria-label={`${file.name} 재생`}
+                            aria-label={ko.chat.composer.playFile(file.name)}
                             onClick={() => {
                               if (file.file !== null) {
                                 const preview = buildExpandedImagePreview([file], file.id);
@@ -6770,7 +6779,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                         draftTarget: attachmentDraftTarget,
                                       })
                                     }
-                                    aria-label={`${file.name} 업로드 다시 시도`}
+                                    aria-label={ko.chat.composer.retryUpload(file.name)}
                                   />
                                 }
                               >
@@ -6789,7 +6798,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                             size="icon-xs"
                             className="absolute right-1 top-1 bg-background/80 hover:bg-background/90"
                             onClick={() => removeComposerFileFromDraft(file.id)}
-                            aria-label={`${file.name} 빼기`}
+                            aria-label={ko.chat.composer.removeAttachment(file.name)}
                           >
                             <XIcon />
                           </Button>
@@ -6833,8 +6842,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           <span className="shrink-0 text-xs text-secondary-label">
                             {needsReattach
                               ? canReattachFile
-                                ? "다시 첨부"
-                                : "보내려면 빼 주세요"
+                                ? ko.chat.composer.reattach
+                                : ko.chat.composer.removeToSend
                               : upload?.status === "uploading"
                                 ? formatAttachmentUploadProgress(upload.progress)
                                 : formatAttachmentSize(file.sizeBytes)}
@@ -6853,7 +6862,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                         draftTarget: attachmentDraftTarget,
                                       })
                                     }
-                                    aria-label={`${file.name} 업로드 다시 시도`}
+                                    aria-label={ko.chat.composer.retryUpload(file.name)}
                                   />
                                 }
                               >
@@ -6871,7 +6880,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                             variant="ghost"
                             size="icon-xs"
                             onClick={() => removeComposerFileFromDraft(file.id)}
-                            aria-label={`${file.name} 빼기`}
+                            aria-label={ko.chat.composer.removeAttachment(file.name)}
                           >
                             <XIcon />
                           </Button>
@@ -6913,7 +6922,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                         mimeType={previewFile.mimeType}
                         sizeBytes={previewFile.sizeBytes}
                         file={previewFile.file}
-                        origin="초안"
+                        origin={ko.chat.composer.draftOrigin}
                         {...(previewFile.uploadedAttachmentId && previewFile.uploadEnvironmentId
                           ? {
                               asset: {
@@ -6939,7 +6948,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       className="cursor-text text-muted-foreground text-sm"
                       onClick={() => composerEditorRef.current?.focusAtEnd()}
                     >
-                      메시지
+                      {ko.chat.composer.messageLabel}
                     </span>
                     <ComposerInputHelp onClosed={() => composerEditorRef.current?.focusAtEnd()} />
                   </div>
@@ -6982,20 +6991,20 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     onPaste={onComposerPaste}
                     placeholder={
                       isComposerApprovalState
-                        ? "계속하려면 이 승인 요청을 처리해 주세요"
+                        ? ko.chat.composer.resolveApprovalFirst
                         : activePendingProgress
                           ? isChoiceOnlyPendingQuestion
-                            ? "위에서 항목을 선택해 주세요"
-                            : "직접 답변을 입력하거나, 선택한 항목을 사용하려면 비워 두세요"
+                            ? ko.chat.composer.chooseOptionAbove
+                            : ko.chat.composer.customAnswerPlaceholder
                           : showPlanFollowUpPrompt && activeProposedPlan
-                            ? "계획을 다듬을 의견을 남기거나, 바로 실행하려면 비워 두세요"
+                            ? ko.chat.composer.planFeedbackPlaceholder
                             : projectSelectionRequired
-                              ? "대화를 시작할 프로젝트를 위에서 선택해 주세요"
+                              ? ko.chat.composer.chooseProjectAbove
                               : showProviderUnavailable
-                                ? "메시지를 보내려면 설정에서 프로바이더를 활성화해 주세요"
+                                ? ko.chat.composer.enableProviderToSend
                                 : phase === "disconnected"
                                   ? DISCONNECTED_COMPOSER_PLACEHOLDER
-                                  : "무엇이든 물어보세요"
+                                  : ko.chat.composer.askAnything
                     }
                     disabled={
                       isConnecting ||
@@ -7104,14 +7113,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               size="icon-sm"
                               onPointerDown={(event) => event.preventDefault()}
                               onClick={() => attachmentInputRef.current?.click()}
-                              aria-label="파일 첨부"
+                              aria-label={ko.chat.composer.attachFile}
                               data-icon-control=""
                             />
                           }
                         >
                           <PaperclipIcon />
                         </TooltipTrigger>
-                        <TooltipPopup>파일 첨부</TooltipPopup>
+                        <TooltipPopup>{ko.chat.composer.attachFile}</TooltipPopup>
                       </Tooltip>
                     </>
                   ) : null}

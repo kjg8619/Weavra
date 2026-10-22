@@ -2,6 +2,7 @@ import { InlineButton } from "../ui/button";
 import { useId, useState } from "react";
 
 import { cn } from "../../lib/utils";
+import { ko } from "~/i18n/ko";
 
 /**
  * Long error text clamped to a few lines with a toggle to reveal the rest.
@@ -11,7 +12,7 @@ export function ExpandableText({
   text,
   className,
   collapsedClassName = "line-clamp-3",
-  expandLabel = "Show full error",
+  expandLabel = ko.settings.expandableText.showFullError,
 }: {
   text: string;
   className?: string;
@@ -40,7 +41,7 @@ export function ExpandableText({
           className="mt-1 text-[11px] font-medium text-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? "Show less" : expandLabel}
+          {expanded ? ko.settings.expandableText.showLess : expandLabel}
         </InlineButton>
       ) : null}
     </div>

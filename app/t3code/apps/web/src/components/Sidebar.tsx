@@ -250,6 +250,7 @@ import {
   type ComposerThreadDraftState,
   type DraftSessionState,
 } from "../composerDraftStore";
+import { ko } from "~/i18n/ko";
 
 // Settled-tail paging: recent history is the common lookup; the deep tail
 // stays behind an explicit Show more.
@@ -260,8 +261,9 @@ const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 
 function compactSidebarTimeLabel(label: string): string {
-  if (label === "just now") return "now";
-  return label.endsWith(" ago") ? label.slice(0, -4) : label;
+  if (label === ko.common.time.justNow) return ko.projects.sidebar.justNow;
+  const agoSuffix = ` ${ko.common.time.ago}`;
+  return label.endsWith(agoSuffix) ? label.slice(0, -agoSuffix.length) : label;
 }
 
 function threadTimeLabel(thread: SidebarThreadSummary): string {
@@ -313,7 +315,7 @@ const EMPTY_PROVIDER_ENTRIES: ReadonlyMap<string, ProviderInstanceEntry> = new M
 const EMPTY_THREADS: readonly EnvironmentThreadShell[] = [];
 
 function terminalProcessLabel(count: number): string {
-  return `${count} terminal ${count === 1 ? "process" : "processes"} running`;
+  return ko.projects.sidebar.terminalProcesses(count);
 }
 
 function SidebarThreadTooltip({
@@ -386,7 +388,7 @@ function SidebarThreadTooltip({
             <div className="flex min-w-0 items-start gap-2 text-warning">
               <CircleAlertIcon aria-hidden className="mt-0.5 size-3 shrink-0 stroke-current" />
               <div className="min-w-0 flex-1 wrap-break-word leading-5">
-                지금은 다른 branch로 checkout되어 있어요.
+                {ko.projects.sidebar.checkoutMismatch}
               </div>
             </div>
           ) : null}
@@ -425,7 +427,7 @@ function SidebarThreadTooltip({
           {thread.session?.lastError ? (
             <div className="flex min-w-0 items-center gap-2 text-red-600 dark:text-red-400">
               <CircleAlertIcon className="size-3 shrink-0 stroke-current" />
-              <div className="min-w-0 truncate">오류가 발생했어요</div>
+              <div className="min-w-0 truncate">{ko.projects.sidebar.genericErrorShort}</div>
             </div>
           ) : null}
         </div>
@@ -466,7 +468,7 @@ function SnoozePopoverButton(props: {
               render={
                 <button
                   type="button"
-                  aria-label="대화 미루기"
+                  aria-label={ko.projects.sidebar.snoozeThread}
                   onClick={(event) => event.stopPropagation()}
                   onDoubleClick={(event) => event.stopPropagation()}
                   className="inline-flex h-full cursor-pointer items-center gap-0.5 rounded-md bg-transparent px-1.5 text-xs text-muted-foreground hover:text-foreground"
@@ -477,7 +479,7 @@ function SnoozePopoverButton(props: {
         >
           <ClockIcon className="size-3" />
         </TooltipTrigger>
-        <TooltipPopup>대화 미루기</TooltipPopup>
+        <TooltipPopup>{ko.projects.sidebar.snoozeThread}</TooltipPopup>
       </Tooltip>
       <PopoverPopup side="bottom" align="end" className="w-56" viewportClassName="p-1">
         {presets.map((preset) => (
@@ -508,7 +510,7 @@ function SnoozePopoverButton(props: {
             if (choice) onSnooze(choice);
           }}
         >
-          직접 지정…
+          {ko.projects.sidebar.customSnooze}
         </button>
       </PopoverPopup>
     </Popover>
@@ -739,9 +741,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
     composer.previewAnnotations.length +
     composer.reviewComments.length;
   const preview =
-    promptPreview.length > 0
-      ? promptPreview
-      : `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`;
+    promptPreview.length > 0 ? promptPreview : ko.chat.contextChip.attachmentCount(attachmentCount);
   const handleActivate = useCallback(() => onNavigate(draftId), [draftId, onNavigate]);
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent) => {
@@ -792,7 +792,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
                   render={
                     <button
                       type="button"
-                      aria-label="초안 버리기"
+                      aria-label={ko.projects.sidebar.discardDraft}
                       onClick={handleDiscard}
                       className="pointer-events-none inline-flex cursor-pointer items-center rounded-md bg-transparent px-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100"
                     >
@@ -800,7 +800,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
                     </button>
                   }
                 />
-                <TooltipPopup side="top">초안 버리기</TooltipPopup>
+                <TooltipPopup side="top">{ko.projects.sidebar.discardDraft}</TooltipPopup>
               </Tooltip>
             </span>
           </div>
@@ -941,31 +941,31 @@ const dropVerbBadge: Record<SidebarDropVerb, ReactNode> = {
   pin: (
     <>
       <PinIcon aria-hidden className="size-3" />
-      고정
+      {ko.projects.sidebar.pin}
     </>
   ),
   unpin: (
     <>
       <PinOffIcon aria-hidden className="size-3" />
-      고정 해제
+      {ko.projects.sidebar.unpin}
     </>
   ),
   settle: (
     <>
       <CircleCheckIcon aria-hidden className="size-3" />
-      정리
+      {ko.projects.sidebar.settle}
     </>
   ),
   unsettle: (
     <>
       <Undo2Icon aria-hidden className="size-3" />
-      정리 취소
+      {ko.projects.sidebar.unsettle}
     </>
   ),
   wake: (
     <>
       <AlarmClockOffIcon aria-hidden className="size-3" />
-      다시 열기
+      {ko.projects.sidebar.reopen}
     </>
   ),
 };
@@ -1142,7 +1142,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   const topStatus =
     status === "working"
       ? {
-          label: "작업 중",
+          label: ko.projects.sidebar.working,
           icon: "working" as const,
           // No shimmer: a label that animates forever is noise in a sidebar
           // full of them (and repaints every vsync on high-refresh displays).
@@ -1152,37 +1152,37 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
         ? {
             // Monitoring is calm background presence, not active progress
             // (monitoring-pill D6), so it keeps the label at full strength.
-            label: "지켜보는 중",
+            label: ko.projects.sidebar.monitoring,
             icon: "monitoring" as const,
             className: "text-foreground dark:text-white",
           }
         : status === "approval"
           ? {
-              label: "승인 대기",
+              label: ko.projects.sidebar.awaitingApproval,
               icon: "approval" as const,
               className: "text-amber-700 dark:text-amber-300",
             }
           : status === "input"
             ? {
-                label: "입력 대기",
+                label: ko.projects.sidebar.awaitingInput,
                 icon: "input" as const,
                 className: "text-indigo-600 dark:text-indigo-300",
               }
             : status === "failed"
               ? {
-                  label: "실패",
+                  label: ko.projects.sidebar.failed,
                   icon: "failed" as const,
                   className: "text-red-700 dark:text-red-300",
                 }
               : isWoke
                 ? {
-                    label: "깨어남",
+                    label: ko.projects.sidebar.woke,
                     icon: "woke" as const,
                     className: "text-amber-700 dark:text-amber-300",
                   }
                 : isUnread
                   ? {
-                      label: "완료",
+                      label: ko.common.done,
                       icon: "done" as const,
                       className: "text-emerald-700 dark:text-emerald-300",
                     }
@@ -1460,7 +1460,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     <input
       autoFocus
       value={renamingTitle}
-      aria-label="대화 제목"
+      aria-label={ko.projects.sidebar.threadTitle}
       onChange={(event) => onRenameTitleChange(event.target.value)}
       onFocus={(event) => event.currentTarget.select()}
       onKeyDown={handleRenameKeyDown}
@@ -1541,7 +1541,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
         render={
           <span
             role="img"
-            aria-label="보내지 않은 초안"
+            aria-label={ko.projects.sidebar.unsentDraft}
             data-testid={`sidebar-draft-indicator-${thread.id}`}
             className="inline-flex shrink-0 items-center"
           />
@@ -1549,7 +1549,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
       >
         <SquarePenIcon aria-hidden className={draftPenClassName} />
       </TooltipTrigger>
-      <TooltipPopup side="top">보내지 않은 초안</TooltipPopup>
+      <TooltipPopup side="top">{ko.projects.sidebar.unsentDraft}</TooltipPopup>
     </Tooltip>
   ) : null;
   const showPin =
@@ -1561,7 +1561,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           render={
             <button
               type="button"
-              aria-label="대화 고정 해제"
+              aria-label={ko.projects.sidebar.unpinThread}
               onClick={handleUnpinClick}
               className="inline-flex cursor-pointer items-center rounded-sm text-muted-foreground/65 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
@@ -1569,11 +1569,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
         >
           <PinIcon aria-hidden className="size-3 shrink-0" />
         </TooltipTrigger>
-        <TooltipPopup>대화 고정 해제</TooltipPopup>
+        <TooltipPopup>{ko.projects.sidebar.unpinThread}</TooltipPopup>
       </Tooltip>
     ) : (
       <PinIcon
-        aria-label="고정됨"
+        aria-label={ko.projects.sidebar.pinned}
         role="img"
         className="size-3 shrink-0 text-muted-foreground/65"
       />
@@ -1626,7 +1626,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             {terminalStatusIcon}
             {isRegeneratingTitle ? (
               <span role="status" className="sr-only">
-                제목 다시 만드는 중
+                {ko.projects.sidebar.regeneratingTitle}
               </span>
             ) : null}
             {/* The PR badge stays outside the hover-fading slot: it must
@@ -1657,16 +1657,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                         render={
                           <button
                             type="button"
-                            aria-label="깨어남 알림 닫기"
+                            aria-label={ko.projects.sidebar.dismissWake}
                             onClick={handleAcknowledgeWokeClick}
                             className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-amber-700 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring dark:text-amber-300"
                           >
                             <AlarmClockIcon aria-hidden className="size-3" />
-                            <span role="status">깨어남</span>
+                            <span role="status">{ko.projects.sidebar.woke}</span>
                           </button>
                         }
                       />
-                      <TooltipPopup side="top">깨어남 알림 닫기</TooltipPopup>
+                      <TooltipPopup side="top">{ko.projects.sidebar.dismissWake}</TooltipPopup>
                     </Tooltip>
                   ) : (
                     <span className="text-xs">
@@ -1680,7 +1680,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                   !props.snoozeSupported ? null : (
                     <button
                       type="button"
-                      aria-label="지금 대화 다시 열기"
+                      aria-label={ko.projects.sidebar.reopenThreadNow}
                       onClick={handleUnsnoozeClick}
                       className={cn(
                         "pointer-events-none absolute inset-y-0 right-0 -mr-1 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100",
@@ -1696,7 +1696,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                       render={
                         <button
                           type="button"
-                          aria-label="정리 취소"
+                          aria-label={ko.projects.sidebar.unsettle}
                           onClick={handleUnsettleClick}
                           className={cn(
                             "pointer-events-none absolute inset-y-0 right-0 -mr-1 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100",
@@ -1707,12 +1707,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                     >
                       <Undo2Icon className="mb-px size-3.5" />
                     </TooltipTrigger>
-                    <TooltipPopup side="top">정리 취소</TooltipPopup>
+                    <TooltipPopup side="top">{ko.projects.sidebar.unsettle}</TooltipPopup>
                   </Tooltip>
                 ) : (
                   <button
                     type="button"
-                    aria-label="대화 정리"
+                    aria-label={ko.projects.sidebar.settleThread}
                     onClick={handleSettleClick}
                     className={cn(
                       "pointer-events-none absolute inset-y-0 right-0 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-2 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100",
@@ -1808,7 +1808,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                             render={
                               <button
                                 type="button"
-                                aria-label="깨어남 알림 닫기"
+                                aria-label={ko.projects.sidebar.dismissWake}
                                 onClick={handleAcknowledgeWokeClick}
                                 className={cn(
                                   "inline-flex cursor-pointer items-center gap-1 rounded-sm font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring",
@@ -1820,7 +1820,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                               </button>
                             }
                           />
-                          <TooltipPopup side="top">깨어남 알림 닫기</TooltipPopup>
+                          <TooltipPopup side="top">{ko.projects.sidebar.dismissWake}</TooltipPopup>
                         </Tooltip>
                       ) : (
                         <span
@@ -1875,7 +1875,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                             render={
                               <button
                                 type="button"
-                                aria-label="초안 버리기"
+                                aria-label={ko.projects.sidebar.discardDraft}
                                 onClick={handleDiscardDraftClick}
                                 className="inline-flex cursor-pointer items-center rounded-md bg-transparent px-1.5 text-xs text-muted-foreground hover:text-foreground"
                               />
@@ -1883,7 +1883,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                           >
                             <XIcon className="size-3.5" />
                           </TooltipTrigger>
-                          <TooltipPopup side="top">초안 버리기</TooltipPopup>
+                          <TooltipPopup side="top">{ko.projects.sidebar.discardDraft}</TooltipPopup>
                         </Tooltip>
                       ) : null}
                       {showSnoozeButton ? (
@@ -1900,16 +1900,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                             render={
                               <button
                                 type="button"
-                                aria-label="대화 정리"
+                                aria-label={ko.projects.sidebar.settleThread}
                                 onClick={handleSettleClick}
                                 className="-mr-1 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-xs text-muted-foreground hover:text-foreground"
                               />
                             }
                           >
                             <CheckIcon className="size-3.5" />
-                            정리
+                            {ko.projects.sidebar.settle}
                           </TooltipTrigger>
-                          <TooltipPopup>대화 정리</TooltipPopup>
+                          <TooltipPopup>{ko.projects.sidebar.settleThread}</TooltipPopup>
                         </Tooltip>
                       ) : null}
                     </span>
@@ -1921,7 +1921,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
               {title}
               {isRegeneratingTitle ? (
                 <span role="status" className="sr-only">
-                  제목 다시 만드는 중
+                  {ko.projects.sidebar.regeneratingTitle}
                 </span>
               ) : null}
             </div>
@@ -2181,7 +2181,7 @@ export default function Sidebar() {
     onCopy: ({ path }) => {
       toastManager.add({
         type: "success",
-        title: "경로를 복사했어요",
+        title: ko.projects.sidebar.pathCopied,
         description: path,
       });
     },
@@ -2189,8 +2189,8 @@ export default function Sidebar() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "경로를 복사하지 못했어요",
-          description: error instanceof Error ? error.message : "오류가 발생했어요.",
+          title: ko.projects.sidebar.pathCopyFailed,
+          description: error instanceof Error ? error.message : ko.projects.sidebar.genericError,
         }),
       );
     },
@@ -2200,7 +2200,7 @@ export default function Sidebar() {
     onCopy: ({ branch }) => {
       toastManager.add({
         type: "success",
-        title: "branch를 복사했어요",
+        title: ko.projects.sidebar.branchCopied,
         description: branch,
       });
     },
@@ -2208,8 +2208,8 @@ export default function Sidebar() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "branch를 복사하지 못했어요",
-          description: error instanceof Error ? error.message : "오류가 발생했어요.",
+          title: ko.projects.sidebar.branchCopyFailed,
+          description: error instanceof Error ? error.message : ko.projects.sidebar.genericError,
         }),
       );
     },
@@ -2218,7 +2218,7 @@ export default function Sidebar() {
     onCopy: ({ threadId }) => {
       toastManager.add({
         type: "success",
-        title: "대화 ID를 복사했어요",
+        title: ko.projects.sidebar.threadIdCopied,
         description: threadId,
       });
     },
@@ -2226,8 +2226,8 @@ export default function Sidebar() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "대화 ID를 복사하지 못했어요",
-          description: error instanceof Error ? error.message : "오류가 발생했어요.",
+          title: ko.projects.sidebar.threadIdCopyFailed,
+          description: error instanceof Error ? error.message : ko.projects.sidebar.genericError,
         }),
       );
     },
@@ -2377,7 +2377,7 @@ export default function Sidebar() {
   // while the popup search filters the same collection.
   const projectScopeItems = useMemo(
     () => [
-      { value: "all", label: "모든 프로젝트" },
+      { value: "all", label: ko.projects.sidebar.allProjects },
       ...projectGroups.map((project) => ({
         value: project.projectKey,
         label: project.displayName,
@@ -2991,7 +2991,7 @@ export default function Sidebar() {
         const trimmed = title.trim();
         setRenamingThreadKey(null);
         if (trimmed.length === 0) {
-          toastManager.add({ type: "warning", title: "대화 제목은 비워 둘 수 없어요" });
+          toastManager.add({ type: "warning", title: ko.projects.sidebar.threadTitleEmpty });
           return;
         }
         if (trimmed === originalTitle) return;
@@ -3004,8 +3004,9 @@ export default function Sidebar() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "대화 이름을 바꾸지 못했어요",
-              description: error instanceof Error ? error.message : "오류가 발생했어요.",
+              title: ko.projects.sidebar.renameThreadFailed,
+              description:
+                error instanceof Error ? error.message : ko.projects.sidebar.genericError,
             }),
           );
         }
@@ -3087,8 +3088,9 @@ export default function Sidebar() {
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "대화를 정리하지 못했어요",
-                  description: error instanceof Error ? error.message : "오류가 발생했어요.",
+                  title: ko.projects.sidebar.settleFailed,
+                  description:
+                    error instanceof Error ? error.message : ko.projects.sidebar.genericError,
                 }),
               );
             }
@@ -3123,8 +3125,9 @@ export default function Sidebar() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "대화 정리를 취소하지 못했어요",
-              description: error instanceof Error ? error.message : "오류가 발생했어요.",
+              title: ko.projects.sidebar.unsettleFailed,
+              description:
+                error instanceof Error ? error.message : ko.projects.sidebar.genericError,
             }),
           );
         }
@@ -3141,8 +3144,9 @@ export default function Sidebar() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "대화를 다시 열지 못했어요",
-              description: error instanceof Error ? error.message : "오류가 발생했어요.",
+              title: ko.projects.sidebar.reopenFailed,
+              description:
+                error instanceof Error ? error.message : ko.projects.sidebar.genericError,
             }),
           );
         }
@@ -3305,8 +3309,9 @@ export default function Sidebar() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "대화를 고정하지 못했어요",
-              description: error instanceof Error ? error.message : "오류가 발생했어요.",
+              title: ko.projects.sidebar.pinFailed,
+              description:
+                error instanceof Error ? error.message : ko.projects.sidebar.genericError,
             }),
           );
         }
@@ -3323,8 +3328,9 @@ export default function Sidebar() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "대화 고정을 해제하지 못했어요",
-              description: error instanceof Error ? error.message : "오류가 발생했어요.",
+              title: ko.projects.sidebar.unpinFailed,
+              description:
+                error instanceof Error ? error.message : ko.projects.sidebar.genericError,
             }),
           );
         }
@@ -3620,7 +3626,8 @@ export default function Sidebar() {
               stackedThreadToast({
                 type: "error",
                 title,
-                description: error instanceof Error ? error.message : "오류가 발생했어요.",
+                description:
+                  error instanceof Error ? error.message : ko.projects.sidebar.genericError,
               }),
             );
           }
@@ -3630,9 +3637,10 @@ export default function Sidebar() {
           case "settle": {
             settlingThreadKeysRef.current.add(activeKey);
             const navigateAfterSettle = planForwardNavigation(activeKey);
-            const settled = await run(settleThread(threadRef), "대화를 정리하지 못했어요").finally(
-              () => settlingThreadKeysRef.current.delete(activeKey),
-            );
+            const settled = await run(
+              settleThread(threadRef),
+              ko.projects.sidebar.settleFailed,
+            ).finally(() => settlingThreadKeysRef.current.delete(activeKey));
             if (
               settled &&
               shouldNavigateAfterThreadPark({
@@ -3648,16 +3656,16 @@ export default function Sidebar() {
           }
           case "move-active":
             // The drag expresses unpin intent; button/menu confirmation is unchanged.
-            if (plan.unpin && !(await run(unpinThread(threadRef), "대화 고정을 해제하지 못했어요")))
+            if (plan.unpin && !(await run(unpinThread(threadRef), ko.projects.sidebar.unpinFailed)))
               return;
             if (
               plan.unsettle &&
-              !(await run(unsettleThread(threadRef), "대화 정리를 취소하지 못했어요"))
+              !(await run(unsettleThread(threadRef), ko.projects.sidebar.unsettleFailed))
             )
               return;
             if (
               plan.unsnooze &&
-              !(await run(unsnoozeThread(threadRef), "대화를 다시 열지 못했어요"))
+              !(await run(unsnoozeThread(threadRef), ko.projects.sidebar.reopenFailed))
             )
               return;
             break;
@@ -3668,7 +3676,7 @@ export default function Sidebar() {
                   threadRef,
                   plan.orderKey === undefined ? {} : { orderKey: plan.orderKey },
                 ),
-                "대화를 고정하지 못했어요",
+                ko.projects.sidebar.pinFailed,
               ))
             )
               return;
@@ -3688,8 +3696,8 @@ export default function Sidebar() {
                 assignment.orderKey,
               ),
               plan.kind === "move-active"
-                ? "진행 중 대화 순서를 바꾸지 못했어요"
-                : "고정 대화 순서를 바꾸지 못했어요",
+                ? ko.projects.sidebar.reorderActiveFailed
+                : ko.projects.sidebar.reorderPinnedFailed,
             ))
           )
             return;
@@ -3773,9 +3781,11 @@ export default function Sidebar() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "대화를 미루지 못했어요",
+              title: ko.projects.sidebar.snoozeFailed,
               description:
-                outcome.error instanceof Error ? outcome.error.message : "오류가 발생했어요.",
+                outcome.error instanceof Error
+                  ? outcome.error.message
+                  : ko.projects.sidebar.genericError,
             }),
           );
           return;
@@ -3786,10 +3796,12 @@ export default function Sidebar() {
         toastManager.add(
           stackedThreadToast({
             type: "success",
-            title: `${snoozeWakeDescription(preset.snoozedUntil, new Date(), timestampFormat)}까지 미뤘어요`,
+            title: ko.projects.sidebar.snoozedUntil(
+              snoozeWakeDescription(preset.snoozedUntil, new Date(), timestampFormat),
+            ),
             timeout: 5_000,
             actionProps: {
-              children: "Undo",
+              children: ko.projects.sidebar.undo,
               onClick: () => attemptUnsnooze(threadRef),
             },
           }),
@@ -3854,25 +3866,29 @@ export default function Sidebar() {
         api.contextMenu.show(
           [
             ...(unpinMenuItem ? [unpinMenuItem] : []),
-            { id: "settle", label: `정리 (${count})` },
+            { id: "settle", label: ko.projects.sidebar.settleCount(count) },
             ...(canSnoozeSelection
               ? [
                   {
                     id: "snooze",
-                    label: `미루기 (${count})`,
+                    label: ko.projects.sidebar.snoozeMenuCount(count),
                     children: [
                       ...snoozePresets.map((preset) => ({
                         id: `snooze:${preset.id}`,
                         label: `${preset.label} (${preset.whenLabel})`,
                       })),
-                      { id: "snooze:custom", label: "직접 지정…", separatorBefore: true },
+                      {
+                        id: "snooze:custom",
+                        label: ko.projects.sidebar.customSnooze,
+                        separatorBefore: true,
+                      },
                     ],
                   },
                 ]
               : []),
             ...(titleRegenerationMenuItem ? [titleRegenerationMenuItem] : []),
-            { id: "mark-unread", label: `읽지 않음으로 표시 (${count})` },
-            { id: "delete", label: `삭제 (${count})`, destructive: true },
+            { id: "mark-unread", label: ko.projects.sidebar.markUnreadCount(count) },
+            { id: "delete", label: ko.projects.sidebar.deleteCount(count), destructive: true },
           ],
           position,
         ),
@@ -3910,15 +3926,13 @@ export default function Sidebar() {
                 type: failedCount > 0 ? "warning" : "success",
                 title:
                   failedCount > 0
-                    ? `Snoozed ${snoozedCount} of ${selectedThreads.length} threads`
-                    : `Snoozed ${snoozedCount} thread${snoozedCount === 1 ? "" : "s"}`,
+                    ? ko.projects.sidebar.snoozedPartial(snoozedCount, selectedThreads.length)
+                    : ko.projects.sidebar.snoozedCount(snoozedCount),
                 description:
-                  failedCount > 0
-                    ? `${failedCount} thread${failedCount === 1 ? "" : "s"} couldn't be snoozed.`
-                    : undefined,
+                  failedCount > 0 ? ko.projects.sidebar.snoozeFailedCount(failedCount) : undefined,
                 timeout: 5_000,
                 actionProps: {
-                  children: "Undo",
+                  children: ko.projects.sidebar.undo,
                   onClick: () => {
                     for (const threadRef of snoozedThreadRefs) attemptUnsnooze(threadRef);
                   },
@@ -3930,9 +3944,11 @@ export default function Sidebar() {
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "대화들을 미루지 못했어요",
+                title: ko.projects.sidebar.snoozeThreadsFailed,
                 description:
-                  firstError instanceof Error ? firstError.message : "오류가 발생했어요.",
+                  firstError instanceof Error
+                    ? firstError.message
+                    : ko.projects.sidebar.genericError,
               }),
             );
           }
@@ -3959,8 +3975,9 @@ export default function Sidebar() {
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "대화 제목을 다시 만들지 못했어요",
-                description: error instanceof Error ? error.message : "오류가 발생했어요.",
+                title: ko.projects.sidebar.regenerateTitleFailed,
+                description:
+                  error instanceof Error ? error.message : ko.projects.sidebar.genericError,
               }),
             );
           }
@@ -3998,12 +4015,12 @@ export default function Sidebar() {
           api.dialogs.confirm(
             [
               ...selectedThreads.map((thread) => `“${thread.title}”`),
-              "이 대화들의 기록이 영구히 지워져요.",
+              ko.projects.sidebar.deleteThreadsWarning,
             ].join("\n"),
             {
               variant: "destructive",
-              title: `선택한 스레드 ${count}개를 삭제할까요?`,
-              confirmLabel: "스레드 삭제",
+              title: ko.projects.sidebar.deleteSelectedThreadsTitle(count),
+              confirmLabel: ko.projects.sidebar.deleteThreadConfirm,
             },
           ),
         );
@@ -4024,8 +4041,9 @@ export default function Sidebar() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "대화들을 삭제하지 못했어요",
-            description: firstError instanceof Error ? firstError.message : "오류가 발생했어요.",
+            title: ko.projects.sidebar.deleteThreadsFailed,
+            description:
+              firstError instanceof Error ? firstError.message : ko.projects.sidebar.genericError,
           }),
         );
       }
@@ -4165,8 +4183,9 @@ export default function Sidebar() {
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "대화를 만들지 못했어요",
-                  description: error instanceof Error ? error.message : "오류가 발생했어요.",
+                  title: ko.projects.sidebar.createThreadFailed,
+                  description:
+                    error instanceof Error ? error.message : ko.projects.sidebar.genericError,
                 }),
               );
             }
@@ -4201,8 +4220,9 @@ export default function Sidebar() {
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "대화 제목을 다시 만들지 못했어요",
-                  description: error instanceof Error ? error.message : "오류가 발생했어요.",
+                  title: ko.projects.sidebar.regenerateTitleFailed,
+                  description:
+                    error instanceof Error ? error.message : ko.projects.sidebar.genericError,
                 }),
               );
             }
@@ -4216,8 +4236,8 @@ export default function Sidebar() {
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "경로를 사용할 수 없어요",
-                  description: "이 대화에는 복사할 작업 공간 경로가 없어요.",
+                  title: ko.projects.sidebar.pathUnavailableTitle,
+                  description: ko.projects.sidebar.pathUnavailableDescription,
                 }),
               );
               return;
@@ -4235,7 +4255,7 @@ export default function Sidebar() {
           case "archive": {
             if (confirmThreadArchive) {
               const confirmed = await settlePromise(() =>
-                api.dialogs.confirm(`Archive thread "${thread.title}"?`),
+                api.dialogs.confirm(ko.projects.sidebar.archiveConfirm(thread.title)),
               );
               if (confirmed._tag === "Failure" || !confirmed.value) return;
             }
@@ -4251,9 +4271,10 @@ export default function Sidebar() {
                 stackedThreadToast({
                   type: "error",
                   title: didArchive
-                    ? "Thread archived, but navigation failed"
-                    : "대화를 보관하지 못했어요",
-                  description: error instanceof Error ? error.message : "오류가 발생했어요.",
+                    ? ko.projects.sidebar.archivedNavigationFailed
+                    : ko.projects.sidebar.archiveFailed,
+                  description:
+                    error instanceof Error ? error.message : ko.projects.sidebar.genericError,
                 }),
               );
               return;
@@ -4263,10 +4284,10 @@ export default function Sidebar() {
           case "delete": {
             if (confirmThreadDelete) {
               const confirmed = await settlePromise(() =>
-                api.dialogs.confirm("이 스레드의 대화 기록이 영구히 지워지며 되돌릴 수 없어요.", {
+                api.dialogs.confirm(ko.projects.sidebar.deleteThreadWarning, {
                   variant: "destructive",
-                  title: `“${thread.title}” 스레드를 삭제할까요?`,
-                  confirmLabel: "스레드 삭제",
+                  title: ko.projects.sidebar.deleteThreadTitle(thread.title),
+                  confirmLabel: ko.projects.sidebar.deleteThreadConfirm,
                 }),
               );
               if (confirmed._tag === "Failure" || !confirmed.value) return;
@@ -4277,8 +4298,9 @@ export default function Sidebar() {
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "대화를 삭제하지 못했어요",
-                  description: error instanceof Error ? error.message : "오류가 발생했어요.",
+                  title: ko.projects.sidebar.deleteThreadFailed,
+                  description:
+                    error instanceof Error ? error.message : ko.projects.sidebar.genericError,
                 }),
               );
               return;
@@ -4472,8 +4494,8 @@ export default function Sidebar() {
                       <SidebarHeaderIconButton
                         label={
                           scopedProjectGroup
-                            ? `Filter threads by project: ${scopedProjectGroup.displayName}`
-                            : "프로젝트별로 대화 보기"
+                            ? ko.projects.sidebar.filterByProject(scopedProjectGroup.displayName)
+                            : ko.projects.sidebar.viewThreadsByProject
                         }
                       />
                     }
@@ -4498,8 +4520,8 @@ export default function Sidebar() {
                     className="max-w-[min(18rem,var(--available-width))] overflow-hidden"
                   >
                     <ComboboxSearchInput
-                      aria-label="프로젝트 검색"
-                      placeholder="프로젝트 검색..."
+                      aria-label={ko.projects.sidebar.searchProjects}
+                      placeholder={ko.projects.sidebar.searchProjectsPlaceholder}
                       value={projectScopeMenuState.query}
                       onKeyDown={(event) => {
                         if (
@@ -4525,7 +4547,7 @@ export default function Sidebar() {
                         })
                       }
                     />
-                    <ComboboxEmpty>일치하는 프로젝트가 없어요.</ComboboxEmpty>
+                    <ComboboxEmpty>{ko.projects.sidebar.noMatchingProjects}</ComboboxEmpty>
                     <ComboboxList>
                       {(item: (typeof projectScopeItems)[number]) => {
                         const project = projectGroupByScopeKey.get(item.value) ?? null;
@@ -4559,7 +4581,7 @@ export default function Sidebar() {
                                 variant="ghost-muted"
                                 tabIndex={-1}
                                 aria-hidden="true"
-                                title={`${project.displayName} 프로젝트 설정`}
+                                title={ko.projects.sidebar.projectSettingsFor(project.displayName)}
                                 className="ml-auto size-6 [--control-icon-color:currentColor] text-icon-muted focus-visible:bg-accent focus-visible:text-foreground"
                                 onPointerDown={(event) => event.stopPropagation()}
                                 onClick={(event) => {
@@ -4609,7 +4631,7 @@ export default function Sidebar() {
                 <ul
                   id="sidebar-thread-search-results"
                   role="listbox"
-                  aria-label="대화 검색 결과"
+                  aria-label={ko.projects.sidebar.threadSearchResults}
                   className="flex flex-col gap-px"
                 >
                   {threadSearchResults.map((thread, index) => {
@@ -4661,7 +4683,9 @@ export default function Sidebar() {
                 role="status"
                 className="px-2 py-6 text-center text-xs text-sidebar-muted-foreground"
               >
-                {threadSearch.isPending ? "대화 메시지를 검색하는 중…" : "대화를 찾지 못했어요"}
+                {threadSearch.isPending
+                  ? ko.projects.sidebar.searchingThreadMessages
+                  : ko.projects.sidebar.noThreadsFound}
               </p>
             )
           ) : null}
@@ -4844,7 +4868,7 @@ export default function Sidebar() {
                               <SidebarDragBoundary
                                 key="pinned-header"
                                 marker="pinned-header"
-                                label="고정됨"
+                                label={ko.projects.sidebar.pinned}
                                 visible={from !== null}
                                 isDropTarget={dragTargetSection === "pinned"}
                               />,
@@ -4855,7 +4879,7 @@ export default function Sidebar() {
                               <SidebarDragBoundary
                                 key="pinned-divider"
                                 marker="pinned-divider"
-                                label="진행 중"
+                                label={ko.projects.sidebar.active}
                                 visible={from !== null}
                                 isDropTarget={dragTargetSection === "active"}
                               />,
@@ -4866,7 +4890,7 @@ export default function Sidebar() {
                               <SidebarSectionPlaceholder
                                 key="active-placeholder"
                                 marker="active-placeholder"
-                                label="진행 중"
+                                label={ko.projects.sidebar.active}
                                 showHint={
                                   from !== null &&
                                   (activeThreads.length === 0 ||
@@ -4887,8 +4911,8 @@ export default function Sidebar() {
                                 className="mt-auto"
                                 label={
                                   snoozedShelfExpanded
-                                    ? "Snoozed"
-                                    : `Snoozed (${snoozedThreads.length})`
+                                    ? ko.projects.sidebar.snoozedShelf
+                                    : ko.projects.sidebar.snoozedShelfCount(snoozedThreads.length)
                                 }
                                 toggle={{
                                   expanded: snoozedShelfExpanded,
@@ -4905,8 +4929,8 @@ export default function Sidebar() {
                                 className={cn(snoozedThreads.length === 0 && "mt-auto")}
                                 label={
                                   settledShelfExpanded
-                                    ? "정리됨"
-                                    : `정리됨 (${settledThreads.length})`
+                                    ? ko.projects.sidebar.settled
+                                    : ko.projects.sidebar.settledCount(settledThreads.length)
                                 }
                                 dragging={from !== null}
                                 isDropTarget={dragTargetSection === "settled"}
@@ -4922,7 +4946,7 @@ export default function Sidebar() {
                               <SidebarSectionPlaceholder
                                 key="settled-placeholder"
                                 marker="settled-placeholder"
-                                label="정리됨"
+                                label={ko.projects.sidebar.settled}
                                 showHint={
                                   from !== null &&
                                   (renderedSettledThreads.length === 0 ||
@@ -4947,7 +4971,9 @@ export default function Sidebar() {
                           className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-sidebar-muted-foreground/55 hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
                         >
                           <PlusIcon aria-hidden className="size-4 shrink-0" />
-                          {Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT)}개 더 보기
+                          {ko.projects.sidebar.showMoreCount(
+                            Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT),
+                          )}
                         </button>
                       </li>
                     ) : null}
@@ -4963,23 +4989,23 @@ export default function Sidebar() {
             snoozedThreads.length +
             settledThreads.length ===
             0 ? (
-            <div className="flex flex-col items-center gap-2 px-2 py-6 text-center text-xs text-muted-foreground/60">
+            <div className="flex flex-col items-center gap-2 px-2 py-6 text-center text-sm text-muted-foreground">
               {projects.length === 0 ? (
                 <>
-                  <span>아직 프로젝트가 없어요</span>
+                  <span>{ko.projects.sidebar.noProjectsYet}</span>
                   <button
                     type="button"
                     onClick={openAddProjectCommandPalette}
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-[11px] font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
                   >
                     <PlusIcon className="-mx-0.5 size-3" />
-                    프로젝트 추가
+                    {ko.projects.add}
                   </button>
                 </>
               ) : scopedProjectGroup ? (
-                `${scopedProjectGroup.displayName}에 아직 대화가 없어요`
+                ko.projects.sidebar.noThreadsInProject(scopedProjectGroup.displayName)
               ) : (
-                "아직 대화가 없어요"
+                ko.projects.sidebar.noThreadsYet
               )}
             </div>
           ) : null}

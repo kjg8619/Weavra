@@ -21,6 +21,9 @@ import {
   parseDeviceHostDraft,
   type DeviceHostCheckTarget,
 } from "./deviceHostConnectionChecks";
+import { ko } from "~/i18n/ko";
+
+const copy = ko.settings.deviceHosts;
 
 export function DeviceHostEditor({
   host,
@@ -64,17 +67,17 @@ export function DeviceHostEditor({
         }
       >
         <DialogHeader>
-          <DialogTitle>{isNew ? "Add device host" : "Edit device host"}</DialogTitle>
+          <DialogTitle>{isNew ? copy.addTitle : copy.editTitle}</DialogTitle>
           <DialogDescription>
             {targets.length === 1
-              ? `Connect from ${targets[0]?.label}.`
-              : `Connect from ${targets.length} selected environments.`}{" "}
-            Hosts on the same machine are skipped.
+              ? copy.connectFromOne(targets[0]?.label ?? "")
+              : copy.connectFromMany(targets.length)}{" "}
+            {copy.sameMachineSkipped}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel className="space-y-4">
           <label className="block space-y-1.5 text-sm">
-            <span>Name</span>
+            <span>{copy.name}</span>
             <Input
               autoFocus
               required
@@ -85,23 +88,23 @@ export function DeviceHostEditor({
             />
           </label>
           <label className="block space-y-1.5 text-sm">
-            <span>SSH target</span>
+            <span>{copy.sshTarget}</span>
             <Input
               required
               value={draft.target}
               disabled={busy}
               onChange={(event) => setDraft({ ...draft, target: event.target.value })}
-              placeholder="user@host or SSH alias"
+              placeholder={copy.sshTargetPlaceholder}
             />
           </label>
           <details
             open={host.port !== undefined || host.identityFile !== undefined || undefined}
             className="text-sm"
           >
-            <summary className="cursor-pointer text-muted-foreground">SSH options</summary>
+            <summary className="cursor-pointer text-muted-foreground">{copy.sshOptions}</summary>
             <div className="mt-3 grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
               <label className="block space-y-1.5">
-                <span>Identity file</span>
+                <span>{copy.identityFile}</span>
                 <Input
                   value={draft.identityFile ?? ""}
                   disabled={busy}
@@ -111,11 +114,11 @@ export function DeviceHostEditor({
                       event.target.value ? { ...rest, identityFile: event.target.value } : rest,
                     );
                   }}
-                  placeholder="SSH config default"
+                  placeholder={copy.identityFilePlaceholder}
                 />
               </label>
               <label className="block space-y-1.5">
-                <span>Port</span>
+                <span>{copy.port}</span>
                 <Input
                   type="number"
                   min={1}
@@ -128,24 +131,22 @@ export function DeviceHostEditor({
                       event.target.value ? { ...rest, port: Number(event.target.value) } : rest,
                     );
                   }}
-                  placeholder="Default"
+                  placeholder={ko.common.default}
                 />
               </label>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Optional. Resolved separately on each environment.
-            </p>
+            <p className="mt-2 text-xs text-muted-foreground">{copy.optionsHint}</p>
           </details>
           <div className="rounded-lg border border-border/60">
             <div className="flex items-center justify-between gap-3 px-3 py-2.5">
               <p role="status" className="text-xs text-muted-foreground">
                 {checking
-                  ? "Checking environments…"
+                  ? copy.checkingEnvironments
                   : results
                     ? failed
-                      ? `${failed} of ${targets.length} failed`
-                      : "Connection checks passed"
-                    : "Check access before saving"}
+                      ? copy.failedOfTotal(failed, targets.length)
+                      : copy.checksPassed
+                    : copy.checkBeforeSaving}
               </p>
               <Button
                 type="button"
@@ -156,7 +157,7 @@ export function DeviceHostEditor({
                   if (Option.isSome(input)) void testConnection(input.value);
                 }}
               >
-                {checking ? <Spinner className="size-3" /> : null} Test connection
+                {checking ? <Spinner className="size-3" /> : null} {copy.testConnection}
               </Button>
             </div>
             {results ? (
@@ -173,19 +174,19 @@ export function DeviceHostEditor({
                         >
                           {result.status === "pending" ? (
                             <>
-                              <Spinner className="size-3" /> Checking…
+                              <Spinner className="size-3" /> {copy.checking}
                             </>
                           ) : result.status === "local" ? (
                             <>
-                              <MonitorIcon className="size-3" /> Already available locally
+                              <MonitorIcon className="size-3" /> {copy.availableLocally}
                             </>
                           ) : result.status === "failed" ? (
                             <>
-                              <XIcon className="size-3" /> Failed
+                              <XIcon className="size-3" /> {copy.failed}
                             </>
                           ) : (
                             <>
-                              <CheckIcon className="size-3" /> Connected
+                              <CheckIcon className="size-3" /> {copy.connected}
                             </>
                           )}
                         </span>
@@ -197,7 +198,7 @@ export function DeviceHostEditor({
                       ) : null}
                       {result.status === "failed" ? (
                         <details className="mt-1.5 text-muted-foreground">
-                          <summary className="cursor-pointer">Show error</summary>
+                          <summary className="cursor-pointer">{copy.showError}</summary>
                           <p className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words">
                             {result.error}
                           </p>
@@ -212,10 +213,10 @@ export function DeviceHostEditor({
         </DialogPanel>
         <DialogFooter>
           <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
-            Cancel
+            {ko.common.cancel}
           </Button>
           <Button type="submit" disabled={busy || checking || !valid || !draft.label.trim()}>
-            {busy ? <Spinner className="size-3" /> : null} Save host
+            {busy ? <Spinner className="size-3" /> : null} {copy.saveHost}
           </Button>
         </DialogFooter>
       </DialogPopup>

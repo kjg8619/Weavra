@@ -20,6 +20,7 @@ import {
 import { Button } from "~/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "~/components/ui/input-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { ko } from "~/i18n/ko";
 import { cn } from "~/lib/utils";
 
 interface Props {
@@ -120,7 +121,11 @@ export function PreviewChromeRow({
         className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-1 gap-y-2 border-b border-border/60 bg-background px-2 py-0.5 in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:border-b-transparent"
         data-surface-subheader
       >
-        <div className="flex items-center gap-0.5" role="group" aria-label="Navigation">
+        <div
+          className="flex items-center gap-0.5"
+          role="group"
+          aria-label={ko.devices.preview.navigation}
+        >
           <Tooltip>
             <TooltipTrigger
               render={
@@ -130,14 +135,14 @@ export function PreviewChromeRow({
                   size="icon-xs"
                   onClick={canGoBack ? onBack : NOOP}
                   disabled={!canGoBack}
-                  aria-label="Back"
+                  aria-label={ko.common.back}
                   type="button"
                 />
               }
             >
               <ArrowLeft />
             </TooltipTrigger>
-            <TooltipPopup>Back</TooltipPopup>
+            <TooltipPopup>{ko.common.back}</TooltipPopup>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -148,14 +153,14 @@ export function PreviewChromeRow({
                   size="icon-xs"
                   onClick={canGoForward ? onForward : NOOP}
                   disabled={!canGoForward}
-                  aria-label="Forward"
+                  aria-label={ko.devices.preview.forward}
                   type="button"
                 />
               }
             >
               <ArrowRight />
             </TooltipTrigger>
-            <TooltipPopup>Forward</TooltipPopup>
+            <TooltipPopup>{ko.devices.preview.forward}</TooltipPopup>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -166,14 +171,14 @@ export function PreviewChromeRow({
                   size="icon-xs"
                   onClick={refreshDisabled ? NOOP : onRefresh}
                   disabled={refreshDisabled}
-                  aria-label={loading ? "Stop" : "Refresh"}
+                  aria-label={loading ? ko.devices.preview.stop : ko.common.refresh}
                   type="button"
                 />
               }
             >
               <RefreshIcon refreshing={loading} />
             </TooltipTrigger>
-            <TooltipPopup>{loading ? "Loading…" : "Refresh"}</TooltipPopup>
+            <TooltipPopup>{loading ? ko.common.loading : ko.common.refresh}</TooltipPopup>
           </Tooltip>
         </div>
 
@@ -217,7 +222,7 @@ export function PreviewChromeRow({
                       inputRef.current?.blur();
                     }
                   }}
-                  placeholder="Search or enter URL"
+                  placeholder={ko.devices.preview.addressPlaceholder}
                   spellCheck={false}
                   disabled={inputDisabled}
                   data-preview-url-input
@@ -239,14 +244,14 @@ export function PreviewChromeRow({
                       data-icon-control=""
                       size="icon-xs"
                       onClick={onOpenInBrowser}
-                      aria-label="Open in system browser"
+                      aria-label={ko.devices.preview.openInSystemBrowser}
                       type="button"
                     />
                   }
                 >
                   <ExternalLink />
                 </TooltipTrigger>
-                <TooltipPopup>Open in system browser</TooltipPopup>
+                <TooltipPopup>{ko.devices.preview.openInSystemBrowser}</TooltipPopup>
               </Tooltip>
             </InputGroupAddon>
           ) : null}
@@ -262,7 +267,11 @@ export function PreviewChromeRow({
                   size="icon-xs"
                   onClick={onPickElement}
                   disabled={pickDisabled}
-                  aria-label={pickActive ? "Cancel annotation" : "Annotate preview"}
+                  aria-label={
+                    pickActive
+                      ? ko.devices.preview.cancelAnnotation
+                      : ko.devices.preview.annotatePreview
+                  }
                   aria-pressed={pickActive ? "true" : "false"}
                   type="button"
                 />
@@ -274,8 +283,8 @@ export function PreviewChromeRow({
               {pickDisabled && pickDisabledReason
                 ? pickDisabledReason
                 : pickActive
-                  ? "Cancel annotation (Esc)"
-                  : "Annotate elements, regions, and drawings"}
+                  ? ko.devices.preview.cancelAnnotationHint
+                  : ko.devices.preview.annotateHint}
             </TooltipPopup>
           </Tooltip>
         ) : null}
@@ -288,7 +297,11 @@ export function PreviewChromeRow({
                   data-icon-control=""
                   size="icon-xs"
                   onClick={(event) => onCapture(event.shiftKey)}
-                  aria-label={recording ? "Stop recording" : "Capture screenshot"}
+                  aria-label={
+                    recording
+                      ? ko.devices.preview.stopRecording
+                      : ko.devices.preview.captureScreenshot
+                  }
                   type="button"
                   className="relative"
                   disabled={captureDisabled}
@@ -301,7 +314,7 @@ export function PreviewChromeRow({
               ) : null}
             </TooltipTrigger>
             <TooltipPopup>
-              {recording ? "Stop recording" : "Screenshot · Shift-click to record"}
+              {recording ? ko.devices.preview.stopRecording : ko.devices.preview.captureHint}
             </TooltipPopup>
           </Tooltip>
         ) : null}
@@ -315,7 +328,9 @@ export function PreviewChromeRow({
                   size="icon-xs"
                   onClick={onPictureInPicture}
                   aria-label={
-                    pictureInPicture ? "Close floating preview" : "Float preview over chat"
+                    pictureInPicture
+                      ? ko.devices.preview.closeFloating
+                      : ko.devices.preview.floatOverChat
                   }
                   aria-pressed={pictureInPicture ? "true" : "false"}
                   type="button"
@@ -326,7 +341,9 @@ export function PreviewChromeRow({
               <PictureInPicture2 className={cn(pictureInPicture && "text-primary")} />
             </TooltipTrigger>
             <TooltipPopup>
-              {pictureInPicture ? "Close floating preview" : "Float preview over chat"}
+              {pictureInPicture
+                ? ko.devices.preview.closeFloating
+                : ko.devices.preview.floatOverChat}
             </TooltipPopup>
           </Tooltip>
         ) : null}

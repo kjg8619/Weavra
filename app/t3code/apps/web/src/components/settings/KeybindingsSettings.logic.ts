@@ -13,6 +13,7 @@ import {
 
 import { shortcutKeyFromEvent } from "../../keybindings";
 import { isMacPlatform } from "../../lib/utils";
+import { ko } from "~/i18n/ko";
 
 export type KeybindingSource = "Default" | "Custom" | "Project";
 
@@ -43,15 +44,15 @@ const CORE_WHEN_VARIABLES = [
 ] as const;
 
 export const WHEN_VARIABLE_LABELS: Readonly<Record<string, string>> = {
-  terminalFocus: "터미널에 입력 초점이 있음",
-  terminalOpen: "터미널이 열려 있음",
-  previewFocus: "브라우저 패널에 키보드 초점이 있음",
-  previewOpen: "브라우저 패널이 열려 있음",
-  modelPickerOpen: "모델 선택기가 열려 있음",
-  isWeb: "웹에서 사용 중",
-  isDesktop: "데스크톱 앱에서 사용 중",
-  true: "항상",
-  false: "항상 거짓",
+  terminalFocus: ko.settings.keybindings.whenLabels.terminalFocus,
+  terminalOpen: ko.settings.keybindings.whenLabels.terminalOpen,
+  previewFocus: ko.settings.keybindings.whenLabels.previewFocus,
+  previewOpen: ko.settings.keybindings.whenLabels.previewOpen,
+  modelPickerOpen: ko.settings.keybindings.whenLabels.modelPickerOpen,
+  isWeb: ko.settings.keybindings.whenLabels.isWeb,
+  isDesktop: ko.settings.keybindings.whenLabels.isDesktop,
+  true: ko.settings.keybindings.whenLabels.always,
+  false: ko.settings.keybindings.whenLabels.never,
 };
 
 const DEFAULT_WHEN_VARIABLES = new Set<string>(CORE_WHEN_VARIABLES);
@@ -95,20 +96,26 @@ export function whenAstToExpression(node: KeybindingWhenNode | undefined): strin
 }
 
 export function whenAstToKoreanExplanation(node: KeybindingWhenNode | undefined): string {
-  if (!node) return "항상";
+  if (!node) return ko.settings.keybindings.whenLabels.always;
   switch (node.type) {
     case "identifier": {
       const label = Object.hasOwn(WHEN_VARIABLE_LABELS, node.name)
         ? WHEN_VARIABLE_LABELS[node.name]
         : undefined;
-      return label ?? `사용자 정의 조건 ‘${node.name}’ (고급 조건에서 원문 확인)`;
+      return label ?? ko.settings.keybindings.whenCustom(node.name);
     }
     case "not":
-      return `(${whenAstToKoreanExplanation(node.node)})이 아님`;
+      return ko.settings.keybindings.whenNot(whenAstToKoreanExplanation(node.node));
     case "and":
-      return `(${whenAstToKoreanExplanation(node.left)}) 그리고 (${whenAstToKoreanExplanation(node.right)})`;
+      return ko.settings.keybindings.whenAnd(
+        whenAstToKoreanExplanation(node.left),
+        whenAstToKoreanExplanation(node.right),
+      );
     case "or":
-      return `(${whenAstToKoreanExplanation(node.left)}) 또는 (${whenAstToKoreanExplanation(node.right)})`;
+      return ko.settings.keybindings.whenOr(
+        whenAstToKoreanExplanation(node.left),
+        whenAstToKoreanExplanation(node.right),
+      );
   }
 }
 
@@ -127,11 +134,11 @@ export function groupKeybindingRows(
 }
 
 export function whenNodeRemoveLabel(node: KeybindingWhenNode, depth: number): string {
-  if (depth === 0) return "Clear all conditions";
+  if (depth === 0) return ko.settings.keybindings.clearAllConditions;
   if (node.type === "identifier" || (node.type === "not" && node.node.type === "identifier")) {
-    return "Remove condition";
+    return ko.settings.keybindings.removeCondition;
   }
-  return "Remove group and its conditions";
+  return ko.settings.keybindings.removeGroup;
 }
 
 function wrapWhenExpression(node: KeybindingWhenNode): string {
@@ -149,7 +156,7 @@ export function parseWhenExpressionDraft(
   if (!ast) {
     return {
       ok: false,
-      message: "Use variables with !, &&, ||, and parentheses.",
+      message: ko.settings.keybindings.whenSyntaxError,
     };
   }
 
@@ -267,6 +274,7 @@ export function buildKeybindingRows(
     return (
       row.command.toLowerCase().includes(normalizedQuery) ||
       commandLabel(row.command).toLowerCase().includes(normalizedQuery) ||
+      commandSearchAlias(row.command).toLowerCase().includes(normalizedQuery) ||
       row.key.toLowerCase().includes(normalizedQuery) ||
       row.when.toLowerCase().includes(normalizedQuery) ||
       row.source.toLowerCase().includes(normalizedQuery)
@@ -333,6 +341,33 @@ export function buildKeybindingCommandOptions(
 }
 
 export function commandLabel(command: KeybindingCommand): string {
+  const raw = String(command);
+  const labels = ko.settings.keybindings.commands;
+  if (Object.hasOwn(labels, raw)) return labels[raw]!;
+  const jump = /^(thread|modelPicker)\.jump\.(\d+)$/.exec(raw);
+  if (jump) {
+    return jump[1] === "thread"
+      ? ko.settings.keybindings.threadJump(jump[2]!)
+      : ko.settings.keybindings.modelPickerJump(jump[2]!);
+  }
+  if (raw.startsWith("script.") && raw.endsWith(".run")) {
+    return ko.settings.keybindings.runScript(
+      titleCaseCommandSegment(raw.slice("script.".length, -".run".length)),
+    );
+  }
+  return raw.split(".").map(titleCaseCommandSegment).join(": ");
+}
+
+/** Accessible shortcut name: modifier symbols stay, spelled-out key names are Korean. */
+export function spokenShortcutLabel(label: string): string {
+  const spoken = ko.settings.keybindings.spokenKeys;
+  return label.replace(/[A-Za-z]{2,}/g, (word) =>
+    Object.hasOwn(spoken, word) ? spoken[word]! : word,
+  );
+}
+
+/** The pre-localization English label, kept only as a search alias so English queries still match. */
+export function commandSearchAlias(command: KeybindingCommand): string {
   if (command === "thread.copyReference") return "Pull Request: Copy Link or Thread ID";
   const raw = String(command);
   if (raw.startsWith("script.") && raw.endsWith(".run")) {

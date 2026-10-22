@@ -12,6 +12,7 @@ import {
   CONTEXT_INLINE_CHIP_TONE_CLASS_NAMES,
 } from "../composerInlineChip";
 import { ContextChipPopover, ContextChipShell } from "../contextChipParts";
+import { ko } from "~/i18n/ko";
 
 interface TerminalContextInlineChipProps {
   label: string;
@@ -43,7 +44,7 @@ export function TerminalContextInlineChip(props: TerminalContextInlineChipProps)
   if (!expired && text.length > 0 && detailsMode === "popover") {
     return (
       <ContextChipPopover
-        accessibleLabel={`Terminal excerpt, ${label}`}
+        accessibleLabel={ko.chat.contextChip.terminalExcerpt(label)}
         chip={
           <>
             {icon}

@@ -264,6 +264,7 @@ import {
   type ReviewCommentContext,
 } from "../../reviewCommentContext";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+import { ko } from "~/i18n/ko";
 
 // ---------------------------------------------------------------------------
 // Context — shared state consumed by every row component via Context.
@@ -1889,12 +1890,8 @@ function QueuedMessageTimelineRow({
         {attachmentCount > 0 || contextCount > 0 ? (
           <div className={cn("text-secondary-label text-xs", text.length > 0 && "mt-1.5")}>
             {[
-              attachmentCount > 0
-                ? `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`
-                : null,
-              contextCount > 0
-                ? `${contextCount} context item${contextCount === 1 ? "" : "s"}`
-                : null,
+              attachmentCount > 0 ? ko.chat.contextChip.attachmentCount(attachmentCount) : null,
+              contextCount > 0 ? ko.chat.contextChip.contextItemCount(contextCount) : null,
             ]
               .filter(Boolean)
               .join(", ")}
@@ -2620,15 +2617,15 @@ function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "workin
   // place instead of remounting the row.
   const shimmer = isPreparingWorktree || isCompacting;
   const label = isPreparingWorktree ? (
-    "worktree를 설정하는 중…"
+    ko.chat.timeline.preparingWorktree
   ) : isCompacting ? (
     <CompactingLabel />
   ) : row.createdAt ? (
     <>
-      Working for <WorkingTimer createdAt={row.createdAt} />
+      {ko.chat.timeline.workingFor} <WorkingTimer createdAt={row.createdAt} />
     </>
   ) : (
-    "Working..."
+    ko.chat.timeline.working
   );
   return (
     <div className="border-b border-border/60 pb-2 pt-1">
@@ -3816,7 +3813,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
               />
             }
             label={record.label || record.name}
-            kindLabel="Skill"
+            kindLabel={ko.chat.contextChip.skill}
             tooltip={`$${record.name}`}
             copyMarkdown={context.copyMarkdown}
             toneClassName={CONTEXT_INLINE_CHIP_TONE_CLASS_NAMES.skill}
@@ -3881,7 +3878,11 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
             className={CHAT_INLINE_CHIP_CLASS_NAME}
             labelClassName={CHAT_INLINE_CHIP_LABEL_CLASS_NAME}
             disabled={disabled}
-            accessibleLabel={`${isVideo ? "Video" : "File"} attachment, ${record.name}, ${size}`}
+            accessibleLabel={
+              isVideo
+                ? ko.chat.contextChip.videoAttachment(record.name, size)
+                : ko.chat.contextChip.fileAttachment(record.name, size)
+            }
             copyMarkdown={context.copyMarkdown}
             onOpen={() =>
               isVideo ? context.onExpandVideo(attachment) : context.onOpenFile(attachment)
@@ -3918,7 +3919,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         record.kind === "element" ? (
           <UserMessageContextPopover
             copyMarkdown={context.copyMarkdown}
-            accessibleLabel={`Browser element, ${record.label}`}
+            accessibleLabel={ko.chat.contextChip.browserElement(record.label)}
             chip={
               <UserMessageContextChip
                 icon={
@@ -4029,7 +4030,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         record.kind === "preview-annotation" ? (
           <UserMessageContextPopover
             copyMarkdown={context.copyMarkdown}
-            accessibleLabel={`Preview annotation, ${record.label}`}
+            accessibleLabel={ko.chat.contextChip.previewAnnotation(record.label)}
             chip={
               <UserMessageContextChip
                 icon={

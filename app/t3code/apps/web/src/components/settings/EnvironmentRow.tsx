@@ -3,6 +3,7 @@ import * as Option from "effect/Option";
 import type { ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
+import { ko } from "~/i18n/ko";
 import type { EnvironmentPresentation } from "~/state/environments";
 import { isDesktopLocalConnectionTarget } from "~/connection/desktopLocal";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
@@ -18,8 +19,9 @@ export function formatDesktopSshTarget(target: DesktopSshEnvironmentTarget): str
  */
 export function environmentTransportLabel(environment: EnvironmentPresentation): string {
   const { entry } = environment;
-  if (entry.target._tag === "PrimaryConnectionTarget") return "This machine";
-  if (environment.relayManaged) return "Hosted relay (unavailable)";
+  if (entry.target._tag === "PrimaryConnectionTarget")
+    return ko.settings.connections.transportThisMachine;
+  if (environment.relayManaged) return ko.settings.connections.transportHostedRelay;
   if (isDesktopLocalConnectionTarget(entry.target)) return "WSL";
   if (
     entry.target._tag === "SshConnectionTarget" &&
@@ -28,7 +30,7 @@ export function environmentTransportLabel(environment: EnvironmentPresentation):
   ) {
     return `SSH ${formatDesktopSshTarget(entry.profile.value.target)}`;
   }
-  return environment.displayUrl ?? "Remote link";
+  return environment.displayUrl ?? ko.settings.connections.transportRemoteLink;
 }
 
 /**

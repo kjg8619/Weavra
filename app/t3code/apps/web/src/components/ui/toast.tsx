@@ -26,6 +26,7 @@ import {
   XIcon,
 } from "lucide-react";
 
+import { ko } from "~/i18n/ko";
 import { cn } from "~/lib/utils";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { useComposerDraftStore } from "~/composerDraftStore";
@@ -120,7 +121,7 @@ function handleToastDismissClick(
 
 function CopyErrorButton({ text }: { text: string }) {
   const { copyToClipboard, isCopied } = useCopyToClipboard({ target: "error-message" });
-  const label = isCopied ? "Copied error" : "Copy error";
+  const label = isCopied ? ko.common.toast.copiedError : ko.common.toast.copyError;
 
   return (
     <Tooltip>
@@ -155,8 +156,8 @@ function ToastExpandableSection({
   labels: { expand?: string; collapse?: string };
 }) {
   const [open, setOpen] = useState(false);
-  const expandLabel = labels.expand ?? "Show details";
-  const collapseLabel = labels.collapse ?? "Hide details";
+  const expandLabel = labels.expand ?? ko.common.toast.showDetails;
+  const collapseLabel = labels.collapse ?? ko.common.toast.hideDetails;
 
   return (
     <div className="min-w-0">
@@ -209,8 +210,8 @@ function ToastDescriptionAndExpandable({
     );
   }
 
-  const expandLabel = labels.expand ?? "Show details";
-  const collapseLabel = labels.collapse ?? "Hide details";
+  const expandLabel = labels.expand ?? ko.common.toast.showDetails;
+  const collapseLabel = labels.collapse ?? ko.common.toast.hideDetails;
 
   const toggle = () => setOpen((v) => !v);
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -664,7 +665,7 @@ function Toasts({ position }: { position: ToastPosition }) {
               />
               <div className={toastCornerDismissClass}>
                 <button
-                  aria-label="Dismiss notification"
+                  aria-label={ko.common.toast.dismiss}
                   data-icon-control=""
                   className={toastCornerOrbClass}
                   data-slot="toast-close"
@@ -756,7 +757,7 @@ function AnchoredToasts() {
                     <>
                       <div className={toastCornerDismissClass}>
                         <button
-                          aria-label="Dismiss notification"
+                          aria-label={ko.common.toast.dismiss}
                           data-icon-control=""
                           className={toastCornerOrbClass}
                           data-slot="toast-close"

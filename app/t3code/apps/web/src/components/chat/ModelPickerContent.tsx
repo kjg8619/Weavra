@@ -976,7 +976,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                           <div className="min-w-0 flex-1 text-left">
                             <div className="text-xs font-medium leading-snug">이전 모델</div>
                             <div className="mt-1 text-xs font-normal leading-snug text-muted-foreground/70">
-                              {legacySection.legacyModels.length} models
+                              모델 {legacySection.legacyModels.length}개
                             </div>
                           </div>
                           <ChevronRightIcon

@@ -2,6 +2,9 @@ import { EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { loadPreferenceForWeight, summarizeLoadPreferences } from "./LoadBalancingSettings";
+import { ko } from "~/i18n/ko";
+
+const copy = ko.settings.loadBalancing;
 
 const machines = [
   { environmentId: EnvironmentId.make("a"), label: "alvin" },
@@ -26,7 +29,7 @@ describe("summarizeLoadPreferences", () => {
 
   it("lists only the machines that differ from Normal, in list order", () => {
     expect(summarizeLoadPreferences(machines, { b: 100, c: 0 })).toBe(
-      "bb-1 prefer · ProMini manual only",
+      `${copy.summaryEntry("bb-1", copy.prefer)} · ${copy.summaryEntry("ProMini", copy.manualOnly)}`,
     );
   });
 });

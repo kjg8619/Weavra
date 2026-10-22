@@ -7,7 +7,10 @@ import {
   type WeavraTaskScopeInput,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import { ko } from "~/i18n/ko";
 import { weavraLabel } from "../weavraLabels";
+
+const copy = ko.runtime.task.logic;
 
 export interface TaskDraftFields {
   goal: string;
@@ -111,8 +114,7 @@ export function selectedMessageFinding(input: {
   role: "user" | "assistant";
   text: string;
 }): WeavraAnalysisContext["observations"][number] {
-  if (!input.text.trim() || input.text.length > 500)
-    throw new Error("화면에 표시된 메시지에서 최대 500자를 선택해 주세요.");
+  if (!input.text.trim() || input.text.length > 500) throw new Error(copy.selectionTooLong);
   return {
     text: input.text,
     provenance: input.role === "assistant" ? "MODEL" : "USER",
@@ -159,9 +161,9 @@ export function taskConfirmBlocker(input: {
   reviewed: boolean;
   now: number;
 }): string | null {
-  if (!input.fresh) return "작업 전에 다시 연결하고 이 작업을 동기화해 주세요.";
-  if (!input.canOperate) return "이 세션에는 orchestration:operate 권한이 없어요.";
-  if (input.edited) return "초안이 바뀌었어요. 확인하기 전에 새 스냅샷을 준비해 주세요.";
+  if (!input.fresh) return copy.reconnect;
+  if (!input.canOperate) return copy.noOperatePermission("orchestration:operate");
+  if (input.edited) return copy.draftEdited;
   const { task } = input;
   const preview = task.execution?.preview;
   if (
@@ -169,27 +171,24 @@ export function taskConfirmBlocker(input: {
     task.ownership.state !== "analysis" ||
     task.execution?.confirmCommandId
   )
-    return "이 시도를 확인할 수 없어요. 현재 상태를 다시 조회해 주세요.";
-  if (!preview) return "저장된 미리보기를 사용할 수 없어요. 새 시도를 준비해 주세요.";
-  if (preview.expiresAt <= input.now) return "미리보기가 만료됐어요. 새 시도를 준비해 주세요.";
-  if (!preview.modelRoutes)
-    return "확정된 Runtime 모델 경로를 확인할 수 없어요. 호환되는 Runtime에서 다시 준비해 주세요.";
-  if (!preview.checks.some((check) => check.required)) return "필수로 등록된 검사가 없어요.";
-  if (!input.reviewed) return "이 스냅샷을 검토한 뒤 아래에서 확인해 주세요.";
+    return copy.cannotConfirm;
+  if (!preview) return copy.previewMissing;
+  if (preview.expiresAt <= input.now) return copy.previewExpired;
+  if (!preview.modelRoutes) return copy.modelRoutesMissing;
+  if (!preview.checks.some((check) => check.required)) return copy.noRequiredChecks;
+  if (!input.reviewed) return copy.reviewFirst;
   return null;
 }
 
 export function taskStatus(task: WeavraTask): string {
   const receipt = task.execution?.receipt;
   if (receipt?.status === "FOUND") {
-    if (receipt.run) return `Run ${weavraLabel(receipt.run.status)}`;
+    if (receipt.run) return copy.runStatus(weavraLabel(receipt.run.status));
     const outcome = receipt.admission.outcome;
     return "reasonCode" in outcome
-      ? `${weavraLabel(outcome.status)}: ${outcome.reasonCode} (Run 없음)`
-      : `${weavraLabel(outcome.status)} (Run 미확인)`;
+      ? copy.admissionRejected(weavraLabel(outcome.status), outcome.reasonCode)
+      : copy.admissionPending(weavraLabel(outcome.status));
   }
-  if (receipt?.status === "UNKNOWN") return "실행 응답 미확인 - 소유권을 해제하지 않았어요";
-  return task.phase === "finished"
-    ? "작업 종료 - Runtime 완료 판정은 없어요"
-    : weavraLabel(task.phase);
+  if (receipt?.status === "UNKNOWN") return copy.receiptUnknown;
+  return task.phase === "finished" ? copy.finished : weavraLabel(task.phase);
 }

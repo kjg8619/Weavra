@@ -5,6 +5,7 @@ import { XIcon } from "lucide-react";
 import { useState } from "react";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
+import { ko } from "~/i18n/ko";
 import {
   DIALOG_BACKDROP_CLASS,
   DIALOG_MEDIA_BACKDROP_CLASS,
@@ -109,7 +110,7 @@ function DialogPopup({
           {children}
           {showCloseButton && (
             <DialogPrimitive.Close
-              aria-label="Close"
+              aria-label={ko.common.close}
               className="absolute end-2 top-2"
               render={<Button data-icon-control="" size="icon" variant="ghost" />}
             >

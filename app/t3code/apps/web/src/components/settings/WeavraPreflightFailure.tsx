@@ -8,12 +8,12 @@ export function WeavraPreflightFailure({
   return (
     <section aria-label="Runtime 사전 검사 실패" className="space-y-3 text-sm">
       <p className="text-destructive">
-        Runtime 사전 검사에서 Run을 만들지 못했어요. 자동 재시도는 하지 않았어요.
+        Runtime 사전 검사에서 실행을 만들지 못했어요. 자동 재시도는 하지 않았어요.
       </p>
       {configuration ? (
         <>
           <p className="text-xs text-muted-foreground">
-            현재 프로젝트 설정이며 Run에서 확정한 설정은 아니에요.
+            현재 프로젝트 설정이며 실행에서 확정한 설정은 아니에요.
           </p>
           <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-xs sm:grid-cols-2">
             {[

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId } from "@t3tools/contracts";
 
+import { ko } from "~/i18n/ko";
+
 import {
   filterAvailableSettingsSearchItems,
   getSettingsSearchTargetScope,
@@ -10,8 +12,15 @@ import {
   searchableSetting,
   searchSettings,
   SETTINGS_SEARCH_ITEMS,
+  SETTINGS_SECTION_LABELS,
   type SettingsSearchItem,
 } from "./settingsSearch";
+
+const SETTINGS_ROUTES = new Set(
+  Object.keys(import.meta.glob("../../routes/settings.*.tsx")).map(
+    (file) => `/settings/${/settings\.(.+)\.tsx$/.exec(file)![1]}`,
+  ),
+);
 
 const ITEMS: ReadonlyArray<SettingsSearchItem> = [
   {
@@ -142,7 +151,7 @@ describe("searchSettings", () => {
   it("registers the WSL backend as a desktop-only setting", () => {
     expect(SETTINGS_SEARCH_ITEMS.find((item) => item.id === "wsl-backend")).toMatchObject({
       id: "wsl-backend",
-      title: "WSL backend",
+      title: ko.settings.search.items.wslBackend.title,
       to: "/settings/connections",
       desktopOnly: true,
       windowsOnly: true,
@@ -248,8 +257,14 @@ describe("searchSettings", () => {
   });
 
   it("serves anchor props to panels from the catalog", () => {
-    expect(searchableSetting("word-wrap")).toEqual({ id: "word-wrap", title: "Word wrap" });
-    expect(searchableSetting("archive")).toEqual({ id: "archive", title: "Archived threads" });
+    expect(searchableSetting("word-wrap")).toEqual({
+      id: "word-wrap",
+      title: ko.settings.search.items.wordWrap.title,
+    });
+    expect(searchableSetting("archive")).toEqual({
+      id: "archive",
+      title: ko.settings.search.items.archive.title,
+    });
   });
 
   it("routes appearance settings to their current section", () => {
@@ -353,7 +368,7 @@ describe("settings search targets", () => {
 
   it("treats device-local rows as reachable from every selection", () => {
     const setting = getSettingsSearchTargetScope("time-format")!;
-    expect(setting).toEqual({ title: "Time format", scope: null });
+    expect(setting).toEqual({ title: ko.settings.search.items.timeFormat.title, scope: null });
     expect(isSettingsSearchScopeAvailable(setting.scope, "project")).toBe(true);
     expect(isSettingsSearchScopeAvailable(setting.scope, "all")).toBe(true);
     expect(getSettingsSearchTargetScope("appearance")).toMatchObject({ scope: null });
@@ -502,5 +517,36 @@ describe("settings sidebar scope", () => {
     expect(isSettingsOverviewVisible({ machine: "remote" })).toBe(false);
     expect(isSettingsOverviewVisible({ project: "project" })).toBe(true);
     expect(isSettingsOverviewVisible({ project: "project", checkout: "checkout" })).toBe(true);
+  });
+});
+
+describe("localized search metadata", () => {
+  const searchable = SETTINGS_SEARCH_ITEMS.filter(
+    (item: SettingsSearchItem) => !item.desktopOnly && !item.macOnly && !item.windowsOnly,
+  );
+
+  it("finds every section by its displayed label and lands on a real settings route", () => {
+    for (const [to, label] of Object.entries(SETTINGS_SECTION_LABELS)) {
+      expect(SETTINGS_ROUTES.has(to), to).toBe(true);
+      expect(
+        searchSettings(label).some((item) => item.to === to),
+        label,
+      ).toBe(true);
+    }
+  });
+
+  it("finds every destination by its displayed title and by its former English title", () => {
+    for (const item of searchable) {
+      expect(SETTINGS_ROUTES.has(item.to), item.id).toBe(true);
+      expect(
+        searchSettings(item.title).map((result) => result.id),
+        item.title,
+      ).toContain(item.id);
+      if (item.englishTitle)
+        expect(
+          searchSettings(item.englishTitle).map((result) => result.id),
+          item.englishTitle,
+        ).toContain(item.id);
+    }
   });
 });

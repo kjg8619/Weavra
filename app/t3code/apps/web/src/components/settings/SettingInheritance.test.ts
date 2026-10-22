@@ -2,7 +2,11 @@ import { DEFAULT_SERVER_SETTINGS, EnvironmentId, ProjectId } from "@t3tools/cont
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { describe, expect, it } from "vite-plus/test";
 
+import { ko } from "~/i18n/ko";
 import { settingInheritanceLayers } from "./SettingInheritance";
+
+const { project: PROJECT, default: DEFAULT, on: ON, off: OFF } = ko.common;
+const INHERITS = ko.settings.inheritance.inherits;
 
 const environmentId = EnvironmentId.make("laptop");
 const projectId = ProjectId.make("project");
@@ -16,8 +20,8 @@ describe("settingInheritanceLayers", () => {
       "defaultAutoPull",
     );
     expect(layers.map((layer) => [layer.label, layer.value, layer.effective])).toEqual([
-      ["Laptop", "Inherits", false],
-      ["Default", "Off", true],
+      ["Laptop", INHERITS, false],
+      [DEFAULT, OFF, true],
     ]);
   });
 
@@ -34,9 +38,9 @@ describe("settingInheritanceLayers", () => {
       "defaultAutoPull",
     );
     expect(layers.map((layer) => [layer.label, layer.value, layer.effective])).toEqual([
-      ["Project", "Off", true],
-      ["Laptop", "On", false],
-      ["Default", "Off", false],
+      [PROJECT, OFF, true],
+      ["Laptop", ON, false],
+      [DEFAULT, OFF, false],
     ]);
     const inherited = settingInheritanceLayers(
       {
@@ -49,9 +53,9 @@ describe("settingInheritanceLayers", () => {
       "defaultAutoPull",
     );
     expect(inherited.map((layer) => [layer.value, layer.effective])).toEqual([
-      ["Inherits", false],
-      ["On", true],
-      ["Off", false],
+      [INHERITS, false],
+      [ON, true],
+      [OFF, false],
     ]);
   });
 });

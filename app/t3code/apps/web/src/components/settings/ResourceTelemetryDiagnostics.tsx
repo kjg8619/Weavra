@@ -24,6 +24,7 @@ import type {
   ResourceTelemetryProcessSummary,
   ResourceTelemetrySourceHealth,
   ResourceTelemetrySourceStatus,
+  HostPowerThermalState,
   ServerProcessSignal,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
@@ -55,12 +56,17 @@ import {
   visibleResourceTelemetryProcesses,
 } from "./ResourceTelemetryDiagnostics.logic";
 import { SettingsSection, useRelativeTimeTick } from "./settingsLayout";
+import { ko } from "~/i18n/ko";
+
+// Every thermal state has a Korean label; the raw telemetry value stays unchanged in logic.
+const THERMAL_STATE_LABELS: Readonly<Record<HostPowerThermalState, string>> =
+  ko.settings.telemetry.thermalStates;
 
 const HISTORY_WINDOWS = [
-  { label: "5m", windowMs: 5 * 60_000, bucketMs: 15_000 },
-  { label: "15m", windowMs: 15 * 60_000, bucketMs: 30_000 },
-  { label: "30m", windowMs: 30 * 60_000, bucketMs: 60_000 },
-  { label: "1h", windowMs: 60 * 60_000, bucketMs: 2 * 60_000 },
+  { label: ko.settings.telemetry.window5m, windowMs: 5 * 60_000, bucketMs: 15_000 },
+  { label: ko.settings.telemetry.window15m, windowMs: 15 * 60_000, bucketMs: 30_000 },
+  { label: ko.settings.telemetry.window30m, windowMs: 30 * 60_000, bucketMs: 60_000 },
+  { label: ko.settings.telemetry.window1h, windowMs: 60 * 60_000, bucketMs: 2 * 60_000 },
 ] as const;
 
 function formatBytes(value: number): string {
@@ -96,9 +102,9 @@ function formatDurationMicros(value: number): string {
 function formatSampleInterval(valueMs: number): string {
   if (valueMs < 1_000) return `${Math.max(0, Math.round(valueMs))} ms`;
   const seconds = valueMs / 1_000;
-  return `${seconds.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${
-    seconds === 1 ? "second" : "seconds"
-  }`;
+  return ko.settings.telemetry.sampleIntervalSeconds(
+    seconds.toLocaleString("ko-KR", { maximumFractionDigits: 1 }),
+  );
 }
 
 function processIdentityKey(process: ResourceTelemetryProcess): string {
@@ -119,25 +125,25 @@ function formatProcessName(process: Pick<ResourceTelemetryProcess, "command" | "
 function categoryLabel(category: ResourceTelemetryProcessCategory): string {
   switch (category) {
     case "server":
-      return "Server";
+      return ko.settings.telemetry.categoryServer;
     case "server-child":
-      return "Backend child";
+      return ko.settings.telemetry.categoryServerChild;
     case "provider-root":
-      return "Provider";
+      return ko.settings.telemetry.categoryProvider;
     case "terminal-root":
-      return "Terminal";
+      return ko.settings.telemetry.categoryTerminal;
     case "electron-main":
-      return "Electron main";
+      return ko.settings.telemetry.categoryElectronMain;
     case "electron-renderer":
-      return "Renderer";
+      return ko.settings.telemetry.categoryRenderer;
     case "electron-gpu":
-      return "GPU";
+      return ko.settings.telemetry.categoryGpu;
     case "electron-utility":
-      return "Electron utility";
+      return ko.settings.telemetry.categoryElectronUtility;
     case "resource-monitor":
-      return "Monitor";
+      return ko.settings.telemetry.categoryMonitor;
     case "unknown-t3":
-      return "T3 process";
+      return ko.settings.telemetry.categoryUnknownT3;
   }
 }
 
@@ -151,13 +157,13 @@ function categoryDotClass(category: ResourceTelemetryProcessCategory): string {
 function ioSemanticsLabel(semantics: ResourceTelemetryIoSemantics): string {
   switch (semantics) {
     case "storage":
-      return "Storage bytes";
+      return ko.settings.telemetry.ioStorage;
     case "logical":
-      return "Logical bytes";
+      return ko.settings.telemetry.ioLogical;
     case "all-io":
-      return "All I/O bytes";
+      return ko.settings.telemetry.ioAll;
     case "unavailable":
-      return "Unavailable";
+      return ko.settings.telemetry.unavailable;
   }
 }
 
@@ -167,7 +173,7 @@ function booleanStateLabel(
 ): string {
   if (value === "true") return labels.true;
   if (value === "false") return labels.false;
-  return "Unknown";
+  return ko.settings.telemetry.unknown;
 }
 
 function sourceStatusTone(status: ResourceTelemetrySourceStatus): "default" | "warning" | "danger" {
@@ -194,7 +200,7 @@ function SourceStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm font-semibold uppercase tracking-[0.08em]",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm font-semibold",
         tone === "neutral" && "border-border/70 bg-muted/45 text-muted-foreground",
         tone === "default" &&
           "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -212,7 +218,7 @@ function SourceStatusBadge({
           tone === "danger" && "bg-destructive",
         )}
       />
-      {label} {presentation?.label ?? status}
+      {label} {presentation?.label ?? ko.settings.telemetry.sourceStatus[status]}
     </span>
   );
 }
@@ -220,15 +226,24 @@ function SourceStatusBadge({
 function LastSampleLabel({ sampledAt }: { sampledAt: DateTime.Utc | null }) {
   useRelativeTimeTick();
   if (!sampledAt) {
-    return <span className="text-sm text-muted-foreground">Waiting for sample</span>;
+    return (
+      <span className="text-sm text-muted-foreground">
+        {ko.settings.telemetry.waitingForSample}
+      </span>
+    );
   }
   const relative = formatRelativeTime(DateTime.formatIso(sampledAt));
   if (!relative) {
-    return <span className="text-sm text-muted-foreground">Waiting for sample</span>;
+    return (
+      <span className="text-sm text-muted-foreground">
+        {ko.settings.telemetry.waitingForSample}
+      </span>
+    );
   }
   return (
     <span className="text-sm text-muted-foreground">
-      Updated <span className="font-mono tabular-nums">{relative.value}</span>
+      {ko.settings.telemetry.updated}{" "}
+      <span className="font-mono tabular-nums">{relative.value}</span>
       {relative.suffix ? ` ${relative.suffix}` : ""}
     </span>
   );
@@ -249,7 +264,7 @@ function IconStat({
 }) {
   return (
     <div className="group min-w-0 px-4 py-4 sm:px-5">
-      <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.11em] text-muted-foreground">
+      <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
         <span
           aria-hidden="true"
           className="shrink-0 text-muted-foreground transition-colors group-hover:text-foreground/65"
@@ -287,18 +302,28 @@ function AggregateCard({
     <div className="relative overflow-hidden border-t border-border/60 px-4 py-4 first:border-t-0 md:border-t-0 md:border-l md:first:border-l-0 sm:px-5">
       <span className={cn("absolute inset-x-5 top-0 h-0.5 rounded-full opacity-75", accentClass)} />
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold uppercase tracking-[0.11em] text-muted-foreground">
-          {label}
-        </div>
+        <div className="text-sm font-semibold text-muted-foreground">{label}</div>
         <div className="rounded-md bg-muted/55 px-1.5 py-0.5 font-mono text-sm tabular-nums text-muted-foreground">
-          {aggregate.processCount} {aggregate.processCount === 1 ? "process" : "processes"}
+          {ko.settings.telemetry.processCount(aggregate.processCount)}
         </div>
       </div>
-      <div className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5">
-        <MetricPair label="CPU" value={`${aggregate.currentCpuPercent.toFixed(1)}%`} />
-        <MetricPair label="Memory" value={formatBytes(aggregate.currentRssBytes)} />
-        <MetricPair label="Read" value={formatRate(aggregate.ioReadBytesPerSecond)} />
-        <MetricPair label="Write" value={formatRate(aggregate.ioWriteBytesPerSecond)} />
+      <div className="mt-3.5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,6rem),1fr))] gap-x-4 gap-y-2.5">
+        <MetricPair
+          label={ko.settings.telemetry.cpu}
+          value={`${aggregate.currentCpuPercent.toFixed(1)}%`}
+        />
+        <MetricPair
+          label={ko.settings.telemetry.memory}
+          value={formatBytes(aggregate.currentRssBytes)}
+        />
+        <MetricPair
+          label={ko.settings.telemetry.read}
+          value={formatRate(aggregate.ioReadBytesPerSecond)}
+        />
+        <MetricPair
+          label={ko.settings.telemetry.write}
+          value={formatRate(aggregate.ioWriteBytesPerSecond)}
+        />
       </div>
     </div>
   );
@@ -307,9 +332,7 @@ function AggregateCard({
 function MetricPair({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-sm font-semibold text-muted-foreground">{label}</div>
       <div className="truncate font-mono text-sm font-medium tabular-nums text-foreground/90">
         {value}
       </div>
@@ -322,14 +345,14 @@ function HealthSource({ label, health }: { label: string; health: ResourceTeleme
     health.status === "unavailable" &&
     Option.exists(health.lastError, (error) => error.includes("'web' mode"));
   return (
-    <div className="flex items-start justify-between gap-4 border-t border-border/50 py-3 first:border-t-0">
-      <div className="min-w-0">
+    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-border/50 py-3 first:border-t-0">
+      <div className="min-w-0 flex-1 basis-48">
         <div className="text-sm font-medium text-foreground">{label}</div>
         <div className="mt-1 text-sm leading-relaxed text-muted-foreground">
           {expectedInBrowser
-            ? "Available when this page runs inside the desktop app."
+            ? ko.settings.telemetry.desktopAppOnlyHint
             : Option.match(health.lastError, {
-                onNone: () => "No reported errors",
+                onNone: () => ko.settings.telemetry.noReportedErrors,
                 onSome: (error) => error,
               })}
         </div>
@@ -340,7 +363,7 @@ function HealthSource({ label, health }: { label: string; health: ResourceTeleme
         presentation={
           expectedInBrowser
             ? {
-                label: "Desktop only",
+                label: ko.settings.telemetry.desktopOnly,
                 tone: "neutral",
               }
             : undefined
@@ -364,7 +387,7 @@ function DetailRow({
       <span className="text-sm text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "min-w-0 truncate text-right font-mono text-sm tabular-nums text-foreground/85",
+          "min-w-0 break-words text-right font-mono text-sm tabular-nums text-foreground/85",
           valueClassName,
         )}
       >
@@ -383,7 +406,7 @@ function HistoryWindowSelector({
 }) {
   return (
     <ToggleGroup
-      aria-label="Resource history period"
+      aria-label={ko.settings.telemetry.historyPeriod}
       variant="segmented"
       value={[String(selectedWindowMs)]}
       onValueChange={(next) => {
@@ -412,13 +435,16 @@ function ResourceHistoryChart({
     <div className="border-t border-border/60 px-4 py-4 sm:px-5">
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-foreground/70" /> CPU average
+          <span className="h-1.5 w-3 rounded-full bg-foreground/70" />{" "}
+          {ko.settings.telemetry.legendCpu}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-sky-500/70" /> I/O reads
+          <span className="h-1.5 w-3 rounded-full bg-sky-500/70" />{" "}
+          {ko.settings.telemetry.legendReads}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-full bg-amber-500/80" /> I/O writes
+          <span className="h-1.5 w-3 rounded-full bg-amber-500/80" />{" "}
+          {ko.settings.telemetry.legendWrites}
         </span>
       </div>
       <div className="flex h-32 items-end gap-1 overflow-hidden rounded-lg border border-border/40 bg-muted/8 px-2 pt-3 pb-2">
@@ -459,10 +485,10 @@ function ResourceHistoryChart({
                 }
               />
               <TooltipPopup side="top" className="space-y-0.5 text-left">
-                <div>CPU avg {bucket.avgCpuPercent.toFixed(1)}%</div>
-                <div>CPU peak {bucket.maxCpuPercent.toFixed(1)}%</div>
-                <div>Read {formatBytes(bucket.ioReadBytes)}</div>
-                <div>Write {formatBytes(bucket.ioWriteBytes)}</div>
+                <div>{ko.settings.telemetry.bucketCpuAverage(bucket.avgCpuPercent.toFixed(1))}</div>
+                <div>{ko.settings.telemetry.bucketCpuPeak(bucket.maxCpuPercent.toFixed(1))}</div>
+                <div>{ko.settings.telemetry.bucketRead(formatBytes(bucket.ioReadBytes))}</div>
+                <div>{ko.settings.telemetry.bucketWrite(formatBytes(bucket.ioWriteBytes))}</div>
               </TooltipPopup>
             </Tooltip>
           );
@@ -494,7 +520,9 @@ function ProcessTreeName({
           size="icon-micro"
           variant="ghost-muted"
           onClick={() => onToggle(process)}
-          aria-label={collapsed ? `Expand ${name}` : `Collapse ${name}`}
+          aria-label={
+            collapsed ? ko.settings.telemetry.expand(name) : ko.settings.telemetry.collapse(name)
+          }
         >
           <ChevronIcon className="size-3.5" />
         </Button>
@@ -577,7 +605,7 @@ function ProcessTable({
       hideScrollbars
       className="max-h-[min(68vh,48rem)] w-full max-w-full border-t border-border/60"
     >
-      <table className="w-full min-w-[1320px] table-fixed text-left text-sm">
+      <table className="w-full min-w-[82.5rem] table-fixed text-left text-sm">
         <colgroup>
           <col className="w-[20%]" />
           <col className="w-[10%]" />
@@ -591,26 +619,42 @@ function ProcessTable({
           <col className="w-[6%]" />
           <col className="w-[4%]" />
         </colgroup>
-        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm uppercase tracking-[0.08em] text-muted-foreground">
+        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm text-muted-foreground">
           <tr>
-            <th className="px-4 py-2 font-semibold sm:pl-5">Process</th>
-            <th className="px-3 py-2 font-semibold">Category</th>
-            <th className="px-3 py-2 text-right font-semibold">CPU</th>
-            <th className="px-3 py-2 text-right font-semibold">CPU Time</th>
-            <th className="px-3 py-2 text-right font-semibold">Memory</th>
-            <th className="px-3 py-2 text-right font-semibold">Read/s</th>
-            <th className="px-3 py-2 text-right font-semibold">Write/s</th>
-            <th className="px-3 py-2 text-right font-semibold">Read Total</th>
-            <th className="px-3 py-2 text-right font-semibold">Write Total</th>
-            <th className="px-3 py-2 text-right font-semibold">PID</th>
-            <th className="px-2 py-2 text-right font-semibold sm:pr-4">Kill</th>
+            <th className="px-4 py-2 font-semibold sm:pl-5">
+              {ko.settings.telemetry.columnProcess}
+            </th>
+            <th className="px-3 py-2 font-semibold">{ko.settings.telemetry.columnCategory}</th>
+            <th className="px-3 py-2 text-right font-semibold">{ko.settings.telemetry.cpu}</th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnCpuTime}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">{ko.settings.telemetry.memory}</th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnReadRate}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnWriteRate}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnReadTotal}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnWriteTotal}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnPid}
+            </th>
+            <th className="px-2 py-2 text-right font-semibold sm:pr-4">
+              {ko.settings.telemetry.columnKill}
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/50">
           {visible.length === 0 ? (
             <tr>
               <td colSpan={11} className="px-4 py-5 text-sm text-muted-foreground sm:px-5">
-                Waiting for the native process monitor.
+                {ko.settings.telemetry.waitingForMonitor}
               </td>
             </tr>
           ) : null}
@@ -623,7 +667,7 @@ function ProcessTable({
                   onToggle={toggle}
                 />
               </td>
-              <td className="truncate px-3 py-2 text-sm text-muted-foreground">
+              <td className="px-3 py-2 text-sm text-muted-foreground">
                 {categoryLabel(process.category)}
               </td>
               <td className="px-3 py-2 text-right font-mono tabular-nums">
@@ -680,7 +724,7 @@ function HistoryProcessTable({
       hideScrollbars
       className="max-h-[28rem] w-full max-w-full border-t border-border/60"
     >
-      <table className="w-full min-w-[1020px] table-fixed text-left text-sm">
+      <table className="w-full min-w-[63.75rem] table-fixed text-left text-sm">
         <colgroup>
           <col className="w-[24%]" />
           <col className="w-[11%]" />
@@ -692,24 +736,36 @@ function HistoryProcessTable({
           <col className="w-[7%]" />
           <col className="w-[5%]" />
         </colgroup>
-        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm uppercase tracking-[0.08em] text-muted-foreground">
+        <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-sm text-muted-foreground">
           <tr>
-            <th className="px-4 py-2 font-semibold sm:pl-5">Process</th>
-            <th className="px-3 py-2 font-semibold">Category</th>
-            <th className="px-3 py-2 text-right font-semibold">CPU Time</th>
-            <th className="px-3 py-2 text-right font-semibold">Peak CPU</th>
-            <th className="px-3 py-2 text-right font-semibold">Peak Mem</th>
-            <th className="px-3 py-2 text-right font-semibold">Read</th>
-            <th className="px-3 py-2 text-right font-semibold">Write</th>
-            <th className="px-3 py-2 text-right font-semibold">Samples</th>
-            <th className="px-3 py-2 text-right font-semibold sm:pr-5">PID</th>
+            <th className="px-4 py-2 font-semibold sm:pl-5">
+              {ko.settings.telemetry.columnProcess}
+            </th>
+            <th className="px-3 py-2 font-semibold">{ko.settings.telemetry.columnCategory}</th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnCpuTime}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnPeakCpu}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnPeakMemory}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">{ko.settings.telemetry.read}</th>
+            <th className="px-3 py-2 text-right font-semibold">{ko.settings.telemetry.write}</th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnSamples}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold sm:pr-5">
+              {ko.settings.telemetry.columnPid}
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/50">
           {processes.length === 0 ? (
             <tr>
               <td colSpan={9} className="px-4 py-5 text-sm text-muted-foreground sm:px-5">
-                No retained process samples in this window.
+                {ko.settings.telemetry.noRetainedSamples}
               </td>
             </tr>
           ) : null}
@@ -732,7 +788,7 @@ function HistoryProcessTable({
                   </TooltipPopup>
                 </Tooltip>
               </td>
-              <td className="truncate px-3 py-2 text-sm text-muted-foreground">
+              <td className="px-3 py-2 text-sm text-muted-foreground">
                 {categoryLabel(process.category)}
               </td>
               <td className="px-3 py-2 text-right font-mono tabular-nums">
@@ -767,7 +823,7 @@ function HistoryProcessTable({
 function AttributionTable({ entries }: { entries: ReadonlyArray<ResourceAttributionEntry> }) {
   return (
     <div className="overflow-x-auto border-t border-border/60">
-      <table className="w-full min-w-[720px] table-fixed text-left text-sm">
+      <table className="w-full min-w-[45rem] table-fixed text-left text-sm">
         <colgroup>
           <col className="w-[22%]" />
           <col className="w-[28%]" />
@@ -776,21 +832,31 @@ function AttributionTable({ entries }: { entries: ReadonlyArray<ResourceAttribut
           <col className="w-[10%]" />
           <col className="w-[12%]" />
         </colgroup>
-        <thead className="border-b border-border/60 text-sm uppercase tracking-[0.08em] text-muted-foreground">
+        <thead className="border-b border-border/60 text-sm text-muted-foreground">
           <tr>
-            <th className="px-4 py-2 font-semibold sm:pl-5">Component</th>
-            <th className="px-3 py-2 font-semibold">Operation</th>
-            <th className="px-3 py-2 text-right font-semibold">Logical Read</th>
-            <th className="px-3 py-2 text-right font-semibold">Logical Write</th>
-            <th className="px-3 py-2 text-right font-semibold">Count</th>
-            <th className="px-3 py-2 text-right font-semibold sm:pr-5">Time</th>
+            <th className="px-4 py-2 font-semibold sm:pl-5">
+              {ko.settings.telemetry.columnComponent}
+            </th>
+            <th className="px-3 py-2 font-semibold">{ko.settings.telemetry.columnOperation}</th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnLogicalRead}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnLogicalWrite}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold">
+              {ko.settings.telemetry.columnCount}
+            </th>
+            <th className="px-3 py-2 text-right font-semibold sm:pr-5">
+              {ko.settings.telemetry.columnTime}
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/50">
           {entries.length === 0 ? (
             <tr>
               <td colSpan={6} className="px-4 py-5 text-sm text-muted-foreground sm:px-5">
-                No instrumented application I/O has been recorded yet.
+                {ko.settings.telemetry.noInstrumentedIo}
               </td>
             </tr>
           ) : null}
@@ -871,15 +937,18 @@ export function ResourceTelemetryDiagnostics({
         let confirmed = false;
         try {
           confirmed = await ensureLocalApi().dialogs.confirm(
-            `Send SIGKILL to process ${process.identity.pid}? This cannot be handled by the process.`,
+            ko.settings.telemetry.sigkillConfirm(process.identity.pid),
             { variant: "destructive" },
           );
         } catch (error) {
           clearSignaling();
           toastManager.add({
             type: "error",
-            title: "Could not confirm signal",
-            description: error instanceof Error ? error.message : `Failed to send ${signal}.`,
+            title: ko.settings.telemetry.confirmSignalFailed,
+            description:
+              error instanceof Error
+                ? error.message
+                : ko.settings.telemetry.sendSignalFailed(signal),
           });
           return;
         }
@@ -908,18 +977,20 @@ export function ResourceTelemetryDiagnostics({
           if (result.value.signaled) return;
           toastManager.add({
             type: "error",
-            title: `Could not send ${signal}`,
-            description: Option.getOrElse(
-              result.value.message,
-              () => `Failed to send ${signal} to process ${process.identity.pid}.`,
+            title: ko.settings.telemetry.sendSignalFailedTitle(signal),
+            description: Option.getOrElse(result.value.message, () =>
+              ko.settings.telemetry.sendSignalToProcessFailed(signal, process.identity.pid),
             ),
           });
         })
         .catch((error: unknown) => {
           toastManager.add({
             type: "error",
-            title: `Could not send ${signal}`,
-            description: error instanceof Error ? error.message : `Failed to send ${signal}.`,
+            title: ko.settings.telemetry.sendSignalFailedTitle(signal),
+            description:
+              error instanceof Error
+                ? error.message
+                : ko.settings.telemetry.sendSignalFailed(signal),
           });
         })
         .finally(() => {
@@ -935,9 +1006,9 @@ export function ResourceTelemetryDiagnostics({
       .catch((error: unknown) => {
         toastManager.add({
           type: "error",
-          title: "Could not restart resource monitor",
+          title: ko.settings.telemetry.restartMonitorFailed,
           description:
-            error instanceof Error ? error.message : "The resource monitor retry failed.",
+            error instanceof Error ? error.message : ko.settings.telemetry.monitorRetryFailed,
         });
       })
       .finally(() => {
@@ -961,12 +1032,15 @@ export function ResourceTelemetryDiagnostics({
   return (
     <>
       <SettingsSection
-        title="Resource monitor"
+        title={ko.settings.telemetry.resourceMonitor}
         icon={<ActivityIcon className="size-4 text-muted-foreground" />}
         headerAction={
           <div className="flex items-center gap-2">
             {snapshot ? (
-              <SourceStatusBadge label="Native" status={snapshot.health.native.status} />
+              <SourceStatusBadge
+                label={ko.settings.telemetry.native}
+                status={snapshot.health.native.status}
+              />
             ) : null}
             <LastSampleLabel sampledAt={snapshot?.readAt ?? null} />
             <Tooltip>
@@ -977,13 +1051,13 @@ export function ResourceTelemetryDiagnostics({
                     variant="ghost"
                     disabled={telemetry.isPending}
                     onClick={telemetry.refresh}
-                    aria-label="Refresh resource telemetry"
+                    aria-label={ko.settings.telemetry.refresh}
                   >
                     <RefreshIcon className="size-3" refreshing={telemetry.isPending} />
                   </Button>
                 }
               />
-              <TooltipPopup side="top">Refresh telemetry snapshot</TooltipPopup>
+              <TooltipPopup side="top">{ko.settings.telemetry.refreshSnapshot}</TooltipPopup>
             </Tooltip>
           </div>
         }
@@ -991,53 +1065,70 @@ export function ResourceTelemetryDiagnostics({
         <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_1px_1px_rgb(0_0_0/0.03),0_8px_30px_rgb(0_0_0/0.035)]">
           <div className="flex flex-col gap-3 border-b border-border/60 bg-linear-to-r from-muted/45 via-muted/20 to-transparent px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                T3 system footprint
+              <div className="text-sm font-semibold text-muted-foreground">
+                {ko.settings.telemetry.footprint}
               </div>
               <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                Live native counters for the server, providers, terminals, desktop processes, and
-                the monitor itself.
+                {ko.settings.telemetry.footprintDescription}
               </p>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="size-1.5 rounded-full bg-emerald-500" />
-              Sampling every {snapshot ? formatSampleInterval(snapshot.sampleIntervalMs) : "..."}
+              {ko.settings.telemetry.samplingEvery(
+                snapshot ? formatSampleInterval(snapshot.sampleIntervalMs) : "...",
+              )}
             </div>
           </div>
           <div className="grid grid-cols-1 divide-x divide-y divide-border/55 min-[1000px]:grid-cols-2 xl:grid-cols-3">
             <IconStat
               icon={<CpuIcon className="size-3.5" />}
-              label="Current CPU"
+              label={ko.settings.telemetry.currentCpu}
               value={allT3 ? `${allT3.currentCpuPercent.toFixed(1)}%` : "..."}
-              detail={allT3 ? `${formatCpuTime(allT3.cpuTimeMs)} observed CPU time` : undefined}
+              detail={
+                allT3
+                  ? ko.settings.telemetry.observedCpuTime(formatCpuTime(allT3.cpuTimeMs))
+                  : undefined
+              }
             />
             <IconStat
               icon={<MemoryStickIcon className="size-3.5" />}
-              label="Resident memory"
+              label={ko.settings.telemetry.residentMemory}
               value={allT3 ? formatBytes(allT3.currentRssBytes) : "..."}
               detail={
-                allT3 ? `${formatBytes(allT3.peakRssBytes)} combined process peaks` : undefined
+                allT3
+                  ? ko.settings.telemetry.combinedPeaks(formatBytes(allT3.peakRssBytes))
+                  : undefined
               }
             />
             <IconStat
               icon={<ActivityIcon className="size-3.5" />}
-              label="Process count"
+              label={ko.settings.telemetry.processCountLabel}
               value={allT3 ? String(allT3.processCount) : "..."}
               detail={
-                allT3 ? `${allT3.processStarts} starts · ${allT3.processExits} exits` : undefined
+                allT3
+                  ? ko.settings.telemetry.startsExits(allT3.processStarts, allT3.processExits)
+                  : undefined
               }
             />
             <IconStat
               icon={<HardDriveIcon className="size-3.5" />}
-              label="Read throughput"
+              label={ko.settings.telemetry.readThroughput}
               value={allT3 ? formatRate(allT3.ioReadBytesPerSecond) : "..."}
-              detail={allT3 ? `${formatBytes(allT3.ioReadBytes)} observed` : undefined}
+              detail={
+                allT3
+                  ? ko.settings.telemetry.observedBytes(formatBytes(allT3.ioReadBytes))
+                  : undefined
+              }
             />
             <IconStat
               icon={<DatabaseIcon className="size-3.5" />}
-              label="Write throughput"
+              label={ko.settings.telemetry.writeThroughput}
               value={allT3 ? formatRate(allT3.ioWriteBytesPerSecond) : "..."}
-              detail={allT3 ? `${formatBytes(allT3.ioWriteBytes)} observed` : undefined}
+              detail={
+                allT3
+                  ? ko.settings.telemetry.observedBytes(formatBytes(allT3.ioWriteBytes))
+                  : undefined
+              }
               tone={
                 allT3 && allT3.ioWriteBytesPerSecond >= 10 * 1_024 * 1_024
                   ? "danger"
@@ -1048,11 +1139,21 @@ export function ResourceTelemetryDiagnostics({
             />
             <IconStat
               icon={<GaugeIcon className="size-3.5" />}
-              label="CPU speed limit"
+              label={ko.settings.telemetry.cpuSpeedLimit}
               value={
-                snapshot ? (speedLimit === null ? "Unknown" : `${speedLimit.toFixed(0)}%`) : "..."
+                snapshot
+                  ? speedLimit === null
+                    ? ko.settings.telemetry.unknown
+                    : `${speedLimit.toFixed(0)}%`
+                  : "..."
               }
-              detail={snapshot ? `${snapshot.power.thermalState} thermal state` : undefined}
+              detail={
+                snapshot
+                  ? ko.settings.telemetry.thermalStateDetail(
+                      THERMAL_STATE_LABELS[snapshot.power.thermalState],
+                    )
+                  : undefined
+              }
               tone={speedLimit !== null && speedLimit < 80 ? "warning" : "default"}
             />
           </div>
@@ -1065,17 +1166,17 @@ export function ResourceTelemetryDiagnostics({
           {snapshot ? (
             <div className="grid border-t border-border/60 bg-muted/10 md:grid-cols-3">
               <AggregateCard
-                label="Backend + agents"
+                label={ko.settings.telemetry.backendAgents}
                 accentClass="bg-emerald-500/80"
                 aggregate={snapshot.groups.backend}
               />
               <AggregateCard
-                label="Desktop"
+                label={ko.settings.telemetry.desktop}
                 accentClass="bg-sky-500/80"
                 aggregate={snapshot.groups.electron}
               />
               <AggregateCard
-                label="Monitor overhead"
+                label={ko.settings.telemetry.monitorOverhead}
                 accentClass="bg-amber-500/80"
                 aggregate={snapshot.groups.monitor}
               />
@@ -1085,46 +1186,46 @@ export function ResourceTelemetryDiagnostics({
       </SettingsSection>
 
       <SettingsSection
-        title="Host & collection"
+        title={ko.settings.telemetry.hostCollection}
         icon={<GaugeIcon className="size-4 text-muted-foreground" />}
         headerAction={
           collectorNeedsRetry ? (
             <Button size="xs" variant="outline" disabled={isRetrying} onClick={retryCollector}>
               <RefreshIcon className="size-3" refreshing={isRetrying} />
-              Retry monitor
+              {ko.settings.telemetry.retryMonitor}
             </Button>
           ) : null
         }
       >
         <div className="grid overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_1px_1px_rgb(0_0_0/0.03)] md:grid-cols-2 md:divide-x md:divide-border/60">
           <div className="px-4 py-4 sm:px-5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
               <span className="flex size-6 items-center justify-center rounded-md bg-muted/60">
                 <BatteryIcon className="size-3.5" />
               </span>
-              Host state
+              {ko.settings.telemetry.hostState}
             </div>
             {hasHostPowerSignal && snapshot ? (
               <>
                 <DetailRow
-                  label="Power source"
+                  label={ko.settings.telemetry.powerSource}
                   value={booleanStateLabel(snapshot.power.onBattery, {
-                    true: "Battery",
-                    false: "External power",
+                    true: ko.settings.telemetry.battery,
+                    false: ko.settings.telemetry.externalPower,
                   })}
                 />
                 <DetailRow
-                  label="Low power mode"
+                  label={ko.settings.telemetry.lowPowerMode}
                   value={booleanStateLabel(snapshot.power.lowPowerMode, {
-                    true: "Enabled",
-                    false: "Disabled",
+                    true: ko.common.enabled,
+                    false: ko.common.disabled,
                   })}
                 />
                 <DetailRow
-                  label="Idle"
+                  label={ko.settings.telemetry.idle}
                   value={`${booleanStateLabel(snapshot.power.idle, {
-                    true: "Idle",
-                    false: "Active",
+                    true: ko.settings.telemetry.idle,
+                    false: ko.settings.telemetry.active,
                   })}${
                     snapshot.power.idleSeconds === null
                       ? ""
@@ -1132,19 +1233,19 @@ export function ResourceTelemetryDiagnostics({
                   }`}
                 />
                 <DetailRow
-                  label="Session"
+                  label={ko.settings.telemetry.session}
                   value={
                     snapshot.power.suspended
-                      ? "Suspended"
+                      ? ko.settings.telemetry.suspended
                       : booleanStateLabel(snapshot.power.locked, {
-                          true: "Locked",
-                          false: "Unlocked",
+                          true: ko.settings.telemetry.locked,
+                          false: ko.settings.telemetry.unlocked,
                         })
                   }
                 />
                 <DetailRow
-                  label="Thermal"
-                  value={snapshot.power.thermalState}
+                  label={ko.settings.telemetry.thermal}
+                  value={THERMAL_STATE_LABELS[snapshot.power.thermalState]}
                   valueClassName={
                     snapshot.power.thermalState === "serious" ||
                     snapshot.power.thermalState === "critical"
@@ -1156,36 +1257,44 @@ export function ResourceTelemetryDiagnostics({
             ) : (
               <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-5">
                 <div className="text-sm font-medium text-foreground">
-                  Desktop host signals not connected
+                  {ko.settings.telemetry.hostSignalsDisconnected}
                 </div>
                 <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                  Power, idle, lock, and thermal state are supplied by the desktop host. Process
-                  telemetry remains fully active in this browser session.
+                  {ko.settings.telemetry.hostSignalsDescription}
                 </p>
               </div>
             )}
           </div>
           <div className="border-t border-border/60 px-4 py-4 md:border-t-0 sm:px-5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
               <span className="flex size-6 items-center justify-center rounded-md bg-muted/60">
                 <GaugeIcon className="size-3.5" />
               </span>
-              Collection health
+              {ko.settings.telemetry.collectionHealth}
             </div>
             {snapshot ? (
               <>
-                <HealthSource label="Native process monitor" health={snapshot.health.native} />
-                <HealthSource label="Electron main process" health={snapshot.health.desktop} />
+                <HealthSource
+                  label={ko.settings.telemetry.nativeProcessMonitor}
+                  health={snapshot.health.native}
+                />
+                <HealthSource
+                  label={ko.settings.telemetry.electronMainProcess}
+                  health={snapshot.health.desktop}
+                />
                 <DetailRow
-                  label="Collection time"
+                  label={ko.settings.telemetry.collectionTime}
                   value={formatDurationMicros(snapshot.health.collectionDurationMicros)}
                 />
                 <DetailRow
-                  label="Process scan"
-                  value={`${snapshot.health.retainedProcessCount}/${snapshot.health.scannedProcessCount} retained`}
+                  label={ko.settings.telemetry.processScan}
+                  value={ko.settings.telemetry.retained(
+                    snapshot.health.retainedProcessCount,
+                    snapshot.health.scannedProcessCount,
+                  )}
                 />
                 <DetailRow
-                  label="Inaccessible"
+                  label={ko.settings.telemetry.inaccessible}
                   value={String(snapshot.health.inaccessibleProcessCount)}
                   valueClassName={
                     snapshot.health.inaccessibleProcessCount > 0
@@ -1194,9 +1303,9 @@ export function ResourceTelemetryDiagnostics({
                   }
                 />
                 <DetailRow
-                  label="Sidecar"
+                  label={ko.settings.telemetry.sidecar}
                   value={Option.match(snapshot.health.sidecarVersion, {
-                    onNone: () => "Unavailable",
+                    onNone: () => ko.settings.telemetry.unavailable,
                     onSome: (version) =>
                       `${version}${Option.match(snapshot.health.sidecarPid, {
                         onNone: () => "",
@@ -1204,11 +1313,14 @@ export function ResourceTelemetryDiagnostics({
                       })}`,
                   })}
                 />
-                <DetailRow label="Restarts" value={String(snapshot.health.restartCount)} />
+                <DetailRow
+                  label={ko.settings.telemetry.restarts}
+                  value={String(snapshot.health.restartCount)}
+                />
               </>
             ) : (
               <div className="py-4 text-sm text-muted-foreground">
-                Waiting for collector health.
+                {ko.settings.telemetry.waitingForCollector}
               </div>
             )}
           </div>
@@ -1216,7 +1328,7 @@ export function ResourceTelemetryDiagnostics({
       </SettingsSection>
 
       <SettingsSection
-        title="Resource timeline"
+        title={ko.settings.telemetry.resourceTimeline}
         icon={<HardDriveIcon className="size-4 text-muted-foreground" />}
         headerAction={
           <div className="flex items-center gap-2">
@@ -1226,7 +1338,7 @@ export function ResourceTelemetryDiagnostics({
               variant="ghost"
               disabled={history.isPending}
               onClick={history.refresh}
-              aria-label="Refresh resource history"
+              aria-label={ko.settings.telemetry.refreshHistory}
             >
               <RefreshIcon className="size-3" refreshing={history.isPending} />
             </Button>
@@ -1246,12 +1358,13 @@ export function ResourceTelemetryDiagnostics({
       </SettingsSection>
 
       <SettingsSection
-        title="Live process tree"
+        title={ko.settings.telemetry.liveProcessTree}
         icon={<CpuIcon className="size-4 text-muted-foreground" />}
         headerAction={
           snapshot ? (
             <span className="text-sm text-muted-foreground">
-              Identity: <span className="font-mono">PID + start time</span>
+              {ko.settings.telemetry.identity}{" "}
+              <span className="font-mono">{ko.settings.telemetry.identityValue}</span>
             </span>
           ) : null
         }
@@ -1266,17 +1379,17 @@ export function ResourceTelemetryDiagnostics({
       </SettingsSection>
 
       <SettingsSection
-        title="Instrumented application I/O"
+        title={ko.settings.telemetry.instrumentedIo}
         icon={<DatabaseIcon className="size-4 text-muted-foreground" />}
         headerAction={
-          <span className="text-sm text-muted-foreground">Logical bytes by operation</span>
+          <span className="text-sm text-muted-foreground">
+            {ko.settings.telemetry.logicalBytesByOperation}
+          </span>
         }
       >
         <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_1px_1px_rgb(0_0_0/0.03)]">
           <div className="bg-muted/15 px-4 py-3 text-sm leading-relaxed text-muted-foreground sm:px-5">
-            Native counters identify which process is reading or writing. These application-level
-            counters identify known T3 operations so process spikes can be correlated with specific
-            persistence and logging paths.
+            {ko.settings.telemetry.instrumentedIoDescription}
           </div>
           <AttributionTable entries={snapshot?.attribution.entries ?? []} />
         </div>

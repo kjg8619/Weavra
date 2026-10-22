@@ -38,6 +38,10 @@ import { useEnvironmentSessionState } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { taskMatchesScope, taskSendRoute } from "./weavraTaskLogic";
 import { randomUUID } from "../../lib/utils";
+import { ko } from "~/i18n/ko";
+import { weavraLabel } from "../weavraLabels";
+
+const errorCopy = ko.runtime.task.errors;
 
 type TaskAction =
   | { type: "create"; input: WeavraTaskCreateInput }
@@ -104,101 +108,48 @@ function taskErrorMessage(error: unknown): string {
     typeof error === "object" && error !== null && "code" in error
       ? String(error.code)
       : "REQUEST_FAILED";
-  const guidance: Readonly<Record<string, string>> = {
-    PROJECT_NOT_CONFIGURED:
-      "이 프로젝트에는 .ai/config.yaml이 필요해요. 아래 ‘프로젝트 설정’에서 초안을 검토하고 저장해 주세요. docs/operations/LOCAL_TEAM_PILOT.md의 weavra project init --config <reviewed-config.yaml>도 사용할 수 있어요. 프로젝트 설정 > Weavra > 워크플로 제어에서 Runtime 상태를 확인할 수 있어요. 작업을 만들거나 실행을 허용하지 않았어요.",
-    PROJECT_PREPARATION_BUSY:
-      "같은 폴더의 다른 작업이 진행 중이라 자동 준비를 시작하지 않았어요. 진행 중인 쓰기·터미널·프로바이더 작업을 마친 뒤 다시 시작해 주세요.",
-    PROJECT_PREPARATION_FAILED:
-      "로컬 작업 환경의 자동 준비를 완료하지 못했어요. 기존 파일과 Git 상태를 확인해 주세요. 기존 저장소를 재초기화하거나 실행 확인을 자동으로 다시 보내지 않아요.",
-    TARGET_CHANGED:
-      "선택한 작업 공간을 실행할 수 없어요. 프로젝트·대화 선택과 기존 Git의 HEAD·미커밋 변경을 확인하고 새로고침해 주세요. 새 폴더의 Git은 첫 시작에서 자동 준비하지만 기존 저장소나 변경사항은 자동으로 정리하지 않아요.",
-    WORKSPACE_EVIDENCE_CAPACITY:
-      "프로젝트가 현재 증거 수집 한도를 넘었어요. 프로젝트 설정에서 지원되는 증거 프로필과 수정할 경로를 검토해 주세요. 파일을 삭제하거나 한도를 자동으로 풀지 않아요.",
-    WORKSPACE_EVIDENCE_UNSUPPORTED:
-      "증거를 수집할 수 없는 경로나 파일 형식이 있어요. 프로젝트 설정과 경로 안전성을 확인해 주세요. 파일은 변경하지 않았어요.",
-    WORKSPACE_EVIDENCE_UNAVAILABLE:
-      "프로젝트 증거를 읽을 수 없어요. Git과 파일 읽기 권한을 확인한 뒤 다시 점검해 주세요. 구현 확인 요청을 자동으로 다시 보내지 않아요.",
-    NOT_PREPARED: "확인할 준비 결과가 없어요. 내용을 검토하고 새 스냅샷을 준비해 주세요.",
-    RUNTIME_UNAVAILABLE:
-      "Runtime에 연결할 수 없어요. 환경 연결과 프로젝트 설정을 확인하고 상태를 새로고침해 주세요.",
-    INVALID_RECEIPT:
-      "실행 응답의 일치 여부를 확인할 수 없어요. 확인 요청을 다시 보내지 말고 현재 상태를 조회해 주세요.",
-    REPREPARE_REQUIRED:
-      "기존 준비 결과를 사용할 수 없어요. 현재 설정과 내용을 검토하고 새로 준비해 주세요.",
-    STALE_REVISION: "작업 revision이 바뀌었어요. 상태를 새로고침한 뒤 현재 내용을 검토해 주세요.",
-    COMMAND_CONFLICT:
-      "같은 요청 식별자가 다른 작업에 사용됐어요. 자동으로 다시 보내지 말고 현재 작업을 확인해 주세요.",
-    RUN_MISMATCH: "요청한 Run과 현재 작업의 Run이 일치하지 않아요. 상태를 새로고침해 주세요.",
-    APPROVAL_MISMATCH:
-      "승인 요청이 현재 Run과 일치하지 않아요. 상태를 새로고침하고 현재 승인 내용을 다시 확인해 주세요.",
-    ALREADY_CONFIRMED:
-      "이미 확인을 요청한 작업이에요. 다시 보내지 말고 현재 실행 결과를 조회해 주세요.",
-    ANALYSIS_UNAVAILABLE:
-      "현재 분석을 시작할 수 없어요. 프로바이더 상태와 읽기 전용 조사 지원 여부를 확인해 주세요.",
-    UNSUPPORTED_PROVIDER:
-      "선택한 프로바이더는 읽기 전용 조사를 지원하지 않아요. 지원하는 프로바이더를 직접 선택해 주세요.",
-    TERMINAL_ACTIVE:
-      "이 checkout의 구현을 맡기기 전에 활성 터미널을 닫아 주세요. 구현은 시작하지 않았어요. 터미널 종료 후 작업 상태를 새로고침해 주세요.",
-    RECOVERY_BUSY:
-      "Runtime 소유 프로세스가 실행 중이라 복구하지 않았어요. 진행 상황을 새로고침해 주세요. 확인 요청을 다시 보내지 마세요.",
-    RECOVERY_UNAVAILABLE:
-      "이 Runtime은 작업 복구를 지원하지 않아요. 쓰기 보호는 유지돼요. Runtime을 명시적으로 업데이트하거나 소유 프로세스를 확인해 주세요.",
-    RECOVERY_UNKNOWN:
-      "이 확인 요청에 연결된 실행 허용 기록을 찾지 못했어요. 실행 응답을 새로 조회해 주세요. 확인을 다시 보내거나 결과를 추정하지 마세요.",
-    RECOVERY_OWNER_UNPROVEN:
-      "이 작업의 소유권을 확인할 수 없어요. 쓰기를 계속 차단하니 Runtime 소유 프로세스를 확인해 주세요. 복구는 잠금을 강제로 해제하지 않아요.",
-    RECOVERY_STALE:
-      "Runtime 소유자나 프로젝트 revision이 바뀌었어요. 다시 복구를 요청하기 전에 작업 상태를 새로고침해 주세요.",
-    RECOVERY_CONFLICT:
-      "현재 Runtime 상태가 복구 요청과 충돌해요. 쓰기 차단을 유지하니 대상 작업과 소유 프로세스를 확인해 주세요.",
-    DIRTY_SET_CHANGED:
-      "검토한 뒤 변경 파일 목록이 바뀌어서 커밋하지 않았어요. 구현 준비를 다시 눌러 현재 목록을 확인해 주세요.",
-    DIRTY_BASELINE_REFUSED:
-      "이 변경은 기준 커밋에 포함할 수 없어요. 동의 여부와 Runtime 쓰기 상태, .ai/ 경로를 확인해 주세요. 아무것도 커밋하지 않았어요.",
-    CLEANUP_UNPROVEN:
-      "정리와 쓰기 잠금 해제를 확인하지 못했어요. checkout 보호를 유지해요. 새로고침은 증거 조회이며 구현 재시작이 아니에요.",
-  };
-  if (guidance[code]) return `${code}: ${guidance[code]}`;
+  const guidance = errorCopy.guidance;
+  const message = guidance[code];
+  if (message) return errorCopy.withCode(code, message);
   if (
     isTaskRpcError(error) &&
     error.code === "PREPARE_REJECTED" &&
     error.prepareReason !== undefined
   ) {
     const reason = error.prepareReason;
-    const prefix = `${code} (${reason.code}): 준비 요청이 거부됐으며 Run 실행을 허용하지 않았어요.`;
+    const prefix = errorCopy.prepareRejected(code, reason.code);
     switch (reason.kind) {
       case "preview":
         switch (reason.code) {
           case "INVALID_PREVIEW":
-            return `${prefix} 작업을 새로고침하고 Runtime 호환성을 확인한 뒤 새 스냅샷을 준비해 주세요.`;
+            return `${prefix} ${errorCopy.invalidPreview}`;
           case "STANDARD_REQUIRED":
-            return `${prefix} 통제 작업에는 STANDARD가 필요해요. Runtime 워크플로 설정을 검토하고 다시 준비해 주세요.`;
+            return `${prefix} ${errorCopy.standardRequired(weavraLabel("STANDARD"))}`;
           case "BINDING_MISMATCH":
-            return `${prefix} 증상 수용 기준과 연결된 필수 등록 검사를 검토한 뒤 새 연결을 준비해 주세요.`;
+            return `${prefix} ${errorCopy.bindingMismatch}`;
         }
       case "runtime":
         switch (reason.code) {
           case "INVALID_GOAL":
-            return `${prefix} 목표만으로는 읽기 전용인지 수정인지 정할 수 없어요.`;
+            return `${prefix} ${errorCopy.invalidGoal}`;
           case "INVALID_CRITERIA":
-            return `${prefix} 수용 기준과 필수 등록 검사를 검토한 뒤 다시 준비해 주세요.`;
+            return `${prefix} ${errorCopy.invalidCriteria}`;
           case "UNSUPPORTED_WORKFLOW":
-            return `${prefix} 이 목표에 필요한 워크플로는 통제 작업 화면에서 지원하지 않아요. 현재 화면은 STANDARD 구현 작업용이에요. 읽기 전용 조사는 분석 입력창을 사용하고, 다른 워크플로가 필요하면 프로젝트 설정의 통제 작업 설정을 확인해 주세요.`;
+            return `${prefix} ${errorCopy.unsupportedWorkflow(weavraLabel("STANDARD"))}`;
           case "PROJECT_CHANGED":
             if (reason.details?.reason === "DIRTY_WORKSPACE")
-              return `${prefix} 프로젝트에 커밋하지 않은 변경이 있어요. 아래 파일을 직접 정리하거나, 검토한 뒤 기준 커밋에 포함해 주세요.`;
-            return `${prefix} 작업 상태를 새로고침하고 현재 프로젝트·Runtime 설정을 검토한 뒤 다시 준비해 주세요.`;
+              return `${prefix} ${errorCopy.dirtyWorkspace}`;
+            return `${prefix} ${errorCopy.projectChanged}`;
           case "CONFIG_CHANGED":
           case "STALE_PROJECT":
           case "OWNER_CHANGED":
-            return `${prefix} 작업 상태를 새로고침하고 현재 프로젝트·Runtime 설정을 검토한 뒤 다시 준비해 주세요.`;
+            return `${prefix} ${errorCopy.projectChanged}`;
           default:
-            return `${prefix} Runtime 호스트의 이 checkout에서 weavra project doctor를 실행하고 준비 상태의 차단 사유를 해결한 뒤 다시 준비해 주세요. 이 진단은 모델 인증을 검증하지 않아요.`;
+            return `${prefix} ${errorCopy.doctor("weavra project doctor")}`;
         }
     }
   }
-  return `${code}: 요청 결과를 확인하지 못했어요. 다른 작업 전에 상태를 새로고침하고 checkout·등록 검사·터미널 종료·프로바이더 설정·현재 revision을 확인해 주세요. 이미 실행이 허용됐을 수 있으니 확인 요청을 다시 보내지 마세요.`;
+  return errorCopy.unknown(code);
 }
 
 export function useWeavraTask(input: {
@@ -397,9 +348,7 @@ export function useWeavraTask(input: {
         !taskMatchesScope(result.value, scope) ||
         (action.type !== "create" && action.type !== "reprepare" && result.value.id !== task?.id)
       ) {
-        setError(
-          "TARGET_CHANGED: 이 대화에 해당하는 응답이 아니에요. 현재 작업 상태를 다시 조회해 주세요.",
-        );
+        setError(errorCopy.targetChanged);
         return null;
       }
       setSelection((current) => ({

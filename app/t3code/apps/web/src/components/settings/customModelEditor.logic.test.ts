@@ -10,6 +10,9 @@ import {
   validateDraft,
   type CustomModelDraft,
 } from "./customModelEditor.logic";
+import { ko } from "~/i18n/ko";
+
+const validation = ko.providers.customModelValidation;
 
 const draft = (overrides: Partial<CustomModelDraft>): CustomModelDraft => ({
   slug: "my-model",
@@ -241,19 +244,34 @@ describe("customModelEditor.logic", () => {
     });
 
     expect(validateDraft(draft({ descriptors: [select("", [{ id: "a" }])] }))).toBe(
-      "Option 1 needs an id.",
+      validation.needsId(1),
     );
     expect(
       validateDraft(
         draft({ descriptors: [select("effort", [{ id: "a" }]), select("effort", [{ id: "b" }])] }),
       ),
-    ).toBe('Option 2: id "effort" is used twice.');
+    ).toBe(validation.duplicateId(2, "effort"));
     expect(validateDraft(draft({ descriptors: [select("effort", [])] }))).toBe(
-      "Option 1 needs at least one choice.",
+      validation.needsChoice(1),
     );
     expect(
       validateDraft(draft({ descriptors: [select("effort", [{ id: "a" }, { id: "a" }])] })),
-    ).toBe('Option 1: choice "a" is used twice.');
+    ).toBe(validation.duplicateChoice(1, "a"));
     expect(validateDraft(draft({ descriptors: [select("effort", [{ id: "a" }])] }))).toBeNull();
+  });
+
+  it("adds built-in presets with their original wire labels while the picker shows Korean names", () => {
+    const presets = Object.values(DESCRIPTOR_PRESETS_BY_KIND).flatMap((list) => list ?? []);
+    const display = ko.providers.customModel.presetDisplayLabels;
+    expect(presets.length).toBeGreaterThan(0);
+    for (const preset of presets) {
+      const descriptor = descriptorFromPreset(preset);
+      expect(descriptor.label).toBe(preset.label);
+      expect(descriptor.choices.map((choice) => choice.label)).toEqual(
+        (preset.choices ?? []).map((choice) => choice.label),
+      );
+      expect(Object.hasOwn(display, preset.label), preset.label).toBe(true);
+      expect(display[preset.label]).not.toBe(preset.label);
+    }
   });
 });

@@ -32,6 +32,20 @@ import {
   TOAST_SELECTOR,
   iconTargetMeetsMinimum,
   assertIconTargetHits,
+  COPY_ALIASES,
+  copyNames,
+  copyNamesForCheck,
+  exactName,
+  ariaLabelSelector,
+  auditLocaleLabels,
+  classifyLocaleText,
+  panelMenuItem,
+  localeSources,
+  LOCALE_FIXTURE_VALUES,
+  PRODUCT_VERSION,
+  readLocaleLabels,
+  NAMED_ROW_PATTERNS,
+  namedRowSubject,
 } from "./cases.mjs";
 import {
   bounded,
@@ -581,6 +595,707 @@ console.log(greeting());</pre>
     expect(result.status).toBe("FAIL");
     expect(result.error).toContain("theme retains same code scroll anchor");
   }, 15_000);
+});
+
+describe("English-baseline / Korean-current copy aliases", () => {
+  type Control = { role: string; name: string; run: () => void; visible?: boolean };
+  type Locator = {
+    matches: Control[];
+    or: (other: Locator) => Locator;
+    count: () => Promise<number>;
+    isVisible: () => Promise<boolean>;
+    click: () => Promise<void>;
+  };
+  // Mirrors Playwright: exact role/name matching, `or` unions, strict single-target actions.
+  const locator = (matches: Control[]): Locator => ({
+    matches,
+    or: (other) => locator([...new Set([...matches, ...other.matches])]),
+    count: async () => matches.length,
+    isVisible: async () => {
+      if (matches.length > 1) throw new Error("strict mode violation");
+      return matches[0]?.visible !== false && matches.length === 1;
+    },
+    click: async () => {
+      if (matches.length !== 1) throw new Error(`strict target count ${matches.length}`);
+      matches[0]!.run();
+    },
+  });
+  const fixture = (controls: Array<[string, string, string]>) => {
+    const actions: string[] = [];
+    const page = {
+      getByRole: (role: string, options: { name: string; exact: boolean }) =>
+        locator(
+          controls
+            .filter(([r, name]) => r === role && options.exact && name === options.name)
+            .map(([r, name, action]) => ({ role: r, name, run: () => actions.push(action) })),
+        ),
+    };
+    return { page, actions };
+  };
+  const click = (
+    page: ReturnType<typeof fixture>["page"],
+    check: string,
+    role: string,
+    english: string,
+  ) => exactName(page, role, copyNamesForCheck(check, english)).click();
+
+  test("keeps one alias row per request row plus the lead's state 13 row", () => {
+    expect(COPY_ALIASES.length).toBe(41);
+    expect(new Set(COPY_ALIASES.map(([english]) => english)).size).toBe(41);
+    for (const [english, korean] of COPY_ALIASES) {
+      expect(korean).not.toBe(english);
+      expect(copyNames(english)).toEqual([english, korean]);
+      expect(copyNames(english, { current: true })).toEqual([korean]);
+    }
+    expect(() => copyNames("Add provide")).toThrow("No copy alias row");
+  });
+  test("English-baseline fixtures pass before todo 22", async () => {
+    const { page, actions } = fixture([
+      ["button", "Add provider", "add-provider"],
+      ["switch", "Sidebar (legacy)", "legacy-sidebar"],
+      ["combobox", "Open links in", "open-links"],
+    ]);
+    await click(page, "18/six-adapters", "button", "Add provider");
+    await click(page, "06/sidebar", "switch", "Sidebar (legacy)");
+    await click(page, "14/keyboard-disclosure", "combobox", "Open links in");
+    expect(actions).toEqual(["add-provider", "legacy-sidebar", "open-links"]);
+    validateVisibleState("11", { text: "Add Action" });
+    validateVisibleState("18", {
+      text: "Color scheme",
+      route: "#/settings/appearance",
+      selectedAppearance: "Use light mode",
+    });
+    validateVisibleState("10", { text: "파일", filesPane: true });
+  });
+  test("Korean-current fixtures pass, including case 22", async () => {
+    const { page, actions } = fixture([
+      ["button", "공급자 추가", "add-provider"],
+      ["button", "레거시 기능", "legacy-features"],
+      ["switch", "레거시 사이드바", "legacy-sidebar"],
+      ["button", "HIG saved action 실행", "run-saved"],
+    ]);
+    await click(page, "22/six-adapters", "button", "Add provider");
+    await click(page, "22/both-sidebars", "button", "Legacy features");
+    await click(page, "22/both-sidebars", "switch", "Sidebar (legacy)");
+    await click(page, "06/sidebar", "switch", "Sidebar (legacy)");
+    expect(actions).toEqual([
+      "add-provider",
+      "legacy-features",
+      "legacy-sidebar",
+      "legacy-sidebar",
+    ]);
+    expect(await savedActionIsVisible(page)).toBe(true);
+    validateVisibleState("30", { text: "제3자 라이선스 고지" });
+    validateVisibleState("19", {
+      text: "색상 모드",
+      route: "#/settings/appearance",
+      selectedAppearance: "다크 모드 사용",
+    });
+  });
+  test("a missing control or readiness text fails", async () => {
+    const { page, actions } = fixture([["button", "공급자", "providers-nav"]]);
+    await expect(click(page, "18/six-adapters", "button", "Add provider")).rejects.toThrow();
+    await expect(click(page, "22/six-adapters", "button", "Add provider")).rejects.toThrow();
+    expect(await savedActionIsVisible(page)).toBe(false);
+    expect(actions).toEqual([]);
+    expect(() => validateVisibleState("14", { text: "기기" })).toThrow("Visible state mismatch");
+  });
+  test("a wrong name, role or action fails", async () => {
+    const { page, actions } = fixture([
+      ["button", "Add providers", "wrong"],
+      ["button", "공급자 추가하기", "wrong"],
+      ["menuitem", "공급자 추가", "wrong"],
+      ["button", "Run HIG saved action extra", "wrong"],
+    ]);
+    await expect(click(page, "18/six-adapters", "button", "Add provider")).rejects.toThrow();
+    expect(await savedActionIsVisible(page)).toBe(false);
+    expect(actions).toEqual([]);
+    // Case 22 closes W-03: the English baseline no longer satisfies its named controls.
+    const english = fixture([["button", "Legacy features", "legacy-features"]]);
+    await expect(
+      click(english.page, "22/both-sidebars", "button", "Legacy features"),
+    ).rejects.toThrow();
+    expect(english.actions).toEqual([]);
+    // Both aliases at once is ambiguity, never a choice.
+    const both = fixture([
+      ["button", "Add provider", "a"],
+      ["button", "공급자 추가", "b"],
+    ]);
+    await expect(click(both.page, "18/six-adapters", "button", "Add provider")).rejects.toThrow();
+    expect(both.actions).toEqual([]);
+    expect(() =>
+      validateVisibleState("18", {
+        text: "색상 모드",
+        route: "#/settings/appearance",
+        selectedAppearance: "다크 모드 사용",
+      }),
+    ).toThrow("Wrong selected appearance");
+  });
+  test("run graph panel opens by its English baseline or Korean current name", async () => {
+    for (const [label, check] of [
+      ["Run 그래프 G", "10/graph-no-snapshot"],
+      ["실행 그래프 G", "10/graph-no-snapshot"],
+      ["실행 그래프 G", "22/any"],
+    ]) {
+      const { page, actions } = fixture([
+        ["menuitem", "브라우저 B", "browser"],
+        ["menuitem", label, "graph"],
+      ]);
+      await panelMenuItem(page, copyNamesForCheck(check, "Run 그래프")).click();
+      expect(actions).toEqual(["graph"]);
+    }
+    validateVisibleState("13", { text: "Run 그래프" });
+    validateVisibleState("13", { text: "실행 그래프" });
+  });
+  test("a missing or wrongly named run graph panel fails", async () => {
+    for (const controls of [
+      [["menuitem", "브라우저 B", "browser"]],
+      [["menuitem", "실행 그래프", "graph"]],
+      [["menuitem", "Run Graph G", "graph"]],
+      [["menuitem", "실행 그래프 보기 G", "graph"]],
+      [["button", "실행 그래프 G", "graph"]],
+    ] as Array<Array<[string, string, string]>>) {
+      const { page, actions } = fixture(controls);
+      await expect(panelMenuItem(page, copyNames("Run 그래프")).click()).rejects.toThrow();
+      expect(actions).toEqual([]);
+    }
+    const english = fixture([["menuitem", "Run 그래프 G", "graph"]]);
+    await expect(
+      panelMenuItem(english.page, copyNamesForCheck("22/any", "Run 그래프")).click(),
+    ).rejects.toThrow();
+    expect(() => panelMenuItem(english.page, ["그래프"])).toThrow("No panel shortcut");
+    expect(() => validateVisibleState("13", { text: "그래프" })).toThrow(
+      "Visible state mismatch",
+    );
+  });
+  test("renderer selectors list one exact aria-label per alias", () => {
+    expect(ariaLabelSelector(copyNames("Appearance mode"), { suffix: " [aria-pressed]" })).toBe(
+      '[aria-label="Appearance mode"] [aria-pressed], [aria-label="색상 모드 선택"] [aria-pressed]',
+    );
+    expect(
+      ariaLabelSelector(copyNames("Dismiss notification", { current: true }), {
+        prefix: "button",
+      }),
+    ).toBe('button[aria-label="알림 닫기"]');
+  });
+});
+
+describe("authored locale audit", () => {
+  const sources = localeSources({
+    keybindingsConfigPath: "/tmp/home/.weavra/keybindings.json",
+    providers: [{ instanceId: "codex", driver: "codex" }],
+  });
+  const row = (fields: Record<string, unknown>) => ({
+    tag: "BUTTON",
+    role: null,
+    text: "",
+    name: null,
+    placeholder: null,
+    keycaps: [],
+    font: null,
+    ...fields,
+  });
+  const audit = (fields: Record<string, unknown>, from = sources) =>
+    auditLocaleLabels([row(fields)], from);
+  const passes = (fields: Record<string, unknown>, from = sources) =>
+    expect(audit(fields, from).unclassified).toEqual([]);
+  const fails = (fields: Record<string, unknown>, from = sources) =>
+    expect(audit(fields, from).unclassified.length).toBeGreaterThan(0);
+
+  test("leftover authored English still fails", () => {
+    const { unclassified } = auditLocaleLabels(
+      [
+        row({ text: "레거시 기능" }),
+        row({ tag: "LABEL", text: "Sidebar (legacy)" }),
+        row({ text: "공급자 추가", name: "Add provider" }),
+      ],
+      sources,
+    );
+    expect(unclassified.map((r) => r.text)).toEqual(["Sidebar (legacy)", "Add provider"]);
+  });
+  test("Korean labels keep only classified Latin segments, recorded with class and source", () => {
+    const { unclassified, exceptions } = auditLocaleLabels(
+      [
+        row({ tag: "LABEL", text: "Tailscale HTTPS 사용" }),
+        row({ tag: "H2", text: "Codex 로그인 필요" }),
+        row({ name: "03 Code blocks 대화 작업" }),
+        row({ tag: "H3", text: "Weavra Runtime" }),
+        row({ name: "T3 Chat 테마 사용" }),
+        row({ name: "Azure DevOps 설정 안내" }),
+        row({ text: "CPU 사용량 Ember 복제 macOS" }),
+      ],
+      sources,
+    );
+    expect(unclassified).toEqual([]);
+    expect(exceptions.flatMap((r) => r.segments)).toEqual([
+      { segment: "Tailscale", class: "tool/VCS", source: "lead allowlist" },
+      { segment: "HTTPS", class: "protocol/format/acronym", source: "lead allowlist" },
+      { segment: "Codex", class: "product/brand", source: "lead allowlist" },
+      { segment: "03 Code blocks", class: "fixture value", source: "seed.mjs" },
+      { segment: "Weavra", class: "product/brand", source: "lead allowlist" },
+      { segment: "Runtime", class: "Weavra component", source: "lead allowlist" },
+      { segment: "T3 Chat", class: "built-in theme", source: "lead allowlist" },
+      { segment: "Azure DevOps", class: "product/brand", source: "lead allowlist" },
+      { segment: "CPU", class: "protocol/format/acronym", source: "lead allowlist" },
+      { segment: "Ember", class: "built-in theme", source: "lead allowlist" },
+      { segment: "macOS", class: "product/brand", source: "lead allowlist" },
+    ]);
+  });
+  test("plain English words fail in every field and context", () => {
+    const context = {
+      role: "combobox",
+      keycaps: ["Enter"],
+      font: { resolvable: false, mac: true },
+    };
+    for (const word of ["Settings", "Save", "Run", "Open", "Delete", "Run 그래프", "Serve 시작"]) {
+      fails({ ...context, text: word });
+      fails({ ...context, name: word });
+      fails({ ...context, placeholder: word });
+      fails({ keycaps: [word] });
+    }
+    for (const value of ["Chat 테마", "Vertex 설정", "Codexes", "codex 로그인", "Code blocks"])
+      fails({ text: value });
+  });
+  test("keycaps count only inside a keycap or a keycap control's trailing chord", () => {
+    passes({ text: "대기 메시지 반영", keycaps: ["⇧", "⌘", "Enter"] });
+    passes({ name: "대화: 대기 메시지 반영 단축키 편집: ⇧⌘Enter", keycaps: ["Enter"] });
+    passes({ name: "추가 (Ctrl Enter)", keycaps: ["Ctrl", "Enter"] });
+    fails({ text: "Enter 키를 눌러 보내요" });
+    fails({ text: "Enter 키를 눌러 보내요", keycaps: ["Enter"] });
+    fails({ name: "단축키 편집: ⇧⌘Enter" });
+    fails({ name: "Enter 키로 보내기", keycaps: ["Enter"] });
+    fails({ keycaps: ["enter"] });
+    fails({ keycaps: ["arrowdown"] });
+  });
+  test("data is accepted only in its own field and only when its source agrees", () => {
+    passes({ tag: "INPUT", placeholder: "codex" });
+    passes({ tag: "INPUT", placeholder: "~/.codex-t3/personal" });
+    passes({ tag: "INPUT", placeholder: "http://127.0.0.1:4096" });
+    passes({ tag: "INPUT", placeholder: "https://..." });
+    passes({ name: "keybindings.json 열기" });
+    passes({ role: "combobox", text: "Menlo", font: { resolvable: true, mac: true } });
+    passes({ role: "combobox", text: "SF Pro", font: { resolvable: false, mac: true } });
+    // Source disagrees.
+    fails({ tag: "INPUT", placeholder: "codex" }, localeSources({ providers: [] }));
+    fails({ tag: "INPUT", placeholder: "~/.gemini" });
+    fails({ name: "settings.json 열기" });
+    fails({ role: "combobox", text: "SF Pro", font: { resolvable: false, mac: false } });
+    fails({ role: "combobox", text: "Default", font: { resolvable: false, mac: true } });
+    // Pattern-shaped token outside its scoped field.
+    fails({ text: "codex" });
+    fails({ name: "~/.codex" });
+    fails({ text: "http://127.0.0.1:4096" });
+    fails({ tag: "H2", text: "keybindings.json" });
+    fails({ text: "Menlo" });
+    fails({ tag: "INPUT", placeholder: "my-project-id" });
+    fails({ tag: "INPUT", placeholder: "https://example.com" });
+  });
+  test("fixture text in composite rows matches seeded values exactly", async () => {
+    passes({ tag: "DIV", role: "button", text: "작업 중\n04 Working fixture\n3분 전" });
+    fails({ tag: "DIV", role: "button", text: "04 Working fixtures\n3분 전" });
+    fails({ tag: "DIV", role: "button", text: "01 Conversation\n3d ago" });
+    const seedSource = await NodeFSP.readFile(new URL("./seed.mjs", import.meta.url), "utf8");
+    for (const value of LOCALE_FIXTURE_VALUES) expect(seedSource).toContain(`"${value}"`);
+  });
+  test("late lead additions pass only as exact names or phrases", () => {
+    passes({ text: "RGB 색상 OTEL 내보내기 Niri Hyprland Omarchy" });
+    passes({ name: "VS Code에서 열기" });
+    passes({ text: "Mac mini 호스트" });
+    passes({ tag: "H3", text: "활성 MCP" });
+    fails({ text: "활성 Mcp" });
+    fails({ text: "Code 열기" });
+    fails({ text: "mini 모드" });
+  });
+  test("custom-model preset labels pass only inside the custom-model editor", () => {
+    passes({ text: "Reasoning", presetScope: true });
+    passes({ text: "Extra High", presetScope: true });
+    passes({ tag: "SPAN", text: "Fast Mode", presetScope: true });
+    fails({ text: "Reasoning" });
+    fails({ text: "Plan" });
+    fails({ text: "Reasoning effort", presetScope: true });
+    fails({ text: "Settings", presetScope: true });
+    fails({ tag: "INPUT", placeholder: "Low", presetScope: true });
+  });
+  test("every runner literal naming Run is an English baseline alias row", async () => {
+    const english = new Set(COPY_ALIASES.map(([name]) => name));
+    for (const file of ["cases.mjs", "capture.mjs", "assert.mjs"]) {
+      const source = await NodeFSP.readFile(new URL(`./${file}`, import.meta.url), "utf8");
+      for (const [literal] of source.matchAll(/"[^"\n]*\bRun\b[^"\n]*"/g))
+        expect(english.has(literal.slice(1, -1))).toBe(true);
+    }
+  });
+
+  // Runner fix 7: rows sampled from a real DOM, as the renderer does.
+  const modelSources = localeSources({
+    keybindingsConfigPath: "/tmp/home/.weavra/keybindings.json",
+    providers: [
+      { instanceId: "codex", driver: "codex", models: [{ slug: "gpt-5.6-luna" }] },
+      { instanceId: "claudeAgent", driver: "claudeAgent", models: [{ slug: "claude-fable-5-1" }] },
+    ],
+  });
+  async function readDom(fixtures: string[]) {
+    await using view = new WebView({ backend: "chrome" });
+    await view.navigate("about:blank");
+    const rows = [];
+    for (const html of fixtures)
+      rows.push(
+        await view.evaluate(`(() => {
+          document.body.innerHTML = ${JSON.stringify(`<main>${html}</main>`)};
+          return (${readLocaleLabels.toString()})("main");
+        })()`),
+      );
+    return rows as Record<string, unknown>[][];
+  }
+  const domAudit = async (html: string[], from = modelSources) =>
+    (await readDom(html)).map((labels) => auditLocaleLabels(labels, from));
+
+  test("code data is split from prose and audited as its own data class", async () => {
+    const [version, provider, slug] = await domAudit([
+      '<h3><span class="x"><span>버전</span><code>development</code></span></h3>',
+      '<button>Codex<span role="group" aria-label="Codex 버전"><code>v0.149.1</code></span>로그인 필요</button>',
+      "<label>모델 <code>gpt-5.6-luna</code></label>",
+    ]);
+    for (const result of [version, provider, slug]) expect(result.unclassified).toEqual([]);
+    expect(version.exceptions).toEqual([
+      expect.objectContaining({
+        prose: "버전",
+        field: "code",
+        text: "development",
+        segments: [
+          {
+            segment: "development",
+            class: "version",
+            source: "packages/shared/src/product.ts WEAVRA_PRODUCT_VERSION",
+          },
+        ],
+      }),
+    ]);
+    expect(provider.exceptions.map((r) => [r.field, r.prose, r.text, r.segments])).toEqual([
+      [
+        "text",
+        "Codex로그인 필요",
+        "Codex로그인 필요",
+        [{ segment: "Codex", class: "product/brand", source: "lead allowlist" }],
+      ],
+      [
+        "code",
+        "Codex로그인 필요",
+        "v0.149.1",
+        [{ segment: "v0.149.1", class: "version", source: "semver" }],
+      ],
+    ]);
+    expect(slug.exceptions[0].segments).toEqual([
+      {
+        segment: "gpt-5.6-luna",
+        class: "model id",
+        source: "serverConfig.providers[].models[].slug",
+      },
+    ]);
+    passes({ text: "경로", codes: ["~/.codex-t3/personal", "OPENAI_API_KEY", "codex --version"] });
+    passes({ text: "열기", codes: ["keybindings.json", "http://127.0.0.1:4096", "03 Code blocks"] });
+    const product = await NodeFSP.readFile(
+      new URL("../../app/t3code/packages/shared/src/product.ts", import.meta.url),
+      "utf8",
+    );
+    expect(product).toContain(`export const WEAVRA_PRODUCT_VERSION = "${PRODUCT_VERSION}";`);
+  }, 15_000);
+  test("code-wrapped unknown English fails, and so does English prose beside code", async () => {
+    const results = await domAudit([
+      "<h3>버전<code>preview build</code></h3>",
+      "<button>설정 <code>hello</code></button>",
+      "<label>모델 <code>Fable</code></label>",
+      "<label>모델 <code>Codex</code></label>",
+      "<button>실행 <code>codex development</code></button>",
+    ]);
+    expect(results.map((r) => r.unclassified.map((u) => [u.field, u.text]))).toEqual([
+      [["code", "preview build"]],
+      [["code", "hello"]],
+      [["code", "Fable"]],
+      [["code", "Codex"]],
+      [["code", "codex development"]],
+    ]);
+    const [prose, both] = await domAudit([
+      "<h3>Version<code>v1.2.3</code></h3>",
+      "<button>Open <code>notes</code></button>",
+    ]);
+    expect(prose.unclassified.map((u) => [u.field, u.text])).toEqual([["text", "Version"]]);
+    expect(both.unclassified.map((u) => [u.field, u.text])).toEqual([
+      ["text", "Open"],
+      ["code", "notes"],
+    ]);
+    // A model slug or the product version is data only when its source agrees.
+    fails({ text: "모델", codes: ["gpt-5.6-luna"] });
+    fails({ text: "버전", codes: ["Development"] });
+    fails({ text: "버전", codes: ["1.2"] });
+  }, 15_000);
+  test("aria-hidden decorative initials are not part of the label", async () => {
+    const [hidden] = await domAudit([
+      '<button><span aria-hidden="true">BP</span><span>baseline-project</span></button>',
+    ]);
+    expect(hidden.unclassified).toEqual([]);
+    expect(hidden.exceptions[0]).toEqual(
+      expect.objectContaining({
+        text: "baseline-project",
+        segments: [{ segment: "baseline-project", class: "fixture value", source: "seed.mjs" }],
+      }),
+    );
+  }, 15_000);
+  test("initials that are not aria-hidden still fail beside a seeded value", async () => {
+    const results = await domAudit([
+      "<button><span>BP</span><span>baseline-project</span></button>",
+      '<button><span aria-hidden="false">BP</span>baseline-project</button>',
+      '<button><span aria-hidden>BP</span>baseline-project</button>',
+      '<button><span aria-hidden="true">BP</span>Settings</button>',
+    ]);
+    expect(results.map((r) => r.unclassified.map((u) => u.text))).toEqual([
+      ["BPbaseline-project"],
+      ["BPbaseline-project"],
+      ["BPbaseline-project"],
+      ["Settings"],
+    ]);
+  }, 15_000);
+  test("model names pass only on a model picker, exactly as their source has them", async () => {
+    const results = await domAudit([
+      '<button data-chat-provider-model-picker="true"><span aria-hidden="true">CF</span><span>Claude Fable 5.1</span></button>',
+      '<button data-chat-provider-model-picker="true"><span data-chat-provider-model-picker-label="true">gpt-5.6-luna</span></button>',
+      '<div data-model-picker-content="true"><button>gpt-5.6-luna</button></div>',
+    ]);
+    expect(results.map((r) => r.unclassified)).toEqual([[], [], []]);
+    expect(results.map((r) => r.exceptions[0].segments[0])).toEqual([
+      { segment: "Claude Fable 5.1", class: "model", source: "runner fixture LABELS.model" },
+      {
+        segment: "gpt-5.6-luna",
+        class: "model",
+        source: "serverConfig.providers[].models[].slug",
+      },
+      {
+        segment: "gpt-5.6-luna",
+        class: "model",
+        source: "serverConfig.providers[].models[].slug",
+      },
+    ]);
+  }, 15_000);
+  test("a model name outside the source list or outside a picker fails", async () => {
+    const results = await domAudit([
+      '<button data-chat-provider-model-picker="true"><span>Claude Fable 6</span></button>',
+      '<button data-chat-provider-model-picker="true"><span>gpt-5.6-lunar</span></button>',
+      '<button data-chat-provider-model-picker="true"><span>Claude Fable 5.1 설정</span></button>',
+      '<button data-chat-provider-model-picker="true"><span>Settings</span></button>',
+      "<button>Claude Fable 5.1</button>",
+      "<button>gpt-5.6-luna</button>",
+      '<div data-model-picker="true"><button>gpt-5.6-luna</button></div>',
+    ]);
+    for (const result of results) expect(result.unclassified.length).toBeGreaterThan(0);
+    // The slug is data only while serverConfig lists it.
+    const [unlisted] = await domAudit(
+      [
+        '<button data-chat-provider-model-picker="true"><span>gpt-5.6-luna</span></button>',
+      ],
+      localeSources({ providers: [{ instanceId: "codex", driver: "codex", models: [] }] }),
+    );
+    expect(unlisted.unclassified.map((u) => u.text)).toEqual(["gpt-5.6-luna"]);
+    fails({ tag: "INPUT", placeholder: "gpt-5.6-luna", modelScope: true }, modelSources);
+  }, 15_000);
+
+  // Runner fix 8: the text-generation default comes from serverConfig.settings, which the server
+  // decodes to contracts DEFAULT_TEXT_GENERATION_MODEL while capture settings leave it unset.
+  const contracts = new URL("../../app/t3code/packages/contracts/src/", import.meta.url);
+  async function contractDefaultSources() {
+    const model = await NodeFSP.readFile(new URL("model.ts", contracts), "utf8");
+    const slug = /export const DEFAULT_TEXT_GENERATION_MODEL = "([^"]+)";/.exec(model)?.[1];
+    expect(slug).toEqual(expect.any(String));
+    const settings = await NodeFSP.readFile(new URL("settings.ts", contracts), "utf8");
+    expect(settings).toContain("model: DEFAULT_TEXT_GENERATION_MODEL,");
+    const sources = localeSources({
+      providers: [{ instanceId: "codex", driver: "codex", models: [] }],
+      settings: { textGenerationModelSelection: { instanceId: "codex", model: slug } },
+    });
+    return { slug: slug as string, sources };
+  }
+  test("the contract default text-generation model passes on a model picker", async () => {
+    const { slug, sources } = await contractDefaultSources();
+    const results = await domAudit(
+      [
+        `<button data-chat-provider-model-picker="true"><span data-chat-provider-model-picker-label="true">${slug}</span></button>`,
+        `<div data-model-picker-content="true"><button>${slug}</button></div>`,
+      ],
+      sources,
+    );
+    expect(results.map((r) => r.unclassified)).toEqual([[], []]);
+    for (const result of results)
+      expect(result.exceptions[0].segments).toEqual([
+        {
+          segment: slug,
+          class: "model",
+          source: "serverConfig.settings.textGenerationModelSelection.model",
+        },
+      ]);
+  }, 15_000);
+  test("the contract default fails outside a picker, and an unknown slug fails inside one", async () => {
+    const { slug, sources } = await contractDefaultSources();
+    const [outside, unknown, near] = await domAudit(
+      [
+        `<button>${slug}</button>`,
+        '<button data-chat-provider-model-picker="true"><span>gpt-5.6-nova</span></button>',
+        `<button data-chat-provider-model-picker="true"><span>${slug}-preview</span></button>`,
+      ],
+      sources,
+    );
+    expect(outside.unclassified.map((u) => u.text)).toEqual([slug]);
+    expect(unknown.unclassified.map((u) => u.text)).toEqual(["gpt-5.6-nova"]);
+    expect(near.unclassified.map((u) => u.text)).toEqual([`${slug}-preview`]);
+    // Picker-scoped only: the default is not a code model id and not a placeholder.
+    fails({ text: "모델", codes: [slug] }, sources);
+    fails({ tag: "INPUT", placeholder: slug, modelScope: true }, sources);
+    // Without the settings value, the same picker row fails as it did on the todo 22 build.
+    const [unset] = await domAudit(
+      [`<button data-chat-provider-model-picker="true"><span>${slug}</span></button>`],
+      localeSources({ providers: [{ instanceId: "codex", driver: "codex", models: [] }] }),
+    );
+    expect(unset.unclassified.map((u) => u.text)).toEqual([slug]);
+  }, 15_000);
+
+  // Runner fix 9: the appearance font previews (todo 22 locale-appearance rows).
+  const fontInput = (label: string, placeholder: string) =>
+    `<input aria-label="${label}" placeholder="${placeholder}">`;
+  test("a font-family input placeholder passes as the font class", async () => {
+    const [sans, mono] = await domAudit([
+      fontInput("인터페이스 글꼴 종류", "SF Pro"),
+      fontInput("고정폭 글꼴 종류", "Menlo"),
+    ]);
+    for (const [result, family] of [
+      [sans, "SF Pro"],
+      [mono, "Menlo"],
+    ] as const) {
+      expect(result.unclassified).toEqual([]);
+      expect(result.exceptions.map((r) => [r.field, r.text, r.segments[0].class])).toEqual([
+        ["placeholder", family, "font family"],
+      ]);
+      expect(["renderer font resolution", "macOS system font label"]).toContain(
+        result.exceptions[0].segments[0].source,
+      );
+    }
+  }, 15_000);
+  test("the same placeholder outside a font-family input fails", async () => {
+    const results = await domAudit([
+      fontInput("글꼴 검색", "SF Pro"),
+      fontInput("프로젝트 이름", "Menlo"),
+      `<textarea aria-label="고정폭 글꼴 종류" placeholder="Menlo"></textarea>`,
+      fontInput("고정폭 글꼴 종류", "Settings"),
+    ]);
+    expect(results.map((r) => r.unclassified.map((u) => [u.field, u.text]))).toEqual([
+      [["placeholder", "SF Pro"]],
+      [["placeholder", "Menlo"]],
+      [["placeholder", "Menlo"]],
+      [["placeholder", "Settings"]],
+    ]);
+  }, 15_000);
+  const mentionChip = (text: string) =>
+    `<button data-composer-mention-chip="true"><span aria-hidden="true">*</span><span>${text}</span></button>`;
+  test("a file name inside a composer file mention chip passes", async () => {
+    const results = await domAudit([
+      mentionChip("surface.test.ts"),
+      mentionChip("SettingsPanels.tsx"),
+      mentionChip("README.md"),
+    ]);
+    expect(results.map((r) => r.unclassified)).toEqual([[], [], []]);
+    expect(results.map((r) => r.exceptions.map((e) => [e.field, e.segments]))).toEqual(
+      ["surface.test.ts", "SettingsPanels.tsx", "README.md"].map((segment) => [
+        ["text", [{ segment, class: "file name", source: "composer file mention chip" }]],
+      ]),
+    );
+  }, 15_000);
+  test("a file name outside a file chip, or with an unlisted extension, fails", async () => {
+    const [prose, button, label, txt, png, name] = await domAudit([
+      "<h3>surface.test.ts</h3>",
+      "<button>SettingsPanels.tsx</button>",
+      "<label>파일 surface.test.ts</label>",
+      mentionChip("notes.txt"),
+      mentionChip("Screenshot.png"),
+      '<button data-composer-mention-chip="true" aria-label="surface.test.ts">파일</button>',
+    ]);
+    const failed = (r: (typeof prose)) => r.unclassified.map((u) => [u.field, u.text]);
+    expect(failed(prose)).toEqual([["text", "surface.test.ts"]]);
+    expect(failed(button)).toEqual([["text", "SettingsPanels.tsx"]]);
+    expect(failed(label)).toEqual([["text", "파일 surface.test.ts"]]);
+    expect(failed(txt)).toEqual([["text", "notes.txt"]]);
+    expect(failed(png)).toEqual([["text", "Screenshot.png"]]);
+    // Chip text only: the same file name in the chip's accessible name still fails.
+    expect(failed(name)).toEqual([["name", "surface.test.ts"]]);
+  }, 15_000);
+
+  const host = "Kang의 MacBook Pro";
+  const hostSources = localeSources({ environment: { label: host } });
+  const connectionsHeading = (title: string) =>
+    `<section id="connections-environment"><div><h2><svg aria-hidden="true"></svg>${title}</h2></div></section>`;
+  const onboardingRow = (label: string) =>
+    `<fieldset><legend>설정할 컴퓨터</legend><div><label><button role="checkbox"></button><span><span>${label}</span><span>연결됨</span></span></label></div></fieldset>`;
+  test("the environment label passes exactly, in a host name element", async () => {
+    const results = await domAudit(
+      [connectionsHeading(host), onboardingRow(host)],
+      hostSources,
+    );
+    expect(results.map((r) => r.unclassified)).toEqual([[], []]);
+    expect(results.map((r) => r.exceptions.map((e) => [e.tag, e.text, e.segments]))).toEqual([
+      [["H2", host, [{ segment: host, class: "host name", source: "serverConfig.environment.label" }]]],
+      [
+        [
+          "LABEL",
+          `${host}연결됨`,
+          [{ segment: host, class: "host name", source: "serverConfig.environment.label" }],
+        ],
+      ],
+    ]);
+  }, 15_000);
+  test("the environment label fails elsewhere, near-miss, or without serverConfig", async () => {
+    const [prose, otherHeading, otherFieldset, near, extra] = await domAudit(
+      [
+        `<label>${host}에 공급자 인스턴스를 하나 더 구성해요.</label>`,
+        `<section id="connections-remote"><h2>${host}</h2></section>`,
+        `<fieldset><legend>다른 목록</legend><label>${host}</label></fieldset>`,
+        connectionsHeading("Kang의 MacBook Air"),
+        connectionsHeading(`${host} Max`),
+      ],
+      hostSources,
+    );
+    for (const result of [prose, otherHeading, otherFieldset, near, extra])
+      expect(result.unclassified.length).toBe(1);
+    const segs = (r: typeof near) => r.unclassified[0].segments.map((s: { segment: string }) => s.segment);
+    expect(segs(near)).toEqual(["Kang", "MacBook", "Air"]);
+    // Only the exact value is taken; any extra Latin beside it still fails the row.
+    expect(segs(extra)).toEqual(["Max"]);
+    const [unset] = await domAudit([connectionsHeading(host)], localeSources({}));
+    expect(unset.unclassified.map((u) => u.text)).toEqual([host]);
+  }, 15_000);
+});
+
+describe("named row controls", () => {
+  test("Worked for disclosure matches either anchored form", () => {
+    for (const name of ["Worked for 1ms", "작업 시간 1ms"])
+      expect(NAMED_ROW_PATTERNS.workedFor.test(name)).toBe(true);
+    for (const name of ["작업시간 1ms", "Worked 1ms", "총 작업 시간 1ms", "worked for 1ms"])
+      expect(NAMED_ROW_PATTERNS.workedFor.test(name)).toBe(false);
+  });
+  test("when-clause controls resolve to the command they name", () => {
+    expect(namedRowSubject("editWhen", "Edit when clause for Chat: send")).toBe("Chat: send");
+    expect(namedRowSubject("editWhen", "대화: 보내기 실행 조건 편집")).toBe("대화: 보내기");
+    expect(NAMED_ROW_PATTERNS.editWhen.test("대화: 보내기 실행 조건 편집")).toBe(true);
+    for (const name of ["실행 조건 편집", "대화: 보내기 실행 조건 편집하기", "Edit when clause"]) {
+      expect(NAMED_ROW_PATTERNS.editWhen.test(name)).toBe(false);
+      expect(namedRowSubject("editWhen", name)).toBe(null);
+    }
+    // The subject must appear in the control's own keybinding row.
+    const subject = namedRowSubject("editWhen", "대화: 보내기 실행 조건 편집");
+    expect("대화: 새 대화 ⌘N".includes(subject!)).toBe(false);
+  });
+  test("source details controls resolve to the source they name", () => {
+    expect(namedRowSubject("sourceDetails", "Toggle GitHub details")).toBe("GitHub");
+    expect(namedRowSubject("sourceDetails", "GitHub 세부 정보 열기/닫기")).toBe("GitHub");
+    for (const name of ["세부 정보 열기/닫기", "GitHub 세부 정보 열기", "Toggle details"]) {
+      expect(NAMED_ROW_PATTERNS.sourceDetails.test(name)).toBe(false);
+      expect(namedRowSubject("sourceDetails", name)).toBe(null);
+    }
+  });
 });
 
 describe("rendered palette preservation", () => {

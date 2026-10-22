@@ -398,8 +398,8 @@ export function WeavraProjectSetup(props: {
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              저장된 설정을 읽었어요. 저장 전까지 로컬 편집이며, 변경은 현재 설정 digest가 일치할
-              때만 반영돼요.
+              저장된 설정을 읽었어요. 저장 전까지 로컬 편집이며, 변경은 현재 설정 다이제스트가
+              일치할 때만 반영돼요.
             </p>
           )}
           {result.kind === "draft" && result.notes?.length ? (

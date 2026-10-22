@@ -5,55 +5,61 @@ import {
   captureSetupAccessReady,
   captureSetupMacPermissionsReady,
 } from "./SnapShotSetupDialog.logic";
+import { ko } from "~/i18n/ko";
 
 export function snapShotStatus(state: DesktopSnapShotState | null, enabled: boolean): string {
-  if (!state) return "Checking snapshots…";
-  if (state.mode === "unavailable") return state.message ?? "Not supported on this platform.";
-  if (!enabled) return "Turn this on to set up snapshots.";
+  if (!state) return ko.settings.snapshots.checking;
+  if (state.mode === "unavailable") return state.message ?? ko.settings.snapshots.notSupported;
+  if (!enabled) return ko.settings.snapshots.turnOnToSetUp;
   return snapShotSetupSummary(state, enabled);
 }
 
 export function snapShotSetupSummary(state: DesktopSnapShotState, enabled: boolean): string {
-  if (state.message) return "Capture needs attention";
+  if (state.message) return ko.settings.snapshots.needsAttention;
   if (state.linuxBackend === "hyprland" && state.hyprlandHelper?.status !== "ready")
     return state.hyprlandHelper?.status === "error"
-      ? "Check capture access in setup"
-      : "Install the capture helper to continue";
+      ? ko.settings.snapshots.checkAccessInSetup
+      : ko.settings.snapshots.installHelperToContinue;
   if (captureSetupBackend(state) === "gnome" && state.gnomeExtension?.status !== "enabled")
-    return "Set up active-window snapshots";
+    return ko.settings.snapshots.setUpActiveWindow;
   if (captureSetupBackend(state) === "kde" && state.kdeHelper?.status !== "ready")
     return state.kdeHelper?.status === "error"
-      ? "Check capture access in setup"
-      : "Install the capture helper to continue";
-  if (captureSetupBackend(state) === "picker")
-    return "Manual capture only — you'll choose a window each time";
-  if (!enabled) return "Enable capture to continue";
+      ? ko.settings.snapshots.checkAccessInSetup
+      : ko.settings.snapshots.installHelperToContinue;
+  if (captureSetupBackend(state) === "picker") return ko.settings.snapshots.manualOnly;
+  if (!enabled) return ko.settings.snapshots.enableToContinue;
   if (state.shortcutPending)
     return state.linuxBackend === "hyprland"
-      ? "Connecting your shortcut…"
-      : "Waiting for shortcut permission";
-  if (state.shortcutVerified) return "Ready to capture";
+      ? ko.settings.snapshots.connectingShortcut
+      : ko.settings.snapshots.waitingShortcutPermission;
+  if (state.shortcutVerified) return ko.settings.snapshots.readyToCapture;
   if (state.linuxBackend === "niri" && state.shortcutBinding)
-    return "Use your shortcut from another app";
+    return ko.settings.snapshots.shortcutFromAnotherApp;
   if (state.linuxBackend === "hyprland" && state.shortcutActionRegistered)
-    return "Use your shortcut from another app";
-  if (state.shortcutRegistered) return state.shortcutLabel ? "Ready to capture" : "Shortcut saved";
-  return "Finish shortcut setup";
+    return ko.settings.snapshots.shortcutFromAnotherApp;
+  if (state.shortcutRegistered)
+    return state.shortcutLabel
+      ? ko.settings.snapshots.readyToCapture
+      : ko.settings.snapshots.shortcutSavedStatus;
+  return ko.settings.snapshots.finishShortcutSetup;
 }
 
 export function snapShotShortcutStatus(state: DesktopSnapShotState | null): string | null {
   if (!state) return null;
   if (state.linuxBackend === "hyprland") return state.shortcutMessage;
-  if (state.shortcutPending) return "Approve the shortcut permission prompt to continue.";
-  if (state.shortcutRegistered) return state.mode === "portal" ? null : "Shortcut saved.";
+  if (state.shortcutPending) return ko.settings.snapshots.approveShortcutPrompt;
+  if (state.shortcutRegistered)
+    return state.mode === "portal" ? null : ko.settings.snapshots.shortcutSaved;
   return state.shortcutMessage;
 }
 
 export function snapShotSetupButtonLabel(state: DesktopSnapShotState | null): string {
-  if (!state) return "Continue setup";
-  if (captureSetupAccessReady(state)) return "Manage capture";
+  if (!state) return ko.settings.snapshots.continueSetup;
+  if (captureSetupAccessReady(state)) return ko.settings.snapshots.manageCapture;
   const desktop = captureSetupDesktopName(state);
-  return desktop ? `Set up ${desktop} capture` : "Continue setup";
+  return desktop
+    ? ko.settings.snapshots.setUpDesktopCapture(desktop)
+    : ko.settings.snapshots.continueSetup;
 }
 
 // Windows needs no permissions or setup: turning capture on is enough. macOS setup
@@ -81,24 +87,24 @@ export function snapShotFeedbackUnavailableMessage(
   if (state?.mode !== "portal" || state.linuxFeedbackAvailable) return undefined;
   if (state.linuxBackend === "hyprland")
     return state.hyprlandHelper?.status === "ready"
-      ? "Capture effects aren't available on this desktop."
-      : "Install or update the capture helper to enable effects.";
-  if (state.linuxBackend === "niri") return "Capture effects aren't available on Niri.";
+      ? ko.settings.snapshots.effectsUnavailable
+      : ko.settings.snapshots.installOrUpdateHelper;
+  if (state.linuxBackend === "niri") return ko.settings.snapshots.effectsUnavailableNiri;
   if (state.linuxBackend === "kde")
     return state.kdeHelper?.status === "ready"
-      ? "Capture effects aren't available on this desktop."
-      : "Install or update the capture helper to enable effects.";
+      ? ko.settings.snapshots.effectsUnavailable
+      : ko.settings.snapshots.installOrUpdateHelper;
   return state.linuxBackend === "gnome-extension"
-    ? "Update the GNOME extension, then sign out and back in to enable effects."
+    ? ko.settings.snapshots.updateGnomeExtension
     : captureSetupBackend(state) === "gnome"
-      ? "Finish extension setup to enable effects."
-      : "Capture effects aren't available on this desktop.";
+      ? ko.settings.snapshots.finishExtensionSetup
+      : ko.settings.snapshots.effectsUnavailable;
 }
 
 export function snapShotDescription(state: DesktopSnapShotState | null): string {
   return state?.mode === "portal" && captureSetupBackend(state) === "picker"
-    ? "Automatic capture isn't available here. 켜면 직접 고른 창을 캡처해 현재 대화의 초안에 첨부하며, 필요한 권한은 처음 캡처할 때 요청해요."
-    : "켜면 단축키로 활성 창을 캡처해 현재 대화의 초안에 첨부하며, 필요한 권한은 처음 설정할 때 요청해요.";
+    ? ko.settings.snapshots.descriptionPicker
+    : ko.settings.snapshots.descriptionDefault;
 }
 
 export function snapShotAccessibilityUnavailableMessage(
@@ -106,15 +112,15 @@ export function snapShotAccessibilityUnavailableMessage(
 ): string | undefined {
   if (state?.mode !== "portal") return undefined;
   if (state.linuxBackend === "picker" || state.linuxBackend === "screenshot-portal")
-    return "This desktop only provides a screenshot.";
+    return ko.settings.snapshots.screenshotOnly;
   return undefined;
 }
 
 export function snapShotUnavailableMessage(hasBridge: boolean): string | undefined {
   if (hasBridge) return undefined;
   return typeof window !== "undefined" && window.desktopBridge
-    ? "Update the desktop app to use snapshots."
-    : "Only available in the desktop app.";
+    ? ko.settings.snapshots.updateDesktopApp
+    : ko.settings.snapshots.desktopAppOnly;
 }
 
 export function snapShotSoundPatch(sound: SnapShotSoundSelection): ClientSettingsPatch {

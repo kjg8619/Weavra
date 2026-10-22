@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProviderDriverKind, ServerProviderModel } from "@t3tools/contracts";
 import type { CustomModelDefinition } from "@t3tools/shared/model";
 
+import { ko } from "~/i18n/ko";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -25,6 +26,7 @@ import {
   validateDraft,
 } from "./customModelEditor.logic";
 
+const copy = ko.providers.customModel;
 const CUSTOM_ID_VALUE = "__custom__";
 const START_FROM_NONE = "__none__";
 
@@ -43,6 +45,12 @@ interface CustomModelEditorProps {
  * descriptors the composer should offer for it (Reasoning effort, Fast
  * mode, ...). Draft state is local; nothing is persisted until Save.
  */
+/** Visible name of a built-in preset; the stored and sent descriptor keeps the original label. */
+function presetDisplayLabel(label: string): string {
+  const labels = ko.providers.customModel.presetDisplayLabels;
+  return Object.hasOwn(labels, label) ? labels[label]! : label;
+}
+
 export function CustomModelEditor({
   instanceId,
   driverKind,
@@ -160,10 +168,10 @@ export function CustomModelEditor({
         size="compact"
         value={choice.id}
         onChange={(event) => updateChoice(descriptor.key, choice.key, { id: event.target.value })}
-        placeholder="value"
+        placeholder={copy.choiceValuePlaceholder}
         className="w-28 font-mono"
         spellCheck={false}
-        aria-label="Choice value"
+        aria-label={copy.choiceValue}
       />
       <Input
         size="compact"
@@ -171,9 +179,9 @@ export function CustomModelEditor({
         onChange={(event) =>
           updateChoice(descriptor.key, choice.key, { label: event.target.value })
         }
-        placeholder="Label"
+        placeholder={copy.labelPlaceholder}
         className="min-w-0 flex-1"
-        aria-label="Choice label"
+        aria-label={copy.choiceLabel}
       />
       <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
         <Switch
@@ -182,15 +190,15 @@ export function CustomModelEditor({
           onCheckedChange={(checked) =>
             updateChoice(descriptor.key, choice.key, { isDefault: checked })
           }
-          aria-label="Default choice"
+          aria-label={copy.defaultChoice}
         />
-        Default
+        {ko.common.default}
       </label>
       <Button
         data-icon-control
         size="icon-micro"
         variant="ghost-muted"
-        aria-label="Remove choice"
+        aria-label={copy.removeChoice}
         onClick={() =>
           updateDescriptor(descriptor.key, {
             choices: descriptor.choices.filter((candidate) => candidate.key !== choice.key),
@@ -208,15 +216,17 @@ export function CustomModelEditor({
       className="flex flex-col gap-2 rounded-md border border-border/60 bg-background/40 p-2.5"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="w-14 shrink-0 text-[11px] text-muted-foreground">Option {index + 1}</span>
+        <span className="w-14 shrink-0 text-[11px] text-muted-foreground">
+          {copy.option(index + 1)}
+        </span>
         {presets.length > 0 ? (
           <Select
             value={idSelectValue(descriptor)}
             onValueChange={(value) => applyPresetId(descriptor, value)}
           >
-            <SelectTrigger size="compact" className="w-40" aria-label="Option id">
+            <SelectTrigger size="compact" className="w-40" aria-label={copy.optionId}>
               <SelectValue>
-                {idSelectValue(descriptor) === CUSTOM_ID_VALUE ? "Custom…" : descriptor.id}
+                {idSelectValue(descriptor) === CUSTOM_ID_VALUE ? copy.customId : descriptor.id}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup align="start" alignItemWithTrigger={false}>
@@ -224,11 +234,13 @@ export function CustomModelEditor({
                 <SelectItem key={preset.id} value={preset.id}>
                   <span className="flex items-baseline gap-2">
                     <code className="font-mono text-xs">{preset.id}</code>
-                    <span className="text-muted-foreground">{preset.label}</span>
+                    <span className="text-muted-foreground">
+                      {presetDisplayLabel(preset.label)}
+                    </span>
                   </span>
                 </SelectItem>
               ))}
-              <SelectItem value={CUSTOM_ID_VALUE}>Custom…</SelectItem>
+              <SelectItem value={CUSTOM_ID_VALUE}>{copy.customId}</SelectItem>
             </SelectPopup>
           </Select>
         ) : null}
@@ -240,16 +252,16 @@ export function CustomModelEditor({
             placeholder="optionId"
             className="w-36 font-mono"
             spellCheck={false}
-            aria-label="Option id"
+            aria-label={copy.optionId}
           />
         ) : null}
         <Input
           size="compact"
           value={descriptor.label}
           onChange={(event) => updateDescriptor(descriptor.key, { label: event.target.value })}
-          placeholder="Label"
+          placeholder={copy.labelPlaceholder}
           className="min-w-0 flex-1"
-          aria-label="Option label"
+          aria-label={copy.optionLabel}
         />
         <Select
           value={descriptor.type}
@@ -257,19 +269,19 @@ export function CustomModelEditor({
             updateDescriptor(descriptor.key, { type: value === "boolean" ? "boolean" : "select" })
           }
         >
-          <SelectTrigger size="compact" className="w-24" aria-label="Option type">
-            <SelectValue>{descriptor.type === "boolean" ? "Toggle" : "Choices"}</SelectValue>
+          <SelectTrigger size="compact" className="w-24" aria-label={copy.optionType}>
+            <SelectValue>{descriptor.type === "boolean" ? copy.toggle : copy.choices}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
-            <SelectItem value="select">Choices</SelectItem>
-            <SelectItem value="boolean">Toggle</SelectItem>
+            <SelectItem value="select">{copy.choices}</SelectItem>
+            <SelectItem value="boolean">{copy.toggle}</SelectItem>
           </SelectPopup>
         </Select>
         <Button
           data-icon-control
           size="icon-micro"
           variant="ghost-muted"
-          aria-label={`Remove option ${index + 1}`}
+          aria-label={copy.removeOption(index + 1)}
           onClick={() => removeDescriptor(descriptor.key)}
         >
           <XIcon className="size-3" />
@@ -290,7 +302,7 @@ export function CustomModelEditor({
             }
           >
             <PlusIcon className="size-3" />
-            Add choice
+            {copy.addChoice}
           </Button>
         </div>
       ) : null}
@@ -317,7 +329,7 @@ export function CustomModelEditor({
     >
       <div className="flex flex-col gap-1">
         <label htmlFor={domId("name")} className="text-sm text-foreground">
-          Display name
+          {copy.displayName}
         </label>
         <Input
           id={domId("name")}
@@ -333,15 +345,11 @@ export function CustomModelEditor({
 
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm text-muted-foreground">Options shown in the composer</span>
+          <span className="text-sm text-muted-foreground">{copy.composerOptions}</span>
           {startFromCandidates.length > 0 ? (
             <Select value={START_FROM_NONE} onValueChange={handleStartFrom}>
-              <SelectTrigger
-                size="compact"
-                className="w-44"
-                aria-label="Copy options from a built-in model"
-              >
-                <SelectValue>Copy from…</SelectValue>
+              <SelectTrigger size="compact" className="w-44" aria-label={copy.copyFromBuiltIn}>
+                <SelectValue>{copy.copyFrom}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 {startFromCandidates.map((model) => (
@@ -354,9 +362,7 @@ export function CustomModelEditor({
           ) : null}
         </div>
         {draft.descriptors.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No custom options. The composer uses the provider's default options.
-          </p>
+          <p className="text-sm text-muted-foreground">{copy.noOptions}</p>
         ) : null}
         {draft.descriptors.map(renderDescriptor)}
         <div className="flex flex-wrap gap-1">
@@ -374,7 +380,7 @@ export function CustomModelEditor({
                 onClick={() => addDescriptor(descriptorFromPreset(preset))}
               >
                 <PlusIcon className="size-3" />
-                {preset.label}
+                {presetDisplayLabel(preset.label)}
               </Button>
             ))}
           <Button
@@ -384,7 +390,7 @@ export function CustomModelEditor({
             onClick={() => addDescriptor(emptyEditorDescriptor())}
           >
             <PlusIcon className="size-3" />
-            Custom option
+            {copy.customOption}
           </Button>
         </div>
       </div>
@@ -397,10 +403,10 @@ export function CustomModelEditor({
 
       <div className="flex gap-2">
         <Button size="default" variant="outline" onClick={handleSave}>
-          Save
+          {ko.common.save}
         </Button>
         <Button size="default" variant="ghost" onClick={onCancel}>
-          Cancel
+          {ko.common.cancel}
         </Button>
       </div>
     </div>

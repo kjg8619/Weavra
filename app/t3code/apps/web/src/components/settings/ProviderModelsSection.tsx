@@ -9,6 +9,7 @@ import {
 } from "@t3tools/contracts";
 import { type CustomModelDefinition, normalizeCustomModelSlug } from "@t3tools/shared/model";
 
+import { ko } from "~/i18n/ko";
 import { cn } from "../../lib/utils";
 import { sortModelsForProviderInstance } from "../../modelOrdering";
 import { MAX_CUSTOM_MODEL_LENGTH } from "../../modelSelection";
@@ -30,6 +31,8 @@ const CUSTOM_MODEL_PLACEHOLDER_BY_KIND: Partial<Record<ProviderDriverKind, strin
   [ProviderDriverKind.make("opencode")]: "openai/gpt-5",
 };
 
+const copy = ko.providers.models;
+
 /** Above this many models the list gets a filter input. */
 const FILTER_THRESHOLD = 8;
 
@@ -49,8 +52,8 @@ function describeModelCapabilities(model: ServerProviderModel): string[] {
         descriptor.type === "select" &&
         descriptor.options.some((option) => option.id === "fast" || option.label === "Fast")),
   );
-  if (hasFastMode) labels.push("Fast mode");
-  if (descriptors.some((descriptor) => descriptor.id === "thinking")) labels.push("Thinking");
+  if (hasFastMode) labels.push(copy.fastMode);
+  if (descriptors.some((descriptor) => descriptor.id === "thinking")) labels.push(copy.thinking);
   if (
     descriptors.some(
       (descriptor) =>
@@ -61,7 +64,7 @@ function describeModelCapabilities(model: ServerProviderModel): string[] {
           descriptor.id === "variant"),
     )
   ) {
-    labels.push("Reasoning");
+    labels.push(copy.reasoning);
   }
   return labels;
 }
@@ -240,19 +243,19 @@ export function ProviderModelsSection({
     if (driverKind === "antigravity") return;
     const normalized = normalizeCustomModelSlug(input);
     if (!normalized) {
-      setError("Enter a model slug.");
+      setError(copy.enterModelId);
       return;
     }
     if (models.some((model) => !model.isCustom && model.slug === normalized)) {
-      setError("That model is already built in.");
+      setError(copy.alreadyBuiltIn);
       return;
     }
     if (normalized.length > MAX_CUSTOM_MODEL_LENGTH) {
-      setError(`Model slugs must be ${MAX_CUSTOM_MODEL_LENGTH} characters or less.`);
+      setError(copy.modelIdTooLong(MAX_CUSTOM_MODEL_LENGTH));
       return;
     }
     if (customModels.some((entry) => entry.slug === normalized)) {
-      setError("That custom model is already saved.");
+      setError(copy.alreadySaved);
       return;
     }
 
@@ -335,16 +338,14 @@ export function ProviderModelsSection({
                 : "text-muted-foreground hover:text-foreground",
             )}
             onClick={() => handleToggleFavorite(model.slug)}
-            aria-label={`${isFavorite ? "Remove" : "Add"} ${model.name} ${
-              isFavorite ? "from" : "to"
-            } favorites`}
+            aria-label={isFavorite ? copy.removeFavorite(model.name) : copy.addFavorite(model.name)}
           />
         }
       >
         <StarIcon className={cn("size-3", isFavorite && "fill-current")} />
       </TooltipTrigger>
       <TooltipPopup side="top">
-        {isFavorite ? "Remove from favorites" : "Add to favorites"}
+        {isFavorite ? copy.removeFromFavorites : copy.addToFavorites}
       </TooltipPopup>
     </Tooltip>
   );
@@ -372,13 +373,13 @@ export function ProviderModelsSection({
                   disabled={!options.canMoveUp}
                   className="disabled:opacity-100"
                   onClick={() => handleMove(model.slug, -1)}
-                  aria-label={`Move ${model.name} up`}
+                  aria-label={copy.moveModelUp(model.name)}
                 />
               }
             >
               <ArrowUpIcon className="size-3" />
             </TooltipTrigger>
-            <TooltipPopup side="top">Move up</TooltipPopup>
+            <TooltipPopup side="top">{copy.moveUp}</TooltipPopup>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -390,13 +391,13 @@ export function ProviderModelsSection({
                   disabled={!options.canMoveDown}
                   className="disabled:opacity-100"
                   onClick={() => handleMove(model.slug, 1)}
-                  aria-label={`Move ${model.name} down`}
+                  aria-label={copy.moveModelDown(model.name)}
                 />
               }
             >
               <ArrowDownIcon className="size-3" />
             </TooltipTrigger>
-            <TooltipPopup side="top">Move down</TooltipPopup>
+            <TooltipPopup side="top">{copy.moveDown}</TooltipPopup>
           </Tooltip>
         </>
       ) : null}
@@ -409,7 +410,7 @@ export function ProviderModelsSection({
                   data-icon-control
                   size="icon-micro"
                   variant="ghost-muted"
-                  aria-label={`Edit ${model.slug}`}
+                  aria-label={copy.editModel(model.slug)}
                   onClick={() =>
                     setEditingSlug((current) => (current === model.slug ? null : model.slug))
                   }
@@ -418,7 +419,7 @@ export function ProviderModelsSection({
             >
               <PencilIcon className="size-3" />
             </TooltipTrigger>
-            <TooltipPopup side="top">Edit name and options</TooltipPopup>
+            <TooltipPopup side="top">{copy.editNameAndOptions}</TooltipPopup>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -427,14 +428,14 @@ export function ProviderModelsSection({
                   data-icon-control
                   size="icon-micro"
                   variant="ghost-muted"
-                  aria-label={`Remove ${model.slug}`}
+                  aria-label={copy.removeModel(model.slug)}
                   onClick={() => handleRemove(model.slug)}
                 />
               }
             >
               <XIcon className="size-3" />
             </TooltipTrigger>
-            <TooltipPopup side="top">Remove custom model</TooltipPopup>
+            <TooltipPopup side="top">{copy.removeCustomModel}</TooltipPopup>
           </Tooltip>
         </>
       ) : null}
@@ -442,11 +443,7 @@ export function ProviderModelsSection({
   );
 
   const pickerTooltip = (model: DisplayModel, isHidden: boolean) =>
-    model.isCustom
-      ? "Custom models are always shown in the picker"
-      : isHidden
-        ? "Hidden from picker"
-        : "Shown in picker";
+    model.isCustom ? copy.customAlwaysShown : isHidden ? copy.hiddenFromPicker : copy.shownInPicker;
 
   // The trigger is a wrapper span: a disabled switch gets no pointer events,
   // so it could not open the tooltip itself.
@@ -458,7 +455,7 @@ export function ProviderModelsSection({
           checked={!isHidden}
           disabled={model.isCustom}
           onCheckedChange={(checked) => setHidden(model.slug, !checked)}
-          aria-label={`Show ${model.name} in the model picker`}
+          aria-label={copy.showInPicker(model.name)}
         />
       </TooltipTrigger>
       <TooltipPopup side="top">{pickerTooltip(model, isHidden)}</TooltipPopup>
@@ -496,7 +493,9 @@ export function ProviderModelsSection({
           {model.name !== model.slug ? (
             <code className="font-mono text-sm text-muted-foreground">{model.slug}</code>
           ) : null}
-          {model.isCustom ? <span className="text-sm text-muted-foreground">custom</span> : null}
+          {model.isCustom ? (
+            <span className="text-sm text-muted-foreground">{copy.customTag}</span>
+          ) : null}
         </span>
         <span className="text-sm text-muted-foreground">
           {capLabels.length > 0 ? (
@@ -522,11 +521,11 @@ export function ProviderModelsSection({
           <Input
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
-            placeholder="Filter models"
+            placeholder={copy.filterModels}
             size="sm"
             className="w-56 max-w-full"
             spellCheck={false}
-            aria-label="Filter models"
+            aria-label={copy.filterModels}
           />
         ) : null}
         <div className="flex items-center gap-2">
@@ -539,15 +538,13 @@ export function ProviderModelsSection({
                 onHiddenModelsChange(nextHiddenModelsForBulkToggle(models, hiddenModels))
               }
             >
-              {allBuiltInModelsHidden ? "Enable all" : "Disable all"}
+              {allBuiltInModelsHidden ? copy.enableAll : copy.disableAll}
             </Button>
           ) : null}
           <span className="text-sm text-muted-foreground">
-            {models.length} model{models.length === 1 ? "" : "s"}
-            {favoriteCount > 0
-              ? ` · ${favoriteCount} favorite${favoriteCount === 1 ? "" : "s"}`
-              : ""}
-            {hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ""}
+            {copy.modelCount(models.length)}
+            {favoriteCount > 0 ? ` · ${copy.favoriteCount(favoriteCount)}` : ""}
+            {hiddenCount > 0 ? ` · ${copy.hiddenCount(hiddenCount)}` : ""}
           </span>
         </div>
         {driverKind !== "antigravity" && !isAdding ? (
@@ -559,14 +556,14 @@ export function ProviderModelsSection({
             onClick={() => setIsAdding(true)}
           >
             <PlusIcon className="size-3" />
-            Add custom model
+            {copy.addCustomModel}
           </Button>
         ) : null}
       </div>
       <div ref={listRef} className="mt-2 -mx-2">
         {visibleModels.length === 0 ? (
           <p className="px-2 py-2 text-sm text-muted-foreground">
-            {isFiltering ? "No models match." : "No models reported for this provider yet."}
+            {isFiltering ? copy.noMatches : copy.noModelsReported}
           </p>
         ) : null}
         {visibleModels.map((model, index) => {
@@ -580,13 +577,13 @@ export function ProviderModelsSection({
           return (
             <div key={`${instanceId}:${model.slug}:group`}>
               {startsGroup && favoriteCount > 0 && group === "favorite"
-                ? groupLabel("Favorites", index === 0)
+                ? groupLabel(copy.favorites, index === 0)
                 : null}
               {startsGroup && favoriteCount > 0 && group === "visible"
-                ? groupLabel("All", index === 0)
+                ? groupLabel(copy.all, index === 0)
                 : null}
               {startsGroup && group === "hidden"
-                ? groupLabel("Hidden from picker", index === 0)
+                ? groupLabel(copy.hiddenFromPicker, index === 0)
                 : null}
               {renderRow(model)}
               {editingEntry ? (
@@ -615,13 +612,13 @@ export function ProviderModelsSection({
             htmlFor={`provider-instance-${instanceId}-custom-model`}
             className="text-foreground text-sm"
           >
-            모델 ID
+            {ko.providers.models.modelId}
           </label>
           <p
             id={`provider-instance-${instanceId}-custom-model-hint`}
             className="text-muted-foreground text-sm break-keep text-pretty"
           >
-            공급자에 그대로 전달할 모델 이름이에요. 공급자 문서에 적힌 ID를 입력해 주세요.
+            {ko.providers.models.modelIdHint}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Input
@@ -651,10 +648,10 @@ export function ProviderModelsSection({
             />
             <div className="flex shrink-0 gap-2">
               <Button size="default" variant="outline" onClick={handleAdd}>
-                Add
+                {ko.common.add}
               </Button>
               <Button size="default" variant="ghost" onClick={cancelAdd}>
-                Cancel
+                {ko.common.cancel}
               </Button>
             </div>
           </div>

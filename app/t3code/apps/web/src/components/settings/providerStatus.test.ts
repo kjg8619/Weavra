@@ -1,7 +1,8 @@
 import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { getProviderSummary } from "./providerStatus";
+import { getProviderRecoveryGuidance, getProviderSummary } from "./providerStatus";
+import { ko } from "~/i18n/ko";
 
 const provider: ServerProvider = {
   instanceId: ProviderInstanceId.make("codex"),
@@ -46,7 +47,7 @@ describe("getProviderSummary", () => {
 
   it("reports ready providers with unknown authentication as available", () => {
     expect(getProviderSummary({ ...provider, auth: { status: "unknown" } })).toEqual({
-      headline: "Available",
+      headline: ko.providers.status.available,
       detail: null,
     });
   });
@@ -59,7 +60,7 @@ describe("getProviderSummary", () => {
         message: "The provider process failed to start.",
       }),
     ).toEqual({
-      headline: "Unavailable",
+      headline: ko.common.unavailable,
       detail: "The provider process failed to start.",
     });
   });
@@ -72,7 +73,7 @@ describe("getProviderSummary", () => {
         message: "The provider version is unsupported.",
       }),
     ).toEqual({
-      headline: "Needs attention",
+      headline: ko.providers.status.needsAttention,
       detail: "The provider version is unsupported.",
     });
   });
@@ -86,12 +87,43 @@ describe("getProviderSummary", () => {
         message: "Run codex login.",
       }),
     ).toEqual({
-      headline: "Not authenticated",
+      headline: ko.providers.status.notAuthenticated,
       detail: "Run codex login.",
     });
   });
 
   it("treats a disabled provider status as disabled even before its enabled flag updates", () => {
-    expect(getProviderSummary({ ...provider, status: "disabled" }).headline).toBe("Disabled");
+    expect(getProviderSummary({ ...provider, status: "disabled" }).headline).toBe(
+      ko.common.disabled,
+    );
+  });
+});
+
+describe("getProviderRecoveryGuidance", () => {
+  const raw = "HIG fixture requires codex login";
+
+  it("gives each structured failure its own catalog cause and action, leaving the raw diagnostic intact", () => {
+    const cases = [
+      { ...provider, installed: false, message: raw },
+      { ...provider, auth: { status: "unauthenticated" as const }, message: raw },
+      { ...provider, status: "error" as const, message: raw },
+      { ...provider, status: "warning" as const, message: raw },
+    ];
+    const guidance = cases.map((entry) => getProviderRecoveryGuidance(entry));
+    const causes = guidance.map((entry) => entry?.cause);
+    expect(new Set(causes).size).toBe(cases.length);
+    for (const [index, entry] of guidance.entries()) {
+      expect(entry).not.toBeNull();
+      expect(entry!.cause).not.toContain(raw);
+      expect(entry!.action).not.toContain(raw);
+      expect(getProviderSummary(cases[index]!).detail).toBe(raw);
+    }
+  });
+
+  it("has no guidance for a ready or disabled provider", () => {
+    expect(getProviderRecoveryGuidance(provider)).toBeNull();
+    expect(
+      getProviderRecoveryGuidance({ ...provider, enabled: false, installed: false }),
+    ).toBeNull();
   });
 });

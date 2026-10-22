@@ -13,6 +13,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import type { LegendListRef, MaintainScrollAtEndOptions } from "@legendapp/list/react";
 import { shouldUseRestingComposerLayout } from "../composerFooterLayout";
 import { useComposerFocusState } from "./useComposerFocusState";
+import { ko } from "~/i18n/ko";
 
 vi.mock("@legendapp/list/react", async () => {
   const legendListTestId = "legend-list";
@@ -508,7 +509,7 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    expect(markup).toContain("Worked for 8.0s");
+    expect(markup).toContain(ko.chat.timeline.workedFor("8.0s"));
   });
 
   it("keeps assistant changed-files headers sticky below the thread header", () => {
@@ -1597,8 +1598,8 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    expect(markup).toContain("Working for");
-    expect(markup).toContain("Running pnpm");
+    expect(markup).toContain(ko.chat.timeline.workingFor);
+    expect(markup).toContain(ko.chat.timeline.commandRunning("pnpm"));
   });
 
   it("scopes a live row failure to the tool named by the row", () => {
@@ -1652,7 +1653,7 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    expect(markup).toContain("Running pnpm");
+    expect(markup).toContain(ko.chat.timeline.commandRunning("pnpm"));
     expect(markup).not.toContain("tool call failed");
   });
 
@@ -1806,9 +1807,9 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    expect(markup).toContain("Running pnpm");
+    expect(markup).toContain(ko.chat.timeline.commandRunning("pnpm"));
     expect(markup).toContain("lucide-terminal");
-    expect(markup).not.toContain("Ran pnpm");
+    expect(markup).not.toContain(ko.chat.timeline.commandRan("pnpm"));
     expect(markup).not.toContain("생각 중");
     expect(markup).not.toContain('data-timeline-row-kind="thinking"');
   });
@@ -1960,10 +1961,14 @@ describe("MessagesTimeline", () => {
     );
 
     // Images report their size like every other attachment chip.
-    expect(markup).toContain('aria-label="Image attachment, shot.png, 1 KB"');
+    expect(markup).toContain(
+      `aria-label="${ko.chat.contextChip.imageAttachment("shot.png", "1 KB")}"`,
+    );
     // Selection copy re-emits chips as their canonical links.
     expect(markup).toContain('data-markdown-copy="![shot.png](t3-context://v1/image/img-1)"');
-    expect(markup).toContain('aria-label="File attachment, notes.txt, 1 KB"');
+    expect(markup).toContain(
+      `aria-label="${ko.chat.contextChip.fileAttachment("notes.txt", "1 KB")}"`,
+    );
     expect(markup).toContain(">1 KB</span>");
     expect(markup).not.toContain('aria-label="notes.txt 내려받기"');
     expect(markup).toContain("legacy.txt");

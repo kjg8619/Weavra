@@ -8,6 +8,7 @@ import {
 import { getBackgroundActivityPresetSettings } from "@t3tools/shared/backgroundActivitySettings";
 import * as Duration from "effect/Duration";
 import { describe, expect, it } from "vite-plus/test";
+import { ko } from "~/i18n/ko";
 import {
   backgroundActivitySharedPolicySettings,
   buildProviderInstanceUpdatePatch,
@@ -20,6 +21,9 @@ import {
   resolveBackgroundActivityProfileOption,
 } from "./SettingsPanels.logic";
 
+const searchItems = ko.settings.search.items;
+const diagnosticsCopy = ko.settings.restoreLabels;
+
 describe("typography settings restore", () => {
   it("detects family and size changes by font row", () => {
     expect(getChangedTypographySettingLabels(DEFAULT_UNIFIED_SETTINGS)).toEqual([]);
@@ -29,7 +33,7 @@ describe("typography settings restore", () => {
         fontSizeInterface: 18,
         fontFamilyCode: "Fira Code",
       }),
-    ).toEqual(["Interface font", "Code font"]);
+    ).toEqual([searchItems.interfaceFont.title, searchItems.codeFont.title]);
   });
 });
 
@@ -161,7 +165,12 @@ describe("formatDiagnosticsDescription", () => {
         otlpMetricsEnabled: true,
         otlpMetricsUrl: "http://localhost:4318/v1/metrics",
       }),
-    ).toBe("Local trace file. Exporting OTEL to http://localhost:4318/v1/{traces,metrics}.");
+    ).toBe(
+      diagnosticsCopy.otelBoth(
+        diagnosticsCopy.localTraceFile,
+        "http://localhost:4318/v1/{traces,metrics}",
+      ),
+    );
   });
 
   it("keeps separate trace and metric URLs when their base paths differ", () => {
@@ -174,7 +183,11 @@ describe("formatDiagnosticsDescription", () => {
         otlpMetricsUrl: "http://localhost:9000/v1/metrics",
       }),
     ).toBe(
-      "Local trace file. Exporting OTEL traces to http://localhost:4318/v1/traces and metrics to http://localhost:9000/v1/metrics.",
+      diagnosticsCopy.otelTracesAndMetrics(
+        diagnosticsCopy.localTraceFile,
+        "http://localhost:4318/v1/traces",
+        "http://localhost:9000/v1/metrics",
+      ),
     );
   });
 
@@ -185,7 +198,7 @@ describe("formatDiagnosticsDescription", () => {
         otlpTracesEnabled: false,
         otlpMetricsEnabled: false,
       }),
-    ).toBe("Local trace file.");
+    ).toBe(diagnosticsCopy.modeOnly(diagnosticsCopy.localTraceFile));
   });
 });
 
@@ -272,12 +285,12 @@ describe("getChangedBrowserSettingLabels", () => {
         browserAutoShowFloatingPreview: !DEFAULT_UNIFIED_SETTINGS.browserAutoShowFloatingPreview,
       }),
     ).toEqual([
-      "Browser viewport",
-      "Browser zoom",
-      "Browser appearance",
-      "Recording frame rate",
-      "Open links in",
-      "Floating preview",
+      searchItems.browserDefaultViewport.title,
+      searchItems.browserDefaultZoom.title,
+      searchItems.browserDefaultAppearance.title,
+      searchItems.browserRecordingFrameRate.title,
+      searchItems.browserLinkTarget.title,
+      searchItems.browserAutoShowFloatingPreview.title,
     ]);
   });
 });

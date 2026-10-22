@@ -1,5 +1,6 @@
 import { Smartphone } from "lucide-react";
 
+import { ko } from "~/i18n/ko";
 import { Spinner } from "~/components/ui/spinner";
 
 export function DeviceLoadingView(props: {
@@ -32,7 +33,9 @@ export function DeviceLoadingView(props: {
           <div
             className="flex w-24 gap-1"
             aria-label={
-              props.stage === "opening" ? "Step 1 of 2: open device" : "Step 2 of 2: connect video"
+              props.stage === "opening"
+                ? ko.devices.loading.stepOpen
+                : ko.devices.loading.stepConnect
             }
           >
             <span className="h-1 flex-1 rounded-full bg-foreground/60" />

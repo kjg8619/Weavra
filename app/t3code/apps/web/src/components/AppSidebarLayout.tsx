@@ -10,6 +10,7 @@ import {
 import { useLocation, useNavigate } from "@tanstack/react-router";
 
 import { isElectron } from "../env";
+import { ko } from "~/i18n/ko";
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
 import {
   isRichTextBoldShortcut,
@@ -134,12 +135,14 @@ function SidebarControl() {
                   stageBackdropVariant &&
                   resolveSidebarStageFocusRingOffsetClass(stageBackdropVariant),
               )}
-              aria-label="Toggle main sidebar"
+              aria-label={ko.common.sidebarChrome.toggleMainSidebar}
             />
           }
         />
         <TooltipPopup side="bottom">
-          Toggle main sidebar{shortcutLabel ? ` (${shortcutLabel})` : ""}
+          {shortcutLabel
+            ? ko.common.sidebarChrome.toggleMainSidebarWithShortcut(shortcutLabel)
+            : ko.common.sidebarChrome.toggleMainSidebar}
         </TooltipPopup>
       </Tooltip>
     </div>

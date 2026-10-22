@@ -89,6 +89,7 @@ import {
   resolveTerminalFontSizePreference,
   TYPOGRAPHY_ADVANCED_STORAGE_KEY,
 } from "../appearanceFonts";
+import { ko } from "~/i18n/ko";
 
 const MIN_DRAWER_HEIGHT = 180;
 const MAX_DRAWER_HEIGHT_RATIO = 0.75;
@@ -105,7 +106,17 @@ function clampDrawerHeight(height: number): number {
 }
 
 function writeSystemMessage(terminal: GhosttyTerminalSurface, message: string): void {
-  terminal.write(`\r\n[terminal] ${message}\r\n`);
+  terminal.write(`\r\n[${ko.chat.terminal.systemTag}] ${message}\r\n`);
+}
+
+// Display-only: the default "Terminal N" label is shown in Korean; custom labels and the
+// label passed into terminal context stay unchanged.
+export function terminalDisplayLabel(terminalId: string, serverLabel: string | undefined): string {
+  if (serverLabel !== undefined && serverLabel !== getTerminalLabel(terminalId)) {
+    return serverLabel;
+  }
+  const index = /^term(?:inal)?-(\d+)$/i.exec(terminalId)?.[1];
+  return index ? ko.chat.terminal.tabLabel(index) : terminalId;
 }
 
 export function writeTerminalOutputUpdate(
@@ -256,8 +267,10 @@ export function terminalSelectionMenuItems(options?: {
   return [
     ...(options?.canAddToChat === false
       ? []
-      : ([{ id: "add-to-chat", label: "Add to chat" }] satisfies ContextMenuItem<"add-to-chat">[])),
-    { id: "copy", label: "Copy" },
+      : ([
+          { id: "add-to-chat", label: ko.chat.terminal.addToChat },
+        ] satisfies ContextMenuItem<"add-to-chat">[])),
+    { id: "copy", label: ko.common.copy },
   ];
 }
 
@@ -277,7 +290,7 @@ export function terminalContextMenuItems(options: {
       ...item,
       disabled: !hasSelection,
     })),
-    { id: "paste", label: "Paste" },
+    { id: "paste", label: ko.chat.terminal.paste },
   ];
 }
 
@@ -436,7 +449,10 @@ export function TerminalViewport({
         hasHandledExitRef.current = false;
       } else if (shouldHandleTerminalExit(status, synchronized, hasHandledExitRef.current)) {
         hasHandledExitRef.current = true;
-        writeSystemMessage(terminal, status === "closed" ? "Terminal closed" : "Process exited");
+        writeSystemMessage(
+          terminal,
+          status === "closed" ? ko.chat.terminal.terminalClosed : ko.chat.terminal.processExited,
+        );
         window.setTimeout(() => {
           if (hasHandledExitRef.current) {
             handleSessionExited();
@@ -624,9 +640,9 @@ export function TerminalViewport({
 
       const copySelection = async (text: string, requestId: number) => {
         try {
-          await writeTextToClipboard(text, "terminal selection");
+          await writeTextToClipboard(text, ko.chat.terminal.clipboardSelectionTarget);
         } catch (error) {
-          reportIfCurrent(requestId, error, "Unable to copy terminal selection");
+          reportIfCurrent(requestId, error, ko.chat.terminal.copyFailed);
         }
         focusIfCurrent(requestId);
       };
@@ -639,11 +655,11 @@ export function TerminalViewport({
           // starts: a paste shortcut fired while the menu read is in flight
           // supersedes this paste instead of landing alongside it.
           await activeTerminal.pasteFromClipboard(
-            () => readTextFromClipboard("terminal input"),
+            () => readTextFromClipboard(ko.chat.terminal.clipboardInputTarget),
             () => requestId === selectionActionRequestIdRef.current,
           );
         } catch (error) {
-          reportIfCurrent(requestId, error, "Unable to read the clipboard");
+          reportIfCurrent(requestId, error, ko.chat.terminal.clipboardReadFailed);
           return;
         }
         focusIfCurrent(requestId);
@@ -669,7 +685,7 @@ export function TerminalViewport({
             { x: event.clientX, y: event.clientY },
           );
         } catch (error) {
-          reportIfCurrent(requestId, error, "Unable to open the terminal context menu");
+          reportIfCurrent(requestId, error, ko.chat.terminal.contextMenuFailed);
           focusIfCurrent(requestId);
           return;
         }
@@ -762,7 +778,7 @@ export function TerminalViewport({
         if (navigationData !== null) {
           event.preventDefault();
           event.stopPropagation();
-          void sendTerminalInput(navigationData, "Failed to move cursor");
+          void sendTerminalInput(navigationData, ko.chat.terminal.moveCursorFailed);
           return false;
         }
 
@@ -770,14 +786,14 @@ export function TerminalViewport({
         if (deleteData !== null) {
           event.preventDefault();
           event.stopPropagation();
-          void sendTerminalInput(deleteData, "Failed to delete terminal input");
+          void sendTerminalInput(deleteData, ko.chat.terminal.deleteInputFailed);
           return false;
         }
 
         if (!isTerminalClearShortcut(event)) return true;
         event.preventDefault();
         event.stopPropagation();
-        void sendTerminalInput("\u000c", "Failed to clear terminal");
+        void sendTerminalInput("\u000c", ko.chat.terminal.clearFailed);
         return false;
       }
 
@@ -786,14 +802,14 @@ export function TerminalViewport({
         if (!latestTerminal) return;
         if (isTerminalUrl(text)) {
           if (!localApi) {
-            writeSystemMessage(latestTerminal, "Opening links is unavailable in this browser.");
+            writeSystemMessage(latestTerminal, ko.chat.terminal.linksUnavailable);
             return;
           }
           const fallbackToBrowser = () => {
             void localApi.shell.openExternal(text).catch((error: unknown) => {
               writeSystemMessage(
                 latestTerminal,
-                error instanceof Error ? error.message : "Unable to open link",
+                error instanceof Error ? error.message : ko.chat.terminal.openLinkFailed,
               );
             });
           };
@@ -807,8 +823,8 @@ export function TerminalViewport({
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "Unable to open link",
-                description: error instanceof Error ? error.message : "An error occurred.",
+                title: ko.chat.terminal.openLinkFailed,
+                description: error instanceof Error ? error.message : ko.chat.terminal.genericError,
               }),
             );
           });
@@ -823,7 +839,7 @@ export function TerminalViewport({
           const error = squashAtomCommandFailure(result);
           writeSystemMessage(
             latestTerminal,
-            error instanceof Error ? error.message : "Unable to open path",
+            error instanceof Error ? error.message : ko.chat.terminal.openPathFailed,
           );
         })();
       }
@@ -835,7 +851,7 @@ export function TerminalViewport({
           const error = squashAtomCommandFailure(result);
           writeSystemMessage(
             terminal,
-            error instanceof Error ? error.message : "Terminal write failed",
+            error instanceof Error ? error.message : ko.chat.terminal.writeFailed,
           );
         })();
       }
@@ -909,9 +925,8 @@ export function TerminalViewport({
         setupTerminal?.dispose();
         setupTerminal = null;
         if (cancelled) return;
-        const message =
-          error instanceof Error ? error.message : "Unable to initialize libghostty-vt";
-        mount.textContent = `${message} — close and reopen the terminal to retry.`;
+        const message = error instanceof Error ? error.message : ko.chat.terminal.initFailed;
+        mount.textContent = ko.chat.terminal.initRetry(message);
       });
 
     return () => {
@@ -1251,21 +1266,21 @@ export default function ThreadTerminalDrawer({
     [cwd, runtimeEnv, terminalLaunchLocationsById, worktreePath],
   );
   const splitTerminalActionLabel = hasReachedSplitLimit
-    ? `Split Terminal Horizontally (max ${MAX_TERMINALS_PER_GROUP} per group)`
+    ? ko.chat.terminal.atSplitLimit(ko.chat.terminal.splitHorizontal, MAX_TERMINALS_PER_GROUP)
     : splitShortcutLabel
-      ? `Split Terminal Horizontally (${splitShortcutLabel})`
-      : "Split Terminal Horizontally";
+      ? ko.chat.terminal.withShortcut(ko.chat.terminal.splitHorizontal, splitShortcutLabel)
+      : ko.chat.terminal.splitHorizontal;
   const splitTerminalVerticalActionLabel = hasReachedSplitLimit
-    ? `Split Terminal Vertically (max ${MAX_TERMINALS_PER_GROUP} per group)`
+    ? ko.chat.terminal.atSplitLimit(ko.chat.terminal.splitVertical, MAX_TERMINALS_PER_GROUP)
     : splitVerticalShortcutLabel
-      ? `Split Terminal Vertically (${splitVerticalShortcutLabel})`
-      : "Split Terminal Vertically";
+      ? ko.chat.terminal.withShortcut(ko.chat.terminal.splitVertical, splitVerticalShortcutLabel)
+      : ko.chat.terminal.splitVertical;
   const newTerminalActionLabel = newShortcutLabel
-    ? `New Terminal (${newShortcutLabel})`
-    : "New Terminal";
+    ? ko.chat.terminal.withShortcut(ko.chat.terminal.newTerminal, newShortcutLabel)
+    : ko.chat.terminal.newTerminal;
   const closeTerminalActionLabel = closeShortcutLabel
-    ? `Close Terminal (${closeShortcutLabel})`
-    : "Close Terminal";
+    ? ko.chat.terminal.withShortcut(ko.chat.terminal.closeTerminal, closeShortcutLabel)
+    : ko.chat.terminal.closeTerminal;
   const onSplitTerminalAction = useCallback(() => {
     if (hasReachedSplitLimit) return;
     onSplitTerminal();
@@ -1279,12 +1294,12 @@ export default function ThreadTerminalDrawer({
   }, [onNewTerminal]);
   const confirmCloseTerminal = useCallback(
     (terminalId: string) => {
-      const label = terminalLabelById.get(terminalId) ?? getTerminalLabel(terminalId);
+      const label = terminalDisplayLabel(terminalId, terminalLabelsById?.get(terminalId));
       void confirmTerminalClose([label]).then((confirmed) => {
         if (confirmed) onCloseTerminal(terminalId);
       });
     },
-    [onCloseTerminal, terminalLabelById],
+    [onCloseTerminal, terminalLabelsById],
   );
 
   useEffect(() => {
@@ -1409,7 +1424,7 @@ export default function ThreadTerminalDrawer({
           />
         ) : null}
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-4 py-6 text-center text-sm text-muted-foreground">
-          <p>No terminal sessions for this thread yet.</p>
+          <p>{ko.chat.terminal.emptyState}</p>
           <Button size="xs" variant="outline" onClick={onNewTerminalAction}>
             {newTerminalActionLabel}
           </Button>
@@ -1636,10 +1651,10 @@ export default function ThreadTerminalDrawer({
                   const terminalCount = terminalGroup.terminalIds.length;
                   const isSplitGroup = terminalCount > 1;
                   const groupLabel = !isSplitGroup
-                    ? "Single"
+                    ? ko.chat.terminal.groupSingle
                     : terminalGroup.splitDirection === "vertical"
-                      ? "Stacked"
-                      : "Side by side";
+                      ? ko.chat.terminal.groupStacked
+                      : ko.chat.terminal.groupSideBySide;
                   const GroupIcon = !isSplitGroup
                     ? Square
                     : terminalGroup.splitDirection === "vertical"
@@ -1669,10 +1684,17 @@ export default function ThreadTerminalDrawer({
                       <div className="flex flex-col gap-0.5">
                         {terminalGroup.terminalIds.map((terminalId) => {
                           const isActive = terminalId === resolvedActiveTerminalId;
-                          const terminalLabel = terminalLabelById.get(terminalId) ?? "Terminal";
-                          const closeTerminalLabel = `Close ${terminalLabel}${
-                            isActive && closeShortcutLabel ? ` (${closeShortcutLabel})` : ""
-                          }`;
+                          const terminalLabel = terminalDisplayLabel(
+                            terminalId,
+                            terminalLabelsById?.get(terminalId),
+                          );
+                          const closeTerminalLabel =
+                            isActive && closeShortcutLabel
+                              ? ko.chat.terminal.withShortcut(
+                                  ko.chat.terminal.closeTab(terminalLabel),
+                                  closeShortcutLabel,
+                                )
+                              : ko.chat.terminal.closeTab(terminalLabel);
                           return (
                             <div
                               key={terminalId}

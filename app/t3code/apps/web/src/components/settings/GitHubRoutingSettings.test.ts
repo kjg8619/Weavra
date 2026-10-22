@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { summarizeGitHubRouting } from "./GitHubRoutingSettings";
+import { ko } from "~/i18n/ko";
+
+const copy = ko.settings.githubRouting;
 
 describe("summarizeGitHubRouting", () => {
   it("is empty when no machine shares", () => {
@@ -15,6 +18,8 @@ describe("summarizeGitHubRouting", () => {
         { label: "cup2", permission: "off" },
         { label: "Theo's MacBook Pro", permission: "read-write" },
       ]),
-    ).toBe("bb-1, Theo's MacBook Pro read and act · alvin read PRs");
+    ).toBe(
+      `${copy.summaryGroup("bb-1, Theo's MacBook Pro", copy.readAndAct)} · ${copy.summaryGroup("alvin", copy.readPrs)}`,
+    );
   });
 });

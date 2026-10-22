@@ -13,6 +13,7 @@ import { Button } from "~/components/ui/button";
 import { InputGroup, InputGroupInput } from "~/components/ui/input-group";
 import { toastManager } from "~/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { ko } from "~/i18n/ko";
 import { useComposerHandleContext } from "~/composerHandleContext";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { useTheme } from "~/hooks/useTheme";
@@ -54,14 +55,16 @@ function RefreshFilesButton(props: { isPending: boolean; onRefresh: () => void }
             type="button"
             variant="ghost"
             size="icon-xs"
-            aria-label="Refresh workspace files"
+            aria-label={ko.projects.files.refreshWorkspaceFiles}
             onClick={props.onRefresh}
           />
         }
       >
         <RefreshIcon refreshing={props.isPending} />
       </TooltipTrigger>
-      <TooltipPopup>{props.isPending ? "Refreshing…" : "Refresh files"}</TooltipPopup>
+      <TooltipPopup>
+        {props.isPending ? ko.projects.files.refreshing : ko.projects.files.refreshFiles}
+      </TooltipPopup>
     </Tooltip>
   );
 }
@@ -81,7 +84,7 @@ function FileSearchField(props: {
         size="sm"
         value={props.value}
         aria-label={props.ariaLabel}
-        placeholder="Search files"
+        placeholder={ko.projects.files.searchPlaceholder}
         spellCheck={false}
         onChange={(event) => props.onValueChange(event.target.value)}
         onKeyDown={(event) => {
@@ -228,8 +231,8 @@ export default function FileBrowserPanel({
       const clicked = await api.contextMenu.show(
         [
           ...fileMenuItems,
-          { id: "copy-mention", label: "Copy mention" },
-          { id: "add-to-chat", label: "Add to chat" },
+          { id: "copy-mention", label: ko.projects.files.copyMention },
+          { id: "add-to-chat", label: ko.projects.files.addToChat },
         ],
         position,
       );
@@ -245,12 +248,16 @@ export default function FileBrowserPanel({
       if (clicked === "copy-mention") {
         try {
           await writeTextToClipboard(mention);
-          toastManager.add({ type: "success", title: "Mention copied", description: relativePath });
+          toastManager.add({
+            type: "success",
+            title: ko.projects.files.mentionCopied,
+            description: relativePath,
+          });
         } catch (error) {
           toastManager.add({
             type: "error",
-            title: "Failed to copy mention",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: ko.projects.files.copyMentionFailed,
+            description: error instanceof Error ? error.message : ko.projects.files.genericError,
           });
         }
         return;
@@ -260,8 +267,8 @@ export default function FileBrowserPanel({
         if (!composer) {
           toastManager.add({
             type: "error",
-            title: "Unable to add to chat",
-            description: "Open a chat for this project and try again.",
+            title: ko.projects.files.addToChatFailed,
+            description: ko.projects.files.openChatAndRetry,
           });
           return;
         }
@@ -269,8 +276,8 @@ export default function FileBrowserPanel({
         if (!inserted) {
           toastManager.add({
             type: "error",
-            title: "Unable to add to chat",
-            description: "The chat isn't ready to accept input right now.",
+            title: ko.projects.files.addToChatFailed,
+            description: ko.projects.files.chatNotReady,
           });
         }
       }
@@ -539,7 +546,7 @@ export default function FileBrowserPanel({
         <RefreshFilesButton isPending={isPending} onRefresh={handleRefresh} />
         <FileSearchField
           name="project-files-search"
-          ariaLabel={`Search ${projectName} files`}
+          ariaLabel={ko.projects.files.searchFiles(projectName)}
           value={search.value}
           onValueChange={handleSearchValueChange}
           onClose={closeSearch}
@@ -554,8 +561,8 @@ export default function FileBrowserPanel({
                   variant="ghost"
                   aria-label={
                     expandAll || allDirectoriesExpanded
-                      ? "Collapse all folders"
-                      : "Expand all folders"
+                      ? ko.projects.files.collapseAllFolders
+                      : ko.projects.files.expandAllFolders
                   }
                   onClick={toggleAllDirectories}
                 />
@@ -568,19 +575,21 @@ export default function FileBrowserPanel({
               )}
             </TooltipTrigger>
             <TooltipPopup>
-              {expandAll || allDirectoriesExpanded ? "Collapse all folders" : "Expand all folders"}
+              {expandAll || allDirectoriesExpanded
+                ? ko.projects.files.collapseAllFolders
+                : ko.projects.files.expandAllFolders}
             </TooltipPopup>
           </Tooltip>
         ) : null}
       </div>
       {query.trim() && pathSearch.truncated && !pathSearch.isPending ? (
         <div className="px-3 py-1 text-xs text-muted-foreground">
-          More matches available. Refine your search.
+          {ko.projects.files.moreMatches}
         </div>
       ) : null}
       <div
         role="region"
-        aria-label={`${projectName} files`}
+        aria-label={ko.projects.files.projectFiles(projectName)}
         className="flex min-h-0 flex-1 flex-col"
       >
         {bodyState.kind === "loading" ? (
@@ -636,7 +645,7 @@ export default function FileBrowserPanel({
         ) : null}
         <FileTree
           model={model}
-          aria-label={`${projectName} file tree`}
+          aria-label={ko.projects.files.fileTree(projectName)}
           className="min-h-0 flex-1 overflow-hidden"
           style={pierreTreeStyle(resolvedTheme)}
         />

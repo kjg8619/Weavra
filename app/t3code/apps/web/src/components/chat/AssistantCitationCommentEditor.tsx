@@ -45,7 +45,7 @@ export function AssistantCitationCommentEditor({
       <textarea
         ref={inputRef}
         aria-label="선택한 텍스트에 댓글"
-        aria-description="Enter로 인용 댓글을 저장하고, Command/Ctrl+Enter로 저장 후 보내고, Shift+Enter로 줄을 바꿔요."
+        aria-description="엔터 키로 인용 댓글을 저장하고, 커맨드 또는 컨트롤+엔터 키로 저장 후 보내고, 시프트+엔터 키로 줄을 바꿔요."
         aria-invalid={commentTooLong || undefined}
         placeholder="댓글을 추가할 수 있어요..."
         rows={2}

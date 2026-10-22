@@ -4,6 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftCloseIcon, PanelLeftIcon } from "lucide-react";
 import * as React from "react";
 import { cn } from "~/lib/utils";
+import { ko } from "~/i18n/ko";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import {
@@ -247,8 +248,8 @@ function Sidebar({
             }
           >
             <SheetHeader className="sr-only">
-              <SheetTitle>Sidebar</SheetTitle>
-              <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+              <SheetTitle>{ko.common.sidebarChrome.mobileSheetTitle}</SheetTitle>
+              <SheetDescription>{ko.common.sidebarChrome.mobileSheetDescription}</SheetDescription>
             </SheetHeader>
             <div
               className={cn(
@@ -339,7 +340,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
       {...props}
     >
       {isOpen ? <PanelLeftCloseIcon /> : <PanelLeftIcon />}
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">{ko.common.sidebarChrome.toggleSidebar}</span>
     </Button>
   );
 }
@@ -368,8 +369,12 @@ function SidebarRail({
     latestResizable.current = resolvedResizable;
   }, [resolvedResizable]);
   const canResize = resolvedResizable !== null && open;
-  const railLabel = canResize ? "Resize Sidebar" : "Toggle Sidebar";
-  const railTitle = canResize ? "Drag to resize sidebar" : "Toggle Sidebar";
+  const railLabel = canResize
+    ? ko.common.sidebarChrome.resizeSidebar
+    : ko.common.sidebarChrome.toggleSidebar;
+  const railTitle = canResize
+    ? ko.common.sidebarChrome.dragToResizeSidebar
+    : ko.common.sidebarChrome.toggleSidebar;
   const resize = useResizeDrag<HTMLButtonElement>((event) => {
     if (!resolvedResizable || !open) return null;
     const rail = event.currentTarget;

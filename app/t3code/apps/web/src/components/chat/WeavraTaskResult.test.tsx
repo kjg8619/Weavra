@@ -333,7 +333,7 @@ describe("canonical result presentation", () => {
       .findAllByType("details")
       .find(
         (node) =>
-          node.findAll((child) => child.children.join("").includes("Run run-result")).length > 0,
+          node.findAll((child) => child.children.join("").includes("실행 run-result")).length > 0,
       );
     expect(runIdentityDisclosure).toBeDefined();
     expect(runIdentityDisclosure?.props.open).toBeUndefined();
@@ -577,7 +577,7 @@ describe("reported Run usage", () => {
     });
     await render();
     expect(usageLines()).toHaveLength(1);
-    expect(usageLines()[0]?.children.join("")).toBe("보고된 토큰 1,234 · 도구 호출 7 · worker 2");
+    expect(usageLines()[0]?.children.join("")).toBe("보고된 토큰 1,234 · 도구 호출 7 · 워커 2");
   });
 
   it("says no tokens were reported instead of estimating them", async () => {
@@ -586,7 +586,7 @@ describe("reported Run usage", () => {
       workers: { count: 1, reportedTokens: null, toolCalls: 0 },
     });
     await render();
-    expect(usageLines()[0]?.children.join("")).toBe("토큰 보고 없음 · 도구 호출 0 · worker 1");
+    expect(usageLines()[0]?.children.join("")).toBe("토큰 보고 없음 · 도구 호출 0 · 워커 1");
   });
 
   it("hides usage when the snapshot has no evidence or belongs to another Run", async () => {
@@ -725,7 +725,7 @@ describe("completed Run diff and PR description", () => {
     expect(draft).toContain("| `symptom-test` | 0 | PASS |");
     expect(draft).toContain("## 독립 검토\nPASS · 독립 검토 예");
     expect(draft).toContain("## 변경 파일\n- `src/fix.ts`");
-    expect(draft).toContain("Weavra Run `run-result` · 상태 revision 9 · 코드 revision 2");
+    expect(draft).toContain("Weavra 실행 `run-result` · 상태 리비전 9 · 코드 리비전 2");
     expect(draft).not.toContain("일부 기록만");
     expect(mocks.toast).toHaveBeenCalledWith({
       type: "success",
@@ -1022,7 +1022,7 @@ describe("failure reason and next action", () => {
       ];
     expect(draft?.goal).toBe("Fix observed failure");
     expect(draft?.criteria).toBe("The observed failure is fixed");
-    expect(draft?.constraints).toContain("이전 Run run-result 검토 결과 REVISE");
+    expect(draft?.constraints).toContain("이전 실행 run-result 검토 결과 REVISE");
     expect(draft?.constraints).toContain("AC-001 미충족: The observed failure is fixed");
     expect(failureSection().findByProps({ role: "status" }).children.join("")).toContain(
       "새 통제 작업을 만들고",

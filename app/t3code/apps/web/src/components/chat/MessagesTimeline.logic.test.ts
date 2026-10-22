@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { ko } from "~/i18n/ko";
 import {
   ApprovalRequestId,
   CheckpointRef,
@@ -744,25 +745,33 @@ describe("work entry labels", () => {
 
   it("keeps command summaries compact without replacing the full command in expanded rows", () => {
     const commandEntry = { ...entry, command: "vp test run", detail: "All tests passed" };
-    expect(liveWorkEntryLabel(commandEntry, undefined, true)).toBe("Running vp");
-    expect(liveWorkEntryLabel(commandEntry, undefined, false)).toBe("Ran vp");
+    expect(liveWorkEntryLabel(commandEntry, undefined, true)).toBe(
+      ko.chat.timeline.commandRunning("vp"),
+    );
+    expect(liveWorkEntryLabel(commandEntry, undefined, false)).toBe(
+      ko.chat.timeline.commandRan("vp"),
+    );
     expect(workEntryDisplayLabel(commandEntry, undefined)).toBe("vp test run");
   });
 
   it("summarizes the program inside a shell wrapper while preserving the expanded command", () => {
     const command = "/bin/zsh -lc 'vp test run apps/web/src/session-logic.test.ts'";
     const commandEntry = { ...entry, command };
-    expect(liveWorkEntryLabel(commandEntry, undefined, true)).toBe("Running vp");
-    expect(liveWorkEntryLabel(commandEntry, undefined, false)).toBe("Ran vp");
+    expect(liveWorkEntryLabel(commandEntry, undefined, true)).toBe(
+      ko.chat.timeline.commandRunning("vp"),
+    );
+    expect(liveWorkEntryLabel(commandEntry, undefined, false)).toBe(
+      ko.chat.timeline.commandRan("vp"),
+    );
     expect(workEntryDisplayLabel(commandEntry, undefined)).toBe(command);
   });
 
   it.each([
-    ["inProgress", "Running vp", "Running vp"],
-    ["completed", "Running vp", "Ran vp"],
-    ["failed", "Failed vp", "Failed vp"],
-    ["declined", "Declined vp", "Declined vp"],
-    ["stopped", "Stopped vp", "Stopped vp"],
+    ["inProgress", ko.chat.timeline.commandRunning("vp"), ko.chat.timeline.commandRunning("vp")],
+    ["completed", ko.chat.timeline.commandRunning("vp"), ko.chat.timeline.commandRan("vp")],
+    ["failed", ko.chat.timeline.commandFailed("vp"), ko.chat.timeline.commandFailed("vp")],
+    ["declined", ko.chat.timeline.commandDeclined("vp"), ko.chat.timeline.commandDeclined("vp")],
+    ["stopped", ko.chat.timeline.commandStopped("vp"), ko.chat.timeline.commandStopped("vp")],
   ] as const)(
     "uses present tense for a live %s command and the outcome once it is no longer live",
     (toolLifecycleStatus, liveLabel, settledLabel) => {
@@ -1735,7 +1744,7 @@ describe("deriveMessagesTimelineRows", () => {
     expect(foldRow?.turnId).toBe("turn-1");
     expect(foldRow?.expanded).toBe(false);
     // User message boundary (00:00:00) → terminal message updatedAt (00:00:22).
-    expect(foldRow?.label).toBe("Worked for 22s");
+    expect(foldRow?.label).toBe(ko.chat.timeline.workedFor("22s"));
     expect(collapsedRows.map((row) => row.id)).toEqual([
       "user-entry",
       "turn-fold:turn-1",
@@ -2391,7 +2400,7 @@ describe("deriveMessagesTimelineRows", () => {
     );
     // User message (00:00:00) → trailing work entry (00:00:12).
     expect(foldRow?.turnId).toBe("turn-1");
-    expect(foldRow?.label).toBe("Worked for 12s");
+    expect(foldRow?.label).toBe(ko.chat.timeline.workedFor("12s"));
   });
 
   it("uses latest-turn timings and the stopped label for an interrupted latest turn", () => {
@@ -2426,7 +2435,7 @@ describe("deriveMessagesTimelineRows", () => {
       expect.objectContaining({
         kind: "turn-fold",
         turnId: "turn-1",
-        label: "You stopped after 47s",
+        label: ko.chat.timeline.stoppedAfter("47s"),
         expanded: false,
       }),
     ]);

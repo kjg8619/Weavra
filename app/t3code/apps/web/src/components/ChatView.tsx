@@ -232,7 +232,7 @@ import {
 } from "@t3tools/client-runtime/state/subagentRuntime";
 import { BranchToolbar, type BranchToolbarHandle } from "./BranchToolbar";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
-import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
+import ThreadTerminalDrawer, { terminalDisplayLabel } from "./ThreadTerminalDrawer";
 import {
   AlarmClockIcon,
   CheckCircle2Icon,
@@ -554,6 +554,7 @@ import {
   ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
   recallableComposerPrompt,
 } from "./chat/composerPromptHistory";
+import { ko } from "~/i18n/ko";
 
 const EMPTY_ACTIVITIES: OrchestrationThreadActivity[] = [];
 const EMPTY_QUEUED_MESSAGES: QueuedComposerMessage[] = [];
@@ -578,10 +579,13 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
   const idPrefix = useId();
   const [pending, setPending] = useState<FirstRequestSuggestion | null>(null);
   const mode = runtimeModeConfig[props.runtimeMode];
-  const scope = props.projectName ? `${props.projectName}에서 ` : "";
+  const scope = props.projectName ? ko.chat.view.suggestionScope(props.projectName) : "";
   if (props.suggestions.length === 0) return null;
   return (
-    <section aria-label="첫 요청 제안" className="pointer-events-auto mx-auto w-full max-w-3xl">
+    <section
+      aria-label={ko.chat.view.firstRequestSuggestions}
+      className="pointer-events-auto mx-auto w-full max-w-3xl"
+    >
       <ul className="grid gap-2 sm:auto-cols-fr sm:grid-flow-col">
         {props.suggestions.map((suggestion) => {
           const reasonId = `${idPrefix}-${suggestion.id}`;
@@ -615,10 +619,10 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
       {pending && props.hasDraftText ? (
         <div
           role="group"
-          aria-label="작성 중인 내용 처리"
+          aria-label={ko.chat.view.draftConflictGroup}
           className="mt-2 flex flex-wrap items-center gap-2 text-sm"
         >
-          <span className="text-muted-foreground">작성 중인 내용이 있어요.</span>
+          <span className="text-muted-foreground">{ko.chat.view.draftInProgress}</span>
           <Button
             size="sm"
             variant="outline"
@@ -628,7 +632,7 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
               setPending(null);
             }}
           >
-            뒤에 이어 쓰기
+            {ko.chat.view.appendToDraft}
           </Button>
           <Button
             size="sm"
@@ -639,7 +643,7 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
               setPending(null);
             }}
           >
-            제안으로 바꾸기
+            {ko.chat.view.replaceWithSuggestion}
           </Button>
           <Button
             size="sm"
@@ -647,12 +651,12 @@ const FirstRequestSuggestions = memo(function FirstRequestSuggestions(props: {
             className="h-8 px-3 sm:h-8"
             onClick={() => setPending(null)}
           >
-            취소
+            {ko.common.cancel}
           </Button>
         </div>
       ) : null}
       <p className="mt-2 break-keep font-normal text-muted-foreground text-pretty text-sm leading-5">
-        제안은 작성기에만 넣고 보내지 않아요. 실행 모드 {mode.label}: {scope}
+        {ko.chat.view.suggestionNotice(mode.label, scope)}
         {mode.description}
       </p>
     </section>
@@ -1559,7 +1563,7 @@ type LocalThreadErrorEntry = {
 };
 
 function chatActionErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "오류가 발생했어요.";
+  return error instanceof Error ? error.message : ko.chat.view.genericError;
 }
 
 const ENVIRONMENT_UNAVAILABLE_SEND_TOAST_TRAIL_SIZE = 3;
@@ -1785,8 +1789,8 @@ export default function ChatView(props: ChatViewProps) {
       if (!inserted) {
         toastManager.add({
           type: "warning",
-          title: "작성기가 아직 준비되지 않았어요",
-          description: "연결이나 대기 중인 입력이 정리된 뒤 다시 인용해 주세요.",
+          title: ko.chat.view.composerNotReady,
+          description: ko.chat.view.quoteRetryLater,
         });
       }
       return inserted;
@@ -2301,7 +2305,7 @@ export default function ChatView(props: ChatViewProps) {
           stackedThreadToast({
             type: "error",
             title,
-            description: error instanceof Error ? error.message : "오류가 발생했어요.",
+            description: error instanceof Error ? error.message : ko.chat.view.genericError,
           }),
         );
       }
@@ -2312,10 +2316,10 @@ export default function ChatView(props: ChatViewProps) {
     activeProjectClone === null
       ? null
       : activeProjectClone.phase === "running"
-        ? "저장소를 복제하는 중"
+        ? ko.chat.view.cloningRepository
         : activeProjectClone.phase === "done"
           ? null
-          : "저장소를 복제하지 못했어요";
+          : ko.chat.view.cloneRepositoryFailed;
   const projectCloneBannerItem = useMemo<ComposerBannerStackItem | null>(() => {
     if (!activeProjectClone || !activeProjectRef || activeProjectClone.phase === "done") {
       return null;
@@ -2329,19 +2333,19 @@ export default function ChatView(props: ChatViewProps) {
         compact: true,
         priority: "activity",
         icon: <DownloadIcon />,
-        title: `${name} 복제 중`,
+        title: ko.chat.view.cloning(name),
         description: projectCloneProgressSummary(activeProjectClone),
         actions: (
           <Button
             size="xs"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneAction("복제를 취소하지 못했어요", () =>
+              void runProjectCloneAction(ko.chat.view.cloneCancelFailed, () =>
                 cancelProjectClone({ environmentId, input: { projectId } }),
               )
             }
           >
-            취소
+            {ko.common.cancel}
           </Button>
         ),
       };
@@ -2352,8 +2356,8 @@ export default function ChatView(props: ChatViewProps) {
       variant: cancelled ? "warning" : "error",
       compact: true,
       icon: <DownloadIcon />,
-      title: cancelled ? `Cancelled cloning ${name}` : `Failed to clone ${name}`,
-      description: cancelled ? "다시 시도해서 저장소를 가져와 주세요." : activeProjectClone.error,
+      title: cancelled ? ko.chat.view.cloneCancelled(name) : ko.chat.view.cloneFailed(name),
+      description: cancelled ? ko.chat.view.cloneRetryHint : activeProjectClone.error,
       actions: (
         <>
           <Button
@@ -2361,18 +2365,18 @@ export default function ChatView(props: ChatViewProps) {
             variant="ghost"
             onClick={() => void removeClonedProject({ environmentId, projectId })}
           >
-            프로젝트 제거
+            {ko.chat.view.removeProject}
           </Button>
           <Button
             size="xs"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneAction("복제를 다시 시도하지 못했어요", () =>
+              void runProjectCloneAction(ko.chat.view.cloneRetryFailed, () =>
                 retryProjectClone({ environmentId, input: { projectId } }),
               )
             }
           >
-            다시 시도
+            {ko.common.retry}
           </Button>
         </>
       ),
@@ -2519,8 +2523,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "환경에 다시 연결하지 못했어요",
-            description: error instanceof Error ? error.message : "다시 연결하지 못했어요.",
+            title: ko.chat.view.reconnectFailedTitle,
+            description: error instanceof Error ? error.message : ko.chat.view.reconnectFailed,
           }),
         );
       }
@@ -2547,8 +2551,8 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "서버 연결을 끊지 못했어요",
-              description: error instanceof Error ? error.message : "연결을 끊지 못했어요.",
+              title: ko.chat.view.disconnectFailedTitle,
+              description: error instanceof Error ? error.message : ko.chat.view.disconnectFailed,
             }),
           );
         }
@@ -2616,7 +2620,7 @@ export default function ChatView(props: ChatViewProps) {
   const openOrReuseProjectDraftThread = useCallback(
     async (input: { branch: string; worktreePath: string | null; envMode: DraftThreadEnvMode }) => {
       if (!activeProject) {
-        throw new Error("No active project is available for this pull request.");
+        throw new Error(ko.chat.view.noActiveProjectForPullRequest);
       }
       const activeProjectRef = scopeProjectRef(activeProject.environmentId, activeProject.id);
       const logicalProjectKey = deriveLogicalProjectKeyFromSettings(
@@ -2873,12 +2877,12 @@ export default function ChatView(props: ChatViewProps) {
           size="xs"
           variant="ghost"
           disabled={disconnectingEnvironment}
-          title="이 서버의 대화를 숨겨요. 연결 설정에서 다시 켤 수 있어요."
+          title={ko.chat.view.disconnectServerHint}
           onClick={() =>
             void handleDisconnectActiveEnvironment(activeEnvironmentUnavailableState.environmentId)
           }
         >
-          서버 연결 끊기
+          {ko.chat.view.disconnectServer}
         </Button>
       ) : undefined;
     const environmentReconnecting =
@@ -2912,8 +2916,11 @@ export default function ChatView(props: ChatViewProps) {
               aria-hidden="true"
             />
           ),
-          title: `${activeEnvironmentUnavailableState.label}에 ${unavailableConnection.phase === "connecting" ? "연결하는 중" : "다시 연결하는 중"}`,
-          description: "업데이트를 마무리하는 중",
+          title:
+            unavailableConnection.phase === "connecting"
+              ? ko.chat.view.connectingTo(activeEnvironmentUnavailableState.label)
+              : ko.chat.view.reconnectingTo(activeEnvironmentUnavailableState.label),
+          description: ko.chat.view.finishingUpdate,
           actions: disconnectAction,
         });
       } else {
@@ -2921,7 +2928,9 @@ export default function ChatView(props: ChatViewProps) {
           id: `environment-unavailable:${activeEnvironmentUnavailableState.environmentId}`,
           variant: unavailableConnection.phase === "error" ? "error" : "warning",
           icon: <WifiOffIcon />,
-          title: `${activeEnvironmentUnavailableState.label} is ${environmentReconnecting ? "reconnecting" : "offline"}`,
+          title: environmentReconnecting
+            ? ko.chat.view.environmentReconnecting(activeEnvironmentUnavailableState.label)
+            : ko.chat.view.environmentOffline(activeEnvironmentUnavailableState.label),
           actions: (
             <>
               {!environmentReconnecting ? (
@@ -2934,7 +2943,7 @@ export default function ChatView(props: ChatViewProps) {
                     )
                   }
                 >
-                  다시 연결
+                  {ko.chat.view.reconnect}
                 </Button>
               ) : null}
               {disconnectAction}
@@ -2973,7 +2982,7 @@ export default function ChatView(props: ChatViewProps) {
                     type="button"
                     className="block max-w-full cursor-help truncate rounded-sm text-left"
                   >
-                    Client/server build mismatch
+                    {ko.chat.view.buildMismatch}
                   </button>
                 }
               />
@@ -2983,7 +2992,7 @@ export default function ChatView(props: ChatViewProps) {
               </TooltipPopup>
             </Tooltip>
           ) : (
-            "Client/server build mismatch"
+            ko.chat.view.buildMismatch
           ),
         description:
           !updateInProgress &&
@@ -3004,14 +3013,14 @@ export default function ChatView(props: ChatViewProps) {
             desktopAppUpdate={versionMismatchDesktopAppUpdate}
             threadContinuation={versionMismatchThreadContinuation}
             targetVersion={versionMismatch.clientVersion}
-            label={updateFailed ? "다시 시도" : "Update"}
+            label={updateFailed ? ko.common.retry : ko.chat.view.update}
             variant="ghost"
           />
         ),
         ...(updateInProgress || (!updateFailed && !versionMismatchDismissKey)
           ? {}
           : {
-              dismissLabel: "업데이트 알림 닫기",
+              dismissLabel: ko.chat.view.dismissUpdateNotice,
               onDismiss: () => {
                 if (updateFailed) {
                   dismissServerUpdateFailure(serverUpdateState);
@@ -3368,7 +3377,7 @@ export default function ChatView(props: ChatViewProps) {
       return true;
     }
     setUsageLimitsPanel(null);
-    toastManager.add({ type: "info", title: "이 공급자는 사용 한도를 볼 수 없어요" });
+    toastManager.add({ type: "info", title: ko.chat.view.usageLimitUnavailable });
     return false;
   }, [
     activeProviderInstanceId,
@@ -3452,16 +3461,16 @@ export default function ChatView(props: ChatViewProps) {
   const isPreparingWorktree = isLocallyPreparingWorktree || awaitingBootstrapTurn;
   const controlledSendReason =
     controlledTask.route === "blocked"
-      ? "보내기 전에 통제 작업을 동기화하고 실행 권한을 확인해 주세요."
+      ? ko.chat.view.controlledSyncRequired
       : controlledTask.route === "analysis" &&
           (!controlledAnalysisSupported || controlledProvider !== "codex")
-        ? "선택한 프로바이더는 읽기 전용 조사를 지원하지 않아요. 다른 방식으로 자동 전환하지 않아요."
+        ? ko.chat.view.readOnlyProbeUnsupported
         : controlledTask.route === "analysis" && isWorking
-          ? "현재 읽기 전용 조사가 끝날 때까지 기다려 주세요."
+          ? ko.chat.view.waitForReadOnlyProbe
           : composerHasNonPromptContent
-            ? "통제 작업 메시지에는 텍스트만 보낼 수 있어요. 기존 첨부 파일이나 참고 자료를 제거하려면 아직 확인하지 않은 작업을 중단해 주세요."
+            ? ko.chat.view.controlledTextOnly
             : !controlledAnalysisSupported && controlledTask.route === "followup"
-              ? "이 환경은 작업 메시지 API를 제공하지 않아요."
+              ? ko.chat.view.taskMessageApiUnsupported
               : null;
   const activeWorkStartedAt = deriveActiveWorkStartedAt(
     activeLatestTurn,
@@ -3536,7 +3545,7 @@ export default function ChatView(props: ChatViewProps) {
     async (attachment: ChatFileAttachment) => {
       const connection = readPreparedConnection(environmentId);
       if (!connection) {
-        toastManager.add({ type: "error", title: "환경이 연결되어 있지 않아요." });
+        toastManager.add({ type: "error", title: ko.chat.view.environmentNotConnected });
         return;
       }
 
@@ -3554,8 +3563,8 @@ export default function ChatView(props: ChatViewProps) {
       } catch (error) {
         toastManager.add({
           type: "error",
-          title: `${attachment.name}을(를) 내려받지 못했어요`,
-          description: error instanceof Error ? error.message : "첨부를 사용할 수 없어요.",
+          title: ko.chat.view.attachmentDownloadFailed(attachment.name),
+          description: error instanceof Error ? error.message : ko.chat.view.attachmentUnavailable,
         });
       }
     },
@@ -3641,7 +3650,7 @@ export default function ChatView(props: ChatViewProps) {
               imageInstances.push(image);
               const handleLoad = () => resolve();
               const handleError = () =>
-                reject(new Error(`Failed to load server preview for ${messageId}.`));
+                reject(new Error(ko.chat.view.serverPreviewLoadFailed(messageId)));
               image.addEventListener("load", handleLoad, { once: true });
               image.addEventListener("error", handleError, { once: true });
               image.src = previewUrl;
@@ -4094,9 +4103,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add({
         type: "warning",
         id: "load-balancing-attachments",
-        title: "첨부를 이 기기에 보관해요",
-        description:
-          "Remove attachments before choosing automatic routing, then attach them on the selected machine.",
+        title: ko.chat.view.attachmentsKeptOnDevice,
+        description: ko.chat.view.removeAttachmentsBeforeAutoRouting,
       });
       return;
     }
@@ -4119,12 +4127,12 @@ export default function ChatView(props: ChatViewProps) {
   ]);
   const autoEnvironmentLabel = automaticEnvironment
     ? draftThread?.loadBalancedEnvironmentId
-      ? "자동 분배"
+      ? ko.chat.view.autoDistribution
       : loadBalancing.pending
-        ? "기기를 확인하는 중…"
+        ? ko.chat.view.checkingDevices
         : loadBalancing.failed
-          ? "자동 분배를 쓸 수 없어요"
-          : "자동 분배"
+          ? ko.chat.view.autoDistributionUnavailable
+          : ko.chat.view.autoDistribution
     : undefined;
 
   // Handle environment change for draft threads.  When the user picks a
@@ -4215,7 +4223,7 @@ export default function ChatView(props: ChatViewProps) {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThread.id,
-        error instanceof Error ? error.message : "현재 턴을 중단하지 못했어요.",
+        error instanceof Error ? error.message : ko.chat.view.interruptTurnFailed,
       );
     }
   }, [interruptThreadTurn]);
@@ -4241,8 +4249,8 @@ export default function ChatView(props: ChatViewProps) {
       if (prompt !== null && !composer.insertTextAtEnd(prompt, { ensureLeadingBoundary: true })) {
         toastManager.add({
           type: "error",
-          title: "채팅에 추가하지 못했어요",
-          description: "작성기가 사용 중이에요. 준비되면 다시 시도해 주세요.",
+          title: ko.chat.view.addToChatFailed,
+          description: ko.chat.view.composerBusy,
         });
         return;
       }
@@ -4495,7 +4503,7 @@ export default function ChatView(props: ChatViewProps) {
           const error = squashAtomCommandFailure(openResult);
           setThreadError(
             activeThreadId,
-            error instanceof Error ? error.message : `Failed to run script "${script.name}".`,
+            error instanceof Error ? error.message : ko.chat.view.scriptRunFailed(script.name),
           );
         }
         return;
@@ -4513,7 +4521,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(writeResult);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : `Failed to run script "${script.name}".`,
+          error instanceof Error ? error.message : ko.chat.view.scriptRunFailed(script.name),
         );
       }
     },
@@ -4642,7 +4650,7 @@ export default function ChatView(props: ChatViewProps) {
       }
       const existingScript = activeProjectScripts.find((script) => script.id === scriptId);
       if (!existingScript) {
-        return AsyncResult.failure(Cause.fail(new Error("Script not found.")));
+        return AsyncResult.failure(Cause.fail(new Error(ko.chat.view.scriptNotFound)));
       }
 
       const updatedScript = buildProjectScript(existingScript.id, input);
@@ -4685,16 +4693,15 @@ export default function ChatView(props: ChatViewProps) {
       if (result._tag === "Success") {
         toastManager.add({
           type: "success",
-          title: `"${deletedName ?? "알 수 없음"}" 작업을 삭제했어요`,
+          title: ko.chat.view.actionDeleted(deletedName ?? ko.chat.view.unknownAction),
         });
       } else if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "작업을 삭제하지 못했어요",
-            description:
-              error instanceof Error ? error.message : "예상하지 못한 오류가 발생했어요.",
+            title: ko.chat.view.actionDeleteFailed,
+            description: error instanceof Error ? error.message : ko.chat.view.unexpectedError,
           }),
         );
       }
@@ -4769,7 +4776,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "브라우저를 열지 못했어요",
+              title: ko.chat.view.browserOpenFailed,
               description: error.message,
             }),
           );
@@ -5220,7 +5227,7 @@ export default function ChatView(props: ChatViewProps) {
   );
   const requestCloseTerminal = useCallback(
     (terminalId: string) => {
-      const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
+      const label = terminalDisplayLabel(terminalId, activeTerminalLabelsById.get(terminalId));
       void confirmTerminalClose([label]).then((confirmed) => {
         if (confirmed) closeTerminal(terminalId);
       });
@@ -5229,7 +5236,7 @@ export default function ChatView(props: ChatViewProps) {
   );
   const requestClosePanelTerminal = useCallback(
     (terminalId: string) => {
-      const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
+      const label = terminalDisplayLabel(terminalId, activeTerminalLabelsById.get(terminalId));
       void confirmTerminalClose([label]).then((confirmed) => {
         if (confirmed) closePanelTerminal(terminalId);
       });
@@ -5416,8 +5423,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "경로를 복사하지 못했어요",
-          description: "클립보드를 사용할 수 없어요.",
+          title: ko.chat.view.pathCopyFailed,
+          description: ko.chat.view.clipboardUnavailable,
         }),
       );
       return;
@@ -5427,7 +5434,7 @@ export default function ChatView(props: ChatViewProps) {
       () => {
         toastManager.add({
           type: "success",
-          title: "경로를 복사했어요",
+          title: ko.chat.view.pathCopied,
           description: relativePath,
         });
       },
@@ -5435,8 +5442,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "경로를 복사하지 못했어요",
-            description: error instanceof Error ? error.message : "오류가 발생했어요.",
+            title: ko.chat.view.pathCopyFailed,
+            description: error instanceof Error ? error.message : ko.chat.view.genericError,
           }),
         );
       },
@@ -6120,7 +6127,7 @@ export default function ChatView(props: ChatViewProps) {
         '[data-chat-composer-main-surface="true"]',
       );
       const button = composerOverlayElement?.parentElement?.querySelector<HTMLElement>(
-        'button[aria-label="맨 아래로 이동"]',
+        `button[aria-label="${ko.chat.scrollToLatest}"]`,
       );
       const clearance =
         composerOverlayElement && mainSurface && button
@@ -6254,7 +6261,7 @@ export default function ChatView(props: ChatViewProps) {
           stackedThreadToast({
             type: "error",
             title: target.failureTitle,
-            description: error instanceof Error ? error.message : "오류가 발생했어요.",
+            description: error instanceof Error ? error.message : ko.chat.view.genericError,
           }),
         );
       },
@@ -6361,8 +6368,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "대화 정리를 취소하지 못했어요",
-            description: error instanceof Error ? error.message : "오류가 발생했어요.",
+            title: ko.chat.view.unsettleFailed,
+            description: error instanceof Error ? error.message : ko.chat.view.genericError,
           }),
         );
       }
@@ -6389,8 +6396,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "대화를 다시 열지 못했어요",
-            description: error instanceof Error ? error.message : "오류가 발생했어요.",
+            title: ko.chat.view.reopenFailed,
+            description: error instanceof Error ? error.message : ko.chat.view.genericError,
           }),
         );
       }
@@ -6450,7 +6457,7 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "checkout을 전환하지 못했어요",
+            title: ko.chat.view.checkoutSwitchFailed,
             description: chatActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
           }),
         );
@@ -6470,7 +6477,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "checkout은 전환했지만 대화를 업데이트하지 못했어요",
+              title: ko.chat.view.checkoutSwitchedThreadUpdateFailed,
               description: chatActionErrorMessage(squashAtomCommandFailure(updateResult)),
             }),
           );
@@ -6529,7 +6536,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "백그라운드 작업을 멈추지 못했어요.",
+          error instanceof Error ? error.message : ko.chat.view.stopBackgroundFailed,
         );
       }
     }
@@ -6552,9 +6559,9 @@ export default function ChatView(props: ChatViewProps) {
       ),
       title: working
         ? liveCount > 0
-          ? `에이전트 ${liveCount}개 작업 중`
-          : "백그라운드 작업"
-        : "지켜보는 중",
+          ? ko.chat.view.agentsWorking(liveCount)
+          : ko.chat.view.backgroundWork
+        : ko.chat.view.monitoring,
       actions: (
         <Button
           size="xs"
@@ -6562,7 +6569,7 @@ export default function ChatView(props: ChatViewProps) {
           disabled={isStoppingBackgroundWork}
           onClick={() => void handleStopBackgroundWork()}
         >
-          {isStoppingBackgroundWork ? "Stopping..." : "Stop"}
+          {isStoppingBackgroundWork ? ko.chat.view.stopping : ko.chat.view.stop}
         </Button>
       ),
     };
@@ -6584,9 +6591,9 @@ export default function ChatView(props: ChatViewProps) {
       id: `thread-woke:${activeThread?.id ?? "unknown"}`,
       variant: "info",
       icon: <AlarmClockIcon />,
-      title: "미뤘던 대화가 다시 열렸어요",
-      description: "이어 가려면 메시지를 보내 주세요",
-      dismissLabel: "깨어남 알림 닫기",
+      title: ko.chat.view.snoozedReopenedTitle,
+      description: ko.chat.view.snoozedReopenedDescription,
+      dismissLabel: ko.chat.view.dismissWakeNotice,
       onDismiss: acknowledgeActiveThreadWoke,
     };
   }, [acknowledgeActiveThreadWoke, activeThread?.id, activeThreadWokeVisible]);
@@ -6599,8 +6606,8 @@ export default function ChatView(props: ChatViewProps) {
       id: `thread-${isSnoozed ? "snoozed" : "settled"}:${activeThread?.id ?? "unknown"}`,
       variant: "info",
       icon: isSnoozed ? <AlarmClockIcon /> : <CheckCircle2Icon />,
-      title: `이 대화는 ${isSnoozed ? "미뤄져" : "정리되어"} 있어요`,
-      description: `메시지를 보내면 ${isSnoozed ? "다시 열려요" : "정리가 취소돼요"}`,
+      title: isSnoozed ? ko.chat.view.threadSnoozed : ko.chat.view.threadSettled,
+      description: isSnoozed ? ko.chat.view.sendToReopen : ko.chat.view.sendToUnsettle,
       actions: (
         <Button
           size="xs"
@@ -6612,11 +6619,11 @@ export default function ChatView(props: ChatViewProps) {
         >
           {isSnoozed
             ? isUnsnoozing
-              ? "다시 여는 중..."
-              : "지금 다시 열기"
+              ? ko.chat.view.reopening
+              : ko.chat.view.reopenNow
             : isUnsettling
-              ? "정리 취소 중..."
-              : "정리 취소"}
+              ? ko.chat.view.unsettling
+              : ko.chat.view.unsettle}
         </Button>
       ),
     };
@@ -6660,10 +6667,10 @@ export default function ChatView(props: ChatViewProps) {
   const compactDisabled = compactThreadUnavailable;
   const compactDisabledReason = compactDisabled
     ? !activeProject
-      ? "압축하기 전에 프로젝트를 골라 주세요"
+      ? ko.chat.view.compactNeedsProject
       : !manualCompactionProviderAvailable
-        ? "이 공급자는 압축을 지원하지 않아요"
-        : "지금은 압축할 수 없어요"
+        ? ko.chat.view.compactUnsupported
+        : ko.chat.view.compactUnavailable
     : null;
   const resumeCompactionBannerItem = useMemo<ComposerBannerStackItem | null>(() => {
     if (
@@ -6697,15 +6704,17 @@ export default function ChatView(props: ChatViewProps) {
           composerRef.current?.compactContext();
         }}
       >
-        압축
+        {ko.chat.view.compact}
       </Button>
     );
     return {
       id: `resume-compaction:${resumeCompactionKey}`,
       variant: "info",
       icon: <Minimize2Icon />,
-      title: "더 적은 컨텍스트로 이어 가기",
-      description: `${formatContextWindowTokens(activeContextWindow.usedTokens)} tokens from earlier`,
+      title: ko.chat.view.continueWithLessContext,
+      description: ko.chat.view.earlierTokens(
+        formatContextWindowTokens(activeContextWindow.usedTokens),
+      ),
       actions: compactDisabledReason ? (
         <Tooltip>
           <TooltipTrigger render={<span className="inline-flex">{compactAction}</span>} />
@@ -6714,7 +6723,7 @@ export default function ChatView(props: ChatViewProps) {
       ) : (
         compactAction
       ),
-      dismissLabel: "전체 기록 유지",
+      dismissLabel: ko.chat.view.keepFullHistory,
       onDismiss: dismiss,
     };
   }, [
@@ -6791,7 +6800,7 @@ export default function ChatView(props: ChatViewProps) {
         title: (
           <span className="flex min-w-0 items-baseline gap-1.5">
             <span className="shrink-0 font-normal text-muted-foreground">
-              branch가 바뀌었어요. 이전:
+              {ko.chat.view.branchChangedPrevious}
             </span>
             <Tooltip>
               <TooltipTrigger
@@ -6802,8 +6811,10 @@ export default function ChatView(props: ChatViewProps) {
                 }
               />
               <TooltipPopup side="top" className="max-w-80">
-                This thread last ran on {localCheckoutBranchMismatch.threadBranch}. Sending will
-                continue on {localCheckoutBranchMismatch.currentBranch}.
+                {ko.chat.view.branchMismatchTooltip(
+                  localCheckoutBranchMismatch.threadBranch,
+                  localCheckoutBranchMismatch.currentBranch,
+                )}
               </TooltipPopup>
             </Tooltip>
           </span>
@@ -6815,10 +6826,10 @@ export default function ChatView(props: ChatViewProps) {
             disabled={isRestoringThreadBranch}
             onClick={handleRestoreThreadBranch}
           >
-            {isRestoringThreadBranch ? "되돌리는 중..." : "branch 되돌리기"}
+            {isRestoringThreadBranch ? ko.chat.view.restoringBranch : ko.chat.view.restoreBranch}
           </Button>
         ),
-        dismissLabel: "branch 변경 알림 닫기",
+        dismissLabel: ko.chat.view.dismissBranchChange,
         onDismiss: () => {
           dismissBranchMismatchForSession(activeBranchMismatchKey);
           setBranchMismatchDismissTick((tick) => tick + 1);
@@ -6993,8 +7004,8 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "대화를 정리하지 못했어요",
-              description: error instanceof Error ? error.message : "오류가 발생했어요.",
+              title: ko.chat.view.settleFailed,
+              description: error instanceof Error ? error.message : ko.chat.view.genericError,
             }),
           );
         });
@@ -7013,8 +7024,8 @@ export default function ChatView(props: ChatViewProps) {
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: pinned ? "대화 고정을 해제하지 못했어요" : "대화를 고정하지 못했어요",
-                description: error instanceof Error ? error.message : "오류가 발생했어요.",
+                title: pinned ? ko.chat.view.unpinFailed : ko.chat.view.pinFailed,
+                description: error instanceof Error ? error.message : ko.chat.view.genericError,
               }),
             );
           },
@@ -7273,21 +7284,18 @@ export default function ChatView(props: ChatViewProps) {
       if (!message || message.role !== "user") return;
 
       if (!supportsConversationRollback) {
-        setThreadError(
-          activeThread.id,
-          "이 공급자는 대화 기록 되돌리기를 지원하지 않아요. 대신 새 대화를 시작해 주세요.",
-        );
+        setThreadError(activeThread.id, ko.chat.view.rewindUnsupported);
         return;
       }
       if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
         setThreadError(
           activeThread.id,
-          `Reconnect ${activeEnvironmentUnavailableLabel} before reverting checkpoints.`,
+          ko.chat.view.reconnectBeforeRevert(activeEnvironmentUnavailableLabel),
         );
         return;
       }
       if (phase === "running" || isSendBusy || isConnecting) {
-        setThreadError(activeThread.id, "체크포인트를 되돌리기 전에 현재 턴을 중단해 주세요.");
+        setThreadError(activeThread.id, ko.chat.view.interruptBeforeRevert);
         return;
       }
       if (restoreFiles === undefined) {
@@ -7301,10 +7309,10 @@ export default function ChatView(props: ChatViewProps) {
       setThreadError(activeThread.id, null);
       try {
         if (composerRef.current?.hasPendingAttachments()) {
-          throw new Error("Wait for attachments to finish preparing before rewinding.");
+          throw new Error(ko.chat.view.waitForAttachmentsBeforeRewind);
         }
         const connection = readPreparedConnection(environmentId);
-        if (!connection) throw new Error("환경이 연결되어 있지 않아요.");
+        if (!connection) throw new Error(ko.chat.view.environmentNotConnected);
         const files = await prepareRevertedMessageAttachments({
           message,
           environmentId,
@@ -7317,7 +7325,7 @@ export default function ChatView(props: ChatViewProps) {
           (draft?.images.length ?? 0) + (draft?.files.length ?? 0) + files.length >
           PROVIDER_SEND_TURN_MAX_ATTACHMENTS
         ) {
-          throw new Error("되감기 전에 작성기에 이 메시지의 첨부를 넣을 자리를 만들어 주세요.");
+          throw new Error(ko.chat.view.makeRoomForAttachments);
         }
         await waitForRevertedMessage(routeThreadRef, messageId, turnCount, async () => {
           const result = await revertThreadCheckpoint({
@@ -7364,7 +7372,7 @@ export default function ChatView(props: ChatViewProps) {
       } catch (error) {
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "대화 상태를 되돌리지 못했어요.",
+          error instanceof Error ? error.message : ko.chat.view.revertFailed,
         );
       } finally {
         useComposerDraftStore.setState((store) => {
@@ -7455,7 +7463,7 @@ export default function ChatView(props: ChatViewProps) {
           const error = squashAtomCommandFailure(result);
           setThreadError(
             threadId,
-            error instanceof Error ? error.message : "컨텍스트를 압축하지 못했어요.",
+            error instanceof Error ? error.message : ko.chat.view.compactFailed,
           );
         }
       } else {
@@ -7508,7 +7516,7 @@ export default function ChatView(props: ChatViewProps) {
   canRecoverRejectedTurnRef.current = canRecoverRejectedTurn;
   const onRecoverRejectedTurn = async (messageId: MessageId) => {
     const connection = readPreparedConnection(environmentId);
-    if (!connection) throw new Error("환경이 연결되어 있지 않아요.");
+    if (!connection) throw new Error(ko.chat.view.environmentNotConnected);
     await recoverRejectedTurn({
       scope: routeThreadRef,
       messageId,
@@ -7574,8 +7582,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "info",
-          title: "일부 첨부가 대기 중으로 남았어요",
-          description: `A message holds at most ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} attachments. Use Send now on the queued row when you want the rest to go.`,
+          title: ko.chat.view.attachmentsLeftQueued,
+          description: ko.chat.view.queuedAttachmentLimit(PROVIDER_SEND_TURN_MAX_ATTACHMENTS),
         }),
       );
     }
@@ -7617,10 +7625,7 @@ export default function ChatView(props: ChatViewProps) {
       : useComposerDraftStore.getState().getComposerDraft(composerDraftTarget);
     const recoveredTurn = recoveredDraft?.rejectedTurn;
     if (recoveredTurn?.sendAttempt) {
-      setThreadError(
-        threadId,
-        "이 복구한 초안은 이미 보내기를 시도했어요. 버리기 전에 대화를 확인해 주세요.",
-      );
+      setThreadError(threadId, ko.chat.view.recoveredDraftAlreadySent);
       return;
     }
     const recoveredDraftIsCurrent = () =>
@@ -7639,21 +7644,16 @@ export default function ChatView(props: ChatViewProps) {
         directAnnotation !== undefined ||
         submissionIntent !== "foreground")
     ) {
-      setThreadError(
-        threadId,
-        "이 동기화된 대화에서 복구한 초안은 일반 채팅으로 직접 보내야 해요.",
-      );
+      setThreadError(threadId, ko.chat.view.recoveredDraftSendDirectly);
       return;
     }
     if (controlledTaskScope && controlledTask.route !== "free") {
       if (queuedMessage || directAnnotation || submissionIntent !== "foreground") {
-        controlledTask.setError(
-          "통제 작업은 대기 메시지·주석·백그라운드 요청을 보내지 않아요. 텍스트만 직접 보내 주세요.",
-        );
+        controlledTask.setError(ko.chat.view.controlledNoQueue);
         return;
       }
       if (controlledSendReason || controlledTask.busy || composerHasNonPromptContent) {
-        controlledTask.setError(controlledSendReason ?? "현재 작업 요청을 기다려 주세요.");
+        controlledTask.setError(controlledSendReason ?? ko.chat.view.waitForCurrentTask);
         return;
       }
       const text = promptRef.current;
@@ -7692,8 +7692,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "info",
-          title: "주석을 초안에 첨부했어요",
-          description: "지금은 보낼 수 없어요. 현재 작업을 마친 뒤 보내 주세요.",
+          title: ko.chat.view.annotationAttached,
+          description: ko.chat.view.sendAfterCurrentTask,
         }),
       );
     };
@@ -7713,10 +7713,12 @@ export default function ChatView(props: ChatViewProps) {
     if (needsLoadBalancing) {
       toastManager.add({
         type: "warning",
-        title: loadBalancing.pending ? "기기 자원을 확인하는 중" : "이어 가려면 기기를 골라 주세요",
+        title: loadBalancing.pending
+          ? ko.chat.view.checkingDeviceResources
+          : ko.chat.view.chooseDeviceToContinue,
         description: loadBalancing.pending
-          ? "자원 확인이 아직 진행 중이에요. 작성기에서 기기를 고를 수 있어요."
-          : "자원이 남은 기기가 없어요. 작성기에서 기기를 직접 골라 주세요.",
+          ? ko.chat.view.resourceCheckPending
+          : ko.chat.view.noDeviceResources,
       });
       return;
     }
@@ -7727,8 +7729,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add({
         ...stackedThreadToast({
           type: "warning",
-          title: "연결되지 않아 메시지를 보내지 못했어요",
-          description: "환경에 다시 연결하는 중이에요. 연결되면 다시 시도해 주세요.",
+          title: ko.chat.view.sendDisconnectedTitle,
+          description: ko.chat.view.sendDisconnectedDescription,
         }),
         id: `chat-send-environment-unavailable:${toastSlot}`,
       });
@@ -7751,14 +7753,14 @@ export default function ChatView(props: ChatViewProps) {
     }
     const multipleModelSelections = queuedMessage ? null : sendCtx.multipleModelSelections;
     if (recoveredTurn && multipleModelSelections !== null) {
-      setThreadError(threadId, "복구한 초안을 보내기 전에 모델 하나를 골라 주세요.");
+      setThreadError(threadId, ko.chat.view.chooseOneModelForRecoveredDraft);
       return;
     }
     if (
       multipleModelSelections !== null &&
       serverConfig?.environment.capabilities.requiredWorktreeBootstrap !== true
     ) {
-      setThreadError(activeThread.id, "여러 모델을 시작하기 전에 이 서버를 업데이트해 주세요.");
+      setThreadError(activeThread.id, ko.chat.view.updateServerForMultipleModels);
       return;
     }
     if (
@@ -7771,9 +7773,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "모델과 base branch를 골라 주세요",
-          description:
-            "여러 모델은 Git 프로젝트의 새 대화가 필요해요. 모델마다 각자의 worktree를 받아요.",
+          title: ko.chat.view.chooseModelsAndBaseBranch,
+          description: ko.chat.view.multipleModelsNeedGitThread,
         }),
       );
       return;
@@ -7865,8 +7866,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "warning",
-            title: "먼저 Codex 대화를 시작해 주세요",
-            description: "피드백을 보내기 전에 메시지를 먼저 보내 주세요.",
+            title: ko.chat.view.startCodexFirst,
+            description: ko.chat.view.sendMessageBeforeFeedback,
           }),
         );
         return;
@@ -8018,8 +8019,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "먼저 프로젝트를 골라 주세요",
-          description: "이 초안이 가리키는 프로젝트를 더 이상 쓸 수 없어요.",
+          title: ko.chat.view.chooseProjectFirst,
+          description: ko.chat.view.draftProjectUnavailable,
         }),
       );
       return;
@@ -8068,7 +8069,7 @@ export default function ChatView(props: ChatViewProps) {
     const shouldCreateWorktree =
       isFirstMessage && sendEnvMode === "worktree" && !activeThread.worktreePath;
     if (shouldCreateWorktree && !activeThreadBranch) {
-      setThreadError(threadIdForSend, "새 worktree 모드로 보내기 전에 base branch를 골라 주세요.");
+      setThreadError(threadIdForSend, ko.chat.view.chooseBaseBranchForWorktree);
       return;
     }
 
@@ -8080,7 +8081,7 @@ export default function ChatView(props: ChatViewProps) {
       recoveredAttachmentCount + composerAttachmentsSnapshot.length >
       PROVIDER_SEND_TURN_MAX_ATTACHMENTS
     ) {
-      setThreadError(threadIdForSend, "이 복구한 초안을 보내기 전에 첨부를 빼 주세요.");
+      setThreadError(threadIdForSend, ko.chat.view.removeAttachmentsFromRecoveredDraft);
       return;
     }
     const composerTerminalContextsSnapshot = [...sendableComposerTerminalContexts];
@@ -8129,7 +8130,7 @@ export default function ChatView(props: ChatViewProps) {
       if (!recoveredTurn) throw error;
       setThreadError(
         threadIdForSend,
-        error instanceof Error ? error.message : "복구한 컨텍스트를 준비하지 못했어요.",
+        error instanceof Error ? error.message : ko.chat.view.recoveredContextFailed,
       );
       return;
     }
@@ -8173,7 +8174,7 @@ export default function ChatView(props: ChatViewProps) {
         (entry) => entry.instanceId === selection.instanceId,
       );
       if (!provider?.enabled || !provider.isAvailable || provider.status !== "ready") {
-        setThreadError(threadIdForSend, `Provider for ${selection.model} is unavailable.`);
+        setThreadError(threadIdForSend, ko.chat.view.providerUnavailableForModel(selection.model));
         return;
       }
       const providerBlockReason = getAntigravitySendBlockReason(provider.snapshot, selection.model);
@@ -8273,7 +8274,7 @@ export default function ChatView(props: ChatViewProps) {
       }
       if (getUploadedAttachments({ environmentId, images: composerAttachmentsSnapshot }) === null) {
         sendInFlightRef.current = false;
-        setThreadError(threadIdForSend, "보내기 전에 실패한 업로드를 다시 시도하거나 빼 주세요.");
+        setThreadError(threadIdForSend, ko.chat.view.retryOrRemoveFailedUploads);
         abortQueuedReplay();
         return;
       }
@@ -8331,7 +8332,7 @@ export default function ChatView(props: ChatViewProps) {
     if (recoveredTurn && recoveredTurn.attachments.length > 0) {
       try {
         if (!attachmentCapabilitiesBeforeDispatch.supportsAttachmentUploads) {
-          throw new Error("This environment cannot upload recovered attachments.");
+          throw new Error(ko.chat.view.cannotUploadRecoveredAttachments);
         }
         recoveredTransport = await prepareRecoveredTurnAttachmentsForSend({
           environmentId,
@@ -8342,7 +8343,7 @@ export default function ChatView(props: ChatViewProps) {
         sendInFlightRef.current = false;
         setThreadError(
           threadIdForSend,
-          error instanceof Error ? error.message : "복구한 첨부를 준비하지 못했어요.",
+          error instanceof Error ? error.message : ko.chat.view.recoveredAttachmentsFailed,
         );
         return;
       }
@@ -8359,12 +8360,12 @@ export default function ChatView(props: ChatViewProps) {
         if (turnUsesAttachmentUploads) {
           const uploaded = getUploadedAttachments({ environmentId, images: [attachment] })?.[0];
           if (!uploaded) {
-            throw new Error(`Attachment '${attachment.name}' did not finish uploading.`);
+            throw new Error(ko.chat.view.attachmentUploadIncomplete(attachment.name));
           }
           return uploaded;
         }
         if (attachment.type !== "image") {
-          throw new Error("이 서버는 파일 첨부를 지원하지 않아요.");
+          throw new Error(ko.chat.view.attachmentsUnsupported);
         }
         return {
           type: "image" as const,
@@ -8397,7 +8398,7 @@ export default function ChatView(props: ChatViewProps) {
         const title = truncate(
           assistantCitationsToPlainText(stripInlineContextReferences(trimmed)).trim() ||
             composerAttachmentsSnapshot[0]?.name ||
-            "새 대화",
+            ko.chat.view.newThreadTitle,
         );
         promptRef.current = "";
         clearComposerDraftContent(composerDraftTarget);
@@ -8426,9 +8427,7 @@ export default function ChatView(props: ChatViewProps) {
             let requestMayHaveStarted = false;
             try {
               if (uncertainThreadId) {
-                throw new Error(
-                  "이전 요청이 이미 시작되었을 수 있어요. 다시 보내기 전에 그 대화를 열어 확인해 주세요.",
-                );
+                throw new Error(ko.chat.view.previousRequestMayHaveStarted);
               }
               const supportsInlineMessageContext =
                 appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment
@@ -8495,19 +8494,17 @@ export default function ChatView(props: ChatViewProps) {
               const failureToastId = toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: `${target.selection.model}을(를) 시작하지 못했어요`,
-                  description: error instanceof Error ? error.message : "메시지를 보내지 못했어요.",
+                  title: ko.chat.view.modelStartFailed(target.selection.model),
+                  description: error instanceof Error ? error.message : ko.chat.view.sendFailed,
                   ...(retainedThreadId
                     ? {
                         timeout: 0,
                         data: {
                           secondaryActionProps: {
-                            children: "다시 시도 허용",
+                            children: ko.chat.view.allowRetry,
                             onClick: () => {
                               void readLocalApi()
-                                ?.dialogs.confirm(
-                                  "이전 요청이 이미 실행 중일 수 있어요. 먼저 그 대화를 확인해 주세요. 중복 대화가 생길 수 있는데 다시 보낼까요?",
-                                )
+                                ?.dialogs.confirm(ko.chat.view.duplicateThreadRetryConfirm)
                                 .then(
                                   (confirmed) => {
                                     if (
@@ -8525,7 +8522,7 @@ export default function ChatView(props: ChatViewProps) {
                           },
                         },
                         actionProps: {
-                          children: "대화 열기",
+                          children: ko.chat.view.openThread,
                           onClick: () => {
                             void navigate({
                               to: "/$environmentId/$threadId",
@@ -8552,7 +8549,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "success",
-              title: `백그라운드에서 대화 ${startedCount}개를 시작했어요`,
+              title: ko.chat.view.backgroundThreadsStarted(startedCount),
             }),
           );
         }
@@ -8563,7 +8560,7 @@ export default function ChatView(props: ChatViewProps) {
         failedSelections.push(...multipleModelSelections);
         setThreadError(
           threadIdForSend,
-          error instanceof Error ? error.message : "메시지를 보내지 못했어요.",
+          error instanceof Error ? error.message : ko.chat.view.sendFailed,
         );
       } finally {
         const restoreFailedDraft = () => {
@@ -8601,12 +8598,11 @@ export default function ChatView(props: ChatViewProps) {
             const recoveryToastId = toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "A background prompt could not be sent",
-                description:
-                  "새 초안은 그대로예요. 작성기가 비어 있을 때 실패한 프롬프트를 복원해 주세요.",
+                title: ko.chat.view.backgroundPromptSendFailed,
+                description: ko.chat.view.newDraftUnchanged,
                 timeout: 0,
                 actionProps: {
-                  children: "프롬프트 복원",
+                  children: ko.chat.view.restorePrompt,
                   onClick: () => {
                     if (
                       !draftId ||
@@ -8617,8 +8613,7 @@ export default function ChatView(props: ChatViewProps) {
                       )
                     ) {
                       toastManager.update(recoveryToastId, {
-                        description:
-                          "복원하기 전에 원래 초안으로 돌아가 현재 프롬프트를 보내거나 지워 주세요.",
+                        description: ko.chat.view.returnToOriginalDraft,
                       });
                       return;
                     }
@@ -8731,11 +8726,13 @@ export default function ChatView(props: ChatViewProps) {
       } else if (composerTerminalContextsSnapshot.length > 0) {
         titleSeed = formatTerminalContextLabel(composerTerminalContextsSnapshot[0]!);
       } else if (composerReviewCommentsSnapshot.length > 0) {
-        titleSeed = `Review: ${reviewCommentContextLabel(composerReviewCommentsSnapshot[0]!)}`;
+        titleSeed = ko.chat.view.reviewTitleSeed(
+          reviewCommentContextLabel(composerReviewCommentsSnapshot[0]!),
+        );
       } else if (composerPreviewAnnotationsSnapshot.length > 0) {
         titleSeed = previewAnnotationContextLabel(composerPreviewAnnotationsSnapshot[0]!);
       } else {
-        titleSeed = "새 대화";
+        titleSeed = ko.chat.view.newThreadTitle;
       }
     }
     const title = truncate(titleSeed);
@@ -8779,7 +8776,7 @@ export default function ChatView(props: ChatViewProps) {
     const turnAttachmentsResult = await settlePromise(async () => {
       const turnAttachments = await turnAttachmentsPromise;
       if (recoveredTurn && !recoveredDraftIsCurrent()) {
-        throw new Error("The recovered draft changed before Send.");
+        throw new Error(ko.chat.view.recoveredDraftChanged);
       }
       const liveFileBlockReason = readLiveAttachmentCapabilities().fileBlockReason;
       if (liveFileBlockReason !== null) {
@@ -8900,7 +8897,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "warning",
-              title: "새 작성기를 열지 못했어요",
+              title: ko.chat.view.newComposerFailed,
               description: error instanceof Error ? error.message : undefined,
             }),
           );
@@ -8915,7 +8912,7 @@ export default function ChatView(props: ChatViewProps) {
           } catch (error) {
             setThreadError(
               threadIdForSend,
-              error instanceof Error ? error.message : "초안을 정리하지 못했어요.",
+              error instanceof Error ? error.message : ko.chat.view.draftCleanupFailed,
             );
           }
         }
@@ -8933,7 +8930,9 @@ export default function ChatView(props: ChatViewProps) {
             // cleanup failure through the request failure/restoration branch.
             setThreadError(
               threadIdForSend,
-              `메시지는 접수됐지만 초안을 정리하지 못했어요. ${error instanceof Error ? error.message : "이 탭을 열어 두세요."}`,
+              ko.chat.view.acceptedButDraftCleanupFailed(
+                error instanceof Error ? error.message : ko.chat.view.keepTabOpen,
+              ),
             );
           }
         }
@@ -8955,10 +8954,10 @@ export default function ChatView(props: ChatViewProps) {
             toastManager.add(
               stackedThreadToast({
                 type: "success",
-                title: "백그라운드에서 시작했어요",
+                title: ko.chat.view.startedInBackground,
                 timeout: 5_000,
                 actionProps: {
-                  children: "Open",
+                  children: ko.chat.view.open,
                   onClick: () => {
                     void navigate({
                       to: "/$environmentId/$threadId",
@@ -9068,16 +9067,16 @@ export default function ChatView(props: ChatViewProps) {
         }
         setThreadError(
           threadIdForSend,
-          error instanceof Error ? error.message : "메시지를 보내지 못했어요.",
+          error instanceof Error ? error.message : ko.chat.view.sendFailed,
         );
         if (backgroundDraftOpened && draftId) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "백그라운드 작업에 실패했어요",
-              description: error instanceof Error ? error.message : "메시지를 보내지 못했어요.",
+              title: ko.chat.view.backgroundTaskFailed,
+              description: error instanceof Error ? error.message : ko.chat.view.sendFailed,
               actionProps: {
-                children: "초안 열기",
+                children: ko.chat.view.openDraft,
                 onClick: () => {
                   void navigate({ to: "/draft/$draftId", params: { draftId } });
                 },
@@ -9186,7 +9185,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : "승인 결정을 보내지 못했어요.",
+          error instanceof Error ? error.message : ko.chat.view.approvalSendFailed,
         );
       }
       setRespondingRequestIds((existing) => existing.filter((id) => id !== requestId));
@@ -9217,10 +9216,7 @@ export default function ChatView(props: ChatViewProps) {
         if (attachments.length === 0) continue;
         const uploaded = getUploadedAttachments({ environmentId, images: attachments });
         if (!uploaded) {
-          setThreadError(
-            activeThreadId,
-            "Wait for attachments to finish uploading, or remove failed uploads.",
-          );
+          setThreadError(activeThreadId, ko.chat.view.waitForAttachmentUploads);
           return;
         }
         attachmentsByQuestionId.set(
@@ -9247,7 +9243,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : "입력을 보내지 못했어요.",
+          error instanceof Error ? error.message : ko.chat.view.inputSendFailed,
         );
       }
       userInputResponsesInFlight.current.delete(responseKey);
@@ -9281,7 +9277,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : "질문을 닫지 못했어요.",
+          error instanceof Error ? error.message : ko.chat.view.dismissQuestionFailed,
         );
       }
       setRespondingUserInputRequestIds((existing) => existing.filter((id) => id !== requestId));
@@ -9565,7 +9561,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(failure);
         setThreadError(
           threadIdForSend,
-          error instanceof Error ? error.message : "계획 후속 메시지를 보내지 못했어요.",
+          error instanceof Error ? error.message : ko.chat.view.planFollowUpFailed,
         );
       }
       sendInFlightRef.current = false;
@@ -9725,9 +9721,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "구현 대화를 시작하지 못했어요",
-            description:
-              error instanceof Error ? error.message : "새 대화를 만드는 중 오류가 발생했어요.",
+            title: ko.chat.view.implementationThreadFailed,
+            description: error instanceof Error ? error.message : ko.chat.view.createThreadError,
           }),
         );
       }
@@ -9765,7 +9760,7 @@ export default function ChatView(props: ChatViewProps) {
         currentProviderInstanceId: activeThread.session?.providerInstanceId ?? null,
         nextModelSelection: { instanceId, model },
       });
-      return reason ? `${reason.description} Start a new thread to use this model.` : null;
+      return reason ? ko.chat.view.startNewThreadForModel(reason.description) : null;
     },
     [activeThread, providerStatuses],
   );
@@ -10086,15 +10081,16 @@ export default function ChatView(props: ChatViewProps) {
         key={JSON.stringify(controlledTaskScope)}
         ref={controlPanelRef}
         role="region"
-        aria-label="프로젝트 통제 설정"
+        aria-label={ko.chat.view.projectControlSettings}
         data-weavra="controlled-task-details"
         tabIndex={-1}
         className="min-h-0 flex-1 overflow-y-auto p-3"
       >
-        <h2 className="text-sm font-medium">{activeProject?.title} 통제 설정</h2>
+        <h2 className="text-sm font-medium">
+          {ko.projects.controlSettings(activeProject?.title ?? "")}
+        </h2>
         <p className="mt-2 text-xs text-muted-foreground">
-          통제 작업은 선택 사항이에요. 저장된 프로젝트 설정을 재사용하며, 패널을 열거나 닫는
-          것만으로 작업을 시작하거나 실행을 승인하지 않아요.
+          {ko.chat.view.controlledOptionalNotice}
         </p>
         {controlledTask.task &&
         (controlledTask.task.ownership.state === "analysis" ||
@@ -10123,7 +10119,7 @@ export default function ChatView(props: ChatViewProps) {
               }
             }}
           >
-            일반 채팅으로 돌아가기
+            {ko.chat.view.returnToNormalChat}
           </Button>
         ) : null}
         {controlledTaskScope && !paintOnlyDisplayedTimeline ? (
@@ -10138,11 +10134,11 @@ export default function ChatView(props: ChatViewProps) {
               provider={controlledProvider}
               entryBlockedReason={
                 isWorking
-                  ? "현재 대화 응답이 끝난 뒤 통제 작업을 시작할 수 있어요."
+                  ? ko.chat.view.controlledAfterResponse
                   : queuedMessages.length > 0
-                    ? "통제 작업 전에 대기 중인 메시지를 제거해 주세요."
+                    ? ko.chat.view.controlledRemoveQueued
                     : composerHasNonPromptContent
-                      ? "통제 작업 전에 첨부 파일과 참고 자료를 제거해 주세요."
+                      ? ko.chat.view.controlledRemoveAttachments
                       : null
               }
             />
@@ -10215,8 +10211,8 @@ export default function ChatView(props: ChatViewProps) {
       <PullRequestDetailGhost />
     ) : renderedRightPanelSurface?.kind === "pull-request" && !supportsPullRequests ? (
       <PullRequestsUnavailableState
-        title="PR을 쓸 수 없어요"
-        error="이 환경의 서버 빌드는 PR을 지원하지 않아요. 맞는 Weavra 서버 빌드를 써 주세요."
+        title={ko.chat.view.prUnavailableTitle}
+        error={ko.chat.view.prUnsupportedBuild}
       />
     ) : renderedRightPanelSurface?.kind === "pull-request" ? (
       // No onClose: the surface tab's own X owns closing here, and a second X in the header
@@ -10441,7 +10437,7 @@ export default function ChatView(props: ChatViewProps) {
                   className="flex items-center gap-2 rounded-full border border-primary/25 bg-background/95 px-4 py-2.5 text-sm font-medium text-foreground shadow-lg"
                 >
                   <PaperclipIcon className="size-4 text-primary" aria-hidden="true" />
-                  파일을 놓아 첨부해 주세요
+                  {ko.chat.dropToAttach}
                 </div>
               </div>
             ) : null}
@@ -10577,7 +10573,7 @@ export default function ChatView(props: ChatViewProps) {
                   style={{ bottom: scrollToEndClearance + 4 }}
                 >
                   <Button
-                    aria-label="맨 아래로 이동"
+                    aria-label={ko.chat.scrollToLatest}
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={() => {
                       composerRef.current?.restoreAfterTimelineReachedEnd();
@@ -10588,7 +10584,7 @@ export default function ChatView(props: ChatViewProps) {
                     variant="glass"
                   >
                     <ChevronDownIcon className="size-3.5" />
-                    맨 아래로 이동
+                    {ko.chat.scrollToLatest}
                   </Button>
                 </div>
               )}
@@ -10693,22 +10689,22 @@ export default function ChatView(props: ChatViewProps) {
                                 data-weavra-action="open-controlled-task"
                                 onClick={addControlSurface}
                               >
-                                통제 작업
+                                {ko.common.controlledTask}
                               </Button>
                               <span className="truncate text-xs text-muted-foreground">
                                 {activeEnvironmentConnectionPhase !== "connected"
-                                  ? "연결 끊김"
+                                  ? ko.chat.view.disconnected
                                   : !controlledTasksSupported
-                                    ? "사용할 수 없음"
+                                    ? ko.common.unavailable
                                     : !controlledTask.canOperate
-                                      ? "읽기 전용"
+                                      ? ko.chat.view.readOnly
                                       : !controlledTask.discovered
-                                        ? "불러오는 중"
+                                        ? ko.chat.view.loadingShort
                                         : controlledTask.route === "free"
-                                          ? "일반 채팅"
+                                          ? ko.chat.view.normalChat
                                           : controlledTask.task
-                                            ? `${weavraLabel(controlledTask.task.phase)}${controlledTask.fresh ? "" : " (과거 정보)"}`
-                                            : "시작 전"}
+                                            ? `${weavraLabel(controlledTask.task.phase)}${controlledTask.fresh ? "" : ko.chat.view.staleSuffix}`
+                                            : ko.chat.view.notStarted}
                               </span>
                             </div>
                           ) : null}
@@ -10753,13 +10749,13 @@ export default function ChatView(props: ChatViewProps) {
                             isRevertingCheckpoint={isRevertingCheckpoint}
                             sendDisabledReason={
                               isRevertingCheckpoint
-                                ? "대화를 되감는 중"
+                                ? ko.chat.view.rewinding
                                 : feedbackUploading
-                                  ? "피드백을 보내는 중"
+                                  ? ko.chat.view.sendingFeedback
                                   : threadDetailLoading
-                                    ? "메시지를 불러오는 중"
+                                    ? ko.chat.view.loadingMessages
                                     : worktreeSetupBlocksSend
-                                      ? "worktree를 준비하는 중"
+                                      ? ko.chat.view.preparingWorktree
                                       : projectCloneSendBlockReason
                             }
                             isPreparingWorktree={isPreparingWorktree}
@@ -10930,19 +10926,19 @@ export default function ChatView(props: ChatViewProps) {
               <AlertDialogPopup>
                 <AlertDialogHeader>
                   <AlertDialogTitle>
-                    Switch to{" "}
                     <code className="font-medium">
                       {localCheckoutBranchMismatch?.threadBranch ?? ""}
                     </code>
-                    ?
+                    {ko.chat.view.switchToBranchSuffix}
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    You have uncommitted changes. They'll carry over to the other branch, or block
-                    the switch if they conflict.
+                    {ko.chat.view.uncommittedChangesDescription}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogClose render={<Button variant="outline" />}>취소</AlertDialogClose>
+                  <AlertDialogClose render={<Button variant="outline" />}>
+                    {ko.common.cancel}
+                  </AlertDialogClose>
                   <Button
                     variant="default"
                     onClick={() => {
@@ -10950,7 +10946,7 @@ export default function ChatView(props: ChatViewProps) {
                       void handleSwitchCheckoutToThread();
                     }}
                   >
-                    branch 전환
+                    {ko.chat.view.switchBranch}
                   </Button>
                 </AlertDialogFooter>
               </AlertDialogPopup>
@@ -11123,16 +11119,16 @@ export default function ChatView(props: ChatViewProps) {
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>여기부터 편집할까요?</AlertDialogTitle>
+            <AlertDialogTitle>{ko.chat.view.editFromHereTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              이 메시지 이전으로 대화를 되감아요. 프롬프트와 첨부는 작성기로 돌아가요.
-              {activeWorktreePath === null
-                ? " 이 대화는 프로젝트 폴더를 함께 쓰므로 파일은 그대로 남아요."
-                : null}
+              {ko.chat.view.rewindDescription}
+              {activeWorktreePath === null ? ko.chat.view.sharedFolderNote : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>취소</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {ko.common.cancel}
+            </AlertDialogClose>
             {activeWorktreePath !== null ? (
               <Button
                 variant="destructive"
@@ -11142,7 +11138,7 @@ export default function ChatView(props: ChatViewProps) {
                   void onRevertToTurnCount(pendingRevert.turnCount, pendingRevert.messageId, true);
                 }}
               >
-                파일도 되돌리기
+                {ko.chat.view.revertFilesToo}
               </Button>
             ) : null}
             <Button
@@ -11152,7 +11148,7 @@ export default function ChatView(props: ChatViewProps) {
                 void onRevertToTurnCount(pendingRevert.turnCount, pendingRevert.messageId, false);
               }}
             >
-              되돌리고 변경 사항 유지
+              {ko.chat.view.revertKeepChanges}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

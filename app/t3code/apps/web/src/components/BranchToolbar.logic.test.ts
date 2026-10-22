@@ -21,6 +21,7 @@ import {
   shouldShowComposerContextStrip,
   shouldShowEnvironmentIndicator,
 } from "./BranchToolbar.logic";
+import { ko } from "~/i18n/ko";
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
 const remoteEnvironmentId = EnvironmentId.make("environment-remote");
@@ -493,28 +494,32 @@ describe("resolveEffectiveEnvMode", () => {
 
 describe("resolveEnvModeLabel", () => {
   it("uses explicit workspace labels", () => {
-    expect(resolveEnvModeLabel("local")).toBe("현재 checkout");
-    expect(resolveEnvModeLabel("worktree")).toBe("새 worktree");
+    expect(resolveEnvModeLabel("local")).toBe(ko.projects.workspaceMode.currentCheckout);
+    expect(resolveEnvModeLabel("worktree")).toBe(ko.projects.workspaceMode.newWorktree);
   });
 });
 
 describe("resolveCurrentWorkspaceLabel", () => {
   it("describes the main repo checkout when no worktree path is active", () => {
-    expect(resolveCurrentWorkspaceLabel(null)).toBe("현재 checkout");
+    expect(resolveCurrentWorkspaceLabel(null)).toBe(ko.projects.workspaceMode.currentCheckout);
   });
 
   it("describes the active checkout as a worktree when one is attached", () => {
-    expect(resolveCurrentWorkspaceLabel("/repo/.t3/worktrees/feature-a")).toBe("현재 worktree");
+    expect(resolveCurrentWorkspaceLabel("/repo/.t3/worktrees/feature-a")).toBe(
+      ko.projects.workspaceMode.currentWorktree,
+    );
   });
 });
 
 describe("resolveLockedWorkspaceLabel", () => {
   it("uses a shorter label for the main repo checkout", () => {
-    expect(resolveLockedWorkspaceLabel(null)).toBe("로컬 checkout");
+    expect(resolveLockedWorkspaceLabel(null)).toBe(ko.projects.workspaceMode.localCheckout);
   });
 
   it("uses a shorter label for an attached worktree", () => {
-    expect(resolveLockedWorkspaceLabel("/repo/.t3/worktrees/feature-a")).toBe("worktree");
+    expect(resolveLockedWorkspaceLabel("/repo/.t3/worktrees/feature-a")).toBe(
+      ko.projects.workspaceMode.worktree,
+    );
   });
 });
 

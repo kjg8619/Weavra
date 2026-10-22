@@ -13,6 +13,7 @@ import { useSettingsProjectGroups } from "../settings/useSettingsProjectGroups";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { weavraLabel } from "../weavraLabels";
+import { ko } from "~/i18n/ko";
 import { GRAPH_CARD, layoutWeavraRunGraph, type WeavraRunGraph } from "./weavraRunGraphLayout";
 
 const dot: Record<GraphStatus, string> = {
@@ -43,20 +44,8 @@ type GraphStatus = WeavraRunGraph["nodes"][number]["status"];
 type FailureCategory = NonNullable<
   NonNullable<WeavraSnapshotEnvelope["data"]["evidence"]>["failureCategory"]
 >;
-const failureCategoryLabels: Record<FailureCategory, string> = {
-  PREFLIGHT: "사전 점검 실패",
-  POLICY: "정책 위반",
-  PROVIDER: "모델 제공자 오류",
-  TOOL: "도구 오류",
-  BUDGET: "예산 초과",
-  VERIFICATION: "검증 실패",
-  REVIEW: "검토 차단",
-  APPROVAL: "승인 거절",
-  STORAGE: "저장 오류",
-  CLEANUP: "정리 실패",
-  CANCELLED: "취소됨",
-  UNKNOWN: "원인 확인 안 됨",
-};
+const failureCategoryLabels: Readonly<Record<FailureCategory, string>> =
+  ko.devices.runGraphPanel.failureCategories;
 
 /** A terminal failed Run: the Host summary carries a category at most, never the reason text. */
 interface GraphFailure {
@@ -74,10 +63,12 @@ function FailureResultLink({ openResult }: { openResult: GraphFailure["openResul
       onPointerDown={(event) => event.stopPropagation()}
       onClick={openResult}
     >
-      실패 이유는 결과 화면에서 확인
+      {ko.devices.runGraphPanel.openFailureResult}
     </button>
   ) : (
-    <span className="font-mono text-muted-foreground">실패 이유는 결과 화면에서 확인해요</span>
+    <span className="font-mono text-muted-foreground">
+      {ko.devices.runGraphPanel.failureInResult}
+    </span>
   );
 }
 
@@ -107,12 +98,12 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
   return (
     <>
       <p className="font-mono text-sm text-muted-foreground">
-        {done}/{cards.length} 통과 · {active} 진행 중
+        {ko.devices.runGraphPanel.progress(done, cards.length, active)}
       </p>
       <div
         ref={viewport}
         tabIndex={0}
-        aria-label="Run 단계 그래프. 드래그하거나 스크롤해서 이동해요."
+        aria-label={ko.devices.runGraphPanel.graphViewport}
         className="mt-3 max-h-[70vh] cursor-grab touch-pan-x touch-pan-y overflow-auto rounded-md border border-border/60 bg-muted/20 p-3 select-none focus-visible:outline-2 focus-visible:outline-ring active:cursor-grabbing"
         onPointerDown={(event) => {
           if (event.pointerType !== "mouse" || event.button !== 0) return;
@@ -150,10 +141,10 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
                 style={{ left: column.x, top: column.y, width: GRAPH_CARD.width }}
               >
                 {column.key.startsWith("wave:")
-                  ? `웨이브 ${column.key.slice(5)}`
+                  ? ko.devices.runGraphPanel.wave(column.key.slice(5))
                   : weavraLabel(column.key)}{" "}
-                · {column.passed}/{column.total} 통과
-                {column.running > 0 ? ` · ${column.running} 진행 중` : ""}
+                · {ko.devices.runGraphPanel.columnProgress(column.passed, column.total)}
+                {column.running > 0 ? ko.devices.runGraphPanel.columnRunning(column.running) : ""}
               </div>
             ))}
           </div>
@@ -240,7 +231,10 @@ function GraphView({ graph, failure }: { graph: WeavraRunGraph; failure: GraphFa
         </p>
       ) : null}
       {otherEdges.length > 0 ? (
-        <ul aria-label="그 밖의 관계" className="mt-3 space-y-1 text-sm text-muted-foreground">
+        <ul
+          aria-label={ko.devices.runGraphPanel.otherRelations}
+          className="mt-3 space-y-1 text-sm text-muted-foreground"
+        >
           {otherEdges.map((edge) => (
             <li key={`${edge.from}->${edge.to}:${edge.kind}`} className="break-all">
               <code>{edge.from}</code> → <code>{edge.to}</code> · {weavraLabel(edge.kind)}
@@ -280,13 +274,11 @@ function UnsupportedGraphHelp() {
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
       >
-        이 환경에서 볼 수 없는 이유
+        {ko.devices.runGraphPanel.unsupportedReason}
       </Button>
       {open ? (
         <p id={panelId} className="mt-2 text-sm text-muted-foreground">
-          이 환경의 서버가 통제 작업 관찰을 지원하지 않아서 Run 그래프를 만들 수 없어요. 그래프는
-          보기 전용이라 이 환경에서는 아무것도 실행하거나 바꾸지 않아요. 통제 작업을 지원하는
-          환경에서 이 프로젝트를 열면 단계가 보여요.
+          {ko.devices.runGraphPanel.unsupportedDetail}
         </p>
       ) : null}
     </div>
@@ -338,19 +330,22 @@ export function WeavraRunGraphPanel(props: {
   return (
     <div
       role="region"
-      aria-label="Weavra Run 그래프"
+      aria-label={ko.devices.runGraphPanel.region}
       data-weavra="run-graph"
       className="min-h-0 flex-1 overflow-y-auto p-3"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-medium">Run 그래프</h2>
+        <h2 className="text-sm font-medium">{ko.devices.runGraph}</h2>
         <Badge variant={stale ? "warning" : "secondary"}>
-          {snapshot ? (stale ? "과거 스냅샷" : "공식 스냅샷") : "스냅샷 없음"}
+          {snapshot
+            ? stale
+              ? ko.devices.runGraphPanel.pastSnapshot
+              : ko.devices.runGraphPanel.officialSnapshot
+            : ko.devices.runGraphPanel.noSnapshot}
         </Badge>
       </div>
       <p className="mt-1 text-sm break-keep text-pretty text-muted-foreground">
-        Runtime이 기록한 단계와 관계를 보여주는 보기 전용 그래프예요. 여기서 실행·승인·재시도는 하지
-        않아요.
+        {ko.devices.runGraphPanel.description}
       </p>
       {run ? (
         <p className="mt-2 text-sm">
@@ -362,7 +357,7 @@ export function WeavraRunGraphPanel(props: {
           <>
             <UnsupportedGraphHelp />
             <p className="text-sm break-keep text-pretty text-muted-foreground">
-              이 환경은 통제 작업의 읽기 전용 연결을 지원하지 않아요.
+              {ko.devices.runGraphPanel.unsupportedConnection}
             </p>
           </>
         ) : graph ? (
@@ -378,18 +373,15 @@ export function WeavraRunGraphPanel(props: {
                   void navigate({ to: "/projects/$projectKey", params: { projectKey } });
                 }}
               >
-                프로젝트 설정 열기
+                {ko.devices.runGraphPanel.openProjectSettings}
               </Button>
             ) : null}
             <p>
               {snapshot && !run
-                ? "이 프로젝트에 아직 Weavra Run이 없어요. 통제 작업을 실행하면 단계가 여기에 그려져요."
-                : "받은 스냅샷이 아직 없어서 그래프를 그릴 수 없어요. 이벤트나 캐시 조각으로 그래프를 재구성하지 않아요."}
+                ? ko.devices.runGraphPanel.noRunYet
+                : ko.devices.runGraphPanel.noSnapshotYet}
             </p>
-            <p>
-              통제 작업을 시작하기 전 준비 상태와 설정은 프로젝트 설정의 ‘Weavra · 워크플로
-              제어’에서 확인해요. 이 그래프에서는 아무것도 실행하지 않아요.
-            </p>
+            <p>{ko.devices.runGraphPanel.readinessHint(ko.runtime.controls.sectionTitle)}</p>
           </div>
         )}
       </div>

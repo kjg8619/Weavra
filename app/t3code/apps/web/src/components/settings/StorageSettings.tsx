@@ -1,6 +1,7 @@
 import type { StorageCleanupSettings, WorktreeCleanupRules } from "@t3tools/contracts";
 import { resolveWorktreeCleanup } from "@t3tools/shared/projectSettings";
 import { useState } from "react";
+import { ko } from "~/i18n/ko";
 
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
@@ -58,20 +59,20 @@ function RetentionControl({
           }}
         >
           <NumberFieldGroup>
-            <NumberFieldDecrement aria-label={`Decrease ${label}`} />
+            <NumberFieldDecrement aria-label={ko.settings.storage.decrease(label)} />
             <NumberFieldInput
-              aria-label={`${label} in days`}
+              aria-label={ko.settings.storage.inDays(label)}
               size={new Intl.NumberFormat().format(draft ?? value).length}
               className="field-sizing-content w-auto min-w-[1ch] grow-0 text-right in-data-[size=sm]:px-1"
             />
             <span aria-hidden="true" className="self-center pr-2 text-xs">
-              days
+              {ko.settings.storage.daysUnit}
             </span>
-            <NumberFieldIncrement aria-label={`Increase ${label}`} />
+            <NumberFieldIncrement aria-label={ko.settings.storage.increase(label)} />
           </NumberFieldGroup>
         </NumberField>
       ) : (
-        <span className="text-xs text-muted-foreground">Off</span>
+        <span className="text-xs text-muted-foreground">{ko.common.off}</span>
       )}
       <Switch
         aria-label={label}
@@ -105,7 +106,7 @@ export function StorageSettingsPanel() {
           key
         ] !== settings[key],
     )
-      ? "Mixed across selected machines"
+      ? ko.settings.storage.mixedAcrossMachines
       : undefined;
   const update = (patch: Partial<StorageCleanupSettings>) =>
     updateSettings({ storageCleanup: patch });
@@ -123,7 +124,7 @@ export function StorageSettingsPanel() {
   ) {
     return (
       <SettingsScopeNotice target="all">
-        Update the selected machines to configure project worktree cleanup.
+        {ko.settings.storage.updateMachinesForProjectCleanup}
       </SettingsScopeNotice>
     );
   }
@@ -143,24 +144,23 @@ export function StorageSettingsPanel() {
           )
           .map((environment) => environment.environmentId)}
       >
-        Update the selected environments to use storage cleanup, or choose a machine that supports
-        it.
+        {ko.settings.storage.updateEnvironmentsForCleanup}
       </SettingsScopeNotice>
     );
   }
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="storage-worktrees" title="Worktrees">
+      <SettingsSection id="storage-worktrees" title={ko.settings.storage.worktreesSection}>
         {isProjectScope && (
           <SettingsRow
-            title="Automatic worktree cleanup"
+            title={ko.settings.storage.automaticCleanup}
             description={
               mode === "off"
-                ? "Keep this project's worktrees until you delete them manually."
+                ? ko.settings.storage.automaticCleanupOff
                 : mode === "custom"
-                  ? "Use these rules for this project."
-                  : "Use each machine's worktree cleanup settings."
+                  ? ko.settings.storage.automaticCleanupCustom
+                  : ko.settings.storage.automaticCleanupInherit
             }
             serverScoped
             settingKeys={["worktreeCleanup"]}
@@ -175,21 +175,21 @@ export function StorageSettingsPanel() {
                     updateSettings({ worktreeCleanup: { mode: "custom", rules: {} } });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="Automatic worktree cleanup">
+                <SelectTrigger size="sm" aria-label={ko.settings.storage.automaticCleanup}>
                   <SelectValue>
                     {mixedModes
-                      ? "Mixed"
+                      ? ko.settings.storage.modeMixed
                       : mode === "inherit"
-                        ? "Inherit"
+                        ? ko.settings.storage.modeInherit
                         : mode === "off"
-                          ? "Off"
-                          : "Custom"}
+                          ? ko.common.off
+                          : ko.settings.storage.modeCustom}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="inherit">Inherit</SelectItem>
-                  <SelectItem value="off">Off</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
+                  <SelectItem value="inherit">{ko.settings.storage.modeInherit}</SelectItem>
+                  <SelectItem value="off">{ko.common.off}</SelectItem>
+                  <SelectItem value="custom">{ko.settings.storage.modeCustom}</SelectItem>
                 </SelectPopup>
               </Select>
             }
@@ -198,52 +198,52 @@ export function StorageSettingsPanel() {
         {(!isProjectScope || (!mixedModes && mode === "custom")) && (
           <>
             <SettingsRow
-              title="Delete worktrees with deleted threads"
+              title={ko.settings.storage.deleteWithThreads}
               status={ruleStatus("worktreeOnDelete")}
-              description="Remove unused worktrees when active or archived threads are deleted. Worktrees with local changes are kept."
+              description={ko.settings.storage.deleteWithThreadsDescription}
               serverScoped={!isProjectScope}
               control={
                 <Switch
-                  aria-label="Delete worktrees with deleted threads"
+                  aria-label={ko.settings.storage.deleteWithThreads}
                   checked={settings.worktreeOnDelete}
                   onCheckedChange={(worktreeOnDelete) => updateWorktree({ worktreeOnDelete })}
                 />
               }
             />
             <SettingsRow
-              title="Delete inactive worktrees"
+              title={ko.settings.storage.deleteInactive}
               status={ruleStatus("worktreeAfterDays")}
-              description="Remove worktrees after their threads have been inactive for this many days. Branches and thread history are kept."
+              description={ko.settings.storage.deleteInactiveDescription}
               serverScoped={!isProjectScope}
               control={
                 <RetentionControl
-                  label="Delete inactive worktrees"
+                  label={ko.settings.storage.deleteInactive}
                   value={settings.worktreeAfterDays}
                   onChange={(worktreeAfterDays) => updateWorktree({ worktreeAfterDays })}
                 />
               }
             />
             <SettingsRow
-              title="Delete merged worktrees"
+              title={ko.settings.storage.deleteMerged}
               status={ruleStatus("worktreeOnMerge")}
-              description="Remove worktrees whose pull request is merged and whose commits are included in the default branch."
+              description={ko.settings.storage.deleteMergedDescription}
               serverScoped={!isProjectScope}
               control={
                 <Switch
-                  aria-label="Delete merged worktrees"
+                  aria-label={ko.settings.storage.deleteMerged}
                   checked={settings.worktreeOnMerge}
                   onCheckedChange={(worktreeOnMerge) => updateWorktree({ worktreeOnMerge })}
                 />
               }
             />
             <SettingsRow
-              title="Delete unchanged worktrees"
+              title={ko.settings.storage.deleteUnchanged}
               status={ruleStatus("worktreeUnchanged")}
-              description="Remove worktrees with no commits beyond the default branch."
+              description={ko.settings.storage.deleteUnchangedDescription}
               serverScoped={!isProjectScope}
               control={
                 <Switch
-                  aria-label="Delete unchanged worktrees"
+                  aria-label={ko.settings.storage.deleteUnchanged}
                   checked={settings.worktreeUnchanged}
                   onCheckedChange={(worktreeUnchanged) => updateWorktree({ worktreeUnchanged })}
                 />
@@ -254,28 +254,28 @@ export function StorageSettingsPanel() {
       </SettingsSection>
 
       {!isProjectScope && (
-        <SettingsSection id="storage-artifacts" title="Artifacts and logs">
+        <SettingsSection id="storage-artifacts" title={ko.settings.storage.artifactsSection}>
           <SettingsRow
-            title="Delete old browser artifacts"
+            title={ko.settings.storage.deleteBrowserArtifacts}
             status={ruleStatus("browserArtifactsAfterDays")}
-            description="Delete saved browser captures after this many days. Older capture links will no longer open."
+            description={ko.settings.storage.deleteBrowserArtifactsDescription}
             serverScoped
             control={
               <RetentionControl
-                label="Delete old browser artifacts"
+                label={ko.settings.storage.deleteBrowserArtifacts}
                 value={settings.browserArtifactsAfterDays}
                 onChange={(browserArtifactsAfterDays) => update({ browserArtifactsAfterDays })}
               />
             }
           />
           <SettingsRow
-            title="Delete old rotated logs"
+            title={ko.settings.storage.deleteRotatedLogs}
             status={ruleStatus("logsAfterDays")}
-            description="Delete inactive rotated log files after this many days. Current logs are kept."
+            description={ko.settings.storage.deleteRotatedLogsDescription}
             serverScoped
             control={
               <RetentionControl
-                label="Delete old rotated logs"
+                label={ko.settings.storage.deleteRotatedLogs}
                 value={settings.logsAfterDays}
                 onChange={(logsAfterDays) => update({ logsAfterDays })}
               />

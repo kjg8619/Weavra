@@ -2,11 +2,13 @@ import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import { LayersIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { ko } from "~/i18n/ko";
 import { cn } from "../../lib/utils";
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import type { EnvironmentPresentation } from "../../state/environments";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { ProjectFavicon } from "../ProjectFavicon";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   Menu,
   MenuPopup,
@@ -35,8 +37,8 @@ import {
 
 const SETTINGS_BREADCRUMB_LABELS: Readonly<Record<string, string>> = {
   ...SETTINGS_SECTION_LABELS,
-  "/settings/diagnostics": "Diagnostics",
-  "/settings/open-source-licenses": "Open source licenses",
+  "/settings/diagnostics": ko.settings.breadcrumb.diagnostics,
+  "/settings/open-source-licenses": ko.settings.breadcrumb.openSourceLicenses,
 };
 
 function settingsBreadcrumbLabel(pathname: string): string | null {
@@ -68,15 +70,15 @@ export function SettingsBreadcrumb({
   const sectionLabel = settingsBreadcrumbLabel(pathname);
 
   return (
-    <WorkspaceBreadcrumb ariaLabel="Settings breadcrumb">
+    <WorkspaceBreadcrumb ariaLabel={ko.settings.breadcrumb.ariaLabel}>
       {sectionLabel ? (
         <>
-          <WorkspaceBreadcrumbItem>Settings</WorkspaceBreadcrumbItem>
+          <WorkspaceBreadcrumbItem>{ko.common.settings}</WorkspaceBreadcrumbItem>
           <WorkspaceBreadcrumbSeparator />
         </>
       ) : null}
-      <WorkspaceBreadcrumbItem current className="truncate">
-        {sectionLabel ?? "Settings"}
+      <WorkspaceBreadcrumbItem current className="shrink-0">
+        {sectionLabel ?? ko.common.settings}
       </WorkspaceBreadcrumbItem>
       {scope ? (
         <>
@@ -117,7 +119,12 @@ function ScopeMenu({
         )}
       >
         {icon}
-        <span className="min-w-0 truncate">{label}</span>
+        <Tooltip>
+          <TooltipTrigger render={<span className="min-w-0 truncate" data-ellipsis="identity" />}>
+            {label}
+          </TooltipTrigger>
+          <TooltipPopup side="bottom">{label}</TooltipPopup>
+        </Tooltip>
       </MenuTrigger>
       <MenuPopup align="start" className="w-64 max-w-[calc(100vw-2rem)]">
         {children}
@@ -142,7 +149,7 @@ function EnvironmentScopeMenu({
   );
   return (
     <ScopeMenu
-      ariaLabel="Environment scope"
+      ariaLabel={ko.settings.breadcrumb.environmentScope}
       narrowed={environmentValue !== ALL_ENVIRONMENTS_VALUE}
       icon={
         selected ? (
@@ -157,8 +164,8 @@ function EnvironmentScopeMenu({
         selected
           ? settingsScopeEnvironmentLabel(selected, environments)
           : environmentValue !== ALL_ENVIRONMENTS_VALUE
-            ? "Unavailable environment"
-            : "All environments"
+            ? ko.settings.breadcrumb.unavailableEnvironment
+            : ko.settings.breadcrumb.allEnvironments
       }
     >
       <MenuRadioGroup
@@ -170,7 +177,9 @@ function EnvironmentScopeMenu({
         <MenuRadioItem value={ALL_ENVIRONMENTS_VALUE}>
           <span className="flex min-w-0 items-center gap-2">
             <LayersIcon aria-hidden className="size-3.5" />
-            <span className="min-w-0 flex-1 truncate">All environments</span>
+            <span className="min-w-0 flex-1 truncate">
+              {ko.settings.breadcrumb.allEnvironments}
+            </span>
             <MenuRadioItemIndicator />
           </span>
         </MenuRadioItem>
@@ -187,7 +196,9 @@ function EnvironmentScopeMenu({
                 {settingsScopeEnvironmentLabel(environment, environments)}
               </span>
               {environment.connection.phase === "connected" ? null : (
-                <span className="shrink-0 text-xs text-muted-foreground">Offline</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {ko.settings.breadcrumb.offline}
+                </span>
               )}
               <MenuRadioItemIndicator />
             </span>
@@ -202,10 +213,15 @@ function ProjectScopeMenu({ value, groups, onChange }: SettingsScopeBreadcrumbPr
   const selected = groups.find((group) => group.projectKey === value.project);
   return (
     <ScopeMenu
-      ariaLabel="Project scope"
+      ariaLabel={ko.settings.breadcrumb.projectScope}
       narrowed={value.project !== undefined}
       icon={selected ? <ProjectFavicon project={selected} className="size-3.5 shrink-0" /> : null}
-      label={selected?.displayName ?? (value.project ? "Unavailable project" : "All projects")}
+      label={
+        selected?.displayName ??
+        (value.project
+          ? ko.settings.breadcrumb.unavailableProject
+          : ko.settings.breadcrumb.allProjects)
+      }
     >
       <MenuRadioGroup
         value={projectAxisValue(value)}
@@ -215,7 +231,7 @@ function ProjectScopeMenu({ value, groups, onChange }: SettingsScopeBreadcrumbPr
       >
         <MenuRadioItem value={ALL_PROJECTS_VALUE}>
           <span className="flex min-w-0 items-center gap-2">
-            <span className="min-w-0 flex-1 truncate">All projects</span>
+            <span className="min-w-0 flex-1 truncate">{ko.settings.breadcrumb.allProjects}</span>
             <MenuRadioItemIndicator />
           </span>
         </MenuRadioItem>

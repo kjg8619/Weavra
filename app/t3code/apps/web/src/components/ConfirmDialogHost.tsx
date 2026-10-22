@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
+import { ko } from "~/i18n/ko";
 
 type ConfirmationCopy = {
   readonly title: string;
@@ -46,8 +47,8 @@ function resolveConfirmDialogCopy(message: string): ConfirmationCopy {
   }
 
   return {
-    title: "Confirm action",
-    description: normalizedMessage || "This action requires your confirmation.",
+    title: ko.projects.confirmDialog.title,
+    description: normalizedMessage || ko.projects.confirmDialog.description,
   };
 }
 
@@ -104,7 +105,7 @@ export function ConfirmDialogHost() {
               />
             }
           >
-            {state.status !== "idle" && state.confirmLabel !== undefined ? "취소" : "Cancel"}
+            {ko.common.cancel}
           </AlertDialogClose>
           <Button
             variant={confirmVariant === "destructive" ? "destructive-outline" : confirmVariant}
@@ -112,7 +113,9 @@ export function ConfirmDialogHost() {
             className="rounded-none border-foreground text-sm focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-foreground [:hover,[data-pressed]]:border-foreground"
             onClick={onConfirm}
           >
-            {state.status !== "idle" ? (state.confirmLabel ?? "Confirm") : "Confirm"}
+            {state.status !== "idle"
+              ? (state.confirmLabel ?? ko.common.confirm)
+              : ko.common.confirm}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>

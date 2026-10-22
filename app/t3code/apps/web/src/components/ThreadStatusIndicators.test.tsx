@@ -2,6 +2,8 @@ import { ThreadId, type ThreadPullRequestLink } from "@t3tools/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vite-plus/test";
 
+import { ko } from "~/i18n/ko";
+
 import { ThreadWorktreeIndicator, linkedPullRequestSnapshotStatus } from "./ThreadStatusIndicators";
 
 describe("ThreadWorktreeIndicator", () => {
@@ -18,7 +20,7 @@ describe("ThreadWorktreeIndicator", () => {
 
     expect(markup).toContain('role="img"');
     expect(markup).toContain(
-      'aria-label="Worktree: sidebar-indicator (feature/sidebar-indicator)"',
+      `aria-label="${ko.projects.threadStatus.worktreeWithBranch("sidebar-indicator", "feature/sidebar-indicator")}"`,
     );
     expect(markup).toContain('data-testid="thread-worktree-thread-1"');
   });

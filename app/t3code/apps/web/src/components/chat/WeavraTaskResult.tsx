@@ -1,3 +1,4 @@
+import { ko } from "~/i18n/ko";
 import { weavraLabel } from "../weavraLabels";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
@@ -50,71 +51,26 @@ const approvalCommand = createEnvironmentCommand(connectionAtomRuntime, {
   execute: (input: WeavraTaskReadInput) =>
     requestWeavraTask(WS_METHODS.weavraTaskReadApproval, input),
 });
+const copy = ko.runtime.task.result;
 const categories = [
-  { id: "criteria", label: "수용 기준" },
-  { id: "checks", label: "등록된 검사" },
-  { id: "changed-files", label: "실제 변경 경로" },
-  { id: "trust-sources", label: "검증기의 신뢰 소스" },
+  { id: "criteria", label: copy.categories.criteria },
+  { id: "checks", label: copy.categories.checks },
+  { id: "changed-files", label: copy.categories.changedFiles },
+  { id: "trust-sources", label: copy.categories.trustSources },
 ] as const;
 const verificationReasons: Record<
   Extract<IssueVerification, { status: "unverified" }>["reason"],
   string
-> = {
-  RUN_NOT_COMPLETED: "Runtime의 Run 완료 기록이 아직 없어요.",
-  NO_SYMPTOM_BINDING: "이 Run에는 확정된 증상 검사가 없어요.",
-  STALE_OR_MISSING_EVIDENCE: "원래 문제를 평가하려면 현재 증거 스냅샷을 불러와 주세요.",
-  BINDING_CHANGED: "증거가 확정된 증상 검증 연결과 일치하지 않아요.",
-  EVIDENCE_INCOMPLETE: "최종 시도를 평가하려면 수용 기준과 검사 페이지를 모두 불러와 주세요.",
-  CRITERION_UNVERIFIED: "연결된 수용 기준이 검증되지 않았어요.",
-  FINAL_CHECK_UNVERIFIED: "최종 필수 증상 검사가 없거나 실패했거나 오래됐어요.",
-  REGISTRATION_UNVERIFIED: "검사 등록이 바뀌었거나 신뢰 여부가 검증되지 않았어요.",
-  REVIEW_UNVERIFIED: "현재 증거와 일치하는 새 독립 검토가 없어요.",
-};
-const nextActionGuidance: Record<TaskResultNextAction | "inspect-history", string> = {
-  synchronize: "기록된 결과에 따라 작업하기 전에 다시 연결하고 이 대화를 새로고침해 주세요.",
-  reconcile:
-    "Runtime의 현재 결과를 새로 조회해 이 실행을 확인해 주세요. 확인 요청을 다시 보내지 마세요.",
-  "inspect-approval": "별도 결정을 내리기 전에 아래 대기 중인 승인 요청을 확인해 주세요.",
-  "recover-interruption":
-    "활성 작업 카드의 ‘중단된 작업 복구 확인’으로 복구 상태를 살펴보세요. 작업을 다시 시작하거나 checkout 해제를 보장하지 않아요.",
-  "inspect-cleanup":
-    "Runtime의 현재 결과를 새로 조회하고 정리 상태를 확인해 주세요. 정리가 확인될 때까지 checkout 보호를 유지해요.",
-  "inspect-history":
-    "이 시도에 기록된 증거를 확인해 주세요. 실행 제어는 위의 활성 작업에만 적용돼요.",
-  none: "아래 기록된 증거를 확인해 주세요. Run 결과만으로 원래 문제가 검증되지는 않아요.",
-};
-const failureGuidance = {
-  RUN_FAILED: {
-    status: "실행 실패",
-    action: "Runtime 실행 실패 진단을 확인하고 새 스냅샷을 준비해 주세요.",
-  },
-  CHECK_FAILED: {
-    status: "등록 검사 실패",
-    action: "아래 검사 증거에서 실패한 검사를 확인해 주세요.",
-  },
-  RUN_BLOCKED: {
-    status: "실행 차단",
-    action: "Runtime 증거에서 차단 사유와 필요한 조치를 확인해 주세요.",
-  },
-  RUN_CANCELLED: {
-    status: "실행 취소",
-    action: "보존된 변경사항과 증거를 확인한 뒤 새 시도를 준비해 주세요.",
-  },
-  RUN_INTERRUPTED: {
-    status: "실행 중단",
-    action: "중단된 실행과 checkout 정리 상태를 확인해 주세요.",
-  },
-} as const;
+> = copy.verificationReasons;
+const nextActionGuidance: Record<TaskResultNextAction | "inspect-history", string> =
+  copy.nextActions;
+const failureGuidance = copy.failureGuidance;
 
 type CheckRecord = Extract<WeavraEvidenceRecord, { category: "checks" }>;
 type CriterionRecord = Extract<WeavraEvidenceRecord, { category: "criteria" }>;
 type ChangedFileRecord = Extract<WeavraEvidenceRecord, { category: "changed-files" }>;
 const draftCategories = ["criteria", "checks", "changed-files"] as const;
-const runDiffRefusals: Partial<Record<string, string>> = {
-  DIFF_STALE: "작업 폴더가 이 Run의 결과 이후 바뀌어서 Run의 변경을 다시 보여 줄 수 없어요.",
-  DIFF_UNVERIFIED: "Run의 기준 상태를 기록과 맞춰 확인하지 못해 변경을 보여 주지 않아요.",
-  DIFF_TOO_LARGE: "Run의 변경 전체가 표시 한도(256 KiB)를 넘어요.",
-};
+const runDiffRefusals: Partial<Record<string, string>> = copy.runDiffRefusals;
 const cell = (value: string) => value.replaceAll("|", "\\|").replaceAll("\n", " ");
 
 /** Korean PR description built only from the receipt and evidence pages already received. */
@@ -126,8 +82,8 @@ function pullRequestDraft(
   const records = state?.records ?? [];
   const coverage = (category: (typeof draftCategories)[number]) => {
     const unavailable = state?.unavailable[category];
-    if (unavailable) return [`_확인할 수 없음: ${unavailable.reason}_`];
-    return state?.complete.includes(category) ? [] : ["_일부 기록만 불러왔어요._"];
+    if (unavailable) return [copy.draft.unavailable(unavailable.reason)];
+    return state?.complete.includes(category) ? [] : [copy.draft.partial];
   };
   const criteria = records.filter(
     (record): record is CriterionRecord => record.category === "criteria",
@@ -138,35 +94,40 @@ function pullRequestDraft(
   );
   const review = state?.latest.review ?? null;
   return [
-    "## 목표",
-    task.execution?.preview?.goal ?? "확정된 목표 없음",
+    copy.draft.goalHeading,
+    task.execution?.preview?.goal ?? copy.draft.noGoal,
     "",
-    "## 수용 기준",
+    copy.draft.criteriaHeading,
     ...criteria.map((record) => `- ${record.status} \`${record.id}\` ${record.statement}`),
-    ...(criteria.length === 0 ? ["- 기록 없음"] : []),
+    ...(criteria.length === 0 ? [copy.draft.noRecordItem] : []),
     ...coverage("criteria"),
     "",
-    "## 검사 결과",
-    "| 검사 | 종료 코드 | 결과 |",
+    copy.draft.checksHeading,
+    copy.draft.checksTableHeader,
     "| --- | --- | --- |",
     ...checks.map(
       (record) =>
-        `| \`${cell(record.id)}\` | ${record.exitCode ?? "없음"} | ${record.status}${record.required ? "" : " (선택)"} |`,
+        `| \`${cell(record.id)}\` | ${record.exitCode ?? ko.common.none} | ${record.status}${record.required ? "" : copy.draft.optionalSuffix} |`,
     ),
     ...coverage("checks"),
     "",
-    "## 독립 검토",
+    copy.draft.reviewHeading,
     review
-      ? `${review.result} · 독립 검토 ${weavraLabel(review.independent)} · 코드 revision ${review.revision} · 수용 기준 ${review.criteriaCount}개`
-      : "검토 기록 없음",
+      ? copy.draft.review(
+          review.result,
+          weavraLabel(review.independent),
+          review.revision,
+          review.criteriaCount,
+        )
+      : copy.draft.noReview,
     "",
-    "## 변경 파일",
+    copy.draft.filesHeading,
     ...files.map((record) => `- \`${record.path}\``),
-    ...(files.length === 0 ? ["- 기록 없음"] : []),
+    ...(files.length === 0 ? [copy.draft.noRecordItem] : []),
     ...coverage("changed-files"),
     "",
     "---",
-    `Weavra Run \`${run.runId}\` · 상태 revision ${run.revision}${state ? ` · 코드 revision ${state.latest.codeRevision} · Diff \`${state.latest.snapshot.diffDigest}\`` : ""}`,
+    `${copy.draft.footer(run.runId, run.revision)}${state ? copy.draft.footerEvidence(state.latest.codeRevision, state.latest.snapshot.diffDigest) : ""}`,
   ].join("\n");
 }
 type FailureKind =
@@ -190,16 +151,7 @@ interface TaskFailure {
   readonly criteria: readonly CriterionRecord[];
   readonly target: { readonly category: EvidenceCategory; readonly index: number } | null;
 }
-const failureTitles: Record<FailureKind, string> = {
-  policy: "실행 정책 거부",
-  check: "검사 실패",
-  revise: "검토 수정 요청",
-  "review-block": "검토 차단",
-  blocked: "실행 차단",
-  failed: "실행 실패",
-  interrupted: "실행 중단",
-  cancelled: "실행 취소",
-};
+const failureTitles: Record<FailureKind, string> = copy.failureTitles;
 const failureCodes = {
   BLOCKED: "RUN_BLOCKED",
   FAILED: "RUN_FAILED",
@@ -209,10 +161,10 @@ const failureCodes = {
 const isFailedStatus = (status: string): status is keyof typeof failureCodes =>
   status in failureCodes;
 const recordStatus = (value: string | undefined) =>
-  value === undefined ? "확인할 수 없음" : weavraLabel(value);
+  value === undefined ? copy.unavailable : weavraLabel(value);
 // Criterion records say UNMET where the shared labels only know NOT_MET.
 const criterionLabel = (status: CriterionRecord["status"]) =>
-  status === "UNMET" ? "미충족" : weavraLabel(status);
+  status === "UNMET" ? copy.unmet : weavraLabel(status);
 const draftLines = (value: string) =>
   value
     .split("\n")
@@ -252,8 +204,15 @@ function taskFailure(task: WeavraTask, state: TaskEvidenceState | null): TaskFai
         kind: "check",
         tone: "destructive",
         code,
-        reason: `${failed.id} 종료 코드 ${failed.exitCode ?? "없음"}`,
-        detail: `${weavraLabel(failed.kind)} · ${failed.required ? "필수" : "선택"} · ${failed.step} 단계 시도 ${failed.attempt ?? "확인 안 됨"} · 코드 revision ${failed.revision}. ${failedOutput ? "아래는 검사 출력의 마지막 부분이에요(최대 20줄·2KiB, 비밀값 가림)." : "검사 출력 본문은 증거 레코드에 포함되지 않아요."}`,
+        reason: copy.checkFailureReason(failed.id, String(failed.exitCode ?? ko.common.none)),
+        detail: copy.checkFailureDetail(
+          weavraLabel(failed.kind),
+          failed.required,
+          failed.step,
+          String(failed.attempt ?? ko.common.unknown),
+          failed.revision,
+          failedOutput !== "",
+        ),
         ...(failedOutput ? { output: failedOutput } : {}),
         refs: failed.evidenceRefs,
         criteria: [],
@@ -266,9 +225,15 @@ function taskFailure(task: WeavraTask, state: TaskEvidenceState | null): TaskFai
       kind: "policy",
       tone: "destructive",
       code,
-      reason: `검사 ${denied.id}가 실행 정책에 막혔어요: ${denied.required ? "필수" : "선택"} 검사가 ${denied.step} 단계 시도 ${denied.attempt ?? "확인 안 됨"}에서 실행되지 않아 종료 코드 없이 ‘확인할 수 없음’으로 기록됐어요. 신뢰 상태 ${recordStatus(denied.trust?.status)} · sandbox ${recordStatus(denied.sandbox?.status)}.`,
-      detail:
-        "등록된 검사 명령이 실행 정책 안에서 실행 가능해야 Run이 진행돼요. 거부 사유 문구는 증거 레코드에 포함되지 않아요.",
+      reason: copy.policyReason(
+        denied.id,
+        denied.required,
+        denied.step,
+        String(denied.attempt ?? ko.common.unknown),
+        recordStatus(denied.trust?.status),
+        recordStatus(denied.sandbox?.status),
+      ),
+      detail: copy.policyDetail,
       refs: denied.evidenceRefs,
       criteria: [],
       target: { category: "checks", index: denied.index },
@@ -276,23 +241,29 @@ function taskFailure(task: WeavraTask, state: TaskEvidenceState | null): TaskFai
   if (checkFailure) return checkFailure;
   if (review?.result === "REVISE" || review?.result === "BLOCK") {
     const kind = review.result === "REVISE" ? "revise" : "review-block";
-    const reviewer = review.independent ? "독립 검토" : "독립성이 확인되지 않은 검토";
-    const outcome = kind === "revise" ? "수정을 요청했어요(REVISE)" : "구현을 차단했어요(BLOCK)";
+    const reviewer = review.independent ? copy.independentReviewer : copy.unprovenReviewer;
+    const outcome = kind === "revise" ? copy.reviseOutcome : copy.blockOutcome;
     const breakdown =
       criteria.length > 0
-        ? `미충족·미검증 기준 ${criteria.length}개는 아래와 같아요.`
+        ? copy.breakdownUnmet(criteria.length)
         : state?.complete.includes("criteria")
-          ? "모든 기준이 충족으로 기록됐어요."
-          : "기준별 결과는 ‘수용 기준’ 증거를 불러오면 표시돼요.";
+          ? copy.breakdownAllMet
+          : copy.breakdownLoad;
     const first = criteria[0];
     return {
       kind,
       tone: kind === "revise" ? "warning" : "destructive",
       code,
-      reason: `${reviewer}가 ${outcome}. 코드 revision ${review.revision}의 수용 기준 ${review.criteriaCount}개를 검토했고, ${breakdown}`,
+      reason: copy.reviewReason(
+        reviewer,
+        outcome,
+        review.revision,
+        review.criteriaCount,
+        breakdown,
+      ),
       detail: review.reviseSummary
-        ? `검토 수정 이유: ${review.reviseSummary}`
-        : "검토 의견 원문은 증거 레코드에 포함되지 않아요. 기준별 상태가 검토 요약이에요.",
+        ? copy.reviseSummary(review.reviseSummary)
+        : copy.reviewOpinionMissing,
       refs: [],
       criteria,
       target: first ? { category: "criteria", index: first.index } : null,
@@ -300,16 +271,14 @@ function taskFailure(task: WeavraTask, state: TaskEvidenceState | null): TaskFai
   }
   const last = checks.at(-1);
   const target = last ? { category: "checks" as const, index: last.index } : null;
-  const cause = state
-    ? "불러온 증거에 실패한 검사·검토 기록이 없어요. 사전 점검·프로바이더·승인 같은 다른 원인일 수 있어요."
-    : "원인은 검사·검토 증거에 기록돼 있어요. ‘증거 보기’로 불러와 주세요.";
+  const cause = state ? copy.causeLoaded : copy.causeNotLoaded;
   switch (status) {
     case "BLOCKED":
       return {
         kind: "blocked",
         tone: "destructive",
         code,
-        reason: `Runtime이 실행을 차단했어요 (${code}). ${cause}`,
+        reason: copy.blockedReason(code, cause),
         detail: null,
         refs: [],
         criteria: [],
@@ -320,7 +289,7 @@ function taskFailure(task: WeavraTask, state: TaskEvidenceState | null): TaskFai
         kind: "failed",
         tone: "destructive",
         code,
-        reason: `Runtime 실행이 실패했어요 (${code}). ${cause}`,
+        reason: copy.failedReason(code, cause),
         detail: null,
         refs: [],
         criteria: [],
@@ -331,7 +300,10 @@ function taskFailure(task: WeavraTask, state: TaskEvidenceState | null): TaskFai
         kind: "interrupted",
         tone: "warning",
         code,
-        reason: `실행이 중단됐어요 (${code}). 정리 상태: ${weavraLabel(receipt.admission.cleanup ?? "UNCONFIRMED")}. 자동으로 다시 시작하지 않았어요.`,
+        reason: copy.interruptedReason(
+          code,
+          weavraLabel(receipt.admission.cleanup ?? "UNCONFIRMED"),
+        ),
         detail: null,
         refs: [],
         criteria: [],
@@ -342,7 +314,7 @@ function taskFailure(task: WeavraTask, state: TaskEvidenceState | null): TaskFai
         kind: "cancelled",
         tone: "warning",
         code,
-        reason: `실행을 취소했어요 (${code}). 보존된 변경사항은 증거에서 확인할 수 있어요.`,
+        reason: copy.cancelledReason(code),
         detail: null,
         refs: [],
         criteria: [],
@@ -354,7 +326,7 @@ function taskFailure(task: WeavraTask, state: TaskEvidenceState | null): TaskFai
 /** Draft constraint lines for the next attempt; the editor still shows them for review before any prepare. */
 function revisionNotes(failure: TaskFailure, runId: string): string[] {
   return [
-    `이전 Run ${runId} 검토 결과 ${failure.kind === "revise" ? "REVISE" : "BLOCK"}: 미충족 수용 기준을 먼저 해결해요.`,
+    copy.revisionNote(runId, failure.kind === "revise" ? "REVISE" : "BLOCK"),
     ...failure.criteria.map(
       (criterion) => `${criterion.id} ${criterionLabel(criterion.status)}: ${criterion.statement}`,
     ),
@@ -457,7 +429,7 @@ export function WeavraTaskResults({
   return (
     <div className="my-4 min-w-0 space-y-3 rounded-[24px] border border-border/80 bg-card/70 p-4 sm:p-5">
       <label htmlFor={`${id}-history`} className="block text-sm font-medium">
-        기록된 작업 결과
+        {copy.historyLabel}
       </label>
       <select
         id={`${id}-history`}
@@ -469,7 +441,7 @@ export function WeavraTaskResults({
           if (task) void navigate({ to: pathname, hash: `${prefix}${task.id}` });
         }}
       >
-        {!selected ? <option value="">요청한 결과를 확인할 수 없어요</option> : null}
+        {!selected ? <option value="">{copy.resultMissingOption}</option> : null}
         {results.map((task) => (
           <option key={task.id} value={task.id}>
             {task.createdAt.slice(0, 16)} | {taskStatus(task)}
@@ -477,8 +449,8 @@ export function WeavraTaskResults({
         ))}
       </select>
       <p className="text-xs text-muted-foreground">
-        결과 조회는 활성 작업의 대상을 바꾸거나 실행을 시작하지 않아요.
-        {!active ? " 과거 시도의 기록이에요. 활성 작업 제어는 위 카드에서 할 수 있어요." : ""}
+        {copy.historyNote}
+        {!active ? copy.historicalNote : ""}
       </p>
       {selected ? (
         <div
@@ -488,7 +460,7 @@ export function WeavraTaskResults({
           className="min-w-0 focus:outline-none"
         >
           <details className="mb-2 text-xs">
-            <summary className="cursor-pointer">작업 식별 정보</summary>
+            <summary className="cursor-pointer">{copy.taskIdentity}</summary>
             <p className="mt-2 font-mono [overflow-wrap:anywhere]">{selected.id}</p>
           </details>
           <WeavraTaskResult
@@ -509,7 +481,7 @@ export function WeavraTaskResults({
         </div>
       ) : (
         <p role="status" className="text-sm">
-          이 대화에서 요청한 작업을 찾을 수 없어요. 다른 결과로 대체하지 않았어요.
+          {copy.taskNotFound}
         </p>
       )}
     </div>
@@ -581,7 +553,7 @@ function TaskRunActions({
         setLoaded((previous) =>
           previous ? { ...previous, epoch: Symbol("unverified-approval") } : null,
         );
-        setError("승인 요청을 확인할 수 없어요. 작업 상태를 새로고침한 뒤 다시 확인해 주세요.");
+        setError(copy.approvalUnverified);
       }
     } finally {
       pending.current = false;
@@ -605,13 +577,10 @@ function TaskRunActions({
   };
   return (
     <section
-      aria-label="연결된 Runtime 제어"
+      aria-label={copy.controlsAria}
       className="min-w-0 space-y-3 border-t border-border/70 pt-3"
     >
-      <p className="text-xs text-muted-foreground">
-        이 제어는 현재 작업과 Run revision에만 적용돼요. 취소해도 일부 변경은 보존하며, 정리가
-        확인되기 전에는 소유권을 해제하지 않아요.
-      </p>
+      <p className="text-xs text-muted-foreground">{copy.controlsNote}</p>
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
@@ -630,7 +599,7 @@ function TaskRunActions({
               });
           }}
         >
-          Runtime 실행 취소
+          {copy.cancelRun}
         </Button>
         {run.status === "WAITING_APPROVAL" ? (
           <Button
@@ -640,7 +609,7 @@ function TaskRunActions({
             disabled={!connected || !c.fresh || c.busy || loading}
             onClick={() => void inspect()}
           >
-            {loading ? "승인 요청을 불러오고 있어요..." : "대기 중인 승인 확인"}
+            {loading ? copy.loadingApproval : copy.inspectApproval}
           </Button>
         ) : null}
       </div>
@@ -649,27 +618,22 @@ function TaskRunActions({
           {error}
         </p>
       ) : null}
-      {loaded && approval === null ? (
-        <p className="text-xs">대기 중인 승인 요청이 없어요.</p>
-      ) : null}
+      {loaded && approval === null ? <p className="text-xs">{copy.noApproval}</p> : null}
       {approval ? (
         <div className="space-y-3 rounded-lg border border-warning/50 p-3 text-sm [overflow-wrap:anywhere]">
-          <h5 className="font-medium">파일 하나 삭제 승인(R3)</h5>
+          <h5 className="font-medium">{copy.approvalTitle}</h5>
           <p>{approval.explanation}</p>
           <dl className="grid gap-2 text-xs sm:grid-cols-2">
             {[
-              ["대상", approval.path],
-              ["Run", approval.runId],
-              ["승인", approval.approvalId],
-              ["작업 / 역할", `${approval.operation} / ${approval.role}`],
-              ["단계", `${approval.step.stepId}@${approval.step.attempt}`],
-              [
-                "Run / 프로젝트 revision",
-                `${approval.stateRevision} / ${approval.projectRevision}`,
-              ],
-              ["바이트", String(approval.bytes)],
-              ["파일 지문", approval.preconditionDigest],
-              ["만료", new Date(approval.expiresAt).toLocaleString()],
+              [copy.approvalTarget, approval.path],
+              [copy.approvalRun, approval.runId],
+              [copy.approvalId, approval.approvalId],
+              [copy.approvalOperation, `${approval.operation} / ${approval.role}`],
+              [copy.approvalStep, `${approval.step.stepId}@${approval.step.attempt}`],
+              [copy.approvalRevision, `${approval.stateRevision} / ${approval.projectRevision}`],
+              [copy.approvalBytes, String(approval.bytes)],
+              [copy.approvalFingerprint, approval.preconditionDigest],
+              [copy.approvalExpires, new Date(approval.expiresAt).toLocaleString()],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt className="text-muted-foreground">{label}</dt>
@@ -677,14 +641,10 @@ function TaskRunActions({
               </div>
             ))}
           </dl>
-          <p className="text-xs text-muted-foreground">
-            구현 확인은 이 삭제의 승인이 아니에요. 세션 전체 권한이나 자동 되돌리기를 부여하지
-            않아요.
-          </p>
+          <p className="text-xs text-muted-foreground">{copy.approvalScope}</p>
           {!approvalCurrent ? (
             <p role="status" className="text-xs">
-              이 승인은 오래됐거나 만료됐거나 이미 요청했어요. 작업을 새로고침하고 현재 요청을
-              확인해 주세요. 자동 재시도는 없어요.
+              {copy.approvalStale}
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
@@ -695,7 +655,7 @@ function TaskRunActions({
               disabled={disabled || !approvalCurrent}
               onClick={() => decide("reject")}
             >
-              삭제 거부
+              {copy.rejectDelete}
             </Button>
             <Button
               type="button"
@@ -703,7 +663,7 @@ function TaskRunActions({
               disabled={disabled || !approvalCurrent}
               onClick={() => decide("approve")}
             >
-              이번 삭제만 승인
+              {copy.approveDeleteOnce}
             </Button>
           </div>
         </div>
@@ -723,11 +683,11 @@ function ReportedRunUsage({ task, runId }: { task: WeavraTask; runId: string }) 
   const { count, toolCalls, reportedTokens } = evidence.workers;
   const tokens =
     reportedTokens === null
-      ? "토큰 보고 없음"
-      : `보고된 토큰 ${reportedTokens.toLocaleString("ko-KR")}`;
+      ? copy.noTokens
+      : copy.reportedTokens(reportedTokens.toLocaleString("ko-KR"));
   return (
     <p data-weavra="task-run-usage" className="text-xs text-muted-foreground">
-      {`${tokens} · 도구 호출 ${weavraLabel(toolCalls)} · worker ${weavraLabel(count)}`}
+      {copy.usage(tokens, weavraLabel(toolCalls), weavraLabel(count))}
     </p>
   );
 }
@@ -771,14 +731,14 @@ export function WeavraTaskResult({
   );
   return (
     <section
-      aria-label="통제 작업 결과"
+      aria-label={copy.resultAria}
       data-weavra="controlled-outcome"
       data-weavra-result="goal-plan-result"
       data-weavra-start-failure={startFailure ?? undefined}
       className="min-w-0 space-y-4 border-t border-border/70 pt-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="font-medium">작업 결과</h4>
+        <h4 className="font-medium">{copy.resultTitle}</h4>
         <Badge variant="outline">
           {weavraLabel(
             run?.status ??
@@ -790,68 +750,68 @@ export function WeavraTaskResult({
       <div className="space-y-2 rounded-lg bg-muted/40 p-3 text-sm">
         {task.execution?.preview ? (
           <p className="[overflow-wrap:anywhere]">
-            <strong>목표:</strong> {task.execution.preview.goal}
+            <strong>{copy.goal}</strong> {task.execution.preview.goal}
           </p>
         ) : null}
         <p>
-          <strong>계획:</strong>{" "}
+          <strong>{copy.plan}</strong>{" "}
           {task.execution?.preview
-            ? `${task.execution.preview.acceptanceCriteria.length}개 수용 기준, ${task.execution.preview.checks.filter((check) => check.required).length}개 필수 검사`
-            : "확정된 계획 없음"}
+            ? copy.planSummary(
+                task.execution.preview.acceptanceCriteria.length,
+                task.execution.preview.checks.filter((check) => check.required).length,
+              )
+            : copy.noPlan}
         </p>
         <p>
-          <strong>결과:</strong>{" "}
+          <strong>{copy.result}</strong>{" "}
           {failure?.status ??
             weavraLabel(
               run?.status ??
                 (receipt?.status === "FOUND" ? receipt.admission.outcome.status : "UNCONFIRMED"),
             )}
           {startFailure ? ` (${startFailure})` : ""}
-          {run?.status === "COMPLETED" ? " (Runtime 완료 판정)" : ""}
+          {run?.status === "COMPLETED" ? copy.runtimeCompleted : ""}
         </p>
         <p role="status" data-next-action={nextAction} data-weavra-action="task-result-next-action">
-          <strong>다음 단계:</strong>{" "}
+          <strong>{copy.nextStep}</strong>{" "}
           {nextAction === "none" && startFailure
             ? startFailure === "MODEL_UNAVAILABLE"
-              ? "프로젝트 설정에서 Runtime 모델 프로필과 인증을 확인해 주세요. Claude Code 경로라면 명시적 사용 허용과 별도 CLI 로그인이 필요해요. 자동으로 다시 실행하지 않아요."
-              : "프로젝트 설정의 Runtime 사전 검사 진단을 확인하고 준비 상태를 다시 검사해 주세요. 자동으로 다시 실행하지 않아요."
+              ? copy.modelUnavailable
+              : copy.preflightFailed
             : nextAction === "none" && failure
               ? failure.action
               : nextActionGuidance[nextAction]}
         </p>
         <p className="text-xs text-muted-foreground">
-          {fresh
-            ? "현재 확인한 결과예요."
-            : "과거 결과예요. 작업 전에 다시 연결하고 동기화해 주세요."}{" "}
-          작업 단계나 모델의 설명은 완료 증거가 아니에요.
+          {fresh ? copy.freshResult : copy.staleResult} {copy.notCompletionEvidence}
         </p>
       </div>
       <details className="min-w-0 text-xs">
-        <summary className="cursor-pointer font-medium">Runtime 및 checkout 진단</summary>
+        <summary className="cursor-pointer font-medium">{copy.diagnostics}</summary>
         <div className="mt-2 space-y-2 text-muted-foreground">
           <p>
-            checkout 소유권: {weavraLabel(task.ownership.state)}. 정리 상태:{" "}
-            {receipt?.status === "FOUND"
-              ? weavraLabel(receipt.admission.cleanup ?? "UNCONFIRMED")
-              : "확인 안 됨"}
-            .
+            {copy.ownershipCleanup(
+              weavraLabel(task.ownership.state),
+              receipt?.status === "FOUND"
+                ? weavraLabel(receipt.admission.cleanup ?? "UNCONFIRMED")
+                : ko.common.unknown,
+            )}
           </p>
           <p data-weavra-outcome-freshness={fresh ? "fresh" : "historical"}>
-            {fresh
-              ? "마지막으로 확인한 Runtime의 공식 결과예요."
-              : "과거 결과예요. 다시 연결하고 동기화해 주세요."}
+            {fresh ? copy.officialFresh : copy.officialStale}
           </p>
         </div>
       </details>
       <details className="min-w-0 text-xs">
-        <summary className="cursor-pointer font-medium">검토한 참고 자료(검증 증거 아님)</summary>
+        <summary className="cursor-pointer font-medium">{copy.reviewedContext}</summary>
         {task.context ? (
           <div className="mt-3 space-y-3 [overflow-wrap:anywhere]">
             <p>
-              <strong>관찰한 증상:</strong> {task.context.symptom}
+              <strong>{copy.symptom}</strong> {task.context.symptom}
             </p>
             <p>
-              <strong>추정 원인(가설):</strong> {task.context.candidateCause?.text ?? "기록 없음"}
+              <strong>{copy.hypothesis}</strong>{" "}
+              {task.context.candidateCause?.text ?? copy.noRecord}
             </p>
             <ul className="space-y-2">
               {observations.map(({ id, observation }) => (
@@ -867,33 +827,30 @@ export function WeavraTaskResult({
               ))}
             </ul>
             <p>
-              <strong>불확실한 점:</strong> {task.context.uncertainties.join("; ") || "기록 없음"}
+              <strong>{copy.uncertainties}</strong>{" "}
+              {task.context.uncertainties.join("; ") || copy.noRecord}
             </p>
             <p>
-              <strong>제약 조건:</strong> {task.context.constraints.join("; ") || "기록 없음"}
+              <strong>{copy.constraints}</strong>{" "}
+              {task.context.constraints.join("; ") || copy.noRecord}
             </p>
           </div>
         ) : (
-          <p className="mt-2 text-muted-foreground">검토한 참고 자료를 확인할 수 없어요.</p>
+          <p className="mt-2 text-muted-foreground">{copy.contextUnavailable}</p>
         )}
       </details>
       {!receipt ? (
-        <p className="text-sm text-muted-foreground">
-          Runtime의 실행 허용 기록이 없어요. 구현 결과가 있다고 판단하지 않아요.
-        </p>
+        <p className="text-sm text-muted-foreground">{copy.noAdmission}</p>
       ) : receipt.status === "UNKNOWN" ? (
-        <p className="text-sm text-muted-foreground">
-          실행 허용 여부를 확인할 수 없어요. 실행 식별자를 보존하고 현재 상태를 조회해 주세요. 확인
-          요청을 다시 보내지 마세요.
-        </p>
+        <p className="text-sm text-muted-foreground">{copy.admissionUnknown}</p>
       ) : run === null ? (
         <div className="space-y-3">
           <p className="text-sm">
             {receipt.admission.outcome.status === "START_FAILED"
-              ? `시작 실패: ${receipt.admission.outcome.reasonCode}. Run은 만들지 않았어요.`
+              ? copy.startFailed(receipt.admission.outcome.reasonCode)
               : receipt.admission.outcome.status === "INTERRUPTED_BEFORE_START"
-                ? "Run 시작 전에 소유 프로세스가 종료됐어요. 자동으로 재시작하지 않았어요."
-                : "실행을 허용했지만 아직 Run이 확인되지 않았어요."}
+                ? copy.interruptedBeforeStart
+                : copy.admittedPending}
           </p>
           {receipt.admission.outcome.status === "START_FAILED" ? (
             <WeavraPreflightFailure configuration={null} />
@@ -915,7 +872,7 @@ export function WeavraTaskResult({
         disabled={!connected || !canRefresh}
         onClick={onRefresh}
       >
-        Runtime 결과 새로고침
+        {copy.refreshResult}
       </Button>
     </section>
   );
@@ -1052,9 +1009,7 @@ function EvidencePanel({
               typeof cause === "object" && cause !== null && "code" in cause
                 ? String(cause.code)
                 : "REQUEST_FAILED";
-            setError(
-              `${code}: 증거를 확인할 수 없어요. 작업을 새로고침하고 스냅샷을 다시 불러와 주세요.`,
-            );
+            setError(copy.evidenceUnavailable(code));
             setLoaded((previous) =>
               previous ? { ...previous, epoch: Symbol("unverified-evidence") } : null,
             );
@@ -1066,9 +1021,7 @@ function EvidencePanel({
               ? { ok: false as const, code: "PAGE_MISMATCH" as const }
               : appendTaskEvidence(task, base, result.value);
           if (!next.ok) {
-            setError(
-              `${next.code}: 증거 페이지를 합치지 않았어요. 작업을 새로고침하고 다시 불러와 주세요.`,
-            );
+            setError(copy.pageMismatch(next.code));
             setLoaded((previous) =>
               previous ? { ...previous, epoch: Symbol("unverified-evidence") } : null,
             );
@@ -1127,9 +1080,9 @@ function EvidencePanel({
     const base = draftLoaded || !fresh || !connected ? state : await load(false, "draft");
     try {
       await navigator.clipboard.writeText(pullRequestDraft(task, run, base ?? state));
-      toastManager.add({ type: "success", title: "PR 설명 초안을 복사했어요" });
+      toastManager.add({ type: "success", title: copy.draftCopied });
     } catch {
-      toastManager.add({ type: "error", title: "PR 설명 초안을 복사하지 못했어요" });
+      toastManager.add({ type: "error", title: copy.draftCopyFailed });
     }
   };
   const [diffShown, setDiffShown] = useState(false);
@@ -1148,11 +1101,7 @@ function EvidencePanel({
     setRepreparing(true);
     try {
       const created = await onReprepare(revisionNotes(failure, run.runId));
-      setNote(
-        created
-          ? "새 통제 작업을 만들고 수정 요청을 초안의 제약 조건에 반영했어요. 활성 작업 카드에서 초안을 검토한 뒤 준비해 주세요. 아직 준비하거나 실행하지 않았어요."
-          : "새 작업을 만들지 못했어요. 작업 상태를 새로고침하고 활성 작업 카드의 안내를 확인해 주세요.",
-      );
+      setNote(created ? copy.reprepared : copy.reprepareFailed);
     } finally {
       setRepreparing(false);
     }
@@ -1161,7 +1110,7 @@ function EvidencePanel({
     <div className="min-w-0 space-y-3 [overflow-wrap:anywhere]">
       {failure ? (
         <section
-          aria-label="실패 이유와 다음 행동"
+          aria-label={copy.failureAria}
           data-weavra="task-failure"
           data-weavra-failure={failure.kind}
           className={cn(
@@ -1199,7 +1148,7 @@ function EvidencePanel({
           ) : null}
           {failure.refs.length > 0 ? (
             <p className="font-mono text-xs text-muted-foreground">
-              출력 참조: {failure.refs.join(" | ")}
+              {copy.outputRefs(failure.refs.join(" | "))}
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
@@ -1209,14 +1158,10 @@ function EvidencePanel({
                 size="sm"
                 data-weavra-action="fix-checks-in-settings"
                 onClick={() =>
-                  setNote(
-                    openProjectSetup()
-                      ? "프로젝트 설정 패널을 열었어요. 등록 검사를 실행 가능한 명령으로 고쳐 저장한 뒤 새 통제 작업을 시작해 주세요."
-                      : "이 화면에 프로젝트 설정 패널이 없어요. 작업이 해제된 뒤 활성 작업 카드의 ‘프로젝트 설정’에서 검사를 고쳐 주세요.",
-                  )
+                  setNote(openProjectSetup() ? copy.settingsOpened : copy.settingsMissing)
                 }
               >
-                설정에서 검사 고치기
+                {copy.fixChecks}
               </Button>
             ) : null}
             {failure.kind === "revise" ? (
@@ -1227,7 +1172,7 @@ function EvidencePanel({
                 disabled={!onReprepare || busy || repreparing}
                 onClick={() => reprepare()}
               >
-                {repreparing ? "새 작업을 만들고 있어요..." : "수정 요청 반영해 다시 준비"}
+                {repreparing ? copy.repreparing : copy.reprepare}
               </Button>
             ) : null}
             <Button
@@ -1240,13 +1185,11 @@ function EvidencePanel({
               disabled={busy || (!failureLoaded && (!fresh || !connected))}
               onClick={() => inspectFailure()}
             >
-              증거 보기
+              {copy.showEvidence}
             </Button>
           </div>
           {failure.kind === "revise" && !onReprepare ? (
-            <p className="text-xs text-muted-foreground">
-              다시 준비는 활성 작업에서 연결·권한·작업 해제가 확인된 뒤 가능해요.
-            </p>
+            <p className="text-xs text-muted-foreground">{copy.reprepareUnavailable}</p>
           ) : null}
           {note ? (
             <p role="status" className="text-xs text-muted-foreground">
@@ -1257,7 +1200,7 @@ function EvidencePanel({
       ) : null}
       {completed ? (
         <section
-          aria-label="완료된 Run의 변경과 PR 설명"
+          aria-label={copy.completedAria}
           data-weavra="task-completed-actions"
           className="space-y-2"
         >
@@ -1270,7 +1213,7 @@ function EvidencePanel({
               disabled={busy || (!runDiffLoaded && (!fresh || !connected))}
               onClick={showRunDiff}
             >
-              변경 보기
+              {copy.showDiff}
             </Button>
             <Button
               type="button"
@@ -1279,38 +1222,33 @@ function EvidencePanel({
               disabled={busy || (!draftLoaded && (!fresh || !connected))}
               onClick={() => copyDraft()}
             >
-              PR 설명 초안 복사
+              {copy.copyDraft}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            초안은 이 Run의 수용 기준·검사·변경 경로 증거로만 만들어요. PR을 자동으로 올리지 않아요.
-          </p>
+          <p className="text-xs text-muted-foreground">{copy.draftNote}</p>
           {diffShown ? (
-            <div aria-label="이 Run의 변경" data-weavra="run-diff" className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                이 Run의 시작 상태와 결과 사이 변경만 보여 줘요. 다른 스레드의 변경이나 이후 변경은
-                포함하지 않아요.
-              </p>
+            <div aria-label={copy.runDiffAria} data-weavra="run-diff" className="space-y-2">
+              <p className="text-xs text-muted-foreground">{copy.runDiffScope}</p>
               {runDiffUnavailable ? (
                 <p role="status" data-weavra="run-diff-refused" className="text-xs">
-                  {runDiffRefusals[runDiffUnavailable.reason] ?? "Run의 변경을 확인할 수 없어요."}{" "}
+                  {runDiffRefusals[runDiffUnavailable.reason] ?? copy.runDiffUnknown}{" "}
                   <span className="font-mono">{runDiffUnavailable.reason}</span>
                 </p>
               ) : runDiffRecords.length > 0 ? (
                 <WeavraRunDiff records={runDiffRecords} />
               ) : runDiffComplete ? (
-                <p className="text-xs text-muted-foreground">이 Run에 기록된 변경 파일이 없어요.</p>
+                <p className="text-xs text-muted-foreground">{copy.runDiffEmpty}</p>
               ) : busy ? (
-                <p className="text-xs text-muted-foreground">Run의 변경을 불러오고 있어요...</p>
+                <p className="text-xs text-muted-foreground">{copy.runDiffLoading}</p>
               ) : null}
             </div>
           ) : null}
         </section>
       ) : null}
       <details className="text-xs">
-        <summary className="cursor-pointer">Run 및 revision 식별 정보</summary>
+        <summary className="cursor-pointer">{copy.runIdentity}</summary>
         <p className="mt-2 font-mono [overflow-wrap:anywhere]">
-          Run {run?.runId} | 상태 revision {run?.revision}
+          {copy.runIdentityValue(String(run?.runId), String(run?.revision))}
         </p>
       </details>
       <div
@@ -1319,9 +1257,7 @@ function EvidencePanel({
         className="rounded-lg bg-muted/40 p-3 text-sm"
       >
         <p className="font-medium">
-          {verification.status === "verified"
-            ? "이 Run에서 원래 문제 검증 완료"
-            : "원래 문제 미검증"}
+          {verification.status === "verified" ? copy.verified : copy.unverified}
         </p>
         {verification.status === "unverified" ? (
           <p className="mt-1 text-xs text-muted-foreground">
@@ -1332,33 +1268,39 @@ function EvidencePanel({
       {state ? (
         <div className="space-y-2 text-xs text-muted-foreground">
           <p>
-            {current ? "증거 스냅샷" : "과거 증거예요. 평가 전에 다시 불러와 주세요"} |{" "}
-            {weavraLabel(state.latest.source)} | 코드 revision {state.latest.codeRevision}
+            {current ? copy.snapshotCurrent : copy.snapshotStale} |{" "}
+            {weavraLabel(state.latest.source)} | {copy.codeRevision(state.latest.codeRevision)}
           </p>
-          <p className="font-mono">Diff {state.latest.snapshot.diffDigest}</p>
+          <p className="font-mono">{copy.diffDigest(state.latest.snapshot.diffDigest)}</p>
           <p>
-            변경된 줄: {state.latest.changedLines ?? "확인할 수 없음"} | 정리 상태:{" "}
-            {weavraLabel(state.latest.ownership.cleanup)}
+            {copy.changedLines(String(state.latest.changedLines ?? copy.unavailable))} |{" "}
+            {copy.cleanup} {weavraLabel(state.latest.ownership.cleanup)}
           </p>
           <p>
-            독립 검토:{" "}
+            {copy.independentReview}{" "}
             {state.latest.review
-              ? `${weavraLabel(state.latest.review.result)}; 독립 검토=${weavraLabel(state.latest.review.independent)}; 코드 revision ${state.latest.review.revision}; ${state.latest.review.criteriaCount}개 수용 기준${state.latest.review.revision === state.latest.codeRevision && state.latest.review.diffDigest === state.latest.snapshot.diffDigest ? "" : "; 오래된 결과"}`
-              : "확인할 수 없음"}
+              ? copy.reviewDetail(
+                  weavraLabel(state.latest.review.result),
+                  weavraLabel(state.latest.review.independent),
+                  state.latest.review.revision,
+                  state.latest.review.criteriaCount,
+                  !(
+                    state.latest.review.revision === state.latest.codeRevision &&
+                    state.latest.review.diffDigest === state.latest.snapshot.diffDigest
+                  ),
+                )
+              : copy.unavailable}
           </p>
-          <p>이 증거는 기록된 Run revision에 대한 것이며 이후 파일 변경을 반영하지 않아요.</p>
+          <p>{copy.evidenceScope}</p>
           {run?.status !== "COMPLETED" &&
           (state.latest.completeness.changedFiles.total ?? 0) > 0 ? (
-            <p>
-              완료되지 않은 Run의 변경사항을 보존하고 있어요. 성공한 구현이나 자동 되돌리기로 볼
-              수는 없어요.
-            </p>
+            <p>{copy.partialPreserved}</p>
           ) : null}
         </div>
       ) : null}
       <div className="space-y-1">
         <label htmlFor={`${id}-category`} className="text-xs font-medium">
-          증거 분류
+          {copy.category}
         </label>
         <select
           id={`${id}-category`}
@@ -1381,19 +1323,22 @@ function EvidencePanel({
       </div>
       {counts ? (
         <p className="text-xs text-muted-foreground">
-          제공 상태: {weavraLabel(counts.availability)} | 불러온 항목 {selectedRecords.length} /{" "}
-          {counts.total ?? "확인할 수 없음"}
+          {copy.availability(
+            weavraLabel(counts.availability),
+            selectedRecords.length,
+            String(counts.total ?? copy.unavailable),
+          )}
           {category === "checks"
-            ? ` | 필수 기록: ${state?.latest.completeness.checks.required ?? "확인할 수 없음"}`
+            ? copy.requiredRecords(
+                String(state?.latest.completeness.checks.required ?? copy.unavailable),
+              )
             : ""}
         </p>
       ) : null}
       {reference ? (
         <p role="status" className="text-xs">
-          증거 참조: <code>{reference}</code>.{" "}
-          {matchingRecord
-            ? "불러온 기록 중 일치하는 항목으로 이동했어요."
-            : "불러온 검사 기록에 없어요. 남은 페이지를 불러오거나 검토 요약을 확인해 주세요."}
+          {copy.reference} <code>{reference}</code>.{" "}
+          {matchingRecord ? copy.referenceMatched : copy.referenceMissing}
         </p>
       ) : null}
       {error ? (
@@ -1403,8 +1348,7 @@ function EvidencePanel({
       ) : null}
       {unavailable ? (
         <p role="status" className="text-xs">
-          확인 불가: {unavailable.reason}, 기록 {unavailable.recordIndex}. 항목이 없는 성공한
-          분류라는 뜻은 아니에요.
+          {copy.categoryUnavailable(unavailable.reason, unavailable.recordIndex)}
         </p>
       ) : null}
       <div className="space-y-3">
@@ -1417,7 +1361,10 @@ function EvidencePanel({
               else rows.current.delete(key);
             }}
             tabIndex={-1}
-            aria-label={`${record.category} 기록 ${record.index + 1}`}
+            aria-label={copy.recordAria(
+              categories.find((item) => item.id === record.category)?.label ?? record.category,
+              record.index + 1,
+            )}
             data-weavra-record={record.category}
             data-record-index={record.index + 1}
             className="min-w-0 rounded-lg border border-border/70 p-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
@@ -1435,7 +1382,7 @@ function EvidencePanel({
         ))}
       </div>
       {complete && selectedRecords.length === 0 ? (
-        <p className="text-xs text-muted-foreground">현재 스냅샷의 이 분류에는 기록이 없어요.</p>
+        <p className="text-xs text-muted-foreground">{copy.emptyCategory}</p>
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button
@@ -1445,7 +1392,7 @@ function EvidencePanel({
           disabled={!fresh || !connected || busy || !canAssess}
           onClick={() => load(false, "assess")}
         >
-          원래 문제 검증 상태 확인
+          {copy.assess}
         </Button>
         <Button
           type="button"
@@ -1455,10 +1402,10 @@ function EvidencePanel({
           onClick={() => void load()}
         >
           {busy
-            ? "증거를 불러오고 있어요..."
+            ? copy.loadingEvidence
             : current && selectedRecords.length > 0
-              ? "다음 증거 페이지 불러오기"
-              : "Runtime 증거 불러오기"}
+              ? copy.nextPage
+              : copy.loadEvidence}
         </Button>
         {state ? (
           <Button
@@ -1469,14 +1416,12 @@ function EvidencePanel({
             disabled={!fresh || !connected || busy}
             onClick={() => void load(true)}
           >
-            증거 스냅샷 다시 불러오기
+            {copy.reloadSnapshot}
           </Button>
         ) : null}
       </div>
       {current && !complete && !unavailable && selectedRecords.length > 0 ? (
-        <p className="text-xs text-muted-foreground">
-          남은 기록이 있어요. 일부 증거만으로 해결됐다고 판단할 수는 없어요.
-        </p>
+        <p className="text-xs text-muted-foreground">{copy.remaining}</p>
       ) : null}
     </div>
   );
@@ -1516,7 +1461,7 @@ function EvidenceRecord({
             ))}
           </div>
           {record.evidenceRefs.length === 0 ? (
-            <p className="text-muted-foreground">기록된 증거 참조가 없어요.</p>
+            <p className="text-muted-foreground">{copy.noRefs}</p>
           ) : null}
         </div>
       );
@@ -1527,24 +1472,30 @@ function EvidenceRecord({
             {record.id} <Badge variant="outline">{weavraLabel(record.status)}</Badge>
           </p>
           <p>
-            {weavraLabel(record.kind)} | {record.required ? "필수" : "선택"} | {record.step} | 시도{" "}
-            {record.attempt ?? "확인 안 됨"}
+            {copy.checkMeta(
+              weavraLabel(record.kind),
+              record.required,
+              record.step,
+              String(record.attempt ?? ko.common.unknown),
+            )}
           </p>
           <p>
-            코드 revision {record.revision} |{" "}
-            {record.revision === codeRevision && record.diffDigest === diffDigest
-              ? "스냅샷과 일치"
-              : "스냅샷 기준 과거 기록"}{" "}
-            | 종료 코드 {record.exitCode ?? "unavailable"}
+            {copy.checkRevision(
+              record.revision,
+              record.revision === codeRevision && record.diffDigest === diffDigest,
+              String(record.exitCode ?? copy.unavailable),
+            )}
           </p>
           <p>
-            신뢰 상태: {record.trust?.status ?? "확인할 수 없음"} | sandbox:{" "}
-            {record.sandbox?.status ?? "확인할 수 없음"}
+            {copy.trust(
+              record.trust?.status ?? copy.unavailable,
+              record.sandbox?.status ?? copy.unavailable,
+            )}
           </p>
           {record.trust ? (
-            <p className="font-mono">등록 정보 {record.trust.registrationDigest}</p>
+            <p className="font-mono">{copy.registration(record.trust.registrationDigest)}</p>
           ) : null}
-          <p className="font-mono">{record.evidenceRefs.join(" | ") || "기록된 증거 참조 없음"}</p>
+          <p className="font-mono">{record.evidenceRefs.join(" | ") || copy.noRefsInline}</p>
         </div>
       );
     case "changed-files":
@@ -1553,9 +1504,7 @@ function EvidenceRecord({
     case "trust-sources":
       return (
         <div className="space-y-1">
-          <p>
-            {record.checkId} | 검사 기록 {record.checkIndex + 1}
-          </p>
+          <p>{copy.trustSource(record.checkId, record.checkIndex + 1)}</p>
           <p className="font-mono">{record.path}</p>
           <p className="font-mono">{record.digest}</p>
         </div>

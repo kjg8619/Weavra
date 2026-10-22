@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { ko } from "~/i18n/ko";
 import { Alert, AlertAction, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { CircleAlertIcon, XIcon } from "lucide-react";
@@ -64,7 +65,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
               variant="ghost"
               size="icon-xs"
               className="size-9 sm:size-9"
-              aria-label="오류 닫기"
+              aria-label={ko.providers.threadError.dismiss}
               onClick={onDismiss}
             >
               <XIcon className="text-destructive" />

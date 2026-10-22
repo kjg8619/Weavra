@@ -7,6 +7,7 @@ import {
 import { reactHookHarness as hooks } from "../../test/reactHookHarness";
 import { visitElements } from "../../test/reactElementTree";
 import { MAX_CUSTOM_MODEL_LENGTH } from "../../modelSelection";
+import { ko } from "~/i18n/ko";
 
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
@@ -103,7 +104,9 @@ describe("custom model decisions", () => {
     };
     const open = visitElements(
       render(),
-      (e) => Array.isArray(e.props.children) && e.props.children.includes("Add custom model"),
+      (e) =>
+        Array.isArray(e.props.children) &&
+        e.props.children.includes(ko.providers.models.addCustomModel),
     );
     if (!open || typeof open.props.onClick !== "function") throw new Error("Missing add action");
     open.props.onClick();
@@ -115,7 +118,7 @@ describe("custom model decisions", () => {
     (value) => {
       const form = setup();
       form.fill(value);
-      form.click(form.render(), "Add");
+      form.click(form.render(), ko.common.add);
       expect(form.save).not.toHaveBeenCalled();
       expect(visitElements(form.render(), (e) => e.props["aria-invalid"] === true)).not.toBeNull();
     },
@@ -124,17 +127,17 @@ describe("custom model decisions", () => {
   it("saves a corrected long ID once with its exact normalized value", () => {
     const form = setup();
     form.fill("x".repeat(MAX_CUSTOM_MODEL_LENGTH + 1));
-    form.click(form.render(), "Add");
+    form.click(form.render(), ko.common.add);
     const slug = "x".repeat(MAX_CUSTOM_MODEL_LENGTH);
     form.fill(slug);
-    form.click(form.render(), "Add");
+    form.click(form.render(), ko.common.add);
     expect(form.save).toHaveBeenCalledExactlyOnceWith([{ slug, name: slug, capabilities: null }]);
   });
 
   it("cancels an unsaved long ID without changing saved models", () => {
     const form = setup();
     form.fill("unsaved-".repeat(30));
-    form.click(form.render(), "Cancel");
+    form.click(form.render(), ko.common.cancel);
     expect(form.save).not.toHaveBeenCalled();
     expect(
       visitElements(form.render(), (e) => e.props.id === "provider-instance-codex-custom-model"),

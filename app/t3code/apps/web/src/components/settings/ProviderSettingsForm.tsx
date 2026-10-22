@@ -10,6 +10,7 @@ import type {
   ProviderSettingsFormSchemaAnnotation,
 } from "@t3tools/contracts";
 
+import { ko } from "~/i18n/ko";
 import { cn } from "../../lib/utils";
 import { DraftInput } from "../ui/draft-input";
 import { Input } from "../ui/input";
@@ -36,6 +37,10 @@ function titleizeFieldKey(key: string): string {
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[-_]+/g, " ")
     .replace(/^./, (char) => char.toUpperCase());
+}
+
+function localizedFormCopy(table: Readonly<Record<string, string>>, english: string): string {
+  return Object.hasOwn(table, english) ? table[english]! : english;
 }
 
 function readFieldAnnotations(
@@ -102,17 +107,37 @@ export function deriveProviderSettingsFields(
         {
           key,
           control: formAnnotation.control ?? "text",
-          label: annotatedTitle ?? titleizeFieldKey(key),
-          ...(annotatedDescription !== undefined ? { description: annotatedDescription } : {}),
+          label: localizedFormCopy(
+            ko.providers.form.titles,
+            annotatedTitle ?? titleizeFieldKey(key),
+          ),
+          ...(annotatedDescription !== undefined
+            ? {
+                description: localizedFormCopy(
+                  ko.providers.form.descriptions,
+                  annotatedDescription,
+                ),
+              }
+            : {}),
           ...(formAnnotation.placeholder !== undefined
-            ? { placeholder: formAnnotation.placeholder }
+            ? {
+                placeholder: localizedFormCopy(
+                  ko.providers.form.placeholders,
+                  formAnnotation.placeholder,
+                ),
+              }
             : {}),
           clearWhenEmpty: formAnnotation.clearWhenEmpty ?? "omit",
           ...(formAnnotation.control === "switch"
             ? { defaultBooleanValue: readFieldBooleanDefault(fieldSchema) }
             : {}),
           ...(formAnnotation.control === "select" && formAnnotation.options
-            ? { options: formAnnotation.options }
+            ? {
+                options: formAnnotation.options.map((option) => ({
+                  ...option,
+                  label: localizedFormCopy(ko.providers.form.options, option.label),
+                })),
+              }
             : {}),
         } satisfies ProviderSettingsFieldModel,
       ];
@@ -240,8 +265,8 @@ function ProviderSettingsFieldRow({
   const inputId = `${idPrefix}-${field.key}`;
   const descriptionClassName =
     variant === "dialog"
-      ? "text-[11px] text-muted-foreground"
-      : "mt-1 block text-xs text-muted-foreground";
+      ? "text-sm text-muted-foreground"
+      : "mt-1 block text-sm text-muted-foreground";
   const label = <span className="text-xs font-medium text-foreground">{field.label}</span>;
   const description = field.description ? (
     <span className={descriptionClassName}>{field.description}</span>

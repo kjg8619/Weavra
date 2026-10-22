@@ -1,4 +1,5 @@
 import { preloadPatchFile } from "@pierre/diffs/ssr";
+import type { ServerProviderSkill } from "@t3tools/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
 import { EMPTY_COMPOSER_CONTEXT_RECORDS } from "../composerContextPresentation";
@@ -8,6 +9,7 @@ import { DISCONNECTED_COMPOSER_PLACEHOLDER } from "../../composerPlaceholder";
 import { resolveDiffThemeName, type DiffThemeName } from "../../lib/diffRendering";
 import { PREFERRED_HIGHLIGHTER } from "../../lib/syntaxHighlighting";
 import { GhosttyTerminalSurface } from "~/terminal/ghostty/surface";
+import { ko } from "~/i18n/ko";
 
 // The font previews are the real surfaces, not lookalikes: the composer's
 // Tiptap editor, the diff panel's file diff, and the Ghostty canvas
@@ -15,15 +17,24 @@ import { GhosttyTerminalSurface } from "~/terminal/ghostty/surface";
 // terminal, the settings passed down as props), so what the row shows is
 // exactly what the app renders.
 
-const EMPTY_SKILLS: ReadonlyArray<never> = [];
+// The sample skill carries a display name so its chip reads like a real, named skill.
+const PREVIEW_SKILLS: ReadonlyArray<ServerProviderSkill> = [
+  {
+    name: "frontend-design",
+    displayName: ko.settings.fonts.sampleSkillName,
+    path: "frontend-design",
+    enabled: true,
+  },
+];
 
 // Serialized the way the composer stores inline tokens: the $skill and the
 // markdown-style file links render as chips, so the preview shows prompt
 // text and pills exactly as the real composer draws them.
-const PROMPT_PREVIEW_TEXT =
-  "Use $frontend-design to fix the flaky test in " +
-  "[surface.test.ts](apps/web/src/terminal/ghostty/surface.test.ts) and align the header with " +
-  "[SettingsPanels.tsx](apps/web/src/components/settings/SettingsPanels.tsx) before shipping.";
+const PROMPT_PREVIEW_TEXT = ko.settings.fonts.samplePrompt(
+  "$frontend-design",
+  "[surface.test.ts](apps/web/src/terminal/ghostty/surface.test.ts)",
+  "[SettingsPanels.tsx](apps/web/src/components/settings/SettingsPanels.tsx)",
+);
 
 function noop() {}
 
@@ -43,7 +54,7 @@ export function PromptFontPreview() {
         value={prompt}
         cursor={cursor}
         contextRecords={EMPTY_COMPOSER_CONTEXT_RECORDS}
-        skills={EMPTY_SKILLS}
+        skills={PREVIEW_SKILLS}
         disabled={false}
         placeholder={DISCONNECTED_COMPOSER_PLACEHOLDER}
         className="max-h-40 min-h-12"
@@ -266,7 +277,7 @@ export function TerminalFontPreview({ family, size }: { family: string; size: nu
     <div
       ref={mountRef}
       className="relative mt-1 mb-2 h-52 overflow-hidden rounded-lg border border-border"
-      aria-label="Terminal font preview"
+      aria-label={ko.settings.fonts.terminalPreview}
     />
   );
 }

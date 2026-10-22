@@ -37,6 +37,7 @@ import {
   type PullRequestGlyphIcon,
 } from "./pullRequest/pullRequestIcons";
 import { resolvePullRequestState } from "./pullRequest/pullRequestPresentation";
+import { ko } from "~/i18n/ko";
 
 export interface PrStatusIndicator {
   label: string;
@@ -49,7 +50,7 @@ export interface PrStatusIndicator {
 }
 
 export interface TerminalStatusIndicator {
-  label: "터미널 프로세스 실행 중";
+  label: string;
   colorClass: string;
   pulse: boolean;
 }
@@ -157,20 +158,24 @@ export function resolveThreadPullRequestBadgePresentation({
     return {
       Icon: PullRequestGlyph.stack,
       toneClassName: aggregate.toneClassName,
-      label: `PR ${badge.layers}개 스택, ${aggregate.label.toLowerCase()}`,
+      label: ko.projects.threadStatus.stackLabel(badge.layers, aggregate.label.toLowerCase()),
       text: badge.layers,
     };
   }
   if (number === undefined || url === undefined) return null;
 
-  const tooltip = status?.tooltip ?? `PR #${number}, 상태 확인 중`;
+  const tooltip = status?.tooltip ?? ko.projects.threadStatus.pendingPullRequest(number);
   if (badge?.kind === "pull-request" && badge.others > 0) {
     // Unrelated links fold into one state, so a count of merged PRs reads as merged.
     const aggregate = PULL_REQUEST_STATE_PRESENTATION[badge.state];
     return {
       Icon: aggregate.Icon,
       toneClassName: aggregate.toneClassName,
-      label: `${tooltip}, 외 ${badge.others}개 연결됨, 전체 ${aggregate.label.toLowerCase()}`,
+      label: ko.projects.threadStatus.linkedLabel(
+        tooltip,
+        badge.others,
+        aggregate.label.toLowerCase(),
+      ),
       text: `+${badge.others + 1}`,
     };
   }
@@ -301,7 +306,10 @@ export function ThreadPullRequestsMiniList({
             </span>
             {line.stack ? (
               <span className="ml-auto shrink-0 pl-1 text-[10px]">
-                {line.stack.kind === "native" ? "stack" : "chain"} · {line.stack.size}
+                {line.stack.kind === "native"
+                  ? ko.projects.threadStatus.stackNative
+                  : ko.projects.threadStatus.stackChain}{" "}
+                · {line.stack.size}
               </span>
             ) : null}
           </li>
@@ -360,7 +368,7 @@ export function terminalStatusFromRunningIds(
     return null;
   }
   return {
-    label: "터미널 프로세스 실행 중",
+    label: ko.projects.threadStatus.terminalProcessRunning,
     colorClass: "text-teal-600 dark:text-teal-300/90",
     pulse: true,
   };
@@ -378,8 +386,8 @@ export function ThreadWorktreeIndicator({
 
   const displayPath = formatWorktreePathForDisplay(worktreePath);
   const tooltip = thread.branch
-    ? `Worktree: ${displayPath} (${thread.branch})`
-    : `Worktree: ${displayPath}`;
+    ? ko.projects.threadStatus.worktreeWithBranch(displayPath, thread.branch)
+    : ko.projects.threadStatus.worktree(displayPath);
 
   return (
     <Tooltip>
@@ -508,7 +516,7 @@ export function ThreadRowLeadingStatus({ thread }: { thread: SidebarThreadSummar
       {pendingLink ? (
         <PullRequestGlyph.pullRequest
           className="size-3 text-muted-foreground"
-          aria-label={`PR #${pendingLink.number}, status pending`}
+          aria-label={ko.projects.threadStatus.pendingPullRequest(pendingLink.number)}
         />
       ) : null}
       {threadStatus ? <ThreadStatusLabel status={threadStatus} /> : null}
@@ -532,7 +540,9 @@ export function ThreadRowTrailingStatus({ thread }: { thread: SidebarThreadSumma
   // glyph is what tells the environments apart.
   const isRemoteThread = thread.environmentId !== primaryEnvironmentId;
   const remoteEnvLabel = environment?.label ?? null;
-  const threadEnvironmentLabel = isRemoteThread ? (remoteEnvLabel ?? "원격") : null;
+  const threadEnvironmentLabel = isRemoteThread
+    ? (remoteEnvLabel ?? ko.projects.threadStatus.remote)
+    : null;
   const remoteMachine = resolveEnvironmentMachineKind(environment?.serverConfig ?? null);
   const terminalStatus = terminalStatusFromRunningIds(runningTerminalIds);
 
@@ -565,7 +575,7 @@ export function ThreadRowTrailingStatus({ thread }: { thread: SidebarThreadSumma
           <TooltipTrigger
             render={
               <span
-                aria-label={threadEnvironmentLabel ?? "원격"}
+                aria-label={threadEnvironmentLabel ?? ko.projects.threadStatus.remote}
                 className="inline-flex items-center justify-center"
               />
             }

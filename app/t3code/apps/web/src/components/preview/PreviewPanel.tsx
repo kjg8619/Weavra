@@ -2,6 +2,7 @@
 
 import type { PreviewAnnotationPayload, ScopedThreadRef } from "@t3tools/contracts";
 
+import { ko } from "~/i18n/ko";
 import type { ComposerImageAttachment } from "~/composerDraftStore";
 import { isPreviewSupportedInRuntime } from "~/previewStateStore";
 
@@ -32,9 +33,7 @@ export function PreviewPanel({
     return (
       <PreviewPanelShell mode={mode}>
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-          <p className="max-w-sm text-sm text-muted-foreground">
-            Preview is only available in the Weavra desktop app.
-          </p>
+          <p className="max-w-sm text-sm text-muted-foreground">{ko.devices.preview.desktopOnly}</p>
         </div>
       </PreviewPanelShell>
     );

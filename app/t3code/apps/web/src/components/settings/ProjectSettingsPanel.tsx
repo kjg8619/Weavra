@@ -13,6 +13,7 @@ import * as Cause from "effect/Cause";
 import { Trash2Icon } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ko } from "~/i18n/ko";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { releaseProjectDraftUploads } from "../../lib/composerDraftUploads";
 import { readLocalApi } from "../../localApi";
@@ -129,15 +130,15 @@ export function ProjectSettingsPanel({
     return (
       <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
         {groups.length === 0
-          ? "Add a project from the sidebar to configure it here."
-          : "This project is no longer available."}
+          ? ko.projects.settings.noProjects
+          : ko.projects.settings.projectUnavailable}
       </div>
     );
   }
   if (members.length === 0)
     return (
       <p className="p-8 text-sm text-muted-foreground">
-        This checkout is no longer available in the selected project and environment.
+        {ko.projects.settings.checkoutUnavailable}
       </p>
     );
   const scopedGroup = {
@@ -197,7 +198,7 @@ function ProjectDetail({
       stackedThreadToast({
         type: "error",
         title,
-        description: error instanceof Error ? error.message : "An error occurred.",
+        description: error instanceof Error ? error.message : ko.projects.settings.genericError,
       }),
     );
   }, []);
@@ -219,7 +220,7 @@ function ProjectDetail({
       });
       if (unavailable) {
         const error = new Error(
-          `Connect ${unavailable.environmentLabel ?? "the selected environment"} and try again.`,
+          ko.projects.settings.connectAndRetry(unavailable.environmentLabel ?? null),
         );
         const result: AtomCommandResult<void, unknown> = AsyncResult.failure(Cause.fail(error));
         reportFailure(failureTitle, result);
@@ -238,7 +239,7 @@ function ProjectDetail({
           // write. Name the environment so the user knows where it stopped.
           reportFailure(
             group.memberProjects.length > 1
-              ? `${failureTitle} on ${member.environmentLabel ?? "the current environment"}`
+              ? ko.projects.settings.failureOn(failureTitle, member.environmentLabel ?? null)
               : failureTitle,
             result,
           );
@@ -254,7 +255,7 @@ function ProjectDetail({
     async (nextTitle: string, wasEdited: boolean) => {
       const title = nextTitle.trim();
       if (!title) {
-        toastManager.add({ type: "warning", title: "Project title cannot be empty" });
+        toastManager.add({ type: "warning", title: ko.projects.settings.titleEmpty });
         return;
       }
       if (
@@ -266,7 +267,7 @@ function ProjectDetail({
       ) {
         return;
       }
-      await updateAllMembers({ title }, "Failed to rename project");
+      await updateAllMembers({ title }, ko.projects.settings.renameFailed);
     },
     [group.memberProjects, updateAllMembers],
   );
@@ -282,7 +283,7 @@ function ProjectDetail({
       savingFaviconRef.current = true;
       setIsSavingFavicon(true);
       try {
-        await updateAllMembers(input, "Failed to update project icon");
+        await updateAllMembers(input, ko.projects.settings.iconUpdateFailed);
       } finally {
         savingFaviconRef.current = false;
         setIsSavingFavicon(false);
@@ -310,25 +311,27 @@ function ProjectDetail({
         api.dialogs.confirm(
           [
             projectThreads.length > 0
-              ? `Remove ${targetKind} "${targetLabel}" and delete its ${projectThreads.length} thread${projectThreads.length === 1 ? "" : "s"}?`
-              : `Remove ${targetKind} "${targetLabel}"?`,
+              ? ko.projects.settings.removeConfirmWithThreads(
+                  targetKind === "checkout",
+                  targetLabel,
+                  projectThreads.length,
+                )
+              : ko.projects.settings.removeConfirm(targetKind === "checkout", targetLabel),
             ...(singleMember
               ? [
-                  `Path: ${singleMember.workspaceRoot}`,
+                  ko.projects.settings.confirmPath(singleMember.workspaceRoot),
                   ...(singleMember.environmentLabel
-                    ? [`Environment: ${singleMember.environmentLabel}`]
+                    ? [ko.projects.settings.confirmEnvironment(singleMember.environmentLabel)]
                     : []),
                 ]
-              : [`This removes ${members.length} grouped project entries.`]),
+              : [ko.projects.settings.confirmGroupedEntries(members.length)]),
             ...(projectThreads.length > 0
-              ? [
-                  "This permanently clears conversation history for those threads and any archived threads.",
-                ]
-              : ["This permanently clears any archived conversation history."]),
+              ? [ko.projects.settings.confirmClearsThreadHistory]
+              : [ko.projects.settings.confirmClearsArchivedHistory]),
             isWholeGroup && !hasOtherMembers
-              ? "This removes only the project entries, not the files on disk."
-              : "Other entries in this grouped project are unaffected.",
-            "This action cannot be undone.",
+              ? ko.projects.settings.confirmEntriesOnly
+              : ko.projects.settings.confirmOtherEntriesUnaffected,
+            ko.projects.settings.confirmCannotUndo,
           ].join("\n"),
           { variant: "destructive" },
         ),
@@ -352,7 +355,7 @@ function ProjectDetail({
           () => undefined,
         );
         if (result._tag === "Failure") {
-          reportFailure(`Failed to remove "${member.title}"`, result);
+          reportFailure(ko.projects.settings.removeFailed(member.title), result);
           return;
         }
         const projectRef = scopeProjectRef(member.environmentId, member.id);
@@ -383,20 +386,20 @@ function ProjectDetail({
   );
 
   const checkoutChoices = (
-    <SettingsSection title="Checkouts">
+    <SettingsSection title={ko.projects.settings.checkouts}>
       {group.memberProjects.map((member) => (
         <SettingsRow
           key={member.physicalProjectKey}
-          title={member.environmentLabel ?? "Environment"}
+          title={member.environmentLabel ?? ko.projects.settings.environment}
           description={member.workspaceRoot}
           control={
             <Button
               size="sm"
               variant="outline"
               onClick={() => void removeMembers([member])}
-              aria-label={`Remove checkout ${member.workspaceRoot}`}
+              aria-label={ko.projects.settings.removeCheckoutAt(member.workspaceRoot)}
             >
-              Remove
+              {ko.common.remove}
             </Button>
           }
         />
@@ -407,16 +410,16 @@ function ProjectDetail({
   return (
     <>
       <SettingsPageContainer className="gap-6">
-        <SettingsSection id="project-overview" title="Project" hideTitle>
+        <SettingsSection id="project-overview" title={ko.common.project} hideTitle>
           <SettingsRow
-            title="Name"
-            description="The shared name for this project group in the sidebar and thread lists."
+            title={ko.projects.settings.nameTitle}
+            description={ko.projects.settings.nameDescription}
             control={
               <Input
                 key={`${group.projectKey}:${group.displayName}`}
                 size="sm"
                 className="w-full sm:w-64"
-                aria-label="Project name"
+                aria-label={ko.projects.settings.nameAria}
                 defaultValue={group.displayName}
                 onChange={() => {
                   projectNameEditedRef.current = true;
@@ -433,7 +436,7 @@ function ProjectDetail({
             }
           />
           <SettingsRow
-            title="Project icon"
+            title={ko.projects.settings.iconTitle}
             description={
               projectIcon?.kind === "lucide"
                 ? `${projectIcon.name} · ${projectIcon.color}`
@@ -441,14 +444,14 @@ function ProjectDetail({
                   ? `${projectIcon.text} · ${projectIcon.color}`
                   : projectIcon?.kind === "emoji"
                     ? projectIcon.emoji
-                    : (faviconPath ?? "Automatic")
+                    : (faviconPath ?? ko.projects.settings.iconAutomatic)
             }
             resetAction={
               group.memberProjects.some(
                 (member) => member.faviconPath != null || member.projectIcon != null,
               ) ? (
                 <SettingResetButton
-                  label="project icon"
+                  label={ko.projects.settings.iconResetLabel}
                   disabled={isSavingFavicon}
                   onClick={() => void setProjectIcon({ faviconPath: null, projectIcon: null })}
                 />
@@ -461,21 +464,21 @@ function ProjectDetail({
                   size="sm"
                   variant="outline"
                   type="button"
-                  aria-label="Choose a project icon"
+                  aria-label={ko.projects.settings.chooseIconAria}
                   disabled={isSavingFavicon}
                   onClick={() => setIconPickerOpen(true)}
                 >
-                  Choose icon
+                  {ko.projects.settings.chooseIcon}
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   type="button"
-                  aria-label="Choose a project icon file"
+                  aria-label={ko.projects.settings.chooseIconFileAria}
                   disabled={isSavingFavicon}
                   onClick={() => setFaviconPickerOpen(true)}
                 >
-                  Choose file
+                  {ko.projects.settings.chooseFile}
                 </Button>
               </div>
             }
@@ -490,28 +493,27 @@ function ProjectDetail({
         ) : (
           <SettingsSection title="Weavra · 읽기 전용">
             <p className="text-sm text-muted-foreground">
-              설정 범위에서 기기와 checkout을 하나 선택하면 Weavra Run을 조회할 수 있어요. 서로 다른
-              checkout의 Run은 합치지 않아요.
+              {ko.projects.settings.weavraReadOnlyHint}
             </p>
           </SettingsSection>
         )}
         <ProjectActionsSettings />
         {hasMultipleCheckouts ? checkoutChoices : null}
-        <SettingsSection title="Danger">
+        <SettingsSection title={ko.projects.settings.danger}>
           <SettingsRow
             title={
               hasOtherMembers
-                ? "Remove checkout"
+                ? ko.projects.settings.removeCheckout
                 : group.memberProjects.length > 1
-                  ? "Remove this project everywhere"
-                  : "Remove project"
+                  ? ko.projects.settings.removeEverywhere
+                  : ko.projects.settings.removeProject
             }
             description={
               hasOtherMembers
-                ? "Deletes the selected machine's checkout entries and their threads. Other machines and files on disk are not touched."
+                ? ko.projects.settings.removeCheckoutDescription
                 : group.memberProjects.length > 1
-                  ? `Deletes all ${group.memberProjects.length} checkout entries and their threads on every machine. Files on disk are not touched.`
-                  : "Deletes the project entry and its threads. Files on disk are not touched."
+                  ? ko.projects.settings.removeEverywhereDescription(group.memberProjects.length)
+                  : ko.projects.settings.removeProjectDescription
             }
             control={
               <Button
@@ -521,10 +523,10 @@ function ProjectDetail({
               >
                 <Trash2Icon />
                 {hasOtherMembers
-                  ? "Remove checkout"
+                  ? ko.projects.settings.removeCheckout
                   : group.memberProjects.length > 1
-                    ? "Remove all entries"
-                    : "Remove project"}
+                    ? ko.projects.settings.removeAllEntries
+                    : ko.projects.settings.removeProject}
               </Button>
             }
           />

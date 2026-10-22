@@ -1,6 +1,7 @@
 import type { EnvironmentId, EnvironmentMachineKind, VcsRef, ProjectId } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import { toSortableTimestamp } from "../lib/threadSort";
+import { ko } from "~/i18n/ko";
 export {
   dedupeRemoteBranchesWithLocalMatches,
   deriveLocalBranchNameFromRemoteRef,
@@ -83,15 +84,21 @@ export function resolveContextStripLabelsCompact(input: {
 }
 
 export function resolveEnvModeLabel(mode: EnvMode): string {
-  return mode === "worktree" ? "새 worktree" : "현재 checkout";
+  return mode === "worktree"
+    ? ko.projects.workspaceMode.newWorktree
+    : ko.projects.workspaceMode.currentCheckout;
 }
 
 export function resolveCurrentWorkspaceLabel(activeWorktreePath: string | null): string {
-  return activeWorktreePath ? "현재 worktree" : resolveEnvModeLabel("local");
+  return activeWorktreePath
+    ? ko.projects.workspaceMode.currentWorktree
+    : resolveEnvModeLabel("local");
 }
 
 export function resolveLockedWorkspaceLabel(activeWorktreePath: string | null): string {
-  return activeWorktreePath ? "worktree" : "로컬 checkout";
+  return activeWorktreePath
+    ? ko.projects.workspaceMode.worktree
+    : ko.projects.workspaceMode.localCheckout;
 }
 
 export interface PreviousWorktreeSeed {

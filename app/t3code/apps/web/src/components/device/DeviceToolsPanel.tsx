@@ -23,6 +23,7 @@ import {
 import { Spinner } from "~/components/ui/spinner";
 import { Switch } from "~/components/ui/switch";
 import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
+import { ko } from "~/i18n/ko";
 import { cn } from "~/lib/utils";
 import { deviceEnvironment } from "~/state/device";
 import { formatEnvironmentQueryError } from "~/state/query";
@@ -41,58 +42,58 @@ type ActionBody = DeviceActionInput extends infer A
   : never;
 
 const TEXT_SIZES: ReadonlyArray<{ value: DeviceTextSize; label: string }> = [
-  { value: "small", label: "Small" },
-  { value: "default", label: "Default" },
-  { value: "large", label: "Large" },
-  { value: "extra-large", label: "Extra large" },
+  { value: "small", label: ko.devices.tools.textSmall },
+  { value: "default", label: ko.common.default },
+  { value: "large", label: ko.devices.tools.textLarge },
+  { value: "extra-large", label: ko.devices.tools.textExtraLarge },
 ];
 
 const COLOR_FILTERS = [
-  { value: "none", label: "None" },
-  { value: "grayscale", label: "Grayscale" },
-  { value: "red-green", label: "Red / green (protanopia)" },
-  { value: "green-red", label: "Green / red (deuteranopia)" },
-  { value: "blue-yellow", label: "Blue / yellow (tritanopia)" },
+  { value: "none", label: ko.common.none },
+  { value: "grayscale", label: ko.devices.tools.filterGrayscale },
+  { value: "red-green", label: ko.devices.tools.filterRedGreen },
+  { value: "green-red", label: ko.devices.tools.filterGreenRed },
+  { value: "blue-yellow", label: ko.devices.tools.filterBlueYellow },
 ] as const;
 
 const ORIENTATIONS = [
-  { value: "portrait", label: "Portrait" },
-  { value: "landscape_left", label: "Landscape left" },
-  { value: "portrait_upside_down", label: "Upside down" },
-  { value: "landscape_right", label: "Landscape right" },
+  { value: "portrait", label: ko.devices.tools.portrait },
+  { value: "landscape_left", label: ko.devices.tools.landscapeLeft },
+  { value: "portrait_upside_down", label: ko.devices.tools.upsideDown },
+  { value: "landscape_right", label: ko.devices.tools.landscapeRight },
 ] as const;
 
 const IOS_PERMISSIONS: ReadonlyArray<{ value: DevicePermission; label: string }> = [
-  { value: "camera", label: "Camera" },
-  { value: "microphone", label: "Microphone" },
-  { value: "photos", label: "Photos" },
-  { value: "contacts", label: "Contacts" },
-  { value: "calendar", label: "Calendar" },
-  { value: "reminders", label: "Reminders" },
-  { value: "location", label: "Location" },
-  { value: "notifications", label: "Notifications" },
-  { value: "motion", label: "Motion" },
-  { value: "media-library", label: "Media library" },
+  { value: "camera", label: ko.devices.tools.permCamera },
+  { value: "microphone", label: ko.devices.tools.permMicrophone },
+  { value: "photos", label: ko.devices.tools.permPhotos },
+  { value: "contacts", label: ko.devices.tools.permContacts },
+  { value: "calendar", label: ko.devices.tools.permCalendar },
+  { value: "reminders", label: ko.devices.tools.permReminders },
+  { value: "location", label: ko.devices.tools.permLocation },
+  { value: "notifications", label: ko.devices.tools.permNotifications },
+  { value: "motion", label: ko.devices.tools.permMotion },
+  { value: "media-library", label: ko.devices.tools.permMediaLibrary },
   { value: "faceid", label: "Face ID" },
 ];
 
 const ANDROID_PERMISSIONS: ReadonlyArray<{ value: DevicePermission; label: string }> = [
-  { value: "camera", label: "Camera" },
-  { value: "microphone", label: "Microphone" },
-  { value: "photos", label: "Photos" },
-  { value: "contacts", label: "Contacts" },
-  { value: "calendar", label: "Calendar" },
-  { value: "location", label: "Location" },
-  { value: "notifications", label: "Notifications" },
-  { value: "motion", label: "Physical activity" },
+  { value: "camera", label: ko.devices.tools.permCamera },
+  { value: "microphone", label: ko.devices.tools.permMicrophone },
+  { value: "photos", label: ko.devices.tools.permPhotos },
+  { value: "contacts", label: ko.devices.tools.permContacts },
+  { value: "calendar", label: ko.devices.tools.permCalendar },
+  { value: "location", label: ko.devices.tools.permLocation },
+  { value: "notifications", label: ko.devices.tools.permNotifications },
+  { value: "motion", label: ko.devices.tools.permPhysicalActivity },
 ];
 
 const LOCATION_PRESETS = [
-  { label: "San Francisco", latitude: 37.7749, longitude: -122.4194 },
-  { label: "New York", latitude: 40.7128, longitude: -74.006 },
-  { label: "London", latitude: 51.5074, longitude: -0.1278 },
-  { label: "Stockholm", latitude: 59.3293, longitude: 18.0686 },
-  { label: "Tokyo", latitude: 35.6762, longitude: 139.6503 },
+  { label: ko.devices.tools.citySanFrancisco, latitude: 37.7749, longitude: -122.4194 },
+  { label: ko.devices.tools.cityNewYork, latitude: 40.7128, longitude: -74.006 },
+  { label: ko.devices.tools.cityLondon, latitude: 51.5074, longitude: -0.1278 },
+  { label: ko.devices.tools.cityStockholm, latitude: 59.3293, longitude: 18.0686 },
+  { label: ko.devices.tools.cityTokyo, latitude: 35.6762, longitude: 139.6503 },
 ] as const;
 
 /**
@@ -172,12 +173,12 @@ export function DeviceToolsPanel(props: {
       className={cn("flex min-h-0 flex-col border-border bg-background text-sm", props.className)}
     >
       <div className="flex h-9 shrink-0 items-center gap-2 border-b px-3">
-        <span className="font-medium">Tools</span>
+        <span className="font-medium">{ko.devices.tools.title}</span>
         {pending ? <Spinner className="size-3.5" /> : null}
         <Button
           size="icon-xs"
           variant="ghost-muted"
-          aria-label="Close tools"
+          aria-label={ko.devices.tools.closeTools}
           className="ml-auto"
           onClick={props.onClose}
         >
@@ -190,12 +191,12 @@ export function DeviceToolsPanel(props: {
         ) : null}
         {detail === null && !error ? (
           <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-            <Spinner className="size-3.5" /> Reading device settings…
+            <Spinner className="size-3.5" /> {ko.devices.tools.readingSettings}
           </div>
         ) : null}
 
-        <Section title="App">
-          <Row label="Foreground">
+        <Section title={ko.devices.tools.app}>
+          <Row label={ko.devices.tools.foreground}>
             <span className="truncate font-mono text-xs">{foregroundApp?.id ?? "—"}</span>
           </Row>
           {foregroundApp ? (
@@ -206,7 +207,7 @@ export function DeviceToolsPanel(props: {
                 disabled={disabled}
                 onClick={() => void act({ type: "terminateApp", appId: foregroundApp.id })}
               >
-                Terminate
+                {ko.devices.tools.terminate}
               </Button>
               <Button
                 size="xs"
@@ -214,28 +215,32 @@ export function DeviceToolsPanel(props: {
                 disabled={disabled}
                 onClick={() => void act({ type: "launchApp", appId: foregroundApp.id })}
               >
-                Relaunch
+                {ko.devices.tools.relaunch}
               </Button>
             </div>
           ) : null}
           <SubmitRow
-            placeholder="https://… or myapp://"
-            action="Open"
+            placeholder={ko.devices.tools.urlPlaceholder}
+            action={ko.common.open}
             disabled={disabled}
             onSubmit={(url) => act({ type: "openUrl", url })}
           />
           <SubmitRow
-            placeholder={isIos ? "Bundle ID to launch" : "Package name to launch"}
-            action="Launch"
+            placeholder={
+              isIos
+                ? ko.devices.tools.iosAppIdPlaceholder
+                : ko.devices.tools.androidAppIdPlaceholder
+            }
+            action={ko.devices.tools.launch}
             disabled={disabled}
             onSubmit={(appId) => act({ type: "launchApp", appId })}
           />
         </Section>
 
-        <Section title={isIos ? "Simulator" : "Emulator"}>
-          <Row label="Appearance">
+        <Section title={isIos ? ko.devices.tools.simulator : ko.devices.tools.emulator}>
+          <Row label={ko.devices.tools.appearance}>
             <ToggleGroup
-              aria-label="Appearance"
+              aria-label={ko.devices.tools.appearance}
               value={settings?.appearance ? [settings.appearance] : []}
               disabled={disabled}
               onValueChange={(value) => {
@@ -244,13 +249,13 @@ export function DeviceToolsPanel(props: {
                   void act({ type: "setAppearance", value: next });
               }}
             >
-              <Toggle value="light">Light</Toggle>
-              <Toggle value="dark">Dark</Toggle>
+              <Toggle value="light">{ko.devices.tools.light}</Toggle>
+              <Toggle value="dark">{ko.devices.tools.dark}</Toggle>
             </ToggleGroup>
           </Row>
-          <Row label="Text size">
+          <Row label={ko.devices.tools.textSize}>
             <ChoiceSelect
-              ariaLabel="Text size"
+              ariaLabel={ko.devices.tools.textSize}
               value={settings?.textSize ?? null}
               options={TEXT_SIZES}
               disabled={disabled}
@@ -271,13 +276,13 @@ export function DeviceToolsPanel(props: {
                     }
                   }}
                 >
-                  <Toggle value="clear">Clear</Toggle>
-                  <Toggle value="tinted">Tinted</Toggle>
+                  <Toggle value="clear">{ko.devices.tools.glassClear}</Toggle>
+                  <Toggle value="tinted">{ko.devices.tools.glassTinted}</Toggle>
                 </ToggleGroup>
               </Row>
-              <Row label="Color filter">
+              <Row label={ko.devices.tools.colorFilter}>
                 <ChoiceSelect
-                  ariaLabel="Color filter"
+                  ariaLabel={ko.devices.tools.colorFilter}
                   value={settings?.colorFilter ?? null}
                   options={COLOR_FILTERS}
                   disabled={disabled}
@@ -286,11 +291,11 @@ export function DeviceToolsPanel(props: {
               </Row>
             </>
           ) : (
-            <Row label="Orientation">
+            <Row label={ko.devices.tools.orientation}>
               <ChoiceSelect
-                ariaLabel="Orientation"
+                ariaLabel={ko.devices.tools.orientation}
                 value={null}
-                placeholder="Rotate to…"
+                placeholder={ko.devices.tools.rotateTo}
                 options={ORIENTATIONS}
                 disabled={disabled}
                 onChange={(value) => act({ type: "setOrientation", value })}
@@ -298,7 +303,7 @@ export function DeviceToolsPanel(props: {
             </Row>
           )}
           <SwitchRow
-            label="Reduce Motion"
+            label={ko.devices.tools.reduceMotion}
             checked={settings?.reduceMotion}
             disabled={disabled}
             onChange={(value) => act({ type: "setToggle", setting: "reduceMotion", value })}
@@ -306,13 +311,13 @@ export function DeviceToolsPanel(props: {
           {isIos ? (
             <>
               <SwitchRow
-                label="Increase Contrast"
+                label={ko.devices.tools.increaseContrast}
                 checked={settings?.increaseContrast}
                 disabled={disabled}
                 onChange={(value) => act({ type: "setToggle", setting: "increaseContrast", value })}
               />
               <SwitchRow
-                label="Reduce Transparency"
+                label={ko.devices.tools.reduceTransparency}
                 checked={settings?.reduceTransparency}
                 disabled={disabled}
                 onChange={(value) =>
@@ -320,7 +325,7 @@ export function DeviceToolsPanel(props: {
                 }
               />
               <SwitchRow
-                label="Show Borders"
+                label={ko.devices.tools.showBorders}
                 checked={settings?.showBorders}
                 disabled={disabled}
                 onChange={(value) => act({ type: "setToggle", setting: "showBorders", value })}
@@ -334,7 +339,7 @@ export function DeviceToolsPanel(props: {
             </>
           ) : (
             <SwitchRow
-              label="Network"
+              label={ko.devices.tools.network}
               checked={settings?.networkEnabled}
               disabled={disabled}
               onChange={(value) => act({ type: "setToggle", setting: "networkEnabled", value })}
@@ -342,9 +347,9 @@ export function DeviceToolsPanel(props: {
           )}
         </Section>
 
-        <Section title="Accessibility">
+        <Section title={ko.devices.tools.accessibility}>
           <SwitchRow
-            label="Overlay element frames"
+            label={ko.devices.tools.overlayFrames}
             checked={props.axOverlay}
             disabled={props.access === null}
             onChange={(value) => {
@@ -372,10 +377,10 @@ export function DeviceToolsPanel(props: {
         />
 
         {isIos ? (
-          <Section title="Push notification">
+          <Section title={ko.devices.tools.pushNotification}>
             <SubmitRow
-              placeholder="Alert text"
-              action="Send"
+              placeholder={ko.devices.tools.alertText}
+              action={ko.devices.tools.send}
               disabled={disabled || !foregroundApp}
               onSubmit={(payload) =>
                 foregroundApp
@@ -384,7 +389,7 @@ export function DeviceToolsPanel(props: {
               }
             />
             {!foregroundApp ? (
-              <p className="text-xs text-muted-foreground">Open an app first.</p>
+              <p className="text-xs text-muted-foreground">{ko.devices.tools.openAppFirst}</p>
             ) : null}
           </Section>
         ) : null}
@@ -456,7 +461,7 @@ function ChoiceSelect<V extends string>(props: {
           {current ? (
             current.label
           ) : (
-            <span className="text-muted-foreground">{props.placeholder ?? "Unknown"}</span>
+            <span className="text-muted-foreground">{props.placeholder ?? ko.common.unknown}</span>
           )}
         </SelectValue>
       </SelectTrigger>
@@ -526,12 +531,12 @@ function LocationSection(props: {
     Math.abs(parsed.latitude) <= 90 &&
     Math.abs(parsed.longitude) <= 180;
   return (
-    <Section title="Location">
+    <Section title={ko.devices.tools.location}>
       <div className="flex gap-1.5">
         <Input
           size="compact"
           className="min-w-0 flex-1 font-mono"
-          placeholder="Latitude"
+          placeholder={ko.devices.tools.latitude}
           inputMode="decimal"
           value={latitude}
           disabled={props.disabled}
@@ -540,7 +545,7 @@ function LocationSection(props: {
         <Input
           size="compact"
           className="min-w-0 flex-1 font-mono"
-          placeholder="Longitude"
+          placeholder={ko.devices.tools.longitude}
           inputMode="decimal"
           value={longitude}
           disabled={props.disabled}
@@ -559,9 +564,9 @@ function LocationSection(props: {
             void props.onSet(preset.latitude, preset.longitude);
           }}
         >
-          <SelectTrigger size="xs" className="w-32" aria-label="Location preset">
+          <SelectTrigger size="xs" className="w-32" aria-label={ko.devices.tools.locationPreset}>
             <SelectValue>
-              <span className="text-muted-foreground">Preset…</span>
+              <span className="text-muted-foreground">{ko.devices.tools.preset}</span>
             </SelectValue>
           </SelectTrigger>
           <SelectPopup align="start" alignItemWithTrigger={false}>
@@ -578,7 +583,7 @@ function LocationSection(props: {
           disabled={props.disabled || !valid}
           onClick={() => void props.onSet(parsed.latitude, parsed.longitude)}
         >
-          Set
+          {ko.devices.tools.set}
         </Button>
         {props.canClear ? (
           <Button
@@ -591,7 +596,7 @@ function LocationSection(props: {
               void props.onClear();
             }}
           >
-            Clear
+            {ko.devices.tools.clear}
           </Button>
         ) : null}
       </div>
@@ -616,18 +621,18 @@ function PermissionsSection(props: {
   const decide = (decision: "grant" | "revoke" | "reset") =>
     void props.onDecide(resolvedAppId, permission, decision);
   return (
-    <Section title="Permissions">
+    <Section title={ko.devices.tools.permissions}>
       <Input
         size="compact"
         className="font-mono"
-        placeholder={props.defaultAppId || "App ID"}
+        placeholder={props.defaultAppId || ko.devices.tools.appId}
         value={appId}
         disabled={props.disabled}
         onChange={(event) => setAppId(event.target.value)}
       />
       <div className="flex flex-wrap items-center gap-1.5">
         <ChoiceSelect
-          ariaLabel="Permission"
+          ariaLabel={ko.devices.tools.permission}
           value={permission}
           options={props.permissions}
           disabled={props.disabled}
@@ -642,7 +647,7 @@ function PermissionsSection(props: {
           disabled={props.disabled || !resolvedAppId}
           onClick={() => decide("grant")}
         >
-          Grant
+          {ko.devices.tools.grant}
         </Button>
         <Button
           size="xs"
@@ -650,7 +655,7 @@ function PermissionsSection(props: {
           disabled={props.disabled || !resolvedAppId}
           onClick={() => decide("revoke")}
         >
-          Revoke
+          {ko.devices.tools.revoke}
         </Button>
         {props.canReset ? (
           <Button
@@ -659,7 +664,7 @@ function PermissionsSection(props: {
             disabled={props.disabled || !resolvedAppId}
             onClick={() => decide("reset")}
           >
-            Reset
+            {ko.common.reset}
           </Button>
         ) : null}
       </div>
@@ -696,7 +701,7 @@ function EventLogSection(props: {
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 border-b px-3 py-2.5 text-left text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        Event log
+        {ko.devices.tools.eventLog}
         <ChevronDown
           className={cn("ml-auto size-3.5 transition-transform", open && "rotate-180")}
         />
@@ -704,7 +709,7 @@ function EventLogSection(props: {
       <CollapsiblePanel>
         <ol className="max-h-64 overflow-y-auto px-3 py-2 font-mono text-[11px] leading-relaxed">
           {entries.length === 0 ? (
-            <li className="text-muted-foreground">No events yet.</li>
+            <li className="text-muted-foreground">{ko.devices.tools.noEvents}</li>
           ) : (
             entries.map((entry) => (
               <li key={entry.id} className="flex gap-2">

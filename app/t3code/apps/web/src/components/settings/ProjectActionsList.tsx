@@ -1,5 +1,6 @@
 import type { ProjectScript, ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import { SettingsIcon } from "lucide-react";
+import { ko } from "~/i18n/ko";
 import { shortcutLabelForCommand } from "../../keybindings";
 import { commandForProjectScript } from "../../projectScripts";
 import { ScriptIcon } from "../projectScriptEditor";
@@ -20,7 +21,7 @@ export function ProjectActionsList({
   if (scripts.length === 0)
     return (
       <p className="px-3 py-2 text-base text-muted-foreground sm:px-4 sm:text-sm">
-        No actions configured.
+        {ko.projects.actions.empty}
       </p>
     );
   return scripts.map((script) => {
@@ -35,12 +36,12 @@ export function ProjectActionsList({
             <span className="min-w-0 truncate">{script.name}</span>
             {script.runOnWorktreeCreate ? (
               <span className="shrink-0 rounded-sm border border-border/60 px-1.5 py-px text-[11px] font-normal text-muted-foreground">
-                setup
+                {ko.projects.actions.setupBadge}
               </span>
             ) : null}
             {script.previewUrl ? (
               <span className="shrink-0 rounded-sm border border-border/60 px-1.5 py-px text-[11px] font-normal text-muted-foreground max-sm:hidden">
-                preview · desktop only
+                {ko.projects.actions.previewBadge}
               </span>
             ) : null}
           </span>
@@ -55,7 +56,7 @@ export function ProjectActionsList({
               size="icon-xs"
               variant="ghost"
               className="shrink-0 text-muted-foreground opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
-              aria-label={`Edit ${script.name}`}
+              aria-label={ko.projects.actions.edit(script.name)}
               disabled={disabled}
               onClick={() => onEdit(script)}
             >

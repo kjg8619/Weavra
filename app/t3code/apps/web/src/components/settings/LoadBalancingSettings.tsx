@@ -11,12 +11,15 @@ import { Switch } from "../ui/switch";
 import { EnvironmentRow, environmentTransportLabel } from "./EnvironmentRow";
 import { FoldedSettingsSection } from "./FoldedSettingsSection";
 import { searchableSetting } from "./settingsSearch";
+import { ko } from "~/i18n/ko";
+
+const copy = ko.settings.loadBalancing;
 
 const preferences = [
-  { value: 100, label: "Prefer" },
-  { value: 50, label: "Normal" },
-  { value: 25, label: "Less often" },
-  { value: 0, label: "Manual only" },
+  { value: 100, label: copy.prefer },
+  { value: 50, label: copy.normal },
+  { value: 25, label: copy.lessOften },
+  { value: 0, label: copy.manualOnly },
 ] as const;
 
 type LoadPreference = (typeof preferences)[number]["value"];
@@ -44,7 +47,7 @@ export function summarizeLoadPreferences(
     const preference = loadPreferenceForWeight(weights[environment.environmentId]);
     return preference === 50
       ? []
-      : [`${environment.label} ${preferenceLabel(preference).toLowerCase()}`];
+      : [copy.summaryEntry(environment.label, preferenceLabel(preference).toLowerCase())];
   });
   return parts.length === 0 ? null : parts.join(" · ");
 }
@@ -74,21 +77,18 @@ export function LoadBalancingSettings({
       summary={
         settings.loadBalancingEnabled
           ? summarizeLoadPreferences(environments, settings.loadBalancingWeights)
-          : "Off"
+          : ko.common.off
       }
       control={
         <Switch
-          aria-label="Automatically balance load"
+          aria-label={copy.autoBalance}
           checked={settings.loadBalancingEnabled}
           disabled={!settingsHydrated}
           onCheckedChange={(loadBalancingEnabled) => updateSettings({ loadBalancingEnabled })}
         />
       }
     >
-      <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-        New threads in shared projects start on the machine with the most free CPU and memory,
-        weighted by each machine's preference.
-      </p>
+      <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">{copy.description}</p>
       {environments.map((environment) => (
         <EnvironmentRow
           key={environment.environmentId}
@@ -115,7 +115,7 @@ export function LoadBalancingSettings({
             <SelectTrigger
               size="xs"
               className="w-32"
-              aria-label={`${environment.label} load preference`}
+              aria-label={copy.preferenceAria(environment.label)}
             >
               <SelectValue />
             </SelectTrigger>

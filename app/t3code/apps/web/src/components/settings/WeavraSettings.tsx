@@ -1,3 +1,4 @@
+import { ko } from "~/i18n/ko";
 import { weavraLabel } from "../weavraLabels";
 import { useAtomValue } from "@effect/atom-react";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
@@ -21,16 +22,16 @@ const explanations: Record<WeavraObservation["status"], string> = {
   CONFIG_INVALID:
     "로컬 Weavra 시작 검사를 통과하지 못했어요. 해당 환경에서 weavra doctor를 실행해 주세요. 이 화면은 설정을 자동으로 고치지 않아요.",
   READY:
-    "로컬 시작 검사를 통과했어요. 프로바이더 인증과 네트워크는 아직 검증하지 않았으며 공식 스냅샷을 기다리고 있어요.",
+    "로컬 시작 검사를 통과했어요. 공급자 인증과 네트워크는 아직 검증하지 않았으며 공식 스냅샷을 기다리고 있어요.",
   CONNECTING: "읽기 전용 관찰기에 연결하고 있어요. 워크플로를 시작하지 않아요.",
   CONNECTED:
-    "로컬 bridge로 공식 스냅샷을 조회해요. bridge 연결만으로 Runtime 소유 프로세스가 실행 중이라고 판단할 수는 없어요.",
+    "로컬 브리지로 공식 스냅샷을 조회해요. 브리지 연결만으로 Runtime 소유 프로세스가 실행 중이라고 판단할 수는 없어요.",
   DISCONNECTED:
-    "bridge나 환경 연결이 끊겼어요. 마지막 스냅샷은 과거 정보이며 저장된 Run 상태는 바뀌지 않았어요.",
+    "브리지나 환경 연결이 끊겼어요. 마지막 스냅샷은 과거 정보이며 저장된 실행 상태는 바뀌지 않았어요.",
   RECONNECTING:
     "다시 연결하고 최신 공식 스냅샷을 요청하고 있어요. 조회에 성공하기 전까지 캐시는 과거 정보로 표시해요.",
   PROTOCOL_MISMATCH:
-    "이 Weavra bridge는 지원하는 읽기 전용 프로토콜과 호환되지 않아요. 연결 협의 외의 명령은 보내지 않아요.",
+    "이 Weavra 브리지는 지원하는 읽기 전용 프로토콜과 호환되지 않아요. 연결 협의 외의 명령은 보내지 않아요.",
   ERROR:
     "유효한 공식 스냅샷을 읽지 못했어요. 캐시는 과거 정보이며 Runtime 복구나 수정을 시도하지 않았어요.",
 };
@@ -82,11 +83,12 @@ export function WeavraSettings({
           <div role="status" aria-live="polite" className="space-y-1 text-sm text-muted-foreground">
             <p>
               {view?.support === "unsupported"
-                ? "이 환경은 Weavra 읽기 전용 연결을 지원하지 않아요. Weavra RPC를 보내지 않았어요."
+                ? "이 환경은 Weavra 읽기 전용 연결을 지원하지 않아요. Weavra 요청을 보내지 않았어요."
                 : explanations[status]}
             </p>
             <p>
-              Runtime 소유자: 미확인. 연결이 끊겨도 Run을 취소·실패·완료 처리하거나 재개하지 않아요.
+              Runtime 소유자: 미확인. 연결이 끊겨도 실행을 취소·실패·완료 처리하거나 재개하지
+              않아요.
             </p>
             {observation?.errorCode && (
               <p>
@@ -108,11 +110,11 @@ export function WeavraSettings({
                     : null,
                 ],
                 ["Runtime 버전", observation?.runtimeVersion],
-                ["bridge 프로토콜", snapshot?.protocolVersion],
-                ["Run", run?.runId],
+                ["브리지 프로토콜", snapshot?.protocolVersion],
+                ["실행", run?.runId],
                 ["저장된 상태", run?.status],
                 ["단계", run?.phase],
-                ["워크플로 / 위험도", run ? `${run.workflow} / ${run.risk}` : null],
+                ["워크플로 / 위험도", run ? `${weavraLabel(run.workflow)} / ${run.risk}` : null],
                 ["실행 방식", run?.executionMode],
                 [
                   "현재 단계",
@@ -120,14 +122,14 @@ export function WeavraSettings({
                 ],
                 ["활성 에이전트(저장된 값)", run?.activeAgentCount],
                 [
-                  "Run / 프로젝트 revision",
+                  "실행 / 프로젝트 리비전",
                   snapshot
                     ? `${unknown(snapshot.stateRevision)} / ${unknown(snapshot.projectRevision)}`
                     : null,
                 ],
-                ["코드 revision", run?.codeRevision],
+                ["코드 리비전", run?.codeRevision],
                 ["마지막 이벤트 번호", snapshot?.eventId],
-                ["작업 계약 digest", run?.taskContractDigest],
+                ["작업 계약 다이제스트", run?.taskContractDigest],
                 ["쓰기 잠금 존재(실행 중임을 뜻하지 않음)", snapshot?.data.status.writerPresent],
               ].map(([label, value]) => (
                 <div key={String(label)} className="min-w-0">
@@ -138,11 +140,13 @@ export function WeavraSettings({
             </dl>
           </details>
           {snapshot && !run && (
-            <p className="text-sm text-muted-foreground">이 checkout에 현재 Weavra Run이 없어요.</p>
+            <p className="text-sm text-muted-foreground">
+              이 체크아웃에 현재 Weavra 실행이 없어요.
+            </p>
           )}
           {run?.workflow === "COMPLEX" && (
             <p className="text-sm text-muted-foreground">
-              COMPLEX Run의 이 요약은 상위 Run만 보여줘요. 개별 작업 상태·시도·증거는 워크플로
+              복합 작업 실행의 이 요약은 상위 실행만 보여줘요. 개별 작업 상태·시도·증거는 워크플로
               제어에서 확인해 주세요.
             </p>
           )}
@@ -224,23 +228,23 @@ export function WeavraSettings({
                     `${evidence.criteria.met}개 충족 · ${evidence.criteria.notMet}개 미충족 · ${evidence.criteria.unknown}개 미확인 / ${evidence.criteria.total}`,
                   ],
                   [
-                    "현재 revision의 검사",
+                    "현재 리비전의 검사",
                     `${evidence.currentChecks.passed}개 통과 · ${evidence.currentChecks.failed}개 실패 · ${evidence.currentChecks.unavailable}개 확인 불가 · ${evidence.currentChecks.skipped}개 건너뜀 / ${evidence.currentChecks.total}`,
                   ],
                   [
                     "검토",
                     evidence.review
                       ? `${evidence.review.result} · 독립 검토: ${evidence.review.independent}`
-                      : "UNKNOWN",
+                      : ko.common.unknown,
                   ],
                   [
-                    "기록된 worker / 도구 호출",
+                    "기록된 워커 / 도구 호출",
                     `${evidence.workers.count} / ${evidence.workers.toolCalls}`,
                   ],
                   ["보고된 토큰", unknown(evidence.workers.reportedTokens)],
                   [
                     "검토 담당 참고 자료",
-                    `${evidence.reviewerContexts.count} / ${evidence.reviewerContexts.bytes} bytes`,
+                    `${evidence.reviewerContexts.count} / ${evidence.reviewerContexts.bytes}바이트`,
                   ],
                   ["실패 분류", unknown(evidence.failureCategory)],
                   [
@@ -256,7 +260,7 @@ export function WeavraSettings({
               </dl>
             ) : (
               <p className="text-sm text-muted-foreground">
-                증거를 확인할 수 없어요. PASS나 수용 판정을 추정하지 않아요.
+                증거를 확인할 수 없어요. 통과나 수용 판정을 추정하지 않아요.
               </p>
             )}
             <p className="text-xs text-muted-foreground">
@@ -273,7 +277,7 @@ export function WeavraSettings({
             ) : (
               <>
                 <p className="text-muted-foreground">
-                  현재 프로젝트 설정이며 이 Run에서 확정한 설정은 아니에요.
+                  현재 프로젝트 설정이며 이 실행에서 확정한 설정은 아니에요.
                 </p>
                 <p>
                   상태: {unknown(snapshot?.data.configuration.status)} · 등록된 검사:{" "}

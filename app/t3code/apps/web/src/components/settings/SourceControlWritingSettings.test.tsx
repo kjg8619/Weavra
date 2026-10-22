@@ -71,6 +71,9 @@ vi.mock("../ui/textarea", () => ({ Textarea: "textarea" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
 
 import { SourceControlWritingSettingsSection } from "./SourceControlWritingSettings";
+import { ko } from "~/i18n/ko";
+
+const copy = ko.settings.sourceControlWriting;
 
 let renderer: ReactTestRenderer | null;
 
@@ -79,7 +82,7 @@ function button(label: string) {
 }
 
 function openEditor() {
-  act(() => button("Write custom instructions for all").props.onClick());
+  act(() => button(copy.writeForAll).props.onClick());
 }
 
 function editInstructions(value: string) {
@@ -87,7 +90,7 @@ function editInstructions(value: string) {
 }
 
 function applyInstructions() {
-  act(() => button("Apply instructions to all").props.onClick());
+  act(() => button(copy.applyToAll).props.onClick());
 }
 
 beforeEach(() => {
@@ -131,7 +134,7 @@ describe("mixed source control instructions", () => {
       customInstructions,
     }));
 
-    act(() => button("Reset change request templates").props.onClick());
+    act(() => button(`Reset ${copy.templatesResetLabel}`).props.onClick());
 
     expect(state.updateSettings).toHaveBeenCalledTimes(1);
     expect(state.styles.map((style) => style.followChangeRequestTemplates)).toEqual([
@@ -153,7 +156,7 @@ describe("mixed source control instructions", () => {
       );
     });
 
-    act(() => button("Reset source control writing style").props.onClick());
+    act(() => button(`Reset ${copy.writingStyle}`).props.onClick());
 
     expect(state.updateSettings).toHaveBeenCalledTimes(1);
     expect(
@@ -171,7 +174,7 @@ describe("mixed source control instructions", () => {
     const initialStyles = state.styles;
     openEditor();
     expect(renderer!.root.findByType("textarea").props.value).toBe("");
-    expect(button("Apply instructions to all").props.disabled).toBe(true);
+    expect(button(copy.applyToAll).props.disabled).toBe(true);
 
     applyInstructions();
     expect(state.updateSettings).not.toHaveBeenCalled();
@@ -181,7 +184,7 @@ describe("mixed source control instructions", () => {
   it("applies edited instructions to every selected environment", () => {
     openEditor();
     editInstructions("  Keep titles concise.  ");
-    expect(button("Apply instructions to all").props.disabled).toBe(false);
+    expect(button(copy.applyToAll).props.disabled).toBe(false);
     applyInstructions();
 
     expect(state.updateSettings).toHaveBeenCalledTimes(1);
@@ -196,7 +199,7 @@ describe("mixed source control instructions", () => {
     openEditor();
     editInstructions("Temporary instructions");
     editInstructions("");
-    expect(button("Apply instructions to all").props.disabled).toBe(false);
+    expect(button(copy.applyToAll).props.disabled).toBe(false);
     applyInstructions();
 
     expect(state.updateSettings).toHaveBeenCalledTimes(1);
@@ -215,7 +218,7 @@ describe("mixed source control instructions", () => {
     ]);
     // Template preferences still differ, but that is the templates row's
     // concern: the instructions editor is no longer a bulk draft.
-    expect(button("Write custom instructions for all")).toBeUndefined();
+    expect(button(copy.writeForAll)).toBeUndefined();
     expect(renderer!.root.findByType("textarea").props.defaultValue).toBe("Shared instructions");
   });
 });

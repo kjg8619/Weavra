@@ -1,10 +1,16 @@
+import { ko } from "~/i18n/ko";
+
 export type WizardNavigation =
   | { readonly kind: "navigate"; readonly step: number }
   | { readonly kind: "blocked"; readonly step: number; readonly error: string };
 
 const IDENTITY_STEP = 1;
 
-export const ADD_PROVIDER_WIZARD_STEPS = ["Driver", "Identity", "Config"] as const;
+export const ADD_PROVIDER_WIZARD_STEPS = [
+  ko.providers.addInstanceSteps.driver,
+  ko.providers.addInstanceSteps.identity,
+  ko.providers.addInstanceSteps.config,
+] as const;
 
 /**
  * Resolve navigation within the add-provider wizard.

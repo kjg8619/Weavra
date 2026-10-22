@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 
+import { ko } from "~/i18n/ko";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Kbd } from "../ui/kbd";
@@ -248,8 +249,8 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 setActiveResultIndex(0);
               }}
               onKeyDown={handleSearchKeyDown}
-              placeholder="Search"
-              aria-label="Search settings"
+              placeholder={ko.settings.search.placeholder}
+              aria-label={ko.settings.search.ariaLabel}
               role="combobox"
               aria-autocomplete="list"
               aria-expanded={isSearching && hasResults}
@@ -267,7 +268,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 size="icon-micro"
                 variant="ghost"
                 className="shrink-0 text-sidebar-muted-foreground hover:bg-sidebar-control-surface hover:text-sidebar-foreground"
-                aria-label="Clear settings search"
+                aria-label={ko.settings.search.clear}
                 onClick={() => {
                   clearSearch();
                   searchInputRef.current?.focus();
@@ -284,7 +285,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
               role="status"
               className="px-2 py-6 text-center text-xs text-sidebar-muted-foreground"
             >
-              No settings found
+              {ko.settings.search.noResults}
             </p>
           ) : null}
           {isSearching ? (
@@ -292,7 +293,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
               className="ps-px"
               id={hasResults ? "settings-search-results" : undefined}
               role={hasResults ? "listbox" : undefined}
-              aria-label={hasResults ? "Settings search results" : undefined}
+              aria-label={hasResults ? ko.settings.search.resultsLabel : undefined}
             >
               {results.map((item, index) => (
                 <SidebarMenuItem key={item.id} role="presentation">
@@ -312,7 +313,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                       <span className="block truncate text-sm font-medium text-sidebar-foreground">
                         {item.title}
                       </span>
-                      <span className="block truncate text-[11px] text-sidebar-muted-foreground/75">
+                      <span className="block truncate text-xs text-sidebar-muted-foreground">
                         {SETTINGS_SECTION_LABELS[item.to]}
                       </span>
                     </span>
@@ -332,10 +333,14 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton
                       isActive={isActive}
+                      className="h-auto min-h-8 text-sidebar-muted-foreground"
                       onClick={() => handleSectionClick(item.to)}
                     >
                       <Icon />
-                      <span className="truncate">{item.label}</span>
+                      {/* Long labels wrap and the row grows; the destination name is never cut off. */}
+                      <span className="min-w-0 overflow-visible! whitespace-normal!">
+                        {item.label}
+                      </span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );

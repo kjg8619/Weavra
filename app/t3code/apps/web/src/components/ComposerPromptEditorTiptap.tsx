@@ -80,6 +80,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { importPastedComposerText } from "./composerInlineTokenPaste";
 import { didComposerSelectionChangeVisibly } from "./composerSelection";
 import type { ComposerDraftContextRecords } from "./composerContextPresentation";
+import { ko } from "~/i18n/ko";
 
 export interface ComposerPromptEditorHandle {
   focus: () => void;
@@ -221,7 +222,7 @@ function ComposerMentionNodeView({ node }: NodeViewProps) {
     <Button
       variant="chip"
       onClick={() => actions.openMention(path)}
-      aria-label={`Preview ${path}`}
+      aria-label={ko.chat.contextChip.previewPath(path)}
       className={`${FILE_TAG_CHIP_CLASS_NAME} cursor-pointer focus-visible:outline-2`}
       contentEditable={false}
       spellCheck={false}
@@ -283,7 +284,7 @@ function ComposerSkillNodeView({ node }: NodeViewProps) {
   return (
     <NodeViewWrapper as="span" className={COMPOSER_INLINE_CHIP_DECORATOR_CLASS_NAME}>
       <ContextChipPopover
-        accessibleLabel={`Skill ${skillLabel}`}
+        accessibleLabel={ko.chat.contextChip.skillNamed(skillLabel)}
         triggerClassName={COMPOSER_INLINE_SKILL_CHIP_CLASS_NAME}
         chip={
           <>

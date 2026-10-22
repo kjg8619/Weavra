@@ -26,6 +26,7 @@ import { WizardPopup } from "~/components/ui/wizard";
 import { Spinner } from "~/components/ui/spinner";
 import { Toggle } from "~/components/ui/toggle";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { ko } from "~/i18n/ko";
 import { cn } from "~/lib/utils";
 import { deviceEnvironment, useDeviceHubAccess, useDeviceState } from "~/state/device";
 import { formatEnvironmentQueryError } from "~/state/query";
@@ -37,7 +38,7 @@ import { DeviceToolsPanel } from "./DeviceToolsPanel";
 import { PreviewPanelShell, type PreviewPanelMode } from "../preview/PreviewPanelShell";
 
 const platformLabel = (platform: DevicePlatform) =>
-  platform === "ios" ? "iOS Simulators" : "Android Emulators";
+  platform === "ios" ? ko.devices.panel.iosSimulators : ko.devices.panel.androidEmulators;
 
 const deviceKey = (device: Pick<DeviceSummary, "hostId" | "id">) =>
   `${device.hostId}\u0000${device.id}`;
@@ -186,13 +187,13 @@ export function DevicePanel(props: {
       <div className="flex h-9 shrink-0 items-center gap-1.5 border-b px-2">
         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
           {props.surface.target
-            ? `${state.hosts.find((host) => host.id === props.surface.target?.hostId)?.label ?? "Device host"} · ${activeDevice?.version ?? props.surface.target.platform}`
-            : (pendingDevice?.name ?? "Choose a device")}
+            ? `${state.hosts.find((host) => host.id === props.surface.target?.hostId)?.label ?? ko.devices.panel.deviceHost} · ${activeDevice?.version ?? props.surface.target.platform}`
+            : (pendingDevice?.name ?? ko.devices.panel.chooseDevice)}
         </span>
         {activeDevice ? (
           <>
             <DeviceButton
-              label="Home"
+              label={ko.devices.panel.home}
               onClick={() => handle?.pressButton("home")}
               disabled={!handle?.inputConnected}
             >
@@ -201,14 +202,14 @@ export function DevicePanel(props: {
             {activeDevice.platform === "android" ? (
               <>
                 <DeviceButton
-                  label="Back"
+                  label={ko.common.back}
                   onClick={() => handle?.pressButton("back")}
                   disabled={!handle?.inputConnected}
                 >
                   <ChevronLeft />
                 </DeviceButton>
                 <DeviceButton
-                  label="Recents"
+                  label={ko.devices.panel.recents}
                   onClick={() => handle?.pressButton("recents")}
                   disabled={!handle?.inputConnected}
                 >
@@ -217,7 +218,7 @@ export function DevicePanel(props: {
               </>
             ) : (
               <DeviceButton
-                label="Rotate"
+                label={ko.devices.panel.rotate}
                 onClick={() => handle?.rotate()}
                 disabled={!handle?.inputConnected}
               >
@@ -225,7 +226,7 @@ export function DevicePanel(props: {
               </DeviceButton>
             )}
             <Toggle
-              aria-label="Tools"
+              aria-label={ko.devices.panel.tools}
               variant="ghost"
               size="xs"
               pressed={toolsOpen}
@@ -233,13 +234,13 @@ export function DevicePanel(props: {
             >
               <SlidersHorizontal />
             </Toggle>
-            <DeviceButton label="Float device over chat" onClick={floatActive}>
+            <DeviceButton label={ko.devices.panel.floatOverChat} onClick={floatActive}>
               <PictureInPicture2 />
             </DeviceButton>
-            <DeviceButton label="Power off" onClick={() => closeActive(true)}>
+            <DeviceButton label={ko.devices.panel.powerOff} onClick={() => closeActive(true)}>
               <Power />
             </DeviceButton>
-            <DeviceButton label="Close" onClick={() => closeActive(false)}>
+            <DeviceButton label={ko.common.close} onClick={() => closeActive(false)}>
               <X />
             </DeviceButton>
           </>
@@ -255,7 +256,7 @@ export function DevicePanel(props: {
       ) : null}
       {bootingDevices.length > 0 ? (
         <div role="status" className="border-b px-3 py-2 text-xs text-muted-foreground">
-          Starting {bootingDevices.map((device) => device.name).join(", ")}… This can take a minute.
+          {ko.devices.panel.booting(bootingDevices.map((device) => device.name).join(", "))}
         </div>
       ) : null}
       {operationError ? (
@@ -267,7 +268,7 @@ export function DevicePanel(props: {
           <Button
             size="icon-xs"
             variant="ghost"
-            aria-label="Dismiss device error"
+            aria-label={ko.devices.panel.dismissError}
             onClick={() => setOperationError(null)}
           >
             <X className="size-3" />
@@ -283,7 +284,7 @@ export function DevicePanel(props: {
                 environmentId={environmentId}
                 platform={activeDevice.platform}
                 deviceName={activeDevice.name}
-                deviceDescription={`${state.hosts.find((host) => host.id === activeDevice.hostId)?.label ?? "Device host"} · ${activeDevice.version}`}
+                deviceDescription={`${state.hosts.find((host) => host.id === activeDevice.hostId)?.label ?? ko.devices.panel.deviceHost} · ${activeDevice.version}`}
                 deviceId={activeDevice.id}
                 hostId={activeDevice.hostId}
                 visible={props.visible}
@@ -306,21 +307,21 @@ export function DevicePanel(props: {
           </>
         ) : pendingDevice || hostBusy || !loaded ? (
           <DeviceLoadingView
-            name={pendingDevice?.name ?? "Devices"}
+            name={pendingDevice?.name ?? ko.devices.devices}
             description={
               pendingDevice
-                ? `${state.hosts.find((host) => host.id === pendingDevice.hostId)?.label ?? "Device host"} · ${pendingDevice.version}`
+                ? `${state.hosts.find((host) => host.id === pendingDevice.hostId)?.label ?? ko.devices.panel.deviceHost} · ${pendingDevice.version}`
                 : ""
             }
             stage="opening"
             message={
               pendingDevice
                 ? pendingDevice.booted
-                  ? "Opening device…"
-                  : "Starting device…"
+                  ? ko.devices.panel.openingDevice
+                  : ko.devices.panel.startingDevice
                 : state.hostStatus === "installing"
-                  ? "Installing device support…"
-                  : "Finding devices…"
+                  ? ko.devices.panel.installingSupport
+                  : ko.devices.panel.findingDevices
             }
           />
         ) : (
@@ -336,8 +337,8 @@ export function DevicePanel(props: {
                   <Smartphone className="size-6 opacity-60" />
                   <p className="max-w-sm">
                     {state.hostStatus === "failed"
-                      ? (state.hostStatusDetail ?? "The device hub failed to start.")
-                      : "No simulators or emulators were found on this environment."}
+                      ? (state.hostStatusDetail ?? ko.devices.panel.hubFailed)
+                      : ko.devices.panel.noDevices}
                   </p>
                 </>
               ) : null}
@@ -359,16 +360,20 @@ export function DevicePanel(props: {
                               </span>
                             }
                             title={device.name}
-                            description={`${state.hosts.find((host) => host.id === device.hostId)?.label} · ${device.version} · ${device.booted ? "Running" : "Stopped"}`}
+                            description={`${state.hosts.find((host) => host.id === device.hostId)?.label} · ${device.version} · ${device.booted ? ko.devices.panel.running : ko.devices.panel.stopped}`}
                             disabled={pendingDeviceKey !== null}
-                            aria-label={`${device.booted ? "Open" : "Start"} ${device.name}`}
+                            aria-label={
+                              device.booted
+                                ? ko.devices.panel.openDevice(device.name)
+                                : ko.devices.panel.startDevice(device.name)
+                            }
                             onClick={() => void selectDevice(deviceKey(device))}
                             action={
                               pendingDeviceKey === deviceKey(device) ? (
                                 <Spinner className="size-3" />
                               ) : (
                                 <span className="text-xs text-muted-foreground">
-                                  {device.booted ? "Open" : "Start"}
+                                  {device.booted ? ko.devices.panel.open : ko.devices.panel.start}
                                 </span>
                               )
                             }
@@ -382,10 +387,7 @@ export function DevicePanel(props: {
               {hostReady &&
               !state.devices.some((device) => device.platform === "android") &&
               !unavailablePlatforms.some((platform) => platform.platform === "android") ? (
-                <p className="max-w-sm text-xs">
-                  No Android virtual devices found. Create one in Android Studio's Device Manager,
-                  then refresh.
-                </p>
+                <p className="max-w-sm text-xs">{ko.devices.panel.noAndroidDevices}</p>
               ) : null}
               {loaded && !hostBusy ? (
                 <Button
@@ -394,7 +396,7 @@ export function DevicePanel(props: {
                   size="sm"
                   onClick={() => void list({ environmentId, input: {} })}
                 >
-                  Refresh devices
+                  {ko.devices.panel.refreshDevices}
                 </Button>
               ) : null}
             </div>
