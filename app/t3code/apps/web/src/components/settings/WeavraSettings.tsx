@@ -114,7 +114,7 @@ export function WeavraSettings({
                 ["실행", run?.runId],
                 ["저장된 상태", run?.status],
                 ["단계", run?.phase],
-                ["워크플로 / 위험도", run ? `${run.workflow} / ${run.risk}` : null],
+                ["워크플로 / 위험도", run ? `${weavraLabel(run.workflow)} / ${run.risk}` : null],
                 ["실행 방식", run?.executionMode],
                 [
                   "현재 단계",
@@ -146,7 +146,7 @@ export function WeavraSettings({
           )}
           {run?.workflow === "COMPLEX" && (
             <p className="text-sm text-muted-foreground">
-              COMPLEX 실행의 이 요약은 상위 실행만 보여줘요. 개별 작업 상태·시도·증거는 워크플로
+              복합 작업 실행의 이 요약은 상위 실행만 보여줘요. 개별 작업 상태·시도·증거는 워크플로
               제어에서 확인해 주세요.
             </p>
           )}

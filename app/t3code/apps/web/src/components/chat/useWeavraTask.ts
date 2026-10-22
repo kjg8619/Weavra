@@ -39,6 +39,7 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { taskMatchesScope, taskSendRoute } from "./weavraTaskLogic";
 import { randomUUID } from "../../lib/utils";
 import { ko } from "~/i18n/ko";
+import { weavraLabel } from "../weavraLabels";
 
 const errorCopy = ko.runtime.task.errors;
 
@@ -123,7 +124,7 @@ function taskErrorMessage(error: unknown): string {
           case "INVALID_PREVIEW":
             return `${prefix} ${errorCopy.invalidPreview}`;
           case "STANDARD_REQUIRED":
-            return `${prefix} ${errorCopy.standardRequired("STANDARD")}`;
+            return `${prefix} ${errorCopy.standardRequired(weavraLabel("STANDARD"))}`;
           case "BINDING_MISMATCH":
             return `${prefix} ${errorCopy.bindingMismatch}`;
         }
@@ -134,7 +135,7 @@ function taskErrorMessage(error: unknown): string {
           case "INVALID_CRITERIA":
             return `${prefix} ${errorCopy.invalidCriteria}`;
           case "UNSUPPORTED_WORKFLOW":
-            return `${prefix} ${errorCopy.unsupportedWorkflow("STANDARD")}`;
+            return `${prefix} ${errorCopy.unsupportedWorkflow(weavraLabel("STANDARD"))}`;
           case "PROJECT_CHANGED":
             if (reason.details?.reason === "DIRTY_WORKSPACE")
               return `${prefix} ${errorCopy.dirtyWorkspace}`;

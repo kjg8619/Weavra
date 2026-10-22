@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  HostPowerThermalState,
   WeavraCanonicalRunStatus,
   WeavraComplexCleanupStatus,
   WeavraComplexPhase,
   WeavraComplexTaskStatusV2,
   WeavraConnectionStatus,
+  WeavraControlPreview,
 } from "@t3tools/contracts";
 
 import { weavraLabel } from "~/components/weavraLabels";
@@ -100,6 +102,8 @@ describe("Weavra enum presentation", () => {
     ["complex task status", WeavraComplexTaskStatusV2.literals],
     ["cleanup status", WeavraComplexCleanupStatus.literals],
     ["complex phase", WeavraComplexPhase.literals],
+    ["workflow", WeavraControlPreview.fields.workflow.literals],
+    ["execution mode", WeavraControlPreview.fields.executionMode.literals],
   ] as const)("labels every %s wire value in Korean", (_, values) => {
     for (const value of values) {
       const label = weavraLabel(value);
@@ -111,6 +115,33 @@ describe("Weavra enum presentation", () => {
   it("keeps an unknown wire value verbatim and copyable", () => {
     expect(weavraLabel("FUTURE_STATUS_V9")).toBe("FUTURE_STATUS_V9");
     expect(weavraLabel(null)).toBe(ko.common.unknown);
+  });
+});
+
+describe("status display maps", () => {
+  const korean = (label: string | undefined, value: string) => {
+    expect(label, value).toBeDefined();
+    expect(label, value).not.toBe(value);
+    expect(/[가-힣]/.test(label!), value).toBe(true);
+    expect(/[A-Za-z]/.test(label!), value).toBe(false);
+  };
+
+  it("labels every workflow command status in Korean", () => {
+    // The command status type is this key set, so every status a command can reach is listed here.
+    const entries = Object.entries(ko.runtime.controls.commandStatus);
+    expect(entries.map(([value]) => value).toSorted()).toEqual([
+      "accepted",
+      "idle",
+      "rejected",
+      "submitting",
+      "transport-error",
+    ]);
+    for (const [value, label] of entries) korean(label, value);
+  });
+
+  it("labels every host thermal state in Korean", () => {
+    const labels: Readonly<Record<string, string>> = ko.settings.telemetry.thermalStates;
+    for (const value of HostPowerThermalState.literals) korean(labels[value], value);
   });
 });
 

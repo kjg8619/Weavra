@@ -60,7 +60,8 @@ const decodeMutation = Schema.decodeUnknownSync(WeavraControlMutation, {
   onExcessProperty: "error",
 });
 type CommandState = {
-  status: "idle" | "submitting" | "accepted" | "rejected" | "transport-error";
+  // Every status has a Korean label: the type is the catalog key set, so a new status needs copy.
+  status: keyof typeof ko.runtime.controls.commandStatus;
   message: string;
 };
 const idle: CommandState = {
@@ -90,7 +91,7 @@ const toggled = (values: ReadonlyArray<number>, value: number) =>
     : [...values, value].sort((left, right) => left - right);
 /** Local reference checks only; Runtime validates the rest and nothing is repaired here. */
 function complexDraftProblem(rows: ReadonlyArray<ComplexDraftRow>, criteria: number) {
-  if (rows.length < 2 || rows.length > 8) return "COMPLEX 계획에는 작업 2~8개가 필요해요.";
+  if (rows.length < 2 || rows.length > 8) return "복합 작업 계획에는 작업 2~8개가 필요해요.";
   if (criteria < 1 || criteria > 16) return "상위 수용 기준을 한 줄에 하나씩 1~16개 입력해 주세요.";
   for (const [index, row] of rows.entries()) {
     if (row.criterionIndexes.length === 0) return `작업 ${index + 1}에 연결된 수용 기준이 없어요.`;
@@ -167,15 +168,15 @@ function rejectionHint(
   switch (request.type) {
     case "workflow.prepare":
       return code === "STALE_PROJECT"
-        ? " 계획 준비 전에 프로젝트 상태가 바뀌었어요. 종료된 소유자의 실행이 INTERRUPTED로 기록된 경우도 해당해요. 준비나 재시도는 하지 않았으니 새 상태를 확인한 뒤 다시 준비해 주세요."
+        ? " 계획 준비 전에 프로젝트 상태가 바뀌었어요. 종료된 소유자의 실행이 중단됨으로 기록된 경우도 해당해요. 준비나 재시도는 하지 않았으니 새 상태를 확인한 뒤 다시 준비해 주세요."
         : request.complexDraft
           ? code === "INVALID_REQUEST"
-            ? " 작업 계획은 Runtime이 목표를 COMPLEX로 분류한 경우에만 받아들여요. QUICK이나 STANDARD 목표라면 작업 계획을 비워 주세요."
+            ? " 작업 계획은 Runtime이 목표를 복합 작업으로 분류한 경우에만 받아들여요. 빠른 작업이나 표준 작업 목표라면 작업 계획을 비워 주세요."
             : code === "INVALID_CRITERIA"
               ? " Runtime이 작업 계획의 의존성·기준 범위·파일 담당 범위·검사 중 하나를 거부했어요."
               : ""
           : code === "UNSUPPORTED_WORKFLOW" && complexSupported
-            ? " 목표가 COMPLEX로 분류됐다면 작업 2~8개의 구조화된 계획을 추가하고 다시 준비해 주세요."
+            ? " 목표가 복합 작업으로 분류됐다면 작업 2~8개의 구조화된 계획을 추가하고 다시 준비해 주세요."
             : "";
     case "workflow.confirm":
       return code === "PLANNER_BUSY"
@@ -183,7 +184,7 @@ function rejectionHint(
         : "";
     case "planner.start":
       return code === "UNSUPPORTED_WORKFLOW"
-        ? " 계획 담당은 Runtime이 COMPLEX로 분류한 목표만 초안으로 만들며 R3는 처리하지 않아요."
+        ? " 계획 담당은 Runtime이 복합 작업으로 분류한 목표만 초안으로 만들며 R3는 처리하지 않아요."
         : code === "PLANNER_BUSY"
           ? " Runtime에서 계획 또는 실행이 이미 진행 중이에요."
           : "";
@@ -195,7 +196,7 @@ function rejectionHint(
         : "";
     case "workflow.derive":
       return code === "RERUN_NOT_APPLICABLE"
-        ? " 미완료 작업이 남고 BLOCKED·CANCELLED·FAILED·INTERRUPTED로 끝난 최신 COMPLEX 실행만 다시 계획할 수 있어요. R3는 제외해요. 초안을 만들지 않았어요."
+        ? " 미완료 작업이 남고 차단됨·취소됨·실패·중단됨으로 끝난 최신 복합 작업 실행만 다시 계획할 수 있어요. R3는 제외해요. 초안을 만들지 않았어요."
         : code === "RUN_NOT_FOUND"
           ? " 해당 실행이 더 이상 최신 실행이 아니어서 초안을 만들지 않았어요."
           : code === "ACTIVE_RUN"
@@ -686,7 +687,7 @@ export function WeavraControls({
         setCommandState({
           status: "accepted",
           message:
-            "Runtime이 등록 요청을 확인했어요. 브라우저 증거를 새로고침해 등록 내용을 확인해 주세요. 등록은 PASS나 COMPLETE가 아니며 검증마다 새 격리 캡처가 필요해요.",
+            "Runtime이 등록 요청을 확인했어요. 브라우저 증거를 새로고침해 등록 내용을 확인해 주세요. 등록은 통과나 완료 판정이 아니며 검증마다 새 격리 캡처가 필요해요.",
         });
       } else if (response.data.kind === "fact-prepared") {
         setFactPreview(response.data.preview);
@@ -706,7 +707,7 @@ export function WeavraControls({
         setCommandState({
           status: "accepted",
           message:
-            "검토를 기록했어요. Runtime의 공식 사실 상태를 기다리고 있으며 이 응답은 VALID·PASS·COMPLETE 판정이 아니에요.",
+            "검토를 기록했어요. Runtime의 공식 사실 상태를 기다리고 있으며 이 응답은 유효·통과·완료 판정이 아니에요.",
         });
       } else {
         setCommandState({
@@ -719,7 +720,7 @@ export function WeavraControls({
                 : request.type === "planner.start"
                   ? "계획 생성을 시작했어요. Runtime이 백그라운드에서 후보를 만들며 작업을 실행하지 않아요. 직접 불러오기 전에는 편집기에 반영하지 않아요."
                   : request.type === "planner.cancel"
-                    ? "계획 취소 요청을 받았어요. Runtime의 CANCELLED 보고를 기다려 주세요."
+                    ? "계획 취소 요청을 받았어요. Runtime의 취소됨 보고를 기다려 주세요."
                     : "시작 요청을 받았어요. 공식 실행 상태를 기다리고 있으며 이 응답만으로 성공을 판단하지 않아요.",
         });
       }
@@ -748,9 +749,9 @@ export function WeavraControls({
     const problem = !complex
       ? null
       : !complexSupported
-        ? "이 Runtime은 COMPLEX 작업 계획을 제공하지 않아요(NOT EXPOSED). QUICK 또는 STANDARD를 준비하려면 작업 계획을 비워 주세요."
+        ? "이 Runtime은 복합 작업 계획을 제공하지 않아요. 빠른 작업 또는 표준 작업을 준비하려면 작업 계획을 비워 주세요."
         : recipeId
-          ? "검토한 실행 절차는 STANDARD 전용이며 COMPLEX 계획과 함께 보낼 수 없어요. 실행 절차나 작업 계획 중 하나를 비워 주세요."
+          ? "검토한 실행 절차는 표준 작업 전용이며 복합 작업 계획과 함께 보낼 수 없어요. 실행 절차나 작업 계획 중 하나를 비워 주세요."
           : complexDraftProblem(complexRows, complexStatements.length);
     if (problem) {
       setCommandState({ status: "rejected", message: problem });
@@ -776,7 +777,7 @@ export function WeavraControls({
       setCommandState({
         status: "rejected",
         message: complex
-          ? "작업 계획을 확인해 주세요. 작업마다 제목(최대 80자)·목표(최대 300자)·중복 없는 검사 ID 1~16개가 필요해요. 검사 ID에는 영문자·숫자·점·밑줄·콜론·하이픈만 쓸 수 있어요. 파일 담당 범위는 정확한 프로젝트 상대 경로 최대 16개이며 glob·점 경로·역슬래시·앞뒤 슬래시는 허용하지 않아요. 전체 계획은 12,288바이트 이내여야 해요."
+          ? "작업 계획을 확인해 주세요. 작업마다 제목(최대 80자)·목표(최대 300자)·중복 없는 검사 ID 1~16개가 필요해요. 검사 ID에는 영문자·숫자·점·밑줄·콜론·하이픈만 쓸 수 있어요. 파일 담당 범위는 정확한 프로젝트 상대 경로 최대 16개이며 와일드카드 패턴·점 경로·역슬래시·앞뒤 슬래시는 허용하지 않아요. 전체 계획은 12,288바이트 이내여야 해요."
           : "목표·실행 절차 JSON·수용 기준을 확인해 주세요. 비어 있지 않은 기준을 각 500자 이내로 최대 16개 입력할 수 있어요.",
       });
     }
@@ -800,7 +801,7 @@ export function WeavraControls({
         previewId: preview.previewId,
         previewDigest: preview.previewDigest,
       },
-      `이 ${preview.workflow} / ${preview.risk} / ${preview.executionMode} 계획을 다음 체크아웃에서 시작할까요: ${workspaceRoot}?\n목표: ${preview.goal}${
+      `이 ${weavraLabel(preview.workflow)} / ${preview.risk} / ${weavraLabel(preview.executionMode)} 계획을 다음 체크아웃에서 시작할까요: ${workspaceRoot}?\n목표: ${preview.goal}${
         plan
           ? `\n${
               plan.schemaVersion === 2 && plan.limits.maxParallel > 1
@@ -913,7 +914,7 @@ export function WeavraControls({
         previewId: browserPreview.previewId,
         previewDigest: browserPreview.previewDigest,
       },
-      `다음 대상에 이 브라우저 검사를 등록할까요: ${workspaceRoot}?\n검사: ${browserPreview.check.checkId}\n문서: ${browserPreview.check.documentIdentity}\n대상: ${browserPreview.check.target.selector}\n검사 조건: ${JSON.stringify(browserPreview.check.assertion)}\n등록 다이제스트: ${browserPreview.check.registrationDigest}\n예상 결과를 등록할 뿐 PASS 판정이 아니에요. Runtime은 SELF_CHECK와 TEST마다 새 격리 브라우저 캡처를 만들어야 해요. 브라우저 검사 실패 시 자동 수정하지 않아요.`,
+      `다음 대상에 이 브라우저 검사를 등록할까요: ${workspaceRoot}?\n검사: ${browserPreview.check.checkId}\n문서: ${browserPreview.check.documentIdentity}\n대상: ${browserPreview.check.target.selector}\n검사 조건: ${JSON.stringify(browserPreview.check.assertion)}\n등록 다이제스트: ${browserPreview.check.registrationDigest}\n예상 결과를 등록할 뿐 통과 판정이 아니에요. Runtime은 자체 검사와 테스트마다 새 격리 브라우저 캡처를 만들어야 해요. 브라우저 검사 실패 시 자동 수정하지 않아요.`,
     );
   };
   const prepareFact = () => {
@@ -1019,7 +1020,7 @@ export function WeavraControls({
                 : "secondary"
             }
           >
-            {commandState.status}
+            {ko.runtime.controls.commandStatus[commandState.status]}
           </Badge>
           <p>{commandState.message}</p>
         </div>
@@ -1068,14 +1069,14 @@ export function WeavraControls({
         ) : (
           run?.workflow === "COMPLEX" && (
             <p className="text-xs text-muted-foreground">
-              이 Runtime은 COMPLEX 작업 상세를 제공하지 않아요. 위의 공식 실행 상태만 실행 결과로
+              이 Runtime은 복합 작업 상세를 제공하지 않아요. 위의 공식 실행 상태만 실행 결과로
               판단해요.
             </p>
           )
         )}
         {rerunOffered && run && state?.complexExecution && (
           <section
-            aria-label="미완료 COMPLEX 작업"
+            aria-label="미완료 복합 작업"
             className="space-y-2 rounded-md border border-border p-3 text-xs"
           >
             <p>
@@ -1097,8 +1098,8 @@ export function WeavraControls({
             className="text-xs text-muted-foreground"
           >
             다른 Runtime 소유자가 이 프로젝트의 활성 실행을 관리하고 있어요. 소유 프로세스가
-            종료됐다면 워크플로 준비 시 해당 실행을 INTERRUPTED로 기록해요. 작업은 재개하지 않고
-            일부 변경을 보존해요. 소유자가 실행 중이거나 종료를 확인할 수 없으면 요청을 거부해요.
+            종료됐다면 워크플로 준비 시 해당 실행을 중단됨으로 기록해요. 작업은 재개하지 않고 일부
+            변경을 보존해요. 소유자가 실행 중이거나 종료를 확인할 수 없으면 요청을 거부해요.
           </p>
         )}
         {staleWriter && (
@@ -1176,17 +1177,17 @@ export function WeavraControls({
           )}
           {(complexSupported || complexRows.length > 0) && (
             <section
-              aria-label="COMPLEX 작업 계획"
+              aria-label="복합 작업 계획"
               className="space-y-3 rounded-md border border-border p-4"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-sm font-medium">구조화된 작업 계획 · COMPLEX(선택 사항)</h4>
+                <h4 className="text-sm font-medium">구조화된 작업 계획 · 복합 작업(선택 사항)</h4>
                 <Badge variant={complexSupported ? "outline" : "warning"}>
                   {complexSupported ? `Runtime 계약 v${complexVersion}` : "제공되지 않음"}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Runtime이 COMPLEX로 분류한 목표에만 적용해요.{" "}
+                Runtime이 복합 작업으로 분류한 목표에만 적용해요.{" "}
                 {complexVersion === 2
                   ? "선행 작업이 끝난 작업은 Runtime에 설정된 한도까지 동시에 구현할 수 있어요. 검사와 검토는 계획 순서대로 하나씩 진행해요. 순서를 정하려면 의존성을 추가해 주세요."
                   : "하나의 Runtime 소유 실행에서 순서대로 하나씩 진행해요."}{" "}
@@ -1197,7 +1198,7 @@ export function WeavraControls({
                 <label className="block space-y-1 text-sm">
                   <span>상위 수용 기준 · 한 줄에 하나씩(1~16개)</span>
                   <Textarea
-                    aria-label="COMPLEX 수용 기준"
+                    aria-label="복합 작업 수용 기준"
                     value={complexCriteria}
                     maxLength={16384}
                     disabled={!canEditDraft || !complexSupported}
@@ -1646,9 +1647,9 @@ export function WeavraControls({
             <p className="text-sm">{preview.goal}</p>
             <dl className="grid gap-3 text-xs sm:grid-cols-2">
               {[
-                [ko.runtime.controls.workflow, preview.workflow],
+                [ko.runtime.controls.workflow, weavraLabel(preview.workflow)],
                 [ko.runtime.controls.risk, preview.risk],
-                ["실행 방식", preview.executionMode],
+                ["실행 방식", weavraLabel(preview.executionMode)],
                 ["허용 범위", preview.allowedPaths.join(", ") || "없음"],
                 [
                   ko.runtime.controls.recipe,
@@ -1860,9 +1861,9 @@ export function WeavraControls({
           </div>
           <p className="text-xs text-muted-foreground">
             로컬 정적 문서만 지원해요. 후보는 기록된 관찰일 뿐 검사나 현재 페이지 상태의 증거가
-            아니에요. Runtime이 등록과 새 격리 HOME·프로필·CDP-pipe 캡처를 수행하고 Kernel이 완료를
-            판정해요. 브라우저 격리는 OS 샌드박스가 아니에요. 개인 브라우저 세션·스크립트·상호작용은
-            허용하지 않아요.
+            아니에요. Runtime이 등록과 새 격리 홈 디렉터리·프로필·CDP 파이프 캡처를 수행하고
+            Kernel이 완료를 판정해요. 브라우저 격리는 OS 샌드박스가 아니에요. 개인 브라우저
+            세션·스크립트·상호작용은 허용하지 않아요.
           </p>
           {browserInspection && (
             <>
@@ -2051,7 +2052,7 @@ export function WeavraControls({
                     ))}
                   </dl>
                   <p className="text-xs text-muted-foreground">
-                    확인하면 이 예상 결과만 등록해요. 페이지 캡처·PASS 판정·워크플로 시작·자동 수정
+                    확인하면 이 예상 결과만 등록해요. 페이지 캡처·통과 판정·워크플로 시작·자동 수정
                     허용은 하지 않아요.
                   </p>
                   <Button
@@ -2173,7 +2174,7 @@ export function WeavraControls({
             </dl>
             <p className="text-xs text-muted-foreground">
               기본 선택은 거부예요. 세션 전체 권한·범위 확대·자동 되돌리기는 없어요. 승인만으로
-              PASS나 COMPLETE가 되지는 않아요.
+              통과나 완료가 되지는 않아요.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button

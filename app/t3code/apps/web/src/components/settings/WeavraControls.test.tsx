@@ -433,7 +433,7 @@ describe("Weavra workflow control interactions", () => {
       },
     });
     const plan = control(render(), "Runtime 계획 미리보기");
-    expect(text(plan)).toContain("STANDARD");
+    expect(text(plan)).toContain(weavraLabel("STANDARD"));
     expect(text(plan)).toContain("strict");
     expect(text(plan)).toContain("unit checks");
     expect(control(render(), "확인 후 시작").props.disabled).toBe(false);
@@ -502,7 +502,7 @@ describe("Weavra workflow control interactions", () => {
     await click("워크플로 취소");
     expect(data.invoke).not.toHaveBeenCalled();
     expect(data.confirm.mock.calls[0]?.[0]).toContain("일부 변경은");
-    expect(text(render())).toContain("submitting");
+    expect(text(render())).toContain(ko.runtime.controls.commandStatus.submitting);
     decide(true);
     await flush();
     expect(data.invoke).toHaveBeenCalledOnce();
@@ -570,7 +570,7 @@ describe("Weavra workflow control interactions", () => {
     expect(data.confirm).toHaveBeenCalledOnce();
     expect(data.confirm.mock.calls[0]?.[0]).toContain("이번 삭제만 승인할까요");
     expect(data.invoke).toHaveBeenCalledOnce();
-    expect(text(render())).toContain("submitting");
+    expect(text(render())).toContain(ko.runtime.controls.commandStatus.submitting);
     expect(control(render(), "거부").props.disabled).toBe(true);
     finish(
       AsyncResult.success(
@@ -1082,7 +1082,7 @@ async function draftTwoTasks(version: 1 | 2 = 1) {
   change("워크플로 목표", preview.goal);
   await click("작업 추가");
   await click("작업 추가");
-  change("COMPLEX 수용 기준", "Parse input\nValidate input");
+  change("복합 작업 수용 기준", "Parse input\nValidate input");
   change("작업 1 제목", "Extract parser");
   change("작업 1 목표", "Move parsing into src/parse.ts");
   toggle("작업 1의 수용 기준 연결 1");
@@ -1098,7 +1098,7 @@ async function draftTwoTasks(version: 1 | 2 = 1) {
 describe("COMPLEX task plan and execution projection", () => {
   it("shows no COMPLEX surface and never sends a draft without the Runtime capability", async () => {
     expect(
-      visitElements(render(), (node) => node.props["aria-label"] === "COMPLEX 작업 계획"),
+      visitElements(render(), (node) => node.props["aria-label"] === "복합 작업 계획"),
     ).toBeNull();
     expect(visitElements(render(), (node) => text(node) === "작업 추가")).toBeNull();
     await prepare();
@@ -1117,7 +1117,7 @@ describe("COMPLEX task plan and execution projection", () => {
     toggle("작업 2의 수용 기준 연결 2");
     change("검토한 실행 절차", "bug-fix");
     await submitPrepare();
-    expect(words(render())).toContain("STANDARD 전용");
+    expect(words(render())).toContain("표준 작업 전용");
     expect(data.invoke).not.toHaveBeenCalled();
     change("검토한 실행 절차", "");
     data.invoke.mockResolvedValue(
@@ -1173,7 +1173,7 @@ describe("COMPLEX task plan and execution projection", () => {
     await submitPrepare();
     update({ preview: complexPreview, nextRequestId: "owner:2" });
     const section = control(render(), "Runtime 계획 미리보기");
-    expect(words(section)).toContain("COMPLEX");
+    expect(words(section)).toContain(weavraLabel("COMPLEX"));
     expect(words(section)).toContain("AC-002 · Validate input");
     expect(visitElements(section, (node) => node.props["aria-label"] === "수용 기준")).toBeNull();
     const plan = words(child(section, ComplexPlanView));
@@ -1453,7 +1453,7 @@ describe("COMPLEX contract v2 (parallel waves) projection", () => {
   it("keeps the draft editor unchanged for contract v2 and shows maxParallel read-only", async () => {
     await draftTwoTasks(2);
     toggle("작업 2의 수용 기준 연결 2");
-    const editor = words(control(render(), "COMPLEX 작업 계획"));
+    const editor = words(control(render(), "복합 작업 계획"));
     expect(editor).toContain("Runtime 계약 v2");
     expect(editor).toContain("동시에 구현할 수 있어요");
     data.invoke.mockResolvedValue(
@@ -1523,7 +1523,7 @@ describe("Prepare while another owner holds the active Run", () => {
     const tree = render();
     expect(control(tree, "워크플로 준비").props.disabled).toBe(false);
     expect(words(orphanNote(tree))).toContain(
-      "소유 프로세스가 종료됐다면 워크플로 준비 시 해당 실행을 INTERRUPTED로 기록해요. 작업은 재개하지 않고",
+      "소유 프로세스가 종료됐다면 워크플로 준비 시 해당 실행을 중단됨으로 기록해요. 작업은 재개하지 않고",
     );
     expect(words(orphanNote(tree))).toContain("요청을 거부해요");
     // Cancel, approval, facts and browser gates stay as they were.
@@ -1681,7 +1681,7 @@ function advertisePlanner() {
 }
 function enterPlannerRequest() {
   change("워크플로 목표", plannerGoal);
-  change("COMPLEX 수용 기준", plannerStatements.join("\n"));
+  change("복합 작업 수용 기준", plannerStatements.join("\n"));
 }
 function plannerReply(
   data: Extract<WeavraControlResponse, { success: true }>["data"],
@@ -1727,7 +1727,7 @@ describe("V0.8B Planner draft", () => {
       expect(words(render())).not.toMatch(/planner/i);
     }
     // The COMPLEX editor keeps its previous shape: criteria appear only with task rows.
-    expect(labelled(render(), "COMPLEX 수용 기준")).toBeNull();
+    expect(labelled(render(), "복합 작업 수용 기준")).toBeNull();
     await prepare();
     expect(sentTypes()).toEqual(["workflow.prepare"]);
   });
@@ -1737,9 +1737,9 @@ describe("V0.8B Planner draft", () => {
     expect(draftDisabled()).toBe(true);
     change("워크플로 목표", plannerGoal);
     expect(draftDisabled()).toBe(true);
-    change("COMPLEX 수용 기준", "  \n ");
+    change("복합 작업 수용 기준", "  \n ");
     expect(draftDisabled()).toBe(true);
-    change("COMPLEX 수용 기준", plannerStatements.join("\n"));
+    change("복합 작업 수용 기준", plannerStatements.join("\n"));
     expect(draftDisabled()).toBe(false);
     const base = data.observation!;
     const writer = (writerPresent: boolean, run: WeavraControlState["snapshot"]["status"]["run"]) =>
@@ -1939,10 +1939,14 @@ describe("V0.8B Planner draft", () => {
     for (const [label, apply, differs] of [
       [
         "reordered criteria",
-        () => change("COMPLEX 수용 기준", plannerStatements.toReversed().join("\n")),
+        () => change("복합 작업 수용 기준", plannerStatements.toReversed().join("\n")),
         true,
       ],
-      ["original criteria", () => change("COMPLEX 수용 기준", plannerStatements.join("\n")), false],
+      [
+        "original criteria",
+        () => change("복합 작업 수용 기준", plannerStatements.join("\n")),
+        false,
+      ],
       [
         "surrounding whitespace the request trims",
         () => change("워크플로 목표", `  ${plannerGoal}\n`),
@@ -1960,7 +1964,7 @@ describe("V0.8B Planner draft", () => {
     const banner = () => words(control(render(), "불러온 계획 담당 제안"));
     expect(banner()).toContain("현재 상태와 다를 수 있어요");
     expect(banner()).not.toContain("다른 내용으로 만든 계획이에요");
-    change("COMPLEX 수용 기준", plannerStatements[0]!);
+    change("복합 작업 수용 기준", plannerStatements[0]!);
     expect(banner()).toContain("다른 내용으로 만든 계획이에요");
     // The snapshot's live value wins while the Host still reports that request.
     update({ planner: { ...plannerReady, current: true } });
@@ -2073,7 +2077,7 @@ describe("V0.8B Planner draft", () => {
     await click("계획 담당으로 초안 만들기");
     await flush();
     expect(words(render())).toContain(
-      "Runtime이 명령을 거부했어요: UNSUPPORTED_WORKFLOW. 계획 담당은 Runtime이 COMPLEX로 분류한 목표만 초안으로 만들며 R3는 처리하지 않아요.",
+      "Runtime이 명령을 거부했어요: UNSUPPORTED_WORKFLOW. 계획 담당은 Runtime이 복합 작업으로 분류한 목표만 초안으로 만들며 R3는 처리하지 않아요.",
     );
     expect(sentTypes()).toEqual(["planner.start"]);
     // A confirm refused while planning runs is not turned into an implicit cancel (§8).
@@ -2350,7 +2354,7 @@ describe("V0.8C re-run of unfinished COMPLEX work", () => {
   });
   it("offers Re-plan unfinished work only for the latest terminal non-R3 COMPLEX Run with unfinished tasks on a current connection", () => {
     advertiseRerun();
-    const offered = () => labelled(render(), "미완료 COMPLEX 작업");
+    const offered = () => labelled(render(), "미완료 복합 작업");
     for (const status of ["BLOCKED", "CANCELLED", "FAILED", "INTERRUPTED"] as const) {
       endedComplex(status);
       expect([status, offered() !== null]).toEqual([status, true]);
@@ -2431,7 +2435,7 @@ describe("V0.8C re-run of unfinished COMPLEX work", () => {
     expect(data.confirm).not.toHaveBeenCalled();
     const tree = render();
     expect(control(tree, "워크플로 목표").props.value).toBe(preview.goal);
-    expect(control(tree, "COMPLEX 수용 기준").props.value).toBe("Parse input\nValidate input");
+    expect(control(tree, "복합 작업 수용 기준").props.value).toBe("Parse input\nValidate input");
     expect(control(tree, "작업 1 제목").props.value).toBe("Verify: Extract parser");
     expect(control(tree, "작업 1 목표").props.value).toBe(
       "Re-verify without changes: Move parsing into src/parse.ts",
@@ -2496,8 +2500,8 @@ describe("V0.8C re-run of unfinished COMPLEX work", () => {
       ],
       [
         "criteria",
-        () => change("COMPLEX 수용 기준", "Parse input"),
-        () => change("COMPLEX 수용 기준", "Parse input\nValidate input"),
+        () => change("복합 작업 수용 기준", "Parse input"),
+        () => change("복합 작업 수용 기준", "Parse input\nValidate input"),
       ],
       [
         "goal",

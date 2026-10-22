@@ -147,8 +147,8 @@ export function ZoomableImage({
       <div
         ref={viewportRef}
         role="region"
-        aria-label={`${name}, zoomable image`}
-        aria-description="눌러서 확대하거나 화면 맞춤으로 돌아가요. 스크롤로 확대하고 끌어서 이동해요. Enter로 확대를 전환하고, +/-로 확대·축소하고, 0으로 화면에 맞춰요."
+        aria-label={`${name}, 확대할 수 있는 이미지`}
+        aria-description="눌러서 확대하거나 화면 맞춤으로 돌아가요. 스크롤로 확대하고 끌어서 이동해요. 엔터 키로 확대를 전환하고, +/-로 확대·축소하고, 0으로 화면에 맞춰요."
         tabIndex={0}
         className="max-w-[var(--media-width)] overflow-auto overscroll-contain rounded-lg bg-background shadow-2xl ring-1 ring-border/70 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         style={{

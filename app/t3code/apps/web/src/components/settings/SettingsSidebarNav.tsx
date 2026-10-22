@@ -333,11 +333,14 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton
                       isActive={isActive}
-                      className="text-sidebar-muted-foreground"
+                      className="h-auto min-h-8 text-sidebar-muted-foreground"
                       onClick={() => handleSectionClick(item.to)}
                     >
                       <Icon />
-                      <span className="truncate">{item.label}</span>
+                      {/* Long labels wrap and the row grows; the destination name is never cut off. */}
+                      <span className="min-w-0 overflow-visible! whitespace-normal!">
+                        {item.label}
+                      </span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );

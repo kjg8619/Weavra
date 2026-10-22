@@ -122,7 +122,7 @@ export function WeavraTaskCard(props: TaskCardProps) {
         </div>
         {c.task ? <Badge variant="outline">{weavraLabel(c.task.phase)}</Badge> : null}
       </div>
-      <p className="mt-3 text-muted-foreground">{cardCopy.intro("STANDARD")}</p>
+      <p className="mt-3 text-muted-foreground">{cardCopy.intro(weavraLabel("STANDARD"))}</p>
       {reason ? (
         <p className="mt-3 text-muted-foreground" role="status">
           {reason}
@@ -733,7 +733,11 @@ function TaskPreview({ task }: { task: WeavraTask }) {
   return (
     <div className="min-w-0 space-y-4 rounded-lg border border-border bg-background/50 p-3">
       <h4 className="font-medium" data-weavra="prepared-snapshot">
-        {cardCopy.preparedSnapshot(preview.workflow, preview.executionMode, preview.risk)}
+        {cardCopy.preparedSnapshot(
+          weavraLabel(preview.workflow),
+          weavraLabel(preview.executionMode),
+          preview.risk,
+        )}
       </h4>
       <p>{preview.goal}</p>
       <dl className="space-y-2 text-xs">

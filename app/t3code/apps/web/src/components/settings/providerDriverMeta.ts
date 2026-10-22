@@ -17,6 +17,7 @@ import {
   OpenAI,
   OpenCodeIcon,
 } from "../Icons";
+import { ko } from "~/i18n/ko";
 
 type ProviderSettingsSchema = {
   readonly fields: Readonly<Record<string, Schema.Top>>;
@@ -60,14 +61,14 @@ const PROVIDER_CLIENT_DEFINITIONS: readonly ProviderClientDefinition[] = [
     value: ProviderDriverKind.make("cursor"),
     label: "Cursor",
     icon: CursorIcon,
-    badgeLabel: "Early Access",
+    badgeLabel: ko.providers.driverBadge.earlyAccess,
     settingsSchema: CursorSettings,
   },
   {
     value: ProviderDriverKind.make("grok"),
     label: "Grok",
     icon: GrokIcon,
-    badgeLabel: "Early Access",
+    badgeLabel: ko.providers.driverBadge.earlyAccess,
     settingsSchema: GrokSettings,
   },
   {

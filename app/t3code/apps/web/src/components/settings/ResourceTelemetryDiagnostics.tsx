@@ -24,6 +24,7 @@ import type {
   ResourceTelemetryProcessSummary,
   ResourceTelemetrySourceHealth,
   ResourceTelemetrySourceStatus,
+  HostPowerThermalState,
   ServerProcessSignal,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
@@ -56,6 +57,10 @@ import {
 } from "./ResourceTelemetryDiagnostics.logic";
 import { SettingsSection, useRelativeTimeTick } from "./settingsLayout";
 import { ko } from "~/i18n/ko";
+
+// Every thermal state has a Korean label; the raw telemetry value stays unchanged in logic.
+const THERMAL_STATE_LABELS: Readonly<Record<HostPowerThermalState, string>> =
+  ko.settings.telemetry.thermalStates;
 
 const HISTORY_WINDOWS = [
   { label: ko.settings.telemetry.window5m, windowMs: 5 * 60_000, bucketMs: 15_000 },
@@ -1144,7 +1149,9 @@ export function ResourceTelemetryDiagnostics({
               }
               detail={
                 snapshot
-                  ? ko.settings.telemetry.thermalStateDetail(snapshot.power.thermalState)
+                  ? ko.settings.telemetry.thermalStateDetail(
+                      THERMAL_STATE_LABELS[snapshot.power.thermalState],
+                    )
                   : undefined
               }
               tone={speedLimit !== null && speedLimit < 80 ? "warning" : "default"}
@@ -1238,7 +1245,7 @@ export function ResourceTelemetryDiagnostics({
                 />
                 <DetailRow
                   label={ko.settings.telemetry.thermal}
-                  value={snapshot.power.thermalState}
+                  value={THERMAL_STATE_LABELS[snapshot.power.thermalState]}
                   valueClassName={
                     snapshot.power.thermalState === "serious" ||
                     snapshot.power.thermalState === "critical"
