@@ -1,0 +1,1348 @@
+{
+  "actions": [
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "open settings providers",
+      "status": "COMPLETED"
+    }
+  ],
+  "observations": [
+    {
+      "adapterInventory": "공급자 인스턴스 추가\n\nKang의 MacBook Pro에 공급자 인스턴스를 하나 더 구성해요. 예를 들어 다른 작업 공간을 가리키는 두 번째 Codex 설치를 추가할 수 있어요.\n\n1\n드라이버\n2\n식별 정보\n3\n구성\n드라이버\nCodex\nClaude\nCursor\n얼리 액세스\nGrok\n얼리 액세스\nOpenCode\nAntigravity\nGitHub Copilot\n출시 예정\nGemini\n출시 예정\nACP Registry\n출시 예정\nPi Agent\n출시 예정\n취소\n다음"
+    },
+    {
+      "label": "provider-locale",
+      "result": [
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "모든 환경",
+          "name": "환경 범위",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "모든 프로젝트",
+          "name": "프로젝트 범위",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H2",
+          "role": null,
+          "text": "공급자",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "공급자 상태 새로 고침마지막 확인 방금",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "",
+          "name": "공급자 추가",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Codex로그인 필요",
+          "name": "Codex 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [
+            "v0.149.1"
+          ],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Claude인증됨",
+          "name": "Claude 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [
+            "v2.1.303"
+          ],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Cursor사용 안 함",
+          "name": "Cursor 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Grok사용 안 함",
+          "name": "Grok 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "OpenCode사용 안 함",
+          "name": "OpenCode 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Antigravity사용 안 함",
+          "name": "Antigravity 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H2",
+          "role": null,
+          "text": "Codex",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "원문 진단 및 복구 안내",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H3",
+          "role": null,
+          "text": "표시 이름",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "",
+          "name": "Codex 강조 색상 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": "Codex",
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H2",
+          "role": null,
+          "text": "실행 구성",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H3",
+          "role": null,
+          "text": "실행 파일 경로",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "LABEL",
+          "role": null,
+          "text": "실행 파일 경로",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": "codex",
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H3",
+          "role": null,
+          "text": "Codex 홈 경로",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "LABEL",
+          "role": null,
+          "text": "Codex 홈 경로",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": "~/.codex",
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H3",
+          "role": null,
+          "text": "계정별 홈 경로",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "LABEL",
+          "role": null,
+          "text": "계정별 홈 경로",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": "~/.codex-t3/personal",
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H3",
+          "role": null,
+          "text": "실행 인수",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "LABEL",
+          "role": null,
+          "text": "실행 인수",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H2",
+          "role": null,
+          "text": "환경",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H3",
+          "role": null,
+          "text": "변수",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "변수 추가",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H2",
+          "role": null,
+          "text": "모델",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "사용자 지정 모델 추가",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H2",
+          "role": null,
+          "text": "사용량 공급자",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "허브 추가",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H3",
+          "role": null,
+          "text": "설정된 사용량 공급자가 없어요.",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H2",
+          "role": null,
+          "text": "고급",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "H3",
+          "role": null,
+          "text": "상태 확인 간격",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "",
+          "name": "백그라운드 정책 자세히",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "",
+          "name": "공급자 상태 확인 간격 줄이기",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": "공급자 상태 확인 간격(초)",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "",
+          "name": "공급자 상태 확인 간격 늘리기",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null
+        }
+      ]
+    },
+    {
+      "label": "provider-locale",
+      "unclassified": [],
+      "exceptions": [
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Codex로그인 필요",
+          "name": "Codex 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [
+            "v0.149.1"
+          ],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Codex로그인 필요",
+          "field": "text",
+          "segments": [
+            {
+              "segment": "Codex",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Codex 선택",
+          "name": "Codex 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [
+            "v0.149.1"
+          ],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Codex로그인 필요",
+          "field": "name",
+          "segments": [
+            {
+              "segment": "Codex",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "v0.149.1",
+          "name": "Codex 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [
+            "v0.149.1"
+          ],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Codex로그인 필요",
+          "field": "code",
+          "segments": [
+            {
+              "segment": "v0.149.1",
+              "class": "version",
+              "source": "semver"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Claude인증됨",
+          "name": "Claude 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [
+            "v2.1.303"
+          ],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Claude인증됨",
+          "field": "text",
+          "segments": [
+            {
+              "segment": "Claude",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Claude 선택",
+          "name": "Claude 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [
+            "v2.1.303"
+          ],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Claude인증됨",
+          "field": "name",
+          "segments": [
+            {
+              "segment": "Claude",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "v2.1.303",
+          "name": "Claude 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [
+            "v2.1.303"
+          ],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Claude인증됨",
+          "field": "code",
+          "segments": [
+            {
+              "segment": "v2.1.303",
+              "class": "version",
+              "source": "semver"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Cursor사용 안 함",
+          "name": "Cursor 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Cursor사용 안 함",
+          "field": "text",
+          "segments": [
+            {
+              "segment": "Cursor",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Cursor 선택",
+          "name": "Cursor 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Cursor사용 안 함",
+          "field": "name",
+          "segments": [
+            {
+              "segment": "Cursor",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Grok사용 안 함",
+          "name": "Grok 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Grok사용 안 함",
+          "field": "text",
+          "segments": [
+            {
+              "segment": "Grok",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Grok 선택",
+          "name": "Grok 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Grok사용 안 함",
+          "field": "name",
+          "segments": [
+            {
+              "segment": "Grok",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "OpenCode사용 안 함",
+          "name": "OpenCode 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "OpenCode사용 안 함",
+          "field": "text",
+          "segments": [
+            {
+              "segment": "OpenCode",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "OpenCode 선택",
+          "name": "OpenCode 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "OpenCode사용 안 함",
+          "field": "name",
+          "segments": [
+            {
+              "segment": "OpenCode",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Antigravity사용 안 함",
+          "name": "Antigravity 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Antigravity사용 안 함",
+          "field": "text",
+          "segments": [
+            {
+              "segment": "Antigravity",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Antigravity 선택",
+          "name": "Antigravity 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Antigravity사용 안 함",
+          "field": "name",
+          "segments": [
+            {
+              "segment": "Antigravity",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "H2",
+          "role": null,
+          "text": "Codex",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Codex",
+          "field": "text",
+          "segments": [
+            {
+              "segment": "Codex",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "text": "Codex 강조 색상 선택",
+          "name": "Codex 강조 색상 선택",
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "",
+          "field": "name",
+          "segments": [
+            {
+              "segment": "Codex",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "Codex",
+          "name": null,
+          "placeholder": "Codex",
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "",
+          "field": "placeholder",
+          "segments": [
+            {
+              "segment": "Codex",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "codex",
+          "name": null,
+          "placeholder": "codex",
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "",
+          "field": "placeholder",
+          "segments": [
+            {
+              "segment": "codex",
+              "class": "command placeholder",
+              "source": "serverConfig.providers"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "H3",
+          "role": null,
+          "text": "Codex 홈 경로",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Codex 홈 경로",
+          "field": "text",
+          "segments": [
+            {
+              "segment": "Codex",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "LABEL",
+          "role": null,
+          "text": "Codex 홈 경로",
+          "name": null,
+          "placeholder": null,
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "Codex 홈 경로",
+          "field": "text",
+          "segments": [
+            {
+              "segment": "Codex",
+              "class": "product/brand",
+              "source": "lead allowlist"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "~/.codex",
+          "name": null,
+          "placeholder": "~/.codex",
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "",
+          "field": "placeholder",
+          "segments": [
+            {
+              "segment": "~/.codex",
+              "class": "path placeholder",
+              "source": "serverConfig.providers"
+            }
+          ],
+          "unclassified": []
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "text": "~/.codex-t3/personal",
+          "name": null,
+          "placeholder": "~/.codex-t3/personal",
+          "keycaps": [],
+          "codes": [],
+          "presetScope": false,
+          "modelScope": false,
+          "fontInput": false,
+          "fileChip": false,
+          "hostScope": false,
+          "font": null,
+          "prose": "",
+          "field": "placeholder",
+          "segments": [
+            {
+              "segment": "~/.codex-t3/personal",
+              "class": "path placeholder",
+              "source": "serverConfig.providers"
+            }
+          ],
+          "unclassified": []
+        }
+      ]
+    }
+  ]
+}
