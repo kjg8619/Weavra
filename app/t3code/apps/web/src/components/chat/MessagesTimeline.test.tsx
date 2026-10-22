@@ -1961,7 +1961,9 @@ describe("MessagesTimeline", () => {
     );
 
     // Images report their size like every other attachment chip.
-    expect(markup).toContain('aria-label="Image attachment, shot.png, 1 KB"');
+    expect(markup).toContain(
+      `aria-label="${ko.chat.contextChip.imageAttachment("shot.png", "1 KB")}"`,
+    );
     // Selection copy re-emits chips as their canonical links.
     expect(markup).toContain('data-markdown-copy="![shot.png](t3-context://v1/image/img-1)"');
     expect(markup).toContain(

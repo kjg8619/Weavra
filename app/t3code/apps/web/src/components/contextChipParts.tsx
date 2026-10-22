@@ -207,7 +207,7 @@ export function ImageChipButton({
         CONTEXT_INLINE_CHIP_INTERACTIVE_CLASS_NAME,
         "cursor-zoom-in",
       )}
-      aria-label={`Image attachment, ${name}, ${size}`}
+      aria-label={ko.chat.contextChip.imageAttachment(name, size)}
       style={{ ...style, ...(accent ? { "--context-chip-accent": accent } : {}) } as CSSProperties}
       {...props}
     >

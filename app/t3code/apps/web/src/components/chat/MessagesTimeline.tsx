@@ -1890,12 +1890,8 @@ function QueuedMessageTimelineRow({
         {attachmentCount > 0 || contextCount > 0 ? (
           <div className={cn("text-secondary-label text-xs", text.length > 0 && "mt-1.5")}>
             {[
-              attachmentCount > 0
-                ? `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`
-                : null,
-              contextCount > 0
-                ? `${contextCount} context item${contextCount === 1 ? "" : "s"}`
-                : null,
+              attachmentCount > 0 ? ko.chat.contextChip.attachmentCount(attachmentCount) : null,
+              contextCount > 0 ? ko.chat.contextChip.contextItemCount(contextCount) : null,
             ]
               .filter(Boolean)
               .join(", ")}

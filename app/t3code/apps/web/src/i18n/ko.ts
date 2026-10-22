@@ -201,6 +201,12 @@ export const ko = freeze({
     contextChip: freeze({
       showDetails: (label: string) => `${label}. 자세히 보기`,
       attachmentCount: (count: number) => `첨부 ${count}개`,
+      contextItemCount: (count: number) => `컨텍스트 항목 ${count}개`,
+      imageAttachment: (name: string, size: string) => `이미지 첨부, ${name}, ${size}`,
+      previewVideoAttachment: (name: string, size: string) =>
+        `동영상 미리보기 첨부, ${name}, ${size}`,
+      attachmentRestoreFailed: (name: string) => `첨부 파일을 복원하지 못했어요: ${name}`,
+      invalidAttachmentUrl: "환경이 잘못된 첨부 파일 URL을 돌려줬어요.",
       skill: "스킬",
       skillNamed: (label: string) => `스킬 ${label}`,
       videoAttachment: (name: string, size: string) => `동영상 첨부, ${name}, ${size}`,

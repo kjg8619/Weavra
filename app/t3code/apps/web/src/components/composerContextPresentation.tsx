@@ -52,6 +52,7 @@ import {
   PullRequestChip,
   UnresolvedChip,
 } from "./contextChipParts";
+import { ko } from "~/i18n/ko";
 
 /**
  * Draft-side payload behind a context reference chip. Each kind keeps its existing draft
@@ -224,7 +225,11 @@ function FileContextChip(props: {
       error={props.upload?.status === "failed"}
       unresolved={needsReattach}
       suffix={suffix}
-      accessibleLabel={`${isVideo && !needsReattach ? "Preview video" : "File"} attachment, ${props.record.name}, ${size}`}
+      accessibleLabel={
+        isVideo && !needsReattach
+          ? ko.chat.contextChip.previewVideoAttachment(props.record.name, size)
+          : ko.chat.contextChip.fileAttachment(props.record.name, size)
+      }
       onOpen={
         !needsReattach
           ? () =>
