@@ -28,7 +28,23 @@ parent 245a9efd, so 3,902 entries were added. The changed source files hold 2,64
 | Machine-consumed search data | `englishTitle`, English `searchTerms`, `SETTINGS_SECTION_SEARCH_ALIASES` | Never displayed; keeps English typing able to find translated destinations | Plan step 2 |
 | Not user-visible | `console.*` messages, developer invariant errors, JSDoc examples | Never rendered | n/a |
 | Two-letter segments | PR, OS, ID, T3 | Under the three-letter Latin rule | runner localeAudit |
+| Run-state and protocol identifiers | `R3` risk tier, `CANDIDATE_ONLY`, review decisions `REVISE`/`BLOCK`, error codes (`TARGET_CHANGED`, `UNSUPPORTED_WORKFLOW`), Git `HEAD`, `sha256:` digests, `lines.start/end` fields, `CDP` | Protocol and wire identifiers, shown beside Korean copy; workflow, mode and status values themselves show Korean labels | Amendment 2026-10-22i |
+| Formats and units | YAML, Markdown, CSV; KiB, MiB, GB, MB, B/s, ms, px; the 22f timer units h/m/s | Format names and unit symbols | Amendments 2026-10-22f/i |
+| External product and platform names | Xcode Settings > Components, Android Studio > Device Manager, GitHub Actions, Finder, Apple Silicon, Intel, GNOME, Unix | Names of other products and their own menus | Amendment 2026-10-22i |
+| Built-in theme names | T3 Chat, Grove, Ocean, Ember, Iris | Theme proper names | runner built-in theme class |
+| Provider product names (Add provider list) | GitHub Copilot, ACP Registry, Pi Agent | Product names | Amendment 2026-10-22i |
+| Original provider message after a Korean status | `Codex CLI is not authenticated. Run \`codex login\` and try again.` on onboarding and the thread provider banner (server `message`, CodexProvider.ts) | Original server diagnostic kept byte-exact behind the Korean status | Amendment 2026-10-22i |
+| OS clock format | AM/PM in message timestamps (for example "10/18 6:00 PM") | Follows the OS locale and the 12/24-hour setting, as the setting states | n/a (system format) |
 
 Wire enums are never shown raw: every value of WeavraCanonicalRunStatus, ConnectionStatus, ComplexTaskStatusV2,
 ComplexCleanupStatus and ComplexPhase has a Korean `weavraLabel` (enforced by `src/i18n/ko.test.ts`). Resource telemetry
 source status (`healthy`, `degraded`, ...) now shows a Korean label as well.
+
+
+## Follow-up (not in this PR)
+
+Git and pull-request vocabulary in 16 unowned files that are not on the audited states (menus, PR panel): 114 Korean strings still use English Git terms. Lead decision 2026-10-22i (B): not in this PR, listed here as a named follow-up.
+
+Files: `BranchToolbarBranchSelector.tsx`, `BranchToolbarEnvModeSelector.tsx`, `DiffPanel.tsx`, `GitActionsControl.logic.ts`, `GitActionsControl.tsx`, `chat/WorktreeSetupCard.tsx`, `pullRequest/LinkPullRequestDialog.tsx`, `pullRequest/PullRequestCodeTab.tsx`, `pullRequest/PullRequestDetailPanel.tsx`, `pullRequest/PullRequestLabelPicker.tsx`, `pullRequest/PullRequestReviewerPicker.tsx`, `pullRequest/PullRequestStackMenu.tsx`, `pullRequest/PullRequestTimelineTab.tsx`, `pullRequest/ThreadPullRequestsPanel.tsx`, `pullRequest/pullRequestDetail.logic.ts`, `pullRequest/pullRequestLinkContextMenu.ts`.
+
+Proposed glossary: commit 커밋, push 푸시, pull 풀, branch 브랜치, ref 참조, worktree 작업 트리, checkout 체크아웃, host 호스트, rebase 리베이스, merge 병합, stash 스태시, upstream 업스트림, patch 패치, feature 기능, base 기준, triage 분류, Squash and merge 스쿼시 후 병합, Rebase and merge 리베이스 후 병합; the remote name `origin` stays verbatim.

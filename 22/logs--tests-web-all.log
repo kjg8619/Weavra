@@ -5,10 +5,10 @@
 stderr | src/components/ThreadNotificationCoordinator.badge.test.tsx > shows in-app alerts without adding a badge while focused
 react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
 
- ❯ |unit| src/components/ThreadNotificationCoordinator.badge.test.tsx (13 tests | 1 failed) 47ms
-   × shows in-app alerts without adding a badge while focused 4ms
- ❯ |unit| src/components/settings/ProviderInstanceCard.test.ts (4 tests | 1 failed) 27ms
-     × surfaces a failed probe message in both the list row and the editor 4ms
+ ❯ |unit| src/components/ThreadNotificationCoordinator.badge.test.tsx (13 tests | 1 failed) 26ms
+   × shows in-app alerts without adding a badge while focused 2ms
+ ❯ |unit| src/components/settings/ProviderInstanceCard.test.ts (4 tests | 1 failed) 24ms
+     × surfaces a failed probe message in both the list row and the editor 5ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -42,7 +42,7 @@ Received: "<div data-slot="settings-row" class="group flex min-h-18 items-center
 
 
  Test Files  2 failed | 414 passed (416)
-      Tests  2 failed | 5696 passed (5698)
-   Start at  11:58:56
-   Duration  21.81s (transform 18.75s, setup 16.63s, import 198.55s, tests 36.28s, environment 86ms)
+      Tests  2 failed | 5700 passed (5702)
+   Start at  16:52:40
+   Duration  19.16s (transform 15.49s, setup 15.85s, import 168.91s, tests 32.17s, environment 81ms)
 

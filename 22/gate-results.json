@@ -1,17 +1,17 @@
 {
-  "head": "b95bacbb200e3e3925dec26766a1e5b0da7dee3a",
+  "head": "bb118bc4c85f6fd2f849c190ecbd8615c4ce4dc4",
   "parent": "245a9efdfee4e949a5d312798bcdbf31ed0c1675",
   "runner": "daa942df567e52cf47453535083ff139f10d3885",
   "gates": [
     {
       "gate": "fmt --check (changed files)",
-      "command": "pnpm exec vp fmt --check <167 changed app/t3code files>",
+      "command": "pnpm exec vp fmt --check <174 changed app/t3code files>",
       "exit": 0,
       "log": "logs/fmt.log"
     },
     {
       "gate": "lint (changed files)",
-      "command": "pnpm exec vp lint <165 changed ts/tsx files>",
+      "command": "pnpm exec vp lint <172 changed ts/tsx files>",
       "exit": 0,
       "log": "logs/lint.log"
     },
@@ -31,14 +31,14 @@
       "gate": "plan focused tests",
       "command": "vp test run --project unit src/i18n/ko.test.ts src/components/settings/settingsSearch.test.ts src/components/settings/KeybindingsSettings.logic.test.ts",
       "exit": 0,
-      "summary": "Tests  104 passed (104)",
+      "summary": "Tests  108 passed (108)",
       "log": "logs/tests-focused.log"
     },
     {
       "gate": "web unit suite",
       "command": "vp test run --project unit (apps/web)",
       "exit": 1,
-      "summary": "Tests  2 failed | 5696 passed (5698)",
+      "summary": "Tests  2 failed | 5700 passed (5702)",
       "log": "logs/tests-web-all.log",
       "inheritedFailures": [
         "src/components/settings/ProviderInstanceCard.test.ts > deriveProviderModelsForDisplay > surfaces a failed probe message in both the list row and the editor",
