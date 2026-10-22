@@ -11,11 +11,11 @@ The audited work surfaces mixed Korean with English authored copy: settings page
 
 Closes: W-03.
 Base: `hig/21-adaptive-chat` at `245a9efdfee4e949a5d312798bcdbf31ed0c1675` ([PR #93](https://github.com/kjg8619/Weavra/pull/93)).
-Head: `b95bacbb200e3e3925dec26766a1e5b0da7dee3a`.
+Head: `bb118bc4c85f6fd2f849c190ecbd8615c4ce4dc4`.
 Runner: [`daa942df`](https://github.com/kjg8619/Weavra/commit/daa942df567e52cf47453535083ff139f10d3885) (`scripts/hig` identical at head).
 Parent app.asar: `51e20917fe73274b483bb1d89766b18845706fac13e8408b454224cf78481a31`.
-Head app.asar: `2d76c80895ccef42b1961afdd61b853ceb3235ad2cc9c0cdae3be9298fe70919`.
-Scope: plan todo 22 plus lead Amendments 2026-10-21b, 2026-10-22, 2026-10-22b, 2026-10-22c, 2026-10-22d, 2026-10-22e, 2026-10-22f, 2026-10-22g and 2026-10-22h ([ownership.json](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/ownership.json), 129 source files, 38 colocated tests).
+Head app.asar: `3662efa41ee3daa102c1e5caf7e16afb7c07f27e864c0ef363fdfeede49c5bd8`.
+Scope: plan todo 22 plus lead Amendments 2026-10-21b, 2026-10-22, 2026-10-22b, 2026-10-22c, 2026-10-22d, 2026-10-22e, 2026-10-22f, 2026-10-22g, 2026-10-22h and 2026-10-22i ([ownership.json](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/ownership.json), 136 source files, 38 colocated tests).
 
 ## Before / after
 
@@ -31,21 +31,23 @@ Scope: plan todo 22 plus lead Amendments 2026-10-21b, 2026-10-22, 2026-10-22b, 2
 
 ## Rules a-j self-measurement
 
-Head and unchanged parent measured by the same script (`tools/measure-22.mjs`, sha256 `2a3b627cef16b27bad3133d426ded72e1800e1fb1314feaa7463f440ce35135f`). [Full table, method and pre-existing sources](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/rules-a-j.md).
+Head and unchanged parent measured by the same script (`tools/measure-22.mjs`, sha256 `03bf03d48065ef7fec1cd8bd189b548bd0f0476893f0b173adc517625227640d`). [Full table, method and pre-existing sources](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/rules-a-j.md).
 
 | Rule | Head failures | Introduced by this change | Parent failures |
 |---|---|---|---|
 | b | 1 | 0 | 609 |
-| c | 2325 | 0 | 12286 |
-| d | 0 | 0 | 324 |
+| c | 2328 | 0 | 12417 |
+| d | 0 | 0 | 945 |
 | e | 24 | 0 | 24 |
 | f | 0 | 0 | 0 |
-| i | 1496 | 0 | 3307 |
+| i | 452 | 0 | 2121 |
 | j | 50 | 0 | 50 |
-| ax | 0 | 0 | 55108 |
-| a (recorded, copy-only geometry) | 12184 | 345 above the parent count | 12129 |
+| ax | 12 | 0 | 91048 |
+| a (recorded, copy-only geometry) | 12160 | 358 above the parent count | 12142 |
 
-Every remaining head failure for b, c, e, i and j is one the parent also has on the same element and configuration; `ax` (English authored text) is zero on head.
+Every remaining head failure for b, c, e, i and j is one the parent also has on the same element and configuration.
+
+Rule `ax` now classifies every visible text node. Its 12 head rows were each assigned to an approved exception class by an explicit rule (host name (data): 12); 0 remain unclassified ([review](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/measure-after--ax-review.json)).
 
 ## Locale exceptions
 
@@ -70,20 +72,59 @@ Every remaining head failure for b, c, e, i and j is one the parent also has on 
 | Machine-consumed search data | `englishTitle`, English `searchTerms`, `SETTINGS_SECTION_SEARCH_ALIASES` | Never displayed; keeps English typing able to find translated destinations | Plan step 2 |
 | Not user-visible | `console.*` messages, developer invariant errors, JSDoc examples | Never rendered | n/a |
 | Two-letter segments | PR, OS, ID, T3 | Under the three-letter Latin rule | runner localeAudit |
+| Run-state and protocol identifiers | `R3` risk tier, `CANDIDATE_ONLY`, review decisions `REVISE`/`BLOCK`, error codes (`TARGET_CHANGED`, `UNSUPPORTED_WORKFLOW`), Git `HEAD`, `sha256:` digests, `lines.start/end` fields, `CDP` | Protocol and wire identifiers, shown beside Korean copy; workflow, mode and status values themselves show Korean labels | Amendment 2026-10-22i |
+| Formats and units | YAML, Markdown, CSV; KiB, MiB, GB, MB, B/s, ms, px; the 22f timer units h/m/s | Format names and unit symbols | Amendments 2026-10-22f/i |
+| External product and platform names | Xcode Settings > Components, Android Studio > Device Manager, GitHub Actions, Finder, Apple Silicon, Intel, GNOME, Unix | Names of other products and their own menus | Amendment 2026-10-22i |
+| Built-in theme names | T3 Chat, Grove, Ocean, Ember, Iris | Theme proper names | runner built-in theme class |
+| Provider product names (Add provider list) | GitHub Copilot, ACP Registry, Pi Agent | Product names | Amendment 2026-10-22i |
+| Original provider message after a Korean status | `Codex CLI is not authenticated. Run \`codex login\` and try again.` on onboarding and the thread provider banner (server `message`, CodexProvider.ts) | Original server diagnostic kept byte-exact behind the Korean status | Amendment 2026-10-22i |
+| OS clock format | AM/PM in message timestamps (for example "10/18 6:00 PM") | Follows the OS locale and the 12/24-hour setting, as the setting states | n/a (system format) |
+
+## QA-22 fixes (Amendment 2026-10-22i)
+
+- The workflow command status and the host thermal state render through Korean display maps that cover every value (`ko.runtime.controls.commandStatus`, `ko.settings.telemetry.thermalStates`), with unit tests over every enum value in `src/i18n/ko.test.ts`; the raw values stay unchanged in logic.
+- Workflow and run-state identifiers in Weavra prose show their Korean labels (QUICK/STANDARD/COMPLEX, EDIT/READ_ONLY, interrupted/blocked/cancelled/failed, pass/complete/valid); `R3`, `CANDIDATE_ONLY`, review decisions and error codes stay as identifiers (exception table).
+- Settings navigation labels wrap and the row grows instead of being cut off. The label text stays "키보드 단축키" because the shared runner pins that exact name.
+- Remaining English from the all-state sweep is Korean: model count, "Run", "digest", "Policy", "Early Access", keycap words in prose and the zoomable-image name; "GitHub Copilot" is spelled as the product name.
+
+## All-state locale sweep
+
+Every captured state at every size (152 frames of head `bb118bc4c85f6fd2f849c190ecbd8615c4ce4dc4`) was read and every Latin segment classified: 708 distinct segments, 0 unclassified ([inventory](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/capture-latin--capture-latin-inventory.json), [unclassified](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/capture-latin--capture-latin-unclassified.json)).
+
+The rules a-j measurement now classifies every visible text node, mixed Korean and Latin included (rule `ax` above; per-segment classes in [latin-inventory.json](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/measure-after--latin-inventory.json)).
+
+## Long-copy stress (QA-22 method)
+
+QA-22's own stress script re-run unchanged except for the app and output paths and one readiness wait (QA's fixture database now has "03 Code blocks" archived, so it waits on "06 Empty thread", which the script opens anyway) ([script](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/tools--qa22-stress--stress.mjs), [summary](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/stress-qa22--stress-summary.json)): 72 samples over 12 configurations (840/1280/1920, 100/150%, light/dark) with at least +40% Korean copy.
+
+| Check | Result |
+|---|---|
+| Settings navigation ellipsis | 0 |
+| Scope identity names (ellipsis with full-value tooltip) | 16 |
+| Page overflow | 0 |
+| Korean mid-word / orphan breaks | 0 |
+| Expansion below +40% | 0 |
+
+## Follow-up (not in this PR)
+Git and pull-request vocabulary in 16 unowned files that are not on the audited states (menus, PR panel): 114 Korean strings still use English Git terms. Lead decision 2026-10-22i (B): not in this PR, listed here as a named follow-up.
+
+Files: `BranchToolbarBranchSelector.tsx`, `BranchToolbarEnvModeSelector.tsx`, `DiffPanel.tsx`, `GitActionsControl.logic.ts`, `GitActionsControl.tsx`, `chat/WorktreeSetupCard.tsx`, `pullRequest/LinkPullRequestDialog.tsx`, `pullRequest/PullRequestCodeTab.tsx`, `pullRequest/PullRequestDetailPanel.tsx`, `pullRequest/PullRequestLabelPicker.tsx`, `pullRequest/PullRequestReviewerPicker.tsx`, `pullRequest/PullRequestStackMenu.tsx`, `pullRequest/PullRequestTimelineTab.tsx`, `pullRequest/ThreadPullRequestsPanel.tsx`, `pullRequest/pullRequestDetail.logic.ts`, `pullRequest/pullRequestLinkContextMenu.ts`.
+
+Proposed glossary: commit 커밋, push 푸시, pull 풀, branch 브랜치, ref 참조, worktree 작업 트리, checkout 체크아웃, host 호스트, rebase 리베이스, merge 병합, stash 스태시, upstream 업스트림, patch 패치, feature 기능, base 기준, triage 분류, Squash and merge 스쿼시 후 병합, Rebase and merge 리베이스 후 병합; the remote name `origin` stays verbatim.
 
 ## Verification
 
 | Gate | Command | Exit | Result |
 |---|---|---|---|
-| fmt --check (changed files) | `pnpm exec vp fmt --check <167 changed app/t3code files>` | 0 |  |
-| lint (changed files) | `pnpm exec vp lint <165 changed ts/tsx files>` | 0 |  |
+| fmt --check (changed files) | `pnpm exec vp fmt --check <174 changed app/t3code files>` | 0 |  |
+| lint (changed files) | `pnpm exec vp lint <172 changed ts/tsx files>` | 0 |  |
 | typecheck web | `pnpm --filter @t3tools/web typecheck` | 0 |  |
 | typecheck desktop | `pnpm --filter @t3tools/desktop typecheck` | 0 |  |
-| plan focused tests | `vp test run --project unit src/i18n/ko.test.ts src/components/settings/settingsSearch.test.ts src/components/settings/KeybindingsSettings.logic.test.ts` | 0 | Tests  104 passed (104) |
-| web unit suite | `vp test run --project unit (apps/web)` | 1 | Tests  2 failed | 5696 passed (5698) |
+| plan focused tests | `vp test run --project unit src/i18n/ko.test.ts src/components/settings/settingsSearch.test.ts src/components/settings/KeybindingsSettings.logic.test.ts` | 0 | Tests  108 passed (108) |
+| web unit suite | `vp test run --project unit (apps/web)` | 1 | Tests  2 failed | 5700 passed (5702) |
 | desktop suite | `vp test run (apps/desktop)` | 0 | Tests  1247 passed | 46 skipped (1293) |
 | runner harness | `bun test scripts/hig/harness.test.ts` | 0 | 131 pass |
-| lint warnings | same files at head and parent | | 182 at head, 182 at parent, 0 new |
+| lint warnings | same files at head and parent | | 183 at head, 183 at parent, 0 new |
 | accept_pr 22 round 01 | `assert.mjs --case 22` + `--verify-packet` + `git diff --check` | 0 | product PASS, 6/6 checks PASS, app exited |
 | accept_pr 22 round 02 | `assert.mjs --case 22` + `--verify-packet` + `git diff --check` | 0 | product PASS, 6/6 checks PASS, app exited |
 | W-33 regression | `assert.mjs --case 21` on the final build | 0 | 7/7 PASS ([receipt](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/regression-21--scenario-receipt.json)) |
@@ -93,4 +134,4 @@ Inherited web failures (identical at the parent `245a9efd`, Tests  2 failed | 15
 - `src/components/settings/ProviderInstanceCard.test.ts > deriveProviderModelsForDisplay > surfaces a failed probe message in both the list row and the editor`
 - `src/components/ThreadNotificationCoordinator.badge.test.tsx > shows in-app alerts without adding a badge while focused`
 
-Capture: parent `245a9efdfee4e949a5d312798bcdbf31ed0c1675` and head `b95bacbb200e3e3925dec26766a1e5b0da7dee3a`, 158 paired frames; [gate results](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/gate-results.json), [lint comparison](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/lint-comparison.json), [fixture retention](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/fixture-retention.json).
+Capture: parent `245a9efdfee4e949a5d312798bcdbf31ed0c1675` and head `bb118bc4c85f6fd2f849c190ecbd8615c4ce4dc4`, 158 paired frames; [gate results](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/gate-results.json), [lint comparison](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/lint-comparison.json), [fixture retention](https://github.com/kjg8619/Weavra/blob/hig-evidence/22/22/fixture-retention.json).
