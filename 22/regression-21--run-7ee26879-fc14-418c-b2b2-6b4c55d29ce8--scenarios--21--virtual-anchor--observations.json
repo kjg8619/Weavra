@@ -1,0 +1,30 @@
+{
+  "actions": [
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    }
+  ],
+  "observations": [
+    {
+      "label": "anchor before",
+      "result": {
+        "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+        "y": 233.796875,
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code"
+      }
+    },
+    {
+      "label": "anchor after",
+      "result": {
+        "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+        "y": 233.796875,
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code"
+      }
+    }
+  ]
+}

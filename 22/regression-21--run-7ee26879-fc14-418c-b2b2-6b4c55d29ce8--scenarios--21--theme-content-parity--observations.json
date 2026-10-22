@@ -1,0 +1,2718 @@
+{
+  "actions": [
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    }
+  ],
+  "observations": [
+    {
+      "label": "intended code anchor",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 708,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1468,
+              "bottom": 192.3984375,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 709,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1467,
+              "bottom": 348.765625,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 709,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1467,
+              "bottom": 434.6328125,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 708,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1468,
+              "bottom": 553.90625,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        },
+        "pageWidth": 1920
+      }
+    },
+    {
+      "label": "code-840-anchor",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 286,
+              "y": -13,
+              "width": 524,
+              "height": 23.3984375,
+              "top": -13,
+              "right": 810,
+              "bottom": 10.3984375,
+              "left": 286
+            },
+            "painted": true,
+            "intersects": false
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 287,
+              "y": 51.796875,
+              "width": 522,
+              "height": 114.96875,
+              "top": 51.796875,
+              "right": 809,
+              "bottom": 166.765625,
+              "left": 287
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 287,
+              "y": 209.1640625,
+              "width": 522,
+              "height": 43.46875,
+              "top": 209.1640625,
+              "right": 809,
+              "bottom": 252.6328125,
+              "left": 287
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 286,
+              "y": 264.03125,
+              "width": 524,
+              "height": 107.875,
+              "top": 264.03125,
+              "right": 810,
+              "bottom": 371.90625,
+              "left": 286
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -0.203125,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 840,
+          "height": 620
+        },
+        "pageWidth": 840
+      }
+    },
+    {
+      "label": "code-840-baseline",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 286,
+              "y": -71,
+              "width": 524,
+              "height": 23.3984375,
+              "top": -71,
+              "right": 810,
+              "bottom": -47.6015625,
+              "left": 286
+            },
+            "painted": true,
+            "intersects": false
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 287,
+              "y": -6.203125,
+              "width": 522,
+              "height": 114.96875,
+              "top": -6.203125,
+              "right": 809,
+              "bottom": 108.765625,
+              "left": 287
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 287,
+              "y": 151.1640625,
+              "width": 522,
+              "height": 43.46875,
+              "top": 151.1640625,
+              "right": 809,
+              "bottom": 194.6328125,
+              "left": 287
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 286,
+              "y": 206.03125,
+              "width": 524,
+              "height": 107.875,
+              "top": 206.03125,
+              "right": 810,
+              "bottom": 313.90625,
+              "left": 286
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -58.203125,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 840,
+          "height": 620
+        },
+        "pageWidth": 840
+      }
+    },
+    {
+      "label": "code-840-light",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 286,
+              "y": -71,
+              "width": 524,
+              "height": 23.3984375,
+              "top": -71,
+              "right": 810,
+              "bottom": -47.6015625,
+              "left": 286
+            },
+            "painted": true,
+            "intersects": false
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 287,
+              "y": -6.203125,
+              "width": 522,
+              "height": 114.96875,
+              "top": -6.203125,
+              "right": 809,
+              "bottom": 108.765625,
+              "left": 287
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 287,
+              "y": 151.1640625,
+              "width": 522,
+              "height": 43.46875,
+              "top": 151.1640625,
+              "right": 809,
+              "bottom": 194.6328125,
+              "left": 287
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 286,
+              "y": 206.03125,
+              "width": 524,
+              "height": 107.875,
+              "top": 206.03125,
+              "right": 810,
+              "bottom": 313.90625,
+              "left": 286
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -58.203125,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 840,
+          "height": 620
+        },
+        "pageWidth": 840
+      }
+    },
+    {
+      "label": "code-840-dark",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 286,
+              "y": -71,
+              "width": 524,
+              "height": 23.3984375,
+              "top": -71,
+              "right": 810,
+              "bottom": -47.6015625,
+              "left": 286
+            },
+            "painted": true,
+            "intersects": false
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 287,
+              "y": -6.203125,
+              "width": 522,
+              "height": 114.96875,
+              "top": -6.203125,
+              "right": 809,
+              "bottom": 108.765625,
+              "left": 287
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 287,
+              "y": 151.1640625,
+              "width": 522,
+              "height": 43.46875,
+              "top": 151.1640625,
+              "right": 809,
+              "bottom": 194.6328125,
+              "left": 287
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 286,
+              "y": 206.03125,
+              "width": 524,
+              "height": 107.875,
+              "top": 206.03125,
+              "right": 810,
+              "bottom": 313.90625,
+              "left": 286
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -58.203125,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 840,
+          "height": 620
+        },
+        "pageWidth": 840
+      }
+    },
+    {
+      "label": "code-840-light",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 286,
+              "y": -71,
+              "width": 524,
+              "height": 23.3984375,
+              "top": -71,
+              "right": 810,
+              "bottom": -47.6015625,
+              "left": 286
+            },
+            "painted": true,
+            "intersects": false
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 287,
+              "y": -6.203125,
+              "width": 522,
+              "height": 114.96875,
+              "top": -6.203125,
+              "right": 809,
+              "bottom": 108.765625,
+              "left": 287
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 287,
+              "y": 151.1640625,
+              "width": 522,
+              "height": 43.46875,
+              "top": 151.1640625,
+              "right": 809,
+              "bottom": 194.6328125,
+              "left": 287
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 286,
+              "y": 206.03125,
+              "width": 524,
+              "height": 107.875,
+              "top": 206.03125,
+              "right": 810,
+              "bottom": 313.90625,
+              "left": 286
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": -58.203125,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 840,
+          "height": 620
+        },
+        "pageWidth": 840
+      }
+    },
+    {
+      "label": "code-1280-anchor",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 388,
+              "y": 109,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 109,
+              "right": 1148,
+              "bottom": 132.3984375,
+              "left": 388
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 389,
+              "y": 173.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 173.796875,
+              "right": 1147,
+              "bottom": 288.765625,
+              "left": 389
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 389,
+              "y": 331.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 331.1640625,
+              "right": 1147,
+              "bottom": 374.6328125,
+              "left": 389
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 388,
+              "y": 386.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 386.03125,
+              "right": 1148,
+              "bottom": 493.90625,
+              "left": 388
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "pageWidth": 1280
+      }
+    },
+    {
+      "label": "code-1280-baseline",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 388,
+              "y": 109,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 109,
+              "right": 1148,
+              "bottom": 132.3984375,
+              "left": 388
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 389,
+              "y": 173.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 173.796875,
+              "right": 1147,
+              "bottom": 288.765625,
+              "left": 389
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 389,
+              "y": 331.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 331.1640625,
+              "right": 1147,
+              "bottom": 374.6328125,
+              "left": 389
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 388,
+              "y": 386.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 386.03125,
+              "right": 1148,
+              "bottom": 493.90625,
+              "left": 388
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "pageWidth": 1280
+      }
+    },
+    {
+      "label": "code-1280-light",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 388,
+              "y": 109,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 109,
+              "right": 1148,
+              "bottom": 132.3984375,
+              "left": 388
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 389,
+              "y": 173.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 173.796875,
+              "right": 1147,
+              "bottom": 288.765625,
+              "left": 389
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 389,
+              "y": 331.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 331.1640625,
+              "right": 1147,
+              "bottom": 374.6328125,
+              "left": 389
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 388,
+              "y": 386.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 386.03125,
+              "right": 1148,
+              "bottom": 493.90625,
+              "left": 388
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "pageWidth": 1280
+      }
+    },
+    {
+      "label": "code-1280-dark",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 388,
+              "y": 109,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 109,
+              "right": 1148,
+              "bottom": 132.3984375,
+              "left": 388
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 389,
+              "y": 173.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 173.796875,
+              "right": 1147,
+              "bottom": 288.765625,
+              "left": 389
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 389,
+              "y": 331.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 331.1640625,
+              "right": 1147,
+              "bottom": 374.6328125,
+              "left": 389
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 388,
+              "y": 386.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 386.03125,
+              "right": 1148,
+              "bottom": 493.90625,
+              "left": 388
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "pageWidth": 1280
+      }
+    },
+    {
+      "label": "code-1280-light",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 388,
+              "y": 109,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 109,
+              "right": 1148,
+              "bottom": 132.3984375,
+              "left": 388
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 389,
+              "y": 173.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 173.796875,
+              "right": 1147,
+              "bottom": 288.765625,
+              "left": 389
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 389,
+              "y": 331.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 331.1640625,
+              "right": 1147,
+              "bottom": 374.6328125,
+              "left": 389
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 388,
+              "y": 386.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 386.03125,
+              "right": 1148,
+              "bottom": 493.90625,
+              "left": 388
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 121.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "pageWidth": 1280
+      }
+    },
+    {
+      "label": "code-1920-anchor",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 708,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1468,
+              "bottom": 192.3984375,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 709,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1467,
+              "bottom": 348.765625,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 709,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1467,
+              "bottom": 434.6328125,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 708,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1468,
+              "bottom": 553.90625,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        },
+        "pageWidth": 1920
+      }
+    },
+    {
+      "label": "code-1920-baseline",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 708,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1468,
+              "bottom": 192.3984375,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 709,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1467,
+              "bottom": 348.765625,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 709,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1467,
+              "bottom": 434.6328125,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 708,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1468,
+              "bottom": 553.90625,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        },
+        "pageWidth": 1920
+      }
+    },
+    {
+      "label": "code-1920-light",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 708,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1468,
+              "bottom": 192.3984375,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 709,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1467,
+              "bottom": 348.765625,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 709,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1467,
+              "bottom": 434.6328125,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 708,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1468,
+              "bottom": 553.90625,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        },
+        "pageWidth": 1920
+      }
+    },
+    {
+      "label": "code-1920-dark",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 708,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1468,
+              "bottom": 192.3984375,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 709,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1467,
+              "bottom": 348.765625,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 709,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1467,
+              "bottom": 434.6328125,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 708,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1468,
+              "bottom": 553.90625,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        },
+        "pageWidth": 1920
+      }
+    },
+    {
+      "label": "code-1920-light",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 708,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1468,
+              "bottom": 192.3984375,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 709,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1467,
+              "bottom": 348.765625,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 709,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1467,
+              "bottom": 434.6328125,
+              "left": 709
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 708,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1468,
+              "bottom": 553.90625,
+              "left": 708
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        },
+        "pageWidth": 1920
+      }
+    },
+    {
+      "label": "code-2560-anchor",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 1028,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1788,
+              "bottom": 192.3984375,
+              "left": 1028
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 1029,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1787,
+              "bottom": 348.765625,
+              "left": 1029
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 1029,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1787,
+              "bottom": 434.6328125,
+              "left": 1029
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 1028,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1788,
+              "bottom": 553.90625,
+              "left": 1028
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 2560,
+          "height": 1440
+        },
+        "pageWidth": 2560
+      }
+    },
+    {
+      "label": "code-2560-baseline",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 1028,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1788,
+              "bottom": 192.3984375,
+              "left": 1028
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 1029,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1787,
+              "bottom": 348.765625,
+              "left": 1029
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 1029,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1787,
+              "bottom": 434.6328125,
+              "left": 1029
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 1028,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1788,
+              "bottom": 553.90625,
+              "left": 1028
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 2560,
+          "height": 1440
+        },
+        "pageWidth": 2560
+      }
+    },
+    {
+      "label": "code-2560-light",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 1028,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1788,
+              "bottom": 192.3984375,
+              "left": 1028
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 1029,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1787,
+              "bottom": 348.765625,
+              "left": 1029
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 1029,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1787,
+              "bottom": 434.6328125,
+              "left": 1029
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 1028,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1788,
+              "bottom": 553.90625,
+              "left": 1028
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 2560,
+          "height": 1440
+        },
+        "pageWidth": 2560
+      }
+    },
+    {
+      "label": "code-2560-dark",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 1028,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1788,
+              "bottom": 192.3984375,
+              "left": 1028
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 1029,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1787,
+              "bottom": 348.765625,
+              "left": 1029
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 1029,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1787,
+              "bottom": 434.6328125,
+              "left": 1029
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 1028,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1788,
+              "bottom": 553.90625,
+              "left": 1028
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 2560,
+          "height": 1440
+        },
+        "pageWidth": 2560
+      }
+    },
+    {
+      "label": "code-2560-light",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 1028,
+              "y": 169,
+              "width": 760,
+              "height": 23.3984375,
+              "top": 169,
+              "right": 1788,
+              "bottom": 192.3984375,
+              "left": 1028
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 1029,
+              "y": 233.796875,
+              "width": 758,
+              "height": 114.96875,
+              "top": 233.796875,
+              "right": 1787,
+              "bottom": 348.765625,
+              "left": 1029
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 1029,
+              "y": 391.1640625,
+              "width": 758,
+              "height": 43.46875,
+              "top": 391.1640625,
+              "right": 1787,
+              "bottom": 434.6328125,
+              "left": 1029
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 1028,
+              "y": 446.03125,
+              "width": 760,
+              "height": 107.875,
+              "top": 446.03125,
+              "right": 1788,
+              "bottom": 553.90625,
+              "left": 1028
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 181.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 2560,
+          "height": 1440
+        },
+        "pageWidth": 2560
+      }
+    },
+    {
+      "label": "code-390-anchor",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 22,
+              "y": 135,
+              "width": 346,
+              "height": 23.3984375,
+              "top": 135,
+              "right": 368,
+              "bottom": 158.3984375,
+              "left": 22
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 23,
+              "y": 203.796875,
+              "width": 344,
+              "height": 132.84375,
+              "top": 203.796875,
+              "right": 367,
+              "bottom": 336.640625,
+              "left": 23
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 23,
+              "y": 383.0390625,
+              "width": 344,
+              "height": 43.46875,
+              "top": 383.0390625,
+              "right": 367,
+              "bottom": 426.5078125,
+              "left": 23
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 22,
+              "y": 437.90625,
+              "width": 346,
+              "height": 107.875,
+              "top": 437.90625,
+              "right": 368,
+              "bottom": 545.78125,
+              "left": 22
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "pageWidth": 390
+      }
+    },
+    {
+      "label": "code-390-baseline",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 22,
+              "y": 135,
+              "width": 346,
+              "height": 23.3984375,
+              "top": 135,
+              "right": 368,
+              "bottom": 158.3984375,
+              "left": 22
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 23,
+              "y": 203.796875,
+              "width": 344,
+              "height": 132.84375,
+              "top": 203.796875,
+              "right": 367,
+              "bottom": 336.640625,
+              "left": 23
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 23,
+              "y": 383.0390625,
+              "width": 344,
+              "height": 43.46875,
+              "top": 383.0390625,
+              "right": 367,
+              "bottom": 426.5078125,
+              "left": 23
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 22,
+              "y": 437.90625,
+              "width": 346,
+              "height": 107.875,
+              "top": 437.90625,
+              "right": 368,
+              "bottom": 545.78125,
+              "left": 22
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "pageWidth": 390
+      }
+    },
+    {
+      "label": "code-390-light",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 22,
+              "y": 135,
+              "width": 346,
+              "height": 23.3984375,
+              "top": 135,
+              "right": 368,
+              "bottom": 158.3984375,
+              "left": 22
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 23,
+              "y": 203.796875,
+              "width": 344,
+              "height": 132.84375,
+              "top": 203.796875,
+              "right": 367,
+              "bottom": 336.640625,
+              "left": 23
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 23,
+              "y": 383.0390625,
+              "width": 344,
+              "height": 43.46875,
+              "top": 383.0390625,
+              "right": 367,
+              "bottom": 426.5078125,
+              "left": 23
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 22,
+              "y": 437.90625,
+              "width": 346,
+              "height": 107.875,
+              "top": 437.90625,
+              "right": 368,
+              "bottom": 545.78125,
+              "left": 22
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "pageWidth": 390
+      }
+    },
+    {
+      "label": "code-390-dark",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 22,
+              "y": 135,
+              "width": 346,
+              "height": 23.3984375,
+              "top": 135,
+              "right": 368,
+              "bottom": 158.3984375,
+              "left": 22
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 23,
+              "y": 203.796875,
+              "width": 344,
+              "height": 132.84375,
+              "top": 203.796875,
+              "right": 367,
+              "bottom": 336.640625,
+              "left": 23
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 23,
+              "y": 383.0390625,
+              "width": 344,
+              "height": 43.46875,
+              "top": 383.0390625,
+              "right": 367,
+              "bottom": 426.5078125,
+              "left": 23
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 22,
+              "y": 437.90625,
+              "width": 346,
+              "height": 107.875,
+              "top": 437.90625,
+              "right": 368,
+              "bottom": 545.78125,
+              "left": 22
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "pageWidth": 390
+      }
+    },
+    {
+      "label": "code-390-light",
+      "result": {
+        "route": "#/f5609591-a304-4a43-a680-b377ad661b9e/baseline-code",
+        "text": [
+          {
+            "tag": "H2",
+            "text": "Example"
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n"
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n"
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero"
+          }
+        ],
+        "content": [
+          {
+            "tag": "H2",
+            "text": "Example",
+            "rect": {
+              "x": 22,
+              "y": 135,
+              "width": 346,
+              "height": 23.3984375,
+              "top": 135,
+              "right": 368,
+              "bottom": 158.3984375,
+              "left": 22
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+            "rect": {
+              "x": 23,
+              "y": 203.796875,
+              "width": 344,
+              "height": 132.84375,
+              "top": 203.796875,
+              "right": 367,
+              "bottom": 336.640625,
+              "left": 23
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "PRE",
+            "text": "printf 'local fixture only\\n'\n",
+            "rect": {
+              "x": 23,
+              "y": 383.0390625,
+              "width": 344,
+              "height": 43.46875,
+              "top": 383.0390625,
+              "right": 367,
+              "bottom": 426.5078125,
+              "left": 23
+            },
+            "painted": true,
+            "intersects": true
+          },
+          {
+            "tag": "TABLE",
+            "text": "CheckResultProfileIsolatedPaid requestsZero",
+            "rect": {
+              "x": 22,
+              "y": 437.90625,
+              "width": 346,
+              "height": 107.875,
+              "top": 437.90625,
+              "right": 368,
+              "bottom": 545.78125,
+              "left": 22
+            },
+            "painted": true,
+            "intersects": true
+          }
+        ],
+        "anchor": {
+          "text": "export function greeting(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greeting('Weavra'));\n",
+          "offset": 151.796875,
+          "scrollLeft": 0
+        },
+        "zoom": {
+          "css": "1",
+          "scale": 1
+        },
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "pageWidth": 390
+      }
+    }
+  ]
+}
