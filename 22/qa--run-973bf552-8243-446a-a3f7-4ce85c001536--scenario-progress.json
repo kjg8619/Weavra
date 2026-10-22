@@ -1,0 +1,406 @@
+[
+  {
+    "caseId": "22",
+    "checkId": "authored-locale",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "locale-general: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-general-end: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-appearance: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-appearance-end: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-keybindings: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-keybindings-end: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-snapshots: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-snapshots-end: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-providers: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-providers-end: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-integrations: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-integrations-end: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-source_control: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-source_control-end: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-storage: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-storage-end: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-connections: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-connections-end: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-archive: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "locale-archive-end: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/22/authored-locale/result.png",
+        "sha256": "22f87d7d1fa5285690710019bbe79fae41e7c5e4cc3828708c6a7b9a4db8724e"
+      },
+      {
+        "file": "scenarios/22/authored-locale/result.ax.json",
+        "sha256": "06ac4c35fef5775a0cb0e4beab06d42e36027bb9b4d3f7e25f2d036cd12e0995"
+      },
+      {
+        "file": "scenarios/22/authored-locale/observations.json",
+        "sha256": "b771318b6b94b1a1f145ee363a31fb59f84027383840a2cc172423eea0474c06"
+      }
+    ]
+  },
+  {
+    "caseId": "22",
+    "checkId": "raw-diagnostics-allowlist",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "locale-diagnostic-disclosure: one diagnostic disclosure",
+        "actual": 1,
+        "expected": 1
+      },
+      {
+        "label": "locale-diagnostic-disclosure: initially collapsed",
+        "actual": "false",
+        "expected": "false"
+      },
+      {
+        "label": "locale-diagnostic-disclosure: diagnostic target exists",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "locale-diagnostic-disclosure: expanded",
+        "actual": "true",
+        "expected": "true"
+      },
+      {
+        "label": "raw command or diagnostic remains available",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "originals have separate labelled context",
+        "actual": true,
+        "expected": true
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/22/raw-diagnostics-allowlist/locale-diagnostic-disclosure.png",
+        "sha256": "378220523473b2b57c5a7aff1b0c040cd64c621b500e59664d8b107c0a6acfb9"
+      },
+      {
+        "file": "scenarios/22/raw-diagnostics-allowlist/locale-diagnostic-disclosure.ax.json",
+        "sha256": "82227566e609348a7d1d0bae6f6773c551e571824b389636cc65847c4967d72d"
+      },
+      {
+        "file": "scenarios/22/raw-diagnostics-allowlist/result.png",
+        "sha256": "378220523473b2b57c5a7aff1b0c040cd64c621b500e59664d8b107c0a6acfb9"
+      },
+      {
+        "file": "scenarios/22/raw-diagnostics-allowlist/result.ax.json",
+        "sha256": "82227566e609348a7d1d0bae6f6773c551e571824b389636cc65847c4967d72d"
+      },
+      {
+        "file": "scenarios/22/raw-diagnostics-allowlist/observations.json",
+        "sha256": "2a0a018344e6d451f33ffd7c63da01230a1ae0f1739bf3e3e3fffd2b2849e6ea"
+      }
+    ]
+  },
+  {
+    "caseId": "22",
+    "checkId": "both-sidebars",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "requested sidebar variant selected",
+        "actual": false,
+        "expected": false
+      },
+      {
+        "label": "sidebar-locale: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "requested sidebar variant selected",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "sidebar-locale: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/22/both-sidebars/current-sidebar.png",
+        "sha256": "a152d51a50172ab2efabe642203108a6d166702e19bf6abeabb61270dc11a864"
+      },
+      {
+        "file": "scenarios/22/both-sidebars/current-sidebar.ax.json",
+        "sha256": "437869da382b3b22ddb4c130b259b0f52fa0dea471a726fb48e181ce1b3bef4f"
+      },
+      {
+        "file": "scenarios/22/both-sidebars/legacy-sidebar.png",
+        "sha256": "eff61590692fc0b4ba0824482e08bf3a6cc07838d2a58060b2b6e69568154bb5"
+      },
+      {
+        "file": "scenarios/22/both-sidebars/legacy-sidebar.ax.json",
+        "sha256": "148ef2b7063af167150dbeb9e163f8f717ad5d3570d04de49e1d380bd95ec3cc"
+      },
+      {
+        "file": "scenarios/22/both-sidebars/result.png",
+        "sha256": "efb3b97e5f05ffca895227823dbf234591d19d3439d8e6515c87950221407ea7"
+      },
+      {
+        "file": "scenarios/22/both-sidebars/result.ax.json",
+        "sha256": "148ef2b7063af167150dbeb9e163f8f717ad5d3570d04de49e1d380bd95ec3cc"
+      },
+      {
+        "file": "scenarios/22/both-sidebars/observations.json",
+        "sha256": "0bf25e579911a4854e79845fbd7f72b0a56762859dd6f18f32167b9f5a10adf0"
+      }
+    ]
+  },
+  {
+    "caseId": "22",
+    "checkId": "six-adapters",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "Codex: available or explicitly unavailable adapter",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Claude: available or explicitly unavailable adapter",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Cursor: available or explicitly unavailable adapter",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Grok: available or explicitly unavailable adapter",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "OpenCode: available or explicitly unavailable adapter",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "Antigravity: available or explicitly unavailable adapter",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "provider-locale: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/22/six-adapters/result.png",
+        "sha256": "c9ec7856b0a50e623c1cb620b30feb52e8df1b4240df2e2d89550a7924ac988c"
+      },
+      {
+        "file": "scenarios/22/six-adapters/result.ax.json",
+        "sha256": "1a47f5d1ecac7bcfafc53f398676040dfcd69ccbb52b211388ae7e01c6aa2a72"
+      },
+      {
+        "file": "scenarios/22/six-adapters/observations.json",
+        "sha256": "35799a2404d69d0d06de443036e23a61e63c8dcb39afaab4639f1ce2e6affff9"
+      }
+    ]
+  },
+  {
+    "caseId": "22",
+    "checkId": "long-korean-copy",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "expanded copy preserves primary page bounds",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "expanded essential labels are not clipped",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "expanded copy preserves primary page bounds",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "expanded essential labels are not clipped",
+        "actual": [],
+        "expected": []
+      },
+      {
+        "label": "expanded copy preserves primary page bounds",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "expanded essential labels are not clipped",
+        "actual": [],
+        "expected": []
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/22/long-korean-copy/expanded-copy-840.png",
+        "sha256": "dcc0d3acf68eb684628c797d459d0d927e96661433d36958b415fd17c824a790"
+      },
+      {
+        "file": "scenarios/22/long-korean-copy/expanded-copy-840.ax.json",
+        "sha256": "aa42edd7d06a0afafa65d976fa4233828cb688fc71d3ba08f648535d7e263999"
+      },
+      {
+        "file": "scenarios/22/long-korean-copy/expanded-copy-1280.png",
+        "sha256": "22ba2099f8498dcca4871a814097b1140bca4103bb0aa0aae49bbec2c964f17b"
+      },
+      {
+        "file": "scenarios/22/long-korean-copy/expanded-copy-1280.ax.json",
+        "sha256": "853524732ae49733fba3d52bb9b56ca1964242ad2634f4fee46b9eae87028484"
+      },
+      {
+        "file": "scenarios/22/long-korean-copy/expanded-copy-1920.png",
+        "sha256": "7a32745ee9b7136adec4ce819f1e21a0e264a17edfb1acb5f26a72d32041e5e5"
+      },
+      {
+        "file": "scenarios/22/long-korean-copy/expanded-copy-1920.ax.json",
+        "sha256": "863d79ccb2679f33a53003741a64c85e0b8cea9296c895ac68f633e22a80fa06"
+      },
+      {
+        "file": "scenarios/22/long-korean-copy/result.png",
+        "sha256": "3b8e7e814d3f13cd88fb5bac35a91d82019642076b12f2e44979b7da8e2505b3"
+      },
+      {
+        "file": "scenarios/22/long-korean-copy/result.ax.json",
+        "sha256": "863d79ccb2679f33a53003741a64c85e0b8cea9296c895ac68f633e22a80fa06"
+      },
+      {
+        "file": "scenarios/22/long-korean-copy/observations.json",
+        "sha256": "dd6415580af6ccfbdcf34a76ee5989921f9f7e39e2762a40d0103465c31a6505"
+      }
+    ]
+  },
+  {
+    "caseId": "22",
+    "checkId": "keyboard-ax",
+    "status": "PASS",
+    "assertions": [
+      {
+        "label": "keyboard visits actual enabled visible controls",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "keyboard controls have names",
+        "actual": true,
+        "expected": true
+      },
+      {
+        "label": "keyboard-accessible-locale: every authored label is Korean or a classified proper name",
+        "actual": [],
+        "expected": []
+      }
+    ],
+    "artifacts": [
+      {
+        "file": "scenarios/22/keyboard-ax/result.png",
+        "sha256": "da62cff4c8ce95d93a2620da576797d65b1daf23ae4102f5f4d685e28bce45ee"
+      },
+      {
+        "file": "scenarios/22/keyboard-ax/result.ax.json",
+        "sha256": "1cc68206af09a5c642a0a3fe14384465d570084c0847ac474c62da95b3f522c3"
+      },
+      {
+        "file": "scenarios/22/keyboard-ax/observations.json",
+        "sha256": "154c239bba8777eba671c95e0654fa3833f02781f42f2a5d02d225357899f75e"
+      }
+    ]
+  }
+]
