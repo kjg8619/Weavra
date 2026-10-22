@@ -253,6 +253,9 @@ export const LOCALE_FIXTURE_VALUES = [
   "05 Error fixture",
   "06 Empty thread",
 ];
+// The product version the About row renders (app/t3code/packages/shared/src/product.ts
+// WEAVRA_PRODUCT_VERSION); a harness test keeps it equal to the product source.
+export const PRODUCT_VERSION = "development";
 const classMap = (classes) =>
   new Map(
     Object.entries(classes).flatMap(([kind, values]) => values.map((value) => [value, kind])),
@@ -269,6 +272,31 @@ const LOCALE_FILE_TOKEN = /(?<![\w.-])[A-Za-z0-9_-]+\.json(?![\w.-])/g;
 const LOCALE_NAME_CHORD = new RegExp(
   `(?:: |\\()(?:[⌘⇧⌥⌃] ?|(?:Ctrl|Alt|Shift|Cmd)[+ ])*(?:${LOCALE_KEYCAPS.join("|")}|[A-Z0-9])\\)?$`,
 );
+const SEMVER = /^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+// <code> text is data, never prose: the whole value must be one data class, checked against its
+// source where the runner has one, or a seeded fixture value.
+function codeData(value, sources) {
+  if (SEMVER.test(value)) return { class: "version", source: "semver" };
+  if (value === PRODUCT_VERSION)
+    return { class: "version", source: "packages/shared/src/product.ts WEAVRA_PRODUCT_VERSION" };
+  if ((sources.modelSlugs ?? []).includes(value))
+    return { class: "model id", source: "serverConfig.providers[].models[].slug" };
+  if (value === sources.keybindingsFile)
+    return { class: "file name", source: "serverConfig.keybindingsConfigPath" };
+  if (/^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(value))
+    return { class: "env var", source: "environment variable name" };
+  const command =
+    /^([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?: (?:--?[a-z0-9][a-z0-9-]*(?:=\S+)?|[~.]?\/\S*))*$/.exec(
+      value,
+    );
+  if (command && (sources.providerIds ?? []).includes(command[1]))
+    return { class: "command", source: "serverConfig.providers" };
+  if (/^(?:~|\.{1,2})?\/\S*$/.test(value)) return { class: "path", source: "path" };
+  if (/^[a-z][a-z0-9+.-]*:\/\/\S+$/.test(value)) return { class: "URL", source: "URL" };
+  if (LOCALE_FIXTURE_VALUES.includes(value)) return { class: "fixture value", source: "seed.mjs" };
+  return null;
+}
 
 // Data, not authored copy: anchored whole-field patterns, each bound to the field that carries
 // it and to the real source of the value.
@@ -290,6 +318,13 @@ function scopedData(value, context, sources) {
     CUSTOM_MODEL_PRESET_LABELS.includes(value)
   )
     return { class: "custom-model option preset", source: "customModelEditor.logic.ts" };
+  // Model names and slugs only on a model picker or its options, exactly as their source has them.
+  if (
+    context.modelScope &&
+    (context.field === "text" || context.field === "name") &&
+    sources.models?.has(value)
+  )
+    return { class: "model", source: sources.models.get(value) };
   if (
     context.field === "text" &&
     context.font &&
@@ -306,10 +341,15 @@ function scopedData(value, context, sources) {
 // Classifies each Latin segment of one field; unclassified segments fail the audit.
 /**
  * @param {{ field?: string, control?: boolean, keycap?: boolean, presetScope?: boolean,
- *   font?: { resolvable: boolean, mac: boolean } | null }} context
+ *   modelScope?: boolean, font?: { resolvable: boolean, mac: boolean } | null }} context
  */
 export function classifyLocaleText(value, context = {}, sources = {}) {
   const field = context.field ?? "text";
+  if (field === "code") {
+    const data = codeData(value, sources);
+    const row = { segment: value, class: data?.class ?? null, source: data?.source ?? null };
+    return { segments: [row], unclassified: data ? [] : [row] };
+  }
   const data = scopedData(value, { ...context, field }, sources);
   if (data) return { segments: [{ segment: value, ...data }], unclassified: [] };
   const segments = [];
@@ -382,7 +422,72 @@ export function localeSources(config) {
     providerIds: [
       ...new Set((config?.providers ?? []).flatMap((p) => [p.instanceId, p.driver])),
     ].filter(Boolean),
+    modelSlugs: [
+      ...new Set((config?.providers ?? []).flatMap((p) => (p.models ?? []).map((m) => m.slug))),
+    ].filter(Boolean),
+    models: new Map([
+      ...LABELS.model.map((name) => [name, "runner fixture LABELS.model"]),
+      ...(config?.providers ?? []).flatMap((p) =>
+        (p.models ?? []).map((m) => [m.slug, "serverConfig.providers[].models[].slug"]),
+      ),
+    ]),
   };
+}
+
+// Runs in the renderer (self-contained). Decorative aria-hidden="true" subtrees are not part of a
+// label; <kbd> keycaps and <code> data are taken out of the prose and classified on their own.
+export function readLocaleLabels(selector) {
+  return [...document.querySelectorAll(selector)]
+    .flatMap((root) => [
+      ...root.querySelectorAll("button,label,h1,h2,h3,h4,[role=status],input,textarea"),
+    ])
+    .filter((node) => node.checkVisibility())
+    .map((node) => {
+      const prose = node.cloneNode(true);
+      for (const hidden of prose.querySelectorAll('[aria-hidden="true"]')) hidden.remove();
+      for (const keycap of prose.querySelectorAll("kbd")) keycap.remove();
+      const codes = [...prose.querySelectorAll("code")]
+        .filter((code) => !code.parentElement?.closest("code"))
+        .map((code) => code.textContent.trim())
+        .filter(Boolean);
+      for (const code of prose.querySelectorAll("code")) code.remove();
+      const role = node.getAttribute("role");
+      const text = prose.textContent?.trim();
+      let font = null;
+      if (role === "combobox" && text) {
+        const canvas = document.createElement("canvas").getContext("2d");
+        const width = (family) => {
+          canvas.font = `32px ${family}`;
+          return canvas.measureText("mmmmmmmmmmlliWW@#1").width;
+        };
+        font = {
+          resolvable: ["monospace", "serif", "sans-serif"].some(
+            (generic) => width(`${JSON.stringify(text)}, ${generic}`) !== width(generic),
+          ),
+          mac: /Mac/.test(navigator.platform),
+        };
+      }
+      return {
+        tag: node.tagName,
+        role,
+        text,
+        name: node.getAttribute("aria-label"),
+        placeholder: node.getAttribute("placeholder"),
+        keycaps: [...node.querySelectorAll("kbd")]
+          .filter((keycap) => !keycap.querySelector("kbd"))
+          .map((keycap) => keycap.textContent.trim())
+          .filter(Boolean),
+        codes,
+        // Inside the custom-model editor, identified by its name input id, not by copy.
+        presetScope: [
+          ...document.querySelectorAll('input[id^="provider-instance-"][id$="-custom-model-name"]'),
+        ].some((input) => input.parentElement?.parentElement?.contains(node)),
+        // A model picker trigger or its option list (ProviderModelPicker data attributes).
+        modelScope:
+          node.closest("[data-chat-provider-model-picker], [data-model-picker-content]") !== null,
+        font,
+      };
+    });
 }
 
 export function auditLocaleLabels(labels, sources = {}) {
@@ -393,6 +498,7 @@ export function auditLocaleLabels(labels, sources = {}) {
       control: row.tag === "BUTTON" || row.role === "button",
       keycap: (row.keycaps?.length ?? 0) > 0,
       presetScope: row.presetScope === true,
+      modelScope: row.modelScope === true,
       font: row.font ?? null,
     };
     const fields = [
@@ -400,13 +506,15 @@ export function auditLocaleLabels(labels, sources = {}) {
       ["name", row.name],
       ["placeholder", row.placeholder],
       ...(row.keycaps ?? []).map((keycap) => ["keycap", keycap]),
+      ...(row.codes ?? []).map((code) => ["code", code]),
     ];
     for (const [field, value] of fields) {
       if (!value) continue;
       const result = classifyLocaleText(value, { ...context, field }, sources);
-      if (result.unclassified.length)
-        unclassified.push({ ...row, field, text: value, segments: result.unclassified });
-      else if (result.segments.length) exceptions.push({ ...row, field, text: value, ...result });
+      // `prose` keeps the label text a <code> or keycap field was split from.
+      const split = { ...row, prose: row.text, field, text: value };
+      if (result.unclassified.length) unclassified.push({ ...split, segments: result.unclassified });
+      else if (result.segments.length) exceptions.push({ ...split, ...result });
     }
   }
   return { unclassified, exceptions };
@@ -2096,55 +2204,7 @@ export async function runScenarios(context) {
     }
   }
   async function localeAudit(assert, selector, label) {
-    const labels = await sample(
-      label,
-      (selector) =>
-        [...document.querySelectorAll(selector)]
-          .flatMap((root) => [
-            ...root.querySelectorAll("button,label,h1,h2,h3,h4,[role=status],input,textarea"),
-          ])
-          .filter((node) => node.checkVisibility())
-          .map((node) => {
-            // Keycaps are classified on their own; they never count as the label's prose.
-            const prose = node.cloneNode(true);
-            for (const keycap of prose.querySelectorAll("kbd")) keycap.remove();
-            const role = node.getAttribute("role");
-            const text = prose.textContent?.trim();
-            let font = null;
-            if (role === "combobox" && text) {
-              const canvas = document.createElement("canvas").getContext("2d");
-              const width = (family) => {
-                canvas.font = `32px ${family}`;
-                return canvas.measureText("mmmmmmmmmmlliWW@#1").width;
-              };
-              font = {
-                resolvable: ["monospace", "serif", "sans-serif"].some(
-                  (generic) => width(`${JSON.stringify(text)}, ${generic}`) !== width(generic),
-                ),
-                mac: /Mac/.test(navigator.platform),
-              };
-            }
-            return {
-              tag: node.tagName,
-              role,
-              text,
-              name: node.getAttribute("aria-label"),
-              placeholder: node.getAttribute("placeholder"),
-              keycaps: [...node.querySelectorAll("kbd")]
-                .filter((keycap) => !keycap.querySelector("kbd"))
-                .map((keycap) => keycap.textContent.trim())
-                .filter(Boolean),
-              // Inside the custom-model editor, identified by its name input id, not by copy.
-              presetScope: [
-                ...document.querySelectorAll(
-                  'input[id^="provider-instance-"][id$="-custom-model-name"]',
-                ),
-              ].some((input) => input.parentElement?.parentElement?.contains(node)),
-              font,
-            };
-          }),
-      selector,
-    );
+    const labels = await sample(label, readLocaleLabels, selector);
     const { unclassified, exceptions } = auditLocaleLabels(labels, localeSources(liveConfig));
     observations.push({ label, unclassified, exceptions });
     assert(
