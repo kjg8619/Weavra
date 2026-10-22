@@ -1,0 +1,96 @@
+{
+  "file": "1280x800/01_first_launch_onboarding_connection.png",
+  "beforeSha256": "251f422162abfdb831e12aa578d69a86a308c5e708e8396c371250c40a18046d",
+  "afterSha256": "e00cdd5eec9048f1ea2640cea44c72ad90fcb85ac679c6a470cf6e3e61612f89",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 7878,
+    "diffRatio": 0.0077,
+    "similarityScore": 99,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 1,
+        "x": 0,
+        "y": 100,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.2896
+      },
+      {
+        "gridX": 1,
+        "gridY": 1,
+        "x": 160,
+        "y": 100,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0798
+      },
+      {
+        "gridX": 4,
+        "gridY": 3,
+        "x": 640,
+        "y": 300,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0393
+      },
+      {
+        "gridX": 0,
+        "gridY": 7,
+        "x": 0,
+        "y": 700,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0365
+      },
+      {
+        "gridX": 1,
+        "gridY": 7,
+        "x": 160,
+        "y": 700,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0338
+      },
+      {
+        "gridX": 5,
+        "gridY": 3,
+        "x": 800,
+        "y": 300,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0123
+      },
+      {
+        "gridX": 3,
+        "gridY": 3,
+        "x": 480,
+        "y": 300,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0012
+      }
+    ],
+    "summary": "99/100 similarity; 7878/1024000 pixels differ; 7 hotspot region(s)."
+  }
+}

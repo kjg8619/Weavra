@@ -1,0 +1,96 @@
+{
+  "file": "1280x800/34_chat_messages.png",
+  "beforeSha256": "0a2fc57cf4b31e52c772686fc4e23e6b62e80c987cd5b6c32c87e5d8df9731ad",
+  "afterSha256": "b529ea876b219cbf678eb2ed1cfd168af564f47a9dfd3003e4c07796116e90af",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 952,
+    "diffRatio": 0.0009,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 1,
+        "gridY": 1,
+        "x": 160,
+        "y": 100,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0156
+      },
+      {
+        "gridX": 0,
+        "gridY": 7,
+        "x": 0,
+        "y": 700,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0103
+      },
+      {
+        "gridX": 1,
+        "gridY": 3,
+        "x": 160,
+        "y": 300,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0101
+      },
+      {
+        "gridX": 1,
+        "gridY": 4,
+        "x": 160,
+        "y": 400,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0101
+      },
+      {
+        "gridX": 1,
+        "gridY": 7,
+        "x": 160,
+        "y": 700,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0048
+      },
+      {
+        "gridX": 1,
+        "gridY": 2,
+        "x": 160,
+        "y": 200,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0047
+      },
+      {
+        "gridX": 1,
+        "gridY": 5,
+        "x": 160,
+        "y": 500,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0039
+      }
+    ],
+    "summary": "100/100 similarity; 952/1024000 pixels differ; 7 hotspot region(s)."
+  }
+}

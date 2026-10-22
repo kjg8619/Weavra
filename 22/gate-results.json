@@ -1,0 +1,70 @@
+{
+  "head": "b95bacbb200e3e3925dec26766a1e5b0da7dee3a",
+  "parent": "245a9efdfee4e949a5d312798bcdbf31ed0c1675",
+  "runner": "daa942df567e52cf47453535083ff139f10d3885",
+  "gates": [
+    {
+      "gate": "fmt --check (changed files)",
+      "command": "pnpm exec vp fmt --check <167 changed app/t3code files>",
+      "exit": 0,
+      "log": "logs/fmt.log"
+    },
+    {
+      "gate": "lint (changed files)",
+      "command": "pnpm exec vp lint <165 changed ts/tsx files>",
+      "exit": 0,
+      "log": "logs/lint.log"
+    },
+    {
+      "gate": "typecheck web",
+      "command": "pnpm --filter @t3tools/web typecheck",
+      "exit": 0,
+      "log": "logs/typecheck-web.log"
+    },
+    {
+      "gate": "typecheck desktop",
+      "command": "pnpm --filter @t3tools/desktop typecheck",
+      "exit": 0,
+      "log": "logs/typecheck-desktop.log"
+    },
+    {
+      "gate": "plan focused tests",
+      "command": "vp test run --project unit src/i18n/ko.test.ts src/components/settings/settingsSearch.test.ts src/components/settings/KeybindingsSettings.logic.test.ts",
+      "exit": 0,
+      "summary": "Tests  104 passed (104)",
+      "log": "logs/tests-focused.log"
+    },
+    {
+      "gate": "web unit suite",
+      "command": "vp test run --project unit (apps/web)",
+      "exit": 1,
+      "summary": "Tests  2 failed | 5696 passed (5698)",
+      "log": "logs/tests-web-all.log",
+      "inheritedFailures": [
+        "src/components/settings/ProviderInstanceCard.test.ts > deriveProviderModelsForDisplay > surfaces a failed probe message in both the list row and the editor",
+        "src/components/ThreadNotificationCoordinator.badge.test.tsx > shows in-app alerts without adding a badge while focused"
+      ],
+      "parentProof": {
+        "revision": "245a9efdfee4e949a5d312798bcdbf31ed0c1675",
+        "command": "vp test run --project unit src/components/settings/ProviderInstanceCard.test.ts src/components/ThreadNotificationCoordinator.badge.test.tsx (in hig-22-before)",
+        "exit": 1,
+        "summary": "Tests  2 failed | 15 passed (17)",
+        "log": "logs/tests-parent-inherited.log"
+      }
+    },
+    {
+      "gate": "desktop suite",
+      "command": "vp test run (apps/desktop)",
+      "exit": 0,
+      "summary": "Tests  1247 passed | 46 skipped (1293)",
+      "log": "logs/tests-desktop.log"
+    },
+    {
+      "gate": "runner harness",
+      "command": "bun test scripts/hig/harness.test.ts",
+      "exit": 0,
+      "summary": "131 pass",
+      "log": "logs/runner-harness.log"
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "file": "1920x1080/21_settings_snapshots.png",
+  "beforeSha256": "3894e908ad8a3140884c7b40e33a40cc5f556ca4996859ed2aef194b160890a8",
+  "afterSha256": "dcbebb58adeef539ca030fe77bfad1b546f0037f9a081fa5631ac78b24ca35ec",
+  "beforeDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "afterDimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1920,
+      "height": 1080
+    },
+    "actual": {
+      "width": 1920,
+      "height": 1080
+    },
+    "totalPixels": 2073600,
+    "diffPixels": 8986,
+    "diffRatio": 0.0043,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 1,
+        "x": 0,
+        "y": 135,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0753
+      },
+      {
+        "gridX": 0,
+        "gridY": 2,
+        "x": 0,
+        "y": 270,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0661
+      },
+      {
+        "gridX": 3,
+        "gridY": 1,
+        "x": 720,
+        "y": 135,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0432
+      },
+      {
+        "gridX": 1,
+        "gridY": 0,
+        "x": 240,
+        "y": 0,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0361
+      },
+      {
+        "gridX": 0,
+        "gridY": 0,
+        "x": 0,
+        "y": 0,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0246
+      },
+      {
+        "gridX": 0,
+        "gridY": 3,
+        "x": 0,
+        "y": 405,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0224
+      },
+      {
+        "gridX": 2,
+        "gridY": 1,
+        "x": 480,
+        "y": 135,
+        "width": 240,
+        "height": 135,
+        "diffRatio": 0.0096
+      }
+    ],
+    "summary": "100/100 similarity; 8986/2073600 pixels differ; 7 hotspot region(s)."
+  }
+}

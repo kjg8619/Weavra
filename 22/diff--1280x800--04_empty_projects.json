@@ -1,0 +1,96 @@
+{
+  "file": "1280x800/04_empty_projects.png",
+  "beforeSha256": "40935e896e9ee5736dcc5fd369d3a5457650a2a498ee9a735c744b790f3cf0d2",
+  "afterSha256": "fb2cc40c041cae8365a2a465d95780f2559c9c6d00dbfd608920cf9eba9d1a35",
+  "beforeDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "afterDimensions": {
+    "width": 1280,
+    "height": 800
+  },
+  "result": {
+    "command": "image-diff",
+    "dimensionsMatch": true,
+    "reference": {
+      "width": 1280,
+      "height": 800
+    },
+    "actual": {
+      "width": 1280,
+      "height": 800
+    },
+    "totalPixels": 1024000,
+    "diffPixels": 5009,
+    "diffRatio": 0.0049,
+    "similarityScore": 100,
+    "alphaChannelIntact": true,
+    "hotspots": [
+      {
+        "gridX": 0,
+        "gridY": 1,
+        "x": 0,
+        "y": 100,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.1207
+      },
+      {
+        "gridX": 4,
+        "gridY": 3,
+        "x": 640,
+        "y": 300,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0924
+      },
+      {
+        "gridX": 5,
+        "gridY": 3,
+        "x": 800,
+        "y": 300,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0554
+      },
+      {
+        "gridX": 1,
+        "gridY": 1,
+        "x": 160,
+        "y": 100,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0288
+      },
+      {
+        "gridX": 0,
+        "gridY": 7,
+        "x": 0,
+        "y": 700,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0103
+      },
+      {
+        "gridX": 1,
+        "gridY": 7,
+        "x": 160,
+        "y": 700,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0048
+      },
+      {
+        "gridX": 3,
+        "gridY": 3,
+        "x": 480,
+        "y": 300,
+        "width": 160,
+        "height": 100,
+        "diffRatio": 0.0007
+      }
+    ],
+    "summary": "100/100 similarity; 5009/1024000 pixels differ; 7 hotspot region(s)."
+  }
+}

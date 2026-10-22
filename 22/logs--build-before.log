@@ -1,0 +1,15 @@
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-22/before/tracked-diff.patch
+$ node scripts/build-desktop-artifact.ts --platform mac --target zip --arch arm64 --output-dir /Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-22/before/package
+[00:19:22.941] INFO (#1): [desktop-artifact] Building desktop/server/web artifacts...
+[00:19:46.526] INFO (#1): [desktop-artifact] Applied production web client branding.
+[00:19:46.527] INFO (#1): [desktop-artifact] Staging release app...
+[00:19:53.436] INFO (#1): [desktop-artifact] Installing staged production dependencies...
+[00:19:54.469] INFO (#1): [desktop-artifact] Building mac/zip (arch=arm64, version=0.0.42)...
+[00:20:26.308] INFO (#1): [desktop-artifact] Done. Artifacts:
+  artifacts: [
+    '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-22/before/package/Weavra-0.0.42-arm64.zip',
+    '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-22/before/package/Weavra-0.0.42-arm64.zip.blockmap',
+    '/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-22/before/package/builder-debug.yml'
+  ]
+51e20917fe73274b483bb1d89766b18845706fac13e8408b454224cf78481a31  /Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-22/before/app/weavra-desktop.app/Contents/Resources/app.asar
+BUILD_DONE /Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-22/before
