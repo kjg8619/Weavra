@@ -1964,7 +1964,9 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain('aria-label="Image attachment, shot.png, 1 KB"');
     // Selection copy re-emits chips as their canonical links.
     expect(markup).toContain('data-markdown-copy="![shot.png](t3-context://v1/image/img-1)"');
-    expect(markup).toContain('aria-label="File attachment, notes.txt, 1 KB"');
+    expect(markup).toContain(
+      `aria-label="${ko.chat.contextChip.fileAttachment("notes.txt", "1 KB")}"`,
+    );
     expect(markup).toContain(">1 KB</span>");
     expect(markup).not.toContain('aria-label="notes.txt 내려받기"');
     expect(markup).toContain("legacy.txt");

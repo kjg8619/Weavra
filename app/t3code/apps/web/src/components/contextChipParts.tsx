@@ -23,6 +23,7 @@ import { PullRequestContextDetails } from "./PullRequestContextDetails";
 import { Button } from "./ui/button";
 import { Popover, PopoverPopup, PopoverTitle, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
+import { ko } from "~/i18n/ko";
 
 /** Shared visual slots; each surface keeps ownership of payload lookup and actions. */
 export function ContextChipShell({
@@ -91,7 +92,7 @@ export function ContextChipPopover(props: {
               CONTEXT_INLINE_CHIP_FOCUS_CLASS_NAME,
               props.triggerClassName,
             )}
-            aria-label={`${props.accessibleLabel}. Show details`}
+            aria-label={ko.chat.contextChip.showDetails(props.accessibleLabel)}
             data-markdown-copy={props.copyMarkdown}
           />
         }

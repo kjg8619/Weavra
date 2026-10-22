@@ -198,6 +198,19 @@ export const ko = freeze({
     }),
   }),
   chat: freeze({
+    contextChip: freeze({
+      showDetails: (label: string) => `${label}. 자세히 보기`,
+      attachmentCount: (count: number) => `첨부 ${count}개`,
+      skill: "스킬",
+      skillNamed: (label: string) => `스킬 ${label}`,
+      videoAttachment: (name: string, size: string) => `동영상 첨부, ${name}, ${size}`,
+      fileAttachment: (name: string, size: string) => `파일 첨부, ${name}, ${size}`,
+      browserElement: (label: string) => `브라우저 요소, ${label}`,
+      previewAnnotation: (label: string) => `미리보기 주석, ${label}`,
+      terminalExcerpt: (label: string) => `터미널 발췌, ${label}`,
+      previewPath: (path: string) => `${path} 미리보기`,
+      terminalInput: "터미널 입력",
+    }),
     send: "메시지 보내기",
     queue: "대기열에 메시지 추가",
     scrollToLatest: "맨 아래로 이동",
@@ -3429,6 +3442,9 @@ export const ko = freeze({
       addPalette: (modeLabel: string) => `${modeLabel} 팔레트 추가`,
     }),
     fonts: freeze({
+      sampleSkillName: "프론트엔드 디자인",
+      samplePrompt: (skill: string, testFile: string, settingsFile: string) =>
+        `${skill} 스킬로 ${testFile}의 불안정한 테스트를 고치고, 배포 전에 헤더를 ${settingsFile}에 맞춰 주세요.`,
       terminalPreview: "터미널 글꼴 미리보기",
     }),
     inheritance: freeze({

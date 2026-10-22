@@ -741,9 +741,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
     composer.previewAnnotations.length +
     composer.reviewComments.length;
   const preview =
-    promptPreview.length > 0
-      ? promptPreview
-      : `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`;
+    promptPreview.length > 0 ? promptPreview : ko.chat.contextChip.attachmentCount(attachmentCount);
   const handleActivate = useCallback(() => onNavigate(draftId), [draftId, onNavigate]);
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent) => {
