@@ -1154,6 +1154,119 @@ describe("authored locale audit", () => {
     );
     expect(unset.unclassified.map((u) => u.text)).toEqual([slug]);
   }, 15_000);
+
+  // Runner fix 9: the appearance font previews (todo 22 locale-appearance rows).
+  const fontInput = (label: string, placeholder: string) =>
+    `<input aria-label="${label}" placeholder="${placeholder}">`;
+  test("a font-family input placeholder passes as the font class", async () => {
+    const [sans, mono] = await domAudit([
+      fontInput("인터페이스 글꼴 종류", "SF Pro"),
+      fontInput("고정폭 글꼴 종류", "Menlo"),
+    ]);
+    for (const [result, family] of [
+      [sans, "SF Pro"],
+      [mono, "Menlo"],
+    ] as const) {
+      expect(result.unclassified).toEqual([]);
+      expect(result.exceptions.map((r) => [r.field, r.text, r.segments[0].class])).toEqual([
+        ["placeholder", family, "font family"],
+      ]);
+      expect(["renderer font resolution", "macOS system font label"]).toContain(
+        result.exceptions[0].segments[0].source,
+      );
+    }
+  }, 15_000);
+  test("the same placeholder outside a font-family input fails", async () => {
+    const results = await domAudit([
+      fontInput("글꼴 검색", "SF Pro"),
+      fontInput("프로젝트 이름", "Menlo"),
+      `<textarea aria-label="고정폭 글꼴 종류" placeholder="Menlo"></textarea>`,
+      fontInput("고정폭 글꼴 종류", "Settings"),
+    ]);
+    expect(results.map((r) => r.unclassified.map((u) => [u.field, u.text]))).toEqual([
+      [["placeholder", "SF Pro"]],
+      [["placeholder", "Menlo"]],
+      [["placeholder", "Menlo"]],
+      [["placeholder", "Settings"]],
+    ]);
+  }, 15_000);
+  const mentionChip = (text: string) =>
+    `<button data-composer-mention-chip="true"><span aria-hidden="true">*</span><span>${text}</span></button>`;
+  test("a file name inside a composer file mention chip passes", async () => {
+    const results = await domAudit([
+      mentionChip("surface.test.ts"),
+      mentionChip("SettingsPanels.tsx"),
+      mentionChip("README.md"),
+    ]);
+    expect(results.map((r) => r.unclassified)).toEqual([[], [], []]);
+    expect(results.map((r) => r.exceptions.map((e) => [e.field, e.segments]))).toEqual(
+      ["surface.test.ts", "SettingsPanels.tsx", "README.md"].map((segment) => [
+        ["text", [{ segment, class: "file name", source: "composer file mention chip" }]],
+      ]),
+    );
+  }, 15_000);
+  test("a file name outside a file chip, or with an unlisted extension, fails", async () => {
+    const [prose, button, label, txt, png, name] = await domAudit([
+      "<h3>surface.test.ts</h3>",
+      "<button>SettingsPanels.tsx</button>",
+      "<label>파일 surface.test.ts</label>",
+      mentionChip("notes.txt"),
+      mentionChip("Screenshot.png"),
+      '<button data-composer-mention-chip="true" aria-label="surface.test.ts">파일</button>',
+    ]);
+    const failed = (r: (typeof prose)) => r.unclassified.map((u) => [u.field, u.text]);
+    expect(failed(prose)).toEqual([["text", "surface.test.ts"]]);
+    expect(failed(button)).toEqual([["text", "SettingsPanels.tsx"]]);
+    expect(failed(label)).toEqual([["text", "파일 surface.test.ts"]]);
+    expect(failed(txt)).toEqual([["text", "notes.txt"]]);
+    expect(failed(png)).toEqual([["text", "Screenshot.png"]]);
+    // Chip text only: the same file name in the chip's accessible name still fails.
+    expect(failed(name)).toEqual([["name", "surface.test.ts"]]);
+  }, 15_000);
+
+  const host = "Kang의 MacBook Pro";
+  const hostSources = localeSources({ environment: { label: host } });
+  const connectionsHeading = (title: string) =>
+    `<section id="connections-environment"><div><h2><svg aria-hidden="true"></svg>${title}</h2></div></section>`;
+  const onboardingRow = (label: string) =>
+    `<fieldset><legend>설정할 컴퓨터</legend><div><label><button role="checkbox"></button><span><span>${label}</span><span>연결됨</span></span></label></div></fieldset>`;
+  test("the environment label passes exactly, in a host name element", async () => {
+    const results = await domAudit(
+      [connectionsHeading(host), onboardingRow(host)],
+      hostSources,
+    );
+    expect(results.map((r) => r.unclassified)).toEqual([[], []]);
+    expect(results.map((r) => r.exceptions.map((e) => [e.tag, e.text, e.segments]))).toEqual([
+      [["H2", host, [{ segment: host, class: "host name", source: "serverConfig.environment.label" }]]],
+      [
+        [
+          "LABEL",
+          `${host}연결됨`,
+          [{ segment: host, class: "host name", source: "serverConfig.environment.label" }],
+        ],
+      ],
+    ]);
+  }, 15_000);
+  test("the environment label fails elsewhere, near-miss, or without serverConfig", async () => {
+    const [prose, otherHeading, otherFieldset, near, extra] = await domAudit(
+      [
+        `<label>${host}에 공급자 인스턴스를 하나 더 구성해요.</label>`,
+        `<section id="connections-remote"><h2>${host}</h2></section>`,
+        `<fieldset><legend>다른 목록</legend><label>${host}</label></fieldset>`,
+        connectionsHeading("Kang의 MacBook Air"),
+        connectionsHeading(`${host} Max`),
+      ],
+      hostSources,
+    );
+    for (const result of [prose, otherHeading, otherFieldset, near, extra])
+      expect(result.unclassified.length).toBe(1);
+    const segs = (r: typeof near) => r.unclassified[0].segments.map((s: { segment: string }) => s.segment);
+    expect(segs(near)).toEqual(["Kang", "MacBook", "Air"]);
+    // Only the exact value is taken; any extra Latin beside it still fails the row.
+    expect(segs(extra)).toEqual(["Max"]);
+    const [unset] = await domAudit([connectionsHeading(host)], localeSources({}));
+    expect(unset.unclassified.map((u) => u.text)).toEqual([host]);
+  }, 15_000);
 });
 
 describe("named row controls", () => {
