@@ -45,13 +45,26 @@ const ALLOWED = {
 // Data values observed on audited surfaces, not authored copy: system font family names (appearance font
 // pickers) and the seeded fixture model display name (default model picker).
 const DATA_VALUES = ["SF Pro", "Menlo", "Claude Fable 5.1"];
-const PHRASES = ["Azure DevOps", "Vertex AI", "GitHub Copilot", "Claude Code", "T3 Connect", "T3 Chat", "Tailscale Serve", "Android Studio", "Face ID", "Liquid Glass", "VS Code", "Mac mini"];
+// Provider product names on the Add provider list, and commands quoted verbatim in prose.
+const PHRASES = ["ACP Registry", "Pi Agent", "codex app-server", "Azure DevOps", "Vertex AI", "GitHub Copilot", "Claude Code", "T3 Connect", "T3 Chat", "Tailscale Serve", "Android Studio", "Face ID", "Liquid Glass", "VS Code", "Mac mini"];
 const FIXTURE = /^(baseline-project|0[1-6] (Conversation|Long messages|Code blocks|Working fixture|Error fixture|Empty thread)|Baseline review|greeting|Claude Fable 5\.1)$/;
 // Seeded fixture values that appear inside composite labels (thread rows, banners) are data, not authored copy.
 const FIXTURE_PARTS = ["baseline-project", "01 Conversation", "02 Long messages", "03 Code blocks", "04 Working fixture", "05 Error fixture", "06 Empty thread", "Capture fixture: provider unavailable. No external request was sent.", "HIG fixture requires codex login", "Baseline review", "greeting"];
+// The runner's approved segment classes (scripts/hig/cases.mjs LOCALE_SEGMENT_CLASSES) are merged in, so this
+// measurement classifies with the same approved names as the acceptance audit.
+const { LOCALE_SEGMENT_CLASSES } = await import(`${qa}/cases.mjs`);
+for (const [cls, list] of Object.entries(LOCALE_SEGMENT_CLASSES))
+  for (const name of list) (name.includes(" ") ? PHRASES : (ALLOWED[cls] ??= [])).push(name);
+report.latinInventory = {};
 report.allowedSegments = ALLOWED;
 report.allowedPhrases = PHRASES;
 report.dataValues = DATA_VALUES;
+// Original server diagnostics shown verbatim after a Korean status (approved exception class), matched exactly.
+const ORIGINAL_DIAGNOSTICS = ["Codex CLI is not authenticated. Run `codex login` and try again."];
+report.originalDiagnostics = ORIGINAL_DIAGNOSTICS;
+// This Mac's environment label is data from the server config. It is matched in memory only and never written
+// into the report, so the owner's device name is not added to any new file.
+const HOST_LABELS = [(await Bun.$`scutil --get ComputerName`.nothrow().text()).trim()].filter(Boolean);
 
 const rows = [];
 const check = (rule, name, pass, detail = {}) => {
@@ -204,7 +217,11 @@ async function measure(context) {
       return { ok: bad.length === 0, matched, bad };
     };
     const isData = (el) => Boolean(el.closest("pre,code,kbd,[data-slot=kbd],textarea,input,[contenteditable=true],[data-message-id],[data-timeline-row],.chat-markdown,[role=log],[data-slot=terminal],.xterm,[data-raw-diagnostic],[data-license-body]")) ||
-      (location.hash.includes("open-source-licenses") && Boolean(el.closest("main [data-slot=collapsible-trigger], main [data-slot=collapsible] a, main [data-slot=collapsible] button")));
+      (location.hash.includes("open-source-licenses") && Boolean(el.closest("main [data-slot=collapsible-trigger], main [data-slot=collapsible] a, main [data-slot=collapsible] button"))) ||
+      // Diagnostics tables hold recorded machine values (process and span names, trace ids, raw errors): an element in a
+      // table cell whose own text has no Korean is data, on head and parent alike. Controls in the cell (the full-error
+      // disclosure) stay authored copy and are measured on both sides.
+      (location.hash.includes("diagnostics") && Boolean(el.closest("td,th")) && !el.closest("button") && !/[가-힣]/.test(el.innerText));
     const authoredText = (el) => {
       const clone = el.cloneNode(true);
       for (const node of clone.querySelectorAll("pre,code,kbd,[data-slot=kbd],[aria-hidden=true]")) node.remove();
@@ -278,6 +295,8 @@ async function measure(context) {
           for (const l of limits) { left = Math.max(left, l.left); top = Math.max(top, l.top); right = Math.min(right, l.right); bottom = Math.min(bottom, l.bottom); }
           return { x: left, y: top, left, top, right, bottom, width: right - left, height: bottom - top };
         }).filter((r) => r.width > 1 && r.height > 1),
+        // Locale: every visible text node is classified, mixed Korean+Latin included; its Latin segments are kept.
+        latin: segments(raw), cls: classify(raw.trim()),
         text, hangul, fg: style.color, bg: `rgb(${bg.map((v) => Math.round(v)).join(",")})`, tag: el.tagName, rect: box.toJSON(), fontSize: parseFloat(style.fontSize), fontWeight: style.fontWeight,
         contrast: contrast(blend(fg(style.color, el), bg), bg), wordBreak: style.wordBreak, overflowWrap: style.overflowWrap,
         lines: lineList, midWord, clipped, ellipsized, lineClamped, explanatory, data: isData(el), identityEllipsis, inactive, _layer: layer,
@@ -341,11 +360,19 @@ async function measure(context) {
       pageOverflow: document.documentElement.scrollWidth > innerWidth + 0.5,
       route: location.hash, theme: document.documentElement.className, fontSize: getComputedStyle(document.documentElement).fontSize,
     };
-  }, { allowed: ALLOWED, fixture: FIXTURE.source, parts: FIXTURE_PARTS, allText, phrases: [...PHRASES, ...DATA_VALUES] });
+  }, { allowed: ALLOWED, fixture: FIXTURE.source, parts: FIXTURE_PARTS, allText, phrases: [...ORIGINAL_DIAGNOSTICS, ...PHRASES, ...DATA_VALUES, ...HOST_LABELS] });
   report.measurements.push({ ...context, texts: g.texts.length, controls: g.controls.length, route: g.route });
   check("f", "no-primary-page-overflow", !g.pageOverflow, { ...context, route: g.route });
   for (const t of g.texts) {
+    for (const segment of t.latin) {
+      const entry = (report.latinInventory[segment] ??= { classes: {}, count: 0, examples: [] });
+      const cls = t.data ? "data element" : t.cls.bad?.includes(segment) ? "unclassified" : (t.cls.matched.find((m) => m.segment === segment)?.cls ?? "data pattern");
+      entry.classes[cls] = (entry.classes[cls] ?? 0) + 1;
+      entry.count++;
+      if (entry.examples.length < 3) entry.examples.push({ surface: context.label, text: t.text.slice(0, 80), path: t.path });
+    }
     if (t.data) continue;
+    if (t.latin.length) check("ax", "latin-segment-classified-text", t.cls.ok, { ...context, text: t.text.slice(0, 80), path: t.path, bad: t.cls.bad ?? [] });
     const detail = { ...context, text: t.text.slice(0, 80), path: t.path, rect: t.rect };
     if (context.scale === 100 && !context.zoom && !context.expanded && t.explanatory)
       check("b", "explanatory-text-14px", t.fontSize >= 14, { ...detail, fontSize: t.fontSize });
@@ -542,11 +569,11 @@ try {
         for (const section of SETTINGS) {
           await route(`/settings/${section}`);
           await page.evaluate(() => {
-            const w = document.createTreeWalker(document.querySelector("main") ?? document.body, NodeFilter.SHOW_TEXT);
+            const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
             const nodes = []; while (w.nextNode()) nodes.push(w.currentNode);
             for (const n of nodes) {
               const t = n.textContent.trim();
-              if (/[가-힣]/.test(t) && !n.parentElement.closest("pre,code,input,textarea") && !n.parentElement.hasAttribute("data-hig22-expanded")) {
+              if (/[가-힣]/.test(t) && !n.parentElement.closest("pre,code,kbd,input,textarea,[contenteditable=true]") && !n.parentElement.hasAttribute("data-hig22-expanded")) {
                 // At least +40%, ending on a word boundary so the added copy never ends in a cut syllable.
                 // The added copy also ends on a word of at least two characters, so a cut never leaves a one-syllable tail.
                 let cut = t.indexOf(" ", Math.ceil(t.length * 0.4));
@@ -584,5 +611,6 @@ try {
   report.summary = { rows: rows.length, failures: report.failures.length, images: report.images.length, byRule };
   await fs.writeFile(`${out}/observations.json`, JSON.stringify({ ...report, rows }, null, 1));
   await fs.writeFile(`${out}/summary.json`, JSON.stringify(report.summary, null, 2));
+  await fs.writeFile(`${out}/latin-inventory.json`, JSON.stringify(report.latinInventory, null, 1));
   console.log(`MEASURE22 rows=${rows.length} failures=${report.failures.length} images=${report.images.length} ${JSON.stringify(byRule)}`);
 }

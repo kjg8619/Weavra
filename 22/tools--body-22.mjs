@@ -50,12 +50,42 @@ const head = comparison.head.summary.byRule, parent = comparison.parent.summary.
 for (const rule of ["b", "c", "d", "e", "f", "i", "j", "ax"])
   lines.push(`| ${rule} | ${head[rule]?.failed ?? 0} | ${comparison.summary[rule]?.introduced ?? 0} | ${parent[rule]?.failed ?? 0} |`);
 lines.push(`| a (recorded, copy-only geometry) | ${head.a?.failed ?? 0} | ${comparison.summary.a?.introduced ?? 0} above the parent count | ${parent.a?.failed ?? 0} |`, "",
-  "Every remaining head failure for b, c, e, i and j is one the parent also has on the same element and configuration; `ax` (English authored text) is zero on head.");
+  "Every remaining head failure for b, c, e, i and j is one the parent also has on the same element and configuration.");
+const axReview = await json("measure-after/ax-review.json");
+lines.push("", `Rule \`ax\` now classifies every visible text node. Its ${axReview.total} head rows were each assigned to an approved exception class by an explicit rule (${Object.entries(axReview.byClass).map(([cls, count]) => `${cls}: ${count}`).join("; ")}); ${axReview.unclassified.length} remain unclassified ([review](${page("measure-after/ax-review.json")})).`);
 const lower = comparison.preexisting.filter((row) => row.lowerThanParent);
 if (lower.length) lines.push("", `${lower.length} of those rows measure slightly lower than the parent on the same element (${lower.map((row) => `${row.text} ${row.ratio} vs ${row.parentValues.join("/")}`).join("; ")}); they are listed separately in rules-a-j.md.`);
 
 lines.push("", "## Locale exceptions", "", `[Full locale-exception table with source and approval per class](${page("locale-exceptions.md")}).`, "");
 lines.push((await fs.readFile(`${root}/locale-exceptions.md`, "utf8")).split("\n").filter((line) => line.startsWith("|")).join("\n"));
+
+// QA-22 round (Amendment 2026-10-22i): what changed, the all-state locale sweep and the QA stress re-run.
+const stress = await json("stress-qa22/stress-summary.json");
+const navClips = stress.clips.filter((c) => /ul:\d/.test(c.path ?? ""));
+const scopeClips = stress.clips.filter((c) => !/ul:\d/.test(c.path ?? ""));
+const capture = await json("capture-latin/capture-latin-inventory.json");
+const unclassified = await json("capture-latin/capture-latin-unclassified.json");
+const leftover = Object.entries(unclassified);
+lines.push("", "## QA-22 fixes (Amendment 2026-10-22i)", "",
+  "- The workflow command status and the host thermal state render through Korean display maps that cover every value (`ko.runtime.controls.commandStatus`, `ko.settings.telemetry.thermalStates`), with unit tests over every enum value in `src/i18n/ko.test.ts`; the raw values stay unchanged in logic.",
+  "- Workflow and run-state identifiers in Weavra prose show their Korean labels (QUICK/STANDARD/COMPLEX, EDIT/READ_ONLY, interrupted/blocked/cancelled/failed, pass/complete/valid); `R3`, `CANDIDATE_ONLY`, review decisions and error codes stay as identifiers (exception table).",
+  "- Settings navigation labels wrap and the row grows instead of being cut off. The label text stays \"키보드 단축키\" because the shared runner pins that exact name.",
+  "- Remaining English from the all-state sweep is Korean: model count, \"Run\", \"digest\", \"Policy\", \"Early Access\", keycap words in prose and the zoomable-image name; \"GitHub Copilot\" is spelled as the product name.");
+lines.push("", "## All-state locale sweep", "",
+  `Every captured state at every size (${capture.frames} frames of head \`${capture.revision}\`) was read and every Latin segment classified: ${Object.keys(capture.inventory).length} distinct segments, ${leftover.length} unclassified ([inventory](${page("capture-latin/capture-latin-inventory.json")}), [unclassified](${page("capture-latin/capture-latin-unclassified.json")})).`);
+for (const [segment, value] of leftover) lines.push(`- \`${segment}\` in state ${value.states.join(", ")}: ${value.lines[0]}`);
+lines.push("", `The rules a-j measurement now classifies every visible text node, mixed Korean and Latin included (rule \`ax\` above; per-segment classes in [latin-inventory.json](${page("measure-after/latin-inventory.json")})).`);
+lines.push("", "## Long-copy stress (QA-22 method)", "",
+  `QA-22's own stress script re-run unchanged except for the app and output paths and one readiness wait (QA's fixture database now has \"03 Code blocks\" archived, so it waits on \"06 Empty thread\", which the script opens anyway) ([script](${page("tools/qa22-stress/stress.mjs")}), [summary](${page("stress-qa22/stress-summary.json")})): ${stress.samples} samples over ${stress.configurations.length} configurations (840/1280/1920, 100/150%, light/dark) with at least +40% Korean copy.`, "",
+  "| Check | Result |", "|---|---|",
+  `| Settings navigation ellipsis | ${navClips.length} |`,
+  `| Scope identity names (ellipsis with full-value tooltip) | ${scopeClips.length} |`,
+  `| Page overflow | ${stress.overflow.length} |`,
+  `| Korean mid-word / orphan breaks | ${stress.breaks.length} |`,
+  `| Expansion below +40% | ${stress.expansionBelow40.length} |`);
+const exceptionsDoc = await fs.readFile(`${root}/locale-exceptions.md`, "utf8");
+const followUp = exceptionsDoc.split("## Follow-up (not in this PR)")[1];
+if (followUp) lines.push("", "## Follow-up (not in this PR)", followUp.trim());
 
 lines.push("", "## Verification", "", "| Gate | Command | Exit | Result |", "|---|---|---|---|");
 for (const gate of gates.gates) lines.push(`| ${gate.gate} | \`${gate.command}\` | ${gate.exit} | ${gate.summary ?? ""} |`);

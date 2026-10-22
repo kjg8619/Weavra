@@ -12,7 +12,7 @@ const parent = "245a9efdfee4e949a5d312798bcdbf31ed0c1675";
 const runner = process.env.RUNNER;
 assert.ok(runner, "RUNNER must name the authorized hig-01 commit");
 const plan = await fs.readFile(`${root}/omo-user-flow-20261003/.omo/plans/weavra-hig-design-20261018.md`, "utf8");
-const amendments = ["2026-10-21b", "2026-10-22", "2026-10-22b", "2026-10-22c", "2026-10-22d", "2026-10-22e", "2026-10-22f", "2026-10-22g", "2026-10-22h"]
+const amendments = ["2026-10-21b", "2026-10-22", "2026-10-22b", "2026-10-22c", "2026-10-22d", "2026-10-22e", "2026-10-22f", "2026-10-22g", "2026-10-22h", "2026-10-22i"]
   .map((id) => ({ id, recorded: plan.includes(`Amendment ${id}`) }));
 const S = "app/t3code/apps/web/src/";
 const planOwned = [
@@ -36,6 +36,7 @@ const amendmentOwned = {
   "2026-10-22e": ["components/BranchToolbar.logic.ts"],
   "2026-10-22f": ["components/chat/MessagesTimeline.tsx"],
   "2026-10-22g": ["components/contextChipParts.tsx", "components/chat/TerminalContextInlineChip.tsx", "components/ComposerPromptEditorTiptap.tsx", "components/ChatMarkdown.tsx", "terminal/ghostty/surface.ts"],
+  "2026-10-22i": ["components/chat/ModelPickerContent.tsx", "components/settings/WeavraPreflightFailure.tsx", "components/chat/ZoomableImage.tsx", "components/chat/AssistantCitationCommentEditor.tsx", "components/chat/WeavraProjectSetup.tsx", "components/chat/WeavraFactCandidates.tsx", "components/settings/providerDriverMeta.ts"],
   "2026-10-22h": ["components/composerContextPresentation.tsx", "components/ChatView.logic.ts"],
 };
 const owner = new Map(planOwned.map((f) => [f, "plan todo 22"]));

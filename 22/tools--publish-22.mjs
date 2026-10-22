@@ -45,7 +45,11 @@ async function inventory() {
   assert.equal(measured.summary.byRule.f?.failed ?? 0, 0);
   for (const rule of GATED_RULES)
     assert.equal(comparison.introduced.filter((row) => row.rule === rule).length, 0, `introduced rule ${rule}`);
-  assert.equal(comparison.introduced.filter((row) => row.rule === "ax").length + comparison.preexisting.filter((row) => row.rule === "ax").length, 0);
+  // Every remaining head `ax` row must be assigned to an approved exception class by ax-review-22.mjs; none unclassified.
+  const axRows = comparison.introduced.filter((row) => row.rule === "ax").length + comparison.preexisting.filter((row) => row.rule === "ax").length;
+  const axReview = await json("measure-after/ax-review.json");
+  assert.equal(axReview.total, axRows);
+  assert.equal(axReview.unclassified.length, 0);
   const ownership = await json("ownership.json");
   assert.equal(ownership.head, after.revision);
   assert.ok(ownership.amendments.every((amendment) => amendment.recorded));
@@ -64,7 +68,10 @@ async function inventory() {
   }
   for (const directory of ["before/capture", "after/capture", "diff", "qa", "qa-round-01", "regression-21", "tools"]) await scan(directory);
   await scan("delegation", /\.md$/);
-  await scan("measure-after", /\.(png|gz)$|measure-summary\.json$|comparison\.json$/);
+  await scan("measure-after", /\.(png|gz)$|measure-summary\.json$|comparison\.json$|latin-inventory\.json$|ax-review\.json$/);
+  // QA-22 round: the all-state locale sweep and the QA stress re-run (summary and its screenshots).
+  await scan("capture-latin", /\.json$/);
+  await scan("stress-qa22", /stress-summary\.json$|\.png$/);
   await scan("measure-parent", /\.gz$|measure-summary\.json$/);
   for (const file of ["rules-a-j.md", "locale-exceptions.md", "gate-results.json", "lint-comparison.json", "ownership.json",
     "acceptance-verdict.json", "acceptance-verdict-01.json", "acceptance-verdict-02.json", "publication-body.md",
@@ -72,7 +79,8 @@ async function inventory() {
   for (const name of ["fmt", "lint", "lint-parent", "typecheck-web", "typecheck-desktop", "tests-focused", "tests-web-all",
     "tests-parent-inherited", "tests-desktop", "runner-harness", "build-before", "build-after", "measure-after",
     "measure-parent", "capture-before", "capture-after", "diff", "accept-scenarios-01", "accept-scenarios-02",
-    "verify-packet-01", "verify-packet-02", "diff-check-01", "diff-check-02", "runner-identity", "push-source-01", "regression-21"])
+    "verify-packet-01", "verify-packet-02", "diff-check-01", "diff-check-02", "runner-identity", "push-source-01", "regression-21",
+    "stress-qa22", "capture-latin"])
     await add(`logs/${name}.log`);
   assert.equal(new Set(files.map((file) => file.name)).size, files.length);
   return files;
@@ -181,7 +189,8 @@ if (mode === "stage") {
     const bytes = await fs.readFile(`${root}/${directory}/observations.json`);
     const observations = JSON.parse(bytes);
     await fs.writeFile(`${root}/${directory}/observations.json.gz`, gzipSync(bytes, { level: 9 }));
-    const { measurements, failures, rows, ...rest } = observations;
+    // The Latin inventory is published separately (measure-after/latin-inventory.json, environment label masked).
+    const { measurements, failures, rows, latinInventory, ...rest } = observations;
     await fs.writeFile(`${root}/${directory}/measure-summary.json`, JSON.stringify({
       ...rest, observationsSha256: hash(bytes), measurementCount: measurements?.length, failureCount: failures?.length,
     }, null, 2));

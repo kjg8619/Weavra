@@ -1,0 +1,7 @@
+// Copied unchanged from the independent QA-22 run (/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/qa-22-run) so the same +40%/150% stress runs on the new build.
+// Only the output directory and the app path differ; the prior fixture database is read from QA's run.
+import * as fs from 'node:fs/promises';
+const E='/Users/kangjingoo/.omo/evidence/hig-ulw-20261018/waves/exec-weavra/pr-22/stress-qa22';
+const s=JSON.parse(await fs.readFile(`${E}/stress.json`,'utf8'));
+const summary={samples:s.samples.length,configurations:[...new Set(s.samples.map(x=>[x.mode,x.scale,x.width].join('/')))],cleanup:s.cleanup,error:s.error,images:s.images.length,osErrors:s.images.filter(x=>x.error),expansionBelow40:s.samples.flatMap(x=>x.expansion.filter(c=>c.after<c.before*1.4).map(c=>({section:x.section,width:x.width,scale:x.scale,mode:x.mode,...c}))),overflow:s.samples.filter(x=>x.overflow).map(({controls,textRects,latin,expansion,...r})=>r),breaks:s.samples.flatMap(x=>x.breaks.map(r=>({mode:x.mode,width:x.width,scale:x.scale,section:x.section,position:x.position,...r}))),clips:s.samples.flatMap(x=>x.clips.map(r=>({mode:x.mode,width:x.width,scale:x.scale,section:x.section,position:x.position,...r})))};
+await fs.writeFile(`${E}/stress-summary.json`,JSON.stringify(summary,null,2));console.log(JSON.stringify({samples:summary.samples,configs:summary.configurations.length,images:summary.images,osErrors:summary.osErrors.length,below40:summary.expansionBelow40.length,overflows:summary.overflow.length,breaks:summary.breaks.length,clips:summary.clips.length}));
