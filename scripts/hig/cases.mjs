@@ -268,7 +268,9 @@ const exactValues = (values) =>
   new RegExp(`(?<![A-Za-z0-9-])(?:${values.map(escapeRegExp).join("|")})(?![A-Za-z0-9-])`, "g");
 const LOCALE_FIXTURE_PATTERN = exactValues(LOCALE_FIXTURE_VALUES);
 const LOCALE_PHRASE_PATTERN = exactValues([...LOCALE_PHRASE_CLASS.keys()]);
-const LOCALE_FILE_TOKEN = /(?<![\w.-])[A-Za-z0-9_-]+\.json(?![\w.-])/g;
+// basename + one listed extension; a token is data only where classifyLocaleText accepts it.
+const LOCALE_FILE_TOKEN =
+  /(?<![\w.-])[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\.(?:ts|tsx|js|mjs|json|md|css|html|py|sh|yml|yaml)(?![\w.-])/g;
 const LOCALE_NAME_CHORD = new RegExp(
   `(?:: |\\()(?:[⌘⇧⌥⌃] ?|(?:Ctrl|Alt|Shift|Cmd)[+ ])*(?:${LOCALE_KEYCAPS.join("|")}|[A-Z0-9])\\)?$`,
 );
@@ -325,8 +327,10 @@ function scopedData(value, context, sources) {
     sources.models?.has(value)
   )
     return { class: "model", source: sources.models.get(value) };
+  // A font picker's text, or the placeholder of the plain font-family input (the resolved default
+  // family); `font` is measured on that same value.
   if (
-    context.field === "text" &&
+    (context.fontInput ? context.field === "placeholder" : context.field === "text") &&
     context.font &&
     /^[A-Z][A-Za-z]*(?: [A-Z][A-Za-z]*){0,2}$/.test(value)
   ) {
@@ -341,7 +345,8 @@ function scopedData(value, context, sources) {
 // Classifies each Latin segment of one field; unclassified segments fail the audit.
 /**
  * @param {{ field?: string, control?: boolean, keycap?: boolean, presetScope?: boolean,
- *   modelScope?: boolean, font?: { resolvable: boolean, mac: boolean } | null }} context
+ *   modelScope?: boolean, fontInput?: boolean, fileChip?: boolean, hostScope?: boolean,
+ *   font?: { resolvable: boolean, mac: boolean } | null }} context
  */
 export function classifyLocaleText(value, context = {}, sources = {}) {
   const field = context.field ?? "text";
@@ -366,8 +371,16 @@ export function classifyLocaleText(value, context = {}, sources = {}) {
     take(LOCALE_FILE_TOKEN, (token) =>
       context.control && token === sources.keybindingsFile
         ? { class: "file name", source: "serverConfig.keybindingsConfigPath" }
-        : null,
+        : context.fileChip && field === "text"
+          ? { class: "file name", source: "composer file mention chip" }
+          : null,
     );
+    // The environment's own name, exactly as serverConfig has it, only in a host name element.
+    if (context.hostScope && field === "text" && sources.environmentLabel)
+      take(exactValues([sources.environmentLabel]), () => ({
+        class: "host name",
+        source: "serverConfig.environment.label",
+      }));
     take(LOCALE_FIXTURE_PATTERN, () => ({ class: "fixture value", source: "seed.mjs" }));
     take(LOCALE_PHRASE_PATTERN, (phrase) => ({
       class: LOCALE_PHRASE_CLASS.get(phrase),
@@ -424,6 +437,7 @@ export function localeSources(config) {
   const textGenerationModel = config?.settings?.textGenerationModelSelection?.model;
   return {
     keybindingsFile: config?.keybindingsConfigPath?.split(/[\\/]/).at(-1) ?? null,
+    environmentLabel: config?.environment?.label ?? null,
     providerIds: [
       ...new Set((config?.providers ?? []).flatMap((p) => [p.instanceId, p.driver])),
     ].filter(Boolean),
@@ -461,8 +475,17 @@ export function readLocaleLabels(selector) {
       for (const code of prose.querySelectorAll("code")) code.remove();
       const role = node.getAttribute("role");
       const text = prose.textContent?.trim();
+      // The plain family input of a Settings font row (before font discovery swaps in the picker),
+      // named copy.typography.family(title) = "<font row title> 종류"; its placeholder is the
+      // default family the row resolves (appearanceFonts.ts resolveDefaultFamilyLabel).
+      const fontInput =
+        node.tagName === "INPUT" &&
+        /^(?:인터페이스|프롬프트|코드|터미널|고정폭) 글꼴 종류$/.test(
+          node.getAttribute("aria-label") ?? "",
+        );
+      const family = role === "combobox" ? text : fontInput ? node.getAttribute("placeholder") : null;
       let font = null;
-      if (role === "combobox" && text) {
+      if (family) {
         const canvas = document.createElement("canvas").getContext("2d");
         const width = (family) => {
           canvas.font = `32px ${family}`;
@@ -470,7 +493,7 @@ export function readLocaleLabels(selector) {
         };
         font = {
           resolvable: ["monospace", "serif", "sans-serif"].some(
-            (generic) => width(`${JSON.stringify(text)}, ${generic}`) !== width(generic),
+            (generic) => width(`${JSON.stringify(family)}, ${generic}`) !== width(generic),
           ),
           mac: /Mac/.test(navigator.platform),
         };
@@ -493,6 +516,16 @@ export function readLocaleLabels(selector) {
         // A model picker trigger or its option list (ProviderModelPicker data attributes).
         modelScope:
           node.closest("[data-chat-provider-model-picker], [data-model-picker-content]") !== null,
+        fontInput,
+        // A composer file mention chip (ComposerPromptEditorTiptap data attribute).
+        fileChip: node.closest("[data-composer-mention-chip]") !== null,
+        // A host name element: the Connections "This machine" section heading (settings search key
+        // connections-environment) or a computer row of the onboarding "설정할 컴퓨터" fieldset.
+        hostScope:
+          (node.tagName === "H2" && node.closest("section#connections-environment") !== null) ||
+          (node.tagName === "LABEL" &&
+            node.closest("fieldset")?.querySelector(":scope > legend")?.textContent?.trim() ===
+              "설정할 컴퓨터"),
         font,
       };
     });
@@ -507,6 +540,9 @@ export function auditLocaleLabels(labels, sources = {}) {
       keycap: (row.keycaps?.length ?? 0) > 0,
       presetScope: row.presetScope === true,
       modelScope: row.modelScope === true,
+      fontInput: row.fontInput === true,
+      fileChip: row.fileChip === true,
+      hostScope: row.hostScope === true,
       font: row.font ?? null,
     };
     const fields = [
