@@ -1096,6 +1096,64 @@ describe("authored locale audit", () => {
     expect(unlisted.unclassified.map((u) => u.text)).toEqual(["gpt-5.6-luna"]);
     fails({ tag: "INPUT", placeholder: "gpt-5.6-luna", modelScope: true }, modelSources);
   }, 15_000);
+
+  // Runner fix 8: the text-generation default comes from serverConfig.settings, which the server
+  // decodes to contracts DEFAULT_TEXT_GENERATION_MODEL while capture settings leave it unset.
+  const contracts = new URL("../../app/t3code/packages/contracts/src/", import.meta.url);
+  async function contractDefaultSources() {
+    const model = await NodeFSP.readFile(new URL("model.ts", contracts), "utf8");
+    const slug = /export const DEFAULT_TEXT_GENERATION_MODEL = "([^"]+)";/.exec(model)?.[1];
+    expect(slug).toEqual(expect.any(String));
+    const settings = await NodeFSP.readFile(new URL("settings.ts", contracts), "utf8");
+    expect(settings).toContain("model: DEFAULT_TEXT_GENERATION_MODEL,");
+    const sources = localeSources({
+      providers: [{ instanceId: "codex", driver: "codex", models: [] }],
+      settings: { textGenerationModelSelection: { instanceId: "codex", model: slug } },
+    });
+    return { slug: slug as string, sources };
+  }
+  test("the contract default text-generation model passes on a model picker", async () => {
+    const { slug, sources } = await contractDefaultSources();
+    const results = await domAudit(
+      [
+        `<button data-chat-provider-model-picker="true"><span data-chat-provider-model-picker-label="true">${slug}</span></button>`,
+        `<div data-model-picker-content="true"><button>${slug}</button></div>`,
+      ],
+      sources,
+    );
+    expect(results.map((r) => r.unclassified)).toEqual([[], []]);
+    for (const result of results)
+      expect(result.exceptions[0].segments).toEqual([
+        {
+          segment: slug,
+          class: "model",
+          source: "serverConfig.settings.textGenerationModelSelection.model",
+        },
+      ]);
+  }, 15_000);
+  test("the contract default fails outside a picker, and an unknown slug fails inside one", async () => {
+    const { slug, sources } = await contractDefaultSources();
+    const [outside, unknown, near] = await domAudit(
+      [
+        `<button>${slug}</button>`,
+        '<button data-chat-provider-model-picker="true"><span>gpt-5.6-nova</span></button>',
+        `<button data-chat-provider-model-picker="true"><span>${slug}-preview</span></button>`,
+      ],
+      sources,
+    );
+    expect(outside.unclassified.map((u) => u.text)).toEqual([slug]);
+    expect(unknown.unclassified.map((u) => u.text)).toEqual(["gpt-5.6-nova"]);
+    expect(near.unclassified.map((u) => u.text)).toEqual([`${slug}-preview`]);
+    // Picker-scoped only: the default is not a code model id and not a placeholder.
+    fails({ text: "모델", codes: [slug] }, sources);
+    fails({ tag: "INPUT", placeholder: slug, modelScope: true }, sources);
+    // Without the settings value, the same picker row fails as it did on the todo 22 build.
+    const [unset] = await domAudit(
+      [`<button data-chat-provider-model-picker="true"><span>${slug}</span></button>`],
+      localeSources({ providers: [{ instanceId: "codex", driver: "codex", models: [] }] }),
+    );
+    expect(unset.unclassified.map((u) => u.text)).toEqual([slug]);
+  }, 15_000);
 });
 
 describe("named row controls", () => {

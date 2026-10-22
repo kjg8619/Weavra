@@ -417,6 +417,11 @@ export function namedRowSubject(kind, name) {
 }
 
 export function localeSources(config) {
+  // The text-generation picker shows this slug when no provider-listed model is selected. The
+  // packaged app inlines model-manifest.json and the contract constant into its bundles, so the
+  // runtime value is read from serverConfig.settings: capture settings leave it unset, and the
+  // server decodes it to contracts DEFAULT_TEXT_GENERATION_MODEL.
+  const textGenerationModel = config?.settings?.textGenerationModelSelection?.model;
   return {
     keybindingsFile: config?.keybindingsConfigPath?.split(/[\\/]/).at(-1) ?? null,
     providerIds: [
@@ -427,6 +432,9 @@ export function localeSources(config) {
     ].filter(Boolean),
     models: new Map([
       ...LABELS.model.map((name) => [name, "runner fixture LABELS.model"]),
+      ...(textGenerationModel
+        ? [[textGenerationModel, "serverConfig.settings.textGenerationModelSelection.model"]]
+        : []),
       ...(config?.providers ?? []).flatMap((p) =>
         (p.models ?? []).map((m) => [m.slug, "serverConfig.providers[].models[].slug"]),
       ),
