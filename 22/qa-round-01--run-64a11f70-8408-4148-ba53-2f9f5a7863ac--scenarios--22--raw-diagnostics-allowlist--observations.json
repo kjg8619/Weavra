@@ -1,0 +1,75 @@
+{
+  "actions": [
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "return to conversation",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "open settings providers",
+      "status": "COMPLETED"
+    },
+    {
+      "label": "locale-diagnostic-disclosure: open disclosure with keyboard",
+      "status": "COMPLETED"
+    }
+  ],
+  "observations": [
+    {
+      "label": "diagnostic exceptions",
+      "result": [
+        {
+          "text": "v0.149.1",
+          "tag": "CODE",
+          "labelled": true
+        },
+        {
+          "text": "v2.1.303",
+          "tag": "CODE",
+          "labelled": true
+        },
+        {
+          "text": "v0.149.1",
+          "tag": "CODE",
+          "labelled": true
+        },
+        {
+          "text": "Codex CLI is not authenticated. Run `codex login` and try again.",
+          "tag": "PRE",
+          "labelled": true
+        }
+      ]
+    },
+    {
+      "exceptions": [
+        {
+          "text": "v0.149.1",
+          "tag": "CODE",
+          "labelled": true,
+          "classification": "labelled raw diagnostic/command"
+        },
+        {
+          "text": "v2.1.303",
+          "tag": "CODE",
+          "labelled": true,
+          "classification": "labelled raw diagnostic/command"
+        },
+        {
+          "text": "v0.149.1",
+          "tag": "CODE",
+          "labelled": true,
+          "classification": "labelled raw diagnostic/command"
+        },
+        {
+          "text": "Codex CLI is not authenticated. Run `codex login` and try again.",
+          "tag": "PRE",
+          "labelled": true,
+          "classification": "labelled raw diagnostic/command"
+        }
+      ]
+    }
+  ]
+}
