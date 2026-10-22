@@ -1,0 +1,607 @@
+{
+  "head": "b95bacbb200e3e3925dec26766a1e5b0da7dee3a",
+  "parent": "245a9efdfee4e949a5d312798bcdbf31ed0c1675",
+  "runner": "daa942df567e52cf47453535083ff139f10d3885",
+  "amendments": [
+    {
+      "id": "2026-10-21b",
+      "recorded": true
+    },
+    {
+      "id": "2026-10-22",
+      "recorded": true
+    },
+    {
+      "id": "2026-10-22b",
+      "recorded": true
+    },
+    {
+      "id": "2026-10-22c",
+      "recorded": true
+    },
+    {
+      "id": "2026-10-22d",
+      "recorded": true
+    },
+    {
+      "id": "2026-10-22e",
+      "recorded": true
+    },
+    {
+      "id": "2026-10-22f",
+      "recorded": true
+    },
+    {
+      "id": "2026-10-22g",
+      "recorded": true
+    },
+    {
+      "id": "2026-10-22h",
+      "recorded": true
+    }
+  ],
+  "source": [
+    {
+      "file": "app/t3code/apps/web/index.html",
+      "owner": "Amendment 2026-10-22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/AgentsPanel.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/AppSidebarLayout.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/BranchToolbar.logic.ts",
+      "owner": "Amendment 2026-10-22e"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ChatMarkdown.tsx",
+      "owner": "Amendment 2026-10-22g"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ChatView.logic.ts",
+      "owner": "Amendment 2026-10-22h"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ChatView.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/CommandPalette.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/CommandPaletteContent.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ComposerPromptEditorTiptap.tsx",
+      "owner": "Amendment 2026-10-22g"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ConfirmDialogHost.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/LegacySidebar.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/NoProjectsHero.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ProjectScriptsControl.tsx",
+      "owner": "Amendment 2026-10-21b"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ProviderUpdateEnvironmentRows.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ProviderUpdateLaunchNotification.logic.ts",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/RightPanelTabs.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ServerUpdateAction.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/Sidebar.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ThreadStatusIndicators.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ThreadTerminalDrawer.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/ChatComposer.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/CompactComposerControlsMenu.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/DraftHeroHeadline.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/MessagesTimeline.logic.ts",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/MessagesTimeline.tsx",
+      "owner": "Amendment 2026-10-22f"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/ProviderStatusBanner.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/TerminalContextInlineChip.tsx",
+      "owner": "Amendment 2026-10-22g"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/ThreadErrorBanner.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/WeavraRunGraphPanel.tsx",
+      "owner": "Amendment 2026-10-22b"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/WeavraTaskCard.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/WeavraTaskResult.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/runtimeModeConfig.ts",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/useWeavraTask.ts",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/chat/weavraTaskLogic.ts",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/composerContextPresentation.tsx",
+      "owner": "Amendment 2026-10-22h"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/contextChipParts.tsx",
+      "owner": "Amendment 2026-10-22g"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/device/DeviceHostAvailability.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/device/DeviceLoadingView.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/device/DevicePanel.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/device/DeviceSetup.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/device/DeviceToolsPanel.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/files/FileBrowserPanel.tsx",
+      "owner": "Amendment 2026-10-21b"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/onboarding/FirstRunGate.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/onboarding/WelcomeWizard.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/preview/PreviewChromeRow.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/preview/PreviewEmptyState.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/preview/PreviewMoreMenu.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/preview/PreviewPanel.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/projectScriptEditor.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/AddProviderInstanceDialog.logic.ts",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/AddProviderInstanceDialog.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/AddUsageLimitSourceDialog.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/CapabilityInventory.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/CaptureShortcutConfig.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ConnectionsSettings.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/CustomModelEditor.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/DeviceHostEditor.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/DeviceHostsSettings.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/DiagnosticsSettings.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/EnvironmentIconPicker.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/EnvironmentRow.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ExpandableText.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/GitHubRoutingSettings.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/IntegrationsSettings.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/KeybindingsSettings.logic.ts",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/KeybindingsSettings.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/LoadBalancingSettings.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/LocalEnvironmentSetting.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/NotificationSettings.tsx",
+      "owner": "Amendment 2026-10-21b"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/OpenSourceLicenses.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/PanelAnimationsPreview.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProcessSignalActions.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProjectActionsList.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProjectActionsSettings.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProjectDefaultsSettings.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProjectSettingsPanel.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProviderAccentColorPicker.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProviderInstanceCard.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProviderModelsSection.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProviderSettingsForm.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProviderSettingsPanel.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ProviderSetupSection.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ResourceTelemetryDiagnostics.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SettingInheritance.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SettingsBreadcrumb.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SettingsFontPreviews.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SettingsPanels.logic.ts",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SettingsPanels.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SettingsScopeNotice.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SettingsSidebarNav.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SnapShotSettings.logic.ts",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SnapShotSettings.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SnapShotSetupDialog.logic.ts",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SnapShotSetupDialog.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SourceControlSettings.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/SourceControlWritingSettings.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/StorageSettings.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ThemeColorPicker.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ThemeEditorPanel.tsx",
+      "owner": "Amendment 2026-10-21b"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ThemeImportDialog.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ThemePreviewCircles.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/ThemeSettings.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/UsageProviderSettings.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/WeavraComplex.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/WeavraControls.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/WeavraFitness.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/WeavraSettings.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/customModelEditor.logic.ts",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/providerStatus.ts",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/settingsLayout.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/settingsSearch.ts",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/settings/useSnapShotShortcutRecorder.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ui/color-picker.tsx",
+      "owner": "Amendment 2026-10-22d"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ui/dialog.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ui/sheet.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ui/sidebar.tsx",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ui/toast.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/ui/wizard.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/components/weavraLabels.ts",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/hooks/useCopyToClipboard.ts",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/hooks/useSettings.ts",
+      "owner": "Amendment 2026-10-22c"
+    },
+    {
+      "file": "app/t3code/apps/web/src/i18n/ko.ts",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/index.css",
+      "owner": "Amendment 2026-10-22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/routes/settings.providers.tsx",
+      "owner": "plan todo 22"
+    },
+    {
+      "file": "app/t3code/apps/web/src/routes/settings.tsx",
+      "owner": "Amendment 2026-10-21b"
+    },
+    {
+      "file": "app/t3code/apps/web/src/terminal/ghostty/surface.ts",
+      "owner": "Amendment 2026-10-22g"
+    },
+    {
+      "file": "app/t3code/apps/web/src/threadNotifications.ts",
+      "owner": "Amendment 2026-10-21b"
+    },
+    {
+      "file": "app/t3code/apps/web/src/timestampFormat.ts",
+      "owner": "Amendment 2026-10-22c"
+    }
+  ],
+  "colocatedTests": [
+    "app/t3code/apps/web/src/components/BranchToolbar.logic.test.ts",
+    "app/t3code/apps/web/src/components/CommandPalette.logic.test.ts",
+    "app/t3code/apps/web/src/components/ProviderUpdateLaunchNotification.logic.test.ts",
+    "app/t3code/apps/web/src/components/RightPanelTabs.test.tsx",
+    "app/t3code/apps/web/src/components/ThreadStatusIndicators.test.tsx",
+    "app/t3code/apps/web/src/components/chat/MessagesTimeline.logic.test.ts",
+    "app/t3code/apps/web/src/components/chat/MessagesTimeline.test.tsx",
+    "app/t3code/apps/web/src/components/chat/ProviderStatusBanner.test.tsx",
+    "app/t3code/apps/web/src/components/chat/WeavraTaskCard.test.tsx",
+    "app/t3code/apps/web/src/components/chat/WeavraTaskResult.test.tsx",
+    "app/t3code/apps/web/src/components/preview/PreviewEmptyState.test.tsx",
+    "app/t3code/apps/web/src/components/projectScriptEditor.test.tsx",
+    "app/t3code/apps/web/src/components/settings/CaptureShortcutConfig.test.tsx",
+    "app/t3code/apps/web/src/components/settings/EnvironmentIconPicker.test.ts",
+    "app/t3code/apps/web/src/components/settings/GitHubRoutingSettings.test.ts",
+    "app/t3code/apps/web/src/components/settings/IntegrationsSettings.test.tsx",
+    "app/t3code/apps/web/src/components/settings/KeybindingsSettings.logic.test.ts",
+    "app/t3code/apps/web/src/components/settings/LoadBalancingSettings.test.ts",
+    "app/t3code/apps/web/src/components/settings/ProviderInstanceCard.test.ts",
+    "app/t3code/apps/web/src/components/settings/ProviderModelsSection.test.ts",
+    "app/t3code/apps/web/src/components/settings/ProviderSettingsForm.test.ts",
+    "app/t3code/apps/web/src/components/settings/ProviderSettingsPanel.environment.test.tsx",
+    "app/t3code/apps/web/src/components/settings/ProviderSetupSection.test.tsx",
+    "app/t3code/apps/web/src/components/settings/SettingInheritance.test.ts",
+    "app/t3code/apps/web/src/components/settings/SettingsPanels.logic.test.ts",
+    "app/t3code/apps/web/src/components/settings/SnapShotSettings.logic.test.ts",
+    "app/t3code/apps/web/src/components/settings/SnapShotSettings.test.tsx",
+    "app/t3code/apps/web/src/components/settings/SnapShotSetupDialog.logic.test.ts",
+    "app/t3code/apps/web/src/components/settings/SourceControlWritingSettings.test.tsx",
+    "app/t3code/apps/web/src/components/settings/ThemeSelection.test.tsx",
+    "app/t3code/apps/web/src/components/settings/WeavraControls.test.tsx",
+    "app/t3code/apps/web/src/components/settings/colorPickers.test.tsx",
+    "app/t3code/apps/web/src/components/settings/customModelEditor.logic.test.ts",
+    "app/t3code/apps/web/src/components/settings/providerStatus.test.ts",
+    "app/t3code/apps/web/src/components/settings/settingsSearch.test.ts",
+    "app/t3code/apps/web/src/components/settings/useSnapShotShortcutRecorder.test.tsx",
+    "app/t3code/apps/web/src/i18n/ko.test.ts",
+    "app/t3code/apps/web/src/timestampFormat.test.ts"
+  ],
+  "runnerFiles": [
+    "scripts/hig/assert.mjs",
+    "scripts/hig/capture.mjs",
+    "scripts/hig/cases.mjs",
+    "scripts/hig/harness.test.ts"
+  ]
+}
