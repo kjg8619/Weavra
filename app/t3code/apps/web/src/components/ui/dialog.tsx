@@ -2,6 +2,7 @@
 
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
+import { useState } from "react";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
@@ -47,11 +48,24 @@ function DialogViewport({ className, ...props }: DialogPrimitive.Viewport.Props)
   return (
     <DialogPrimitive.Viewport
       className={cn(
-        "fixed inset-0 z-50 grid grid-rows-[1fr_auto_1fr] justify-items-center p-4",
+        "fixed inset-0 z-(--layer-modal) grid grid-rows-[1fr_auto_1fr] justify-items-center p-4",
         className,
       )}
       data-slot="dialog-viewport"
       {...props}
+    />
+  );
+}
+
+function DialogSurface({ finalFocus, ...props }: DialogPrimitive.Popup.Props) {
+  // The portal mounts this before an autoFocus field can replace the opener.
+  const [opener] = useState(() =>
+    document.activeElement instanceof HTMLElement ? document.activeElement : null,
+  );
+  return (
+    <DialogPrimitive.Popup
+      {...props}
+      finalFocus={finalFocus ?? (() => (opener?.isConnected ? opener : true))}
     />
   );
 }
@@ -81,7 +95,7 @@ function DialogPopup({
           viewportClassName,
         )}
       >
-        <DialogPrimitive.Popup
+        <DialogSurface
           className={cn(
             variant === "media" ? DIALOG_MEDIA_POPUP_CLASS : DIALOG_POPUP_CLASS,
             "row-start-2 text-popover-foreground",
@@ -97,12 +111,12 @@ function DialogPopup({
             <DialogPrimitive.Close
               aria-label="Close"
               className="absolute end-2 top-2"
-              render={<Button size="icon" variant="ghost" />}
+              render={<Button data-icon-control="" size="icon" variant="ghost" />}
             >
               <XIcon />
             </DialogPrimitive.Close>
           )}
-        </DialogPrimitive.Popup>
+        </DialogSurface>
       </DialogViewport>
     </DialogPortal>
   );

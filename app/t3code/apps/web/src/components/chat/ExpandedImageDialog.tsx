@@ -23,6 +23,7 @@ import {
   snapShotAccessibilityDetails,
 } from "./SnapShotAttachmentDetails";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ko } from "~/i18n/ko";
 import { ZoomableImage, type ZoomableImageHandle } from "./ZoomableImage";
 import { composerFloatingLayerProps } from "./composerEventScope";
 
@@ -179,8 +180,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         variant="media"
         showCloseButton={false}
         bottomStickOnMobile={false}
-        backdropClassName="z-[60]"
-        viewportClassName="z-[60] grid-rows-1 place-items-center px-4 py-6 [-webkit-app-region:no-drag]"
+        viewportClassName="grid-rows-1 place-items-center px-4 py-6 [-webkit-app-region:no-drag]"
         className="row-start-1 max-h-[92vh] w-[92vw] max-w-[92vw] items-center overflow-visible [--media-width:92vw] [--media-height:min(86vh,calc(100vh-160px))] sm:[--media-width:calc(92vw-96px)]"
         onKeyDown={onKeyDown}
         initialFocus={closeButtonRef}
@@ -189,29 +189,31 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
           if (event.target === event.currentTarget) onClose();
         }}
       >
-        <DialogTitle className="sr-only">{mediaLabel} 크게 보기</DialogTitle>
+        <DialogTitle className="sr-only">{ko.chat.media.expand(mediaLabel)}</DialogTitle>
         {preview.images.length > 1 && (
           <Button
             type="button"
+            data-icon-control=""
             size="icon"
             variant="media-navigation"
             className="left-0 top-auto -bottom-12 translate-y-0 rounded-full bg-white/10 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
-            aria-label="이전 미디어"
+            aria-label={ko.chat.media.previous}
             onClick={() => navigateImage(-1)}
           >
             <ChevronLeftIcon className="size-5" />
           </Button>
         )}
         <MediaActions source={actionsSource}>
-          <div className="relative isolate z-10 max-h-[92vh] max-w-[var(--media-width)]">
+          <div className="relative isolate z-(--layer-raised-content) max-h-[92vh] max-w-[var(--media-width)]">
             <Button
               type="button"
               ref={closeButtonRef}
+              data-icon-control=""
               size="icon-xs"
               variant="media-close"
-              className="absolute right-0 -top-10 z-20"
+              className="absolute right-0 -top-10 z-(--layer-raised-content)"
               onClick={onClose}
-              aria-label={`${mediaLabel} 미리보기 닫기`}
+              aria-label={ko.chat.media.closePreview(mediaLabel)}
             >
               <XIcon />
             </Button>
@@ -258,6 +260,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
                         onClick={() =>
                           setAccessibilityDetailsSrc(showingAccessibilityDetails ? null : item.src)
                         }
+                        data-icon-control=""
                         size="icon-micro"
                         variant="ghost-muted"
                       />
@@ -280,10 +283,11 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         {preview.images.length > 1 && (
           <Button
             type="button"
+            data-icon-control=""
             size="icon"
             variant="media-navigation"
             className="right-0 top-auto -bottom-12 translate-y-0 rounded-full bg-white/10 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
-            aria-label="다음 미디어"
+            aria-label={ko.chat.media.next}
             onClick={() => navigateImage(1)}
           >
             <ChevronRightIcon className="size-5" />

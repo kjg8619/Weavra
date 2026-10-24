@@ -1158,7 +1158,7 @@ export function ThemeEditorPanel({
     <div
       aria-label={isEditing ? "Edit theme" : "Create theme"}
       className={cn(
-        "dialog-glass fixed z-[110] flex max-h-[min(42rem,calc(100dvh-6rem))] w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border text-popover-foreground",
+        "dialog-glass fixed z-(--layer-inspector-panel) flex max-h-[min(42rem,calc(100dvh-6rem))] w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border text-popover-foreground",
         position === null && "bottom-4 right-4",
         isMinimized && "max-h-none",
       )}
@@ -1221,6 +1221,7 @@ export function ThemeEditorPanel({
         </Tooltip>
         <Button
           aria-label={isMinimized ? "Expand the theme editor" : "Minimize the theme editor"}
+          data-icon-control=""
           size="icon-xs"
           variant="ghost"
           onClick={() => setIsMinimized(!isMinimized)}
@@ -1229,6 +1230,7 @@ export function ThemeEditorPanel({
         </Button>
         <Button
           aria-label="Close the theme editor"
+          data-icon-control=""
           size="icon-xs"
           variant="ghost"
           onClick={() => onOpenChange(false)}
@@ -1280,7 +1282,7 @@ export function ThemeEditorPanel({
           </div>
           <div
             aria-hidden
-            className="absolute bottom-0 right-0 z-10 flex size-5 cursor-se-resize touch-none select-none items-end justify-end p-1 text-muted-foreground/70"
+            className="absolute bottom-0 right-0 z-(--layer-raised-content) flex size-5 cursor-se-resize touch-none select-none items-end justify-end p-1 text-muted-foreground/70"
             onPointerCancel={endResize}
             onPointerDown={handleResizePointerDown}
             onPointerMove={handleResizePointerMove}

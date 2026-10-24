@@ -5,6 +5,32 @@
 /* Window Controls Overlay: active when Electron exposes native titlebar control geometry. */
 @custom-variant wco (&:is(.wco, .wco *));
 
+/* Shared icon targets retain their hit box in disabled and pressed states. */
+button[data-icon-control] {
+  min-width: 36px;
+  min-height: 36px;
+  scale: 1;
+  overflow: visible;
+}
+
+/* Keep rounded paint, but hit-test the entire control rectangle. */
+button[data-icon-control]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 0;
+  pointer-events: inherit;
+}
+
+/* The border utility is 1px; include it without extending beyond the box. */
+button[data-icon-control].border::after {
+  inset: -1px;
+}
+
 /* On mobile, morph the expanded hero composer into the compact docked
    composer while it moves; the rest of the app remains visually stationary. */
 html[data-mobile-composer-route-transition="true"]::view-transition-old(root),
@@ -109,9 +135,50 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --workspace-controls-left: calc(env(safe-area-inset-left) + 0.75rem);
   --workspace-controls-right: calc(env(safe-area-inset-right) + 0.75rem);
   --workspace-native-controls-inset: 0px;
-  --workspace-titlebar-control-size: 1.75rem;
+  --workspace-titlebar-control-size: 2.25rem;
   --workspace-titlebar-control-gap: 0.75rem;
   --workspace-titlebar-scroll-fade-height: 1.5rem;
+  /*
+   * Layer contract (DESIGN.md section 6). Portal surfaces and pane-local
+   * stacking contexts both pick from these roles; the numeric values live
+   * only here. The inspector band keeps the user-armed theme inspector above
+   * task modals (so their colors can still be picked) and below those
+   * modals' own popups and tooltips.
+   */
+  --layer-content: 0;
+  --layer-raised-content: 1;
+  --layer-sticky: 10;
+  --layer-selection-tools: 20;
+  --layer-passive-notice: 30;
+  --layer-modal-backdrop: 40;
+  --layer-modal: 50;
+  --layer-inspector-shade: 52;
+  --layer-inspector-outline: 53;
+  --layer-inspector-panel: 55;
+  --layer-modal-child: 60;
+  --layer-tooltip: 70;
+  --layer-blocking-system: 80;
+  /* The toast viewport is its own stacking context; the newest toast counts
+     down from this small local depth instead of a global 9999. */
+  --toast-stack-depth: 16;
+  /*
+   * Motion roles (DESIGN.md section 7): feedback answers a press or hover,
+   * surface moves a popup, dialog, sheet or notice. Reduced motion shortens
+   * both to an opacity-only cue (media query below); consumers drop their
+   * spatial properties with motion-reduce variants.
+   */
+  --motion-feedback: 120ms;
+  --motion-surface: 180ms;
+  /*
+   * Theme-neutral material roles (DESIGN.md section 3). Theme previews
+   * describe the previewed theme, so their separator and shadow never follow
+   * the selected theme; the inspector shade dims any theme the same way.
+   */
+  --overlay-dim: rgb(0 0 0 / 75%);
+  --inspector-shade: rgb(2 3 8 / 54%);
+  --preview-separator: rgb(127 127 127 / 25%);
+  --shadow-preview: 0 2px 5px rgb(0 0 0 / 14%);
+  --shadow-preview-glow: 0 0 6px 1px var(--ring);
 
   @variant dark {
     --appearance-contrast-target: white;
@@ -119,6 +186,13 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
     --glass-blur: 16px;
     --glass-saturation: 1.08;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-feedback: 80ms;
+    --motion-surface: 80ms;
   }
 }
 
@@ -308,13 +382,10 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   border-color: color-mix(in srgb, var(--contrast-foreground) 10%, transparent);
-  box-shadow: 0 24px 64px -24px rgb(0 0 0 / 65%);
+  box-shadow: var(--shadow-modal);
 
   @variant dark {
     border-color: color-mix(in srgb, var(--color-white) 8%, transparent);
-    box-shadow:
-      inset 0 1px rgb(255 255 255 / 4%),
-      0 24px 72px -20px rgb(0 0 0 / 90%);
   }
 
   @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
@@ -323,13 +394,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 }
 
 @utility dialog-backdrop {
-  background: color-mix(in srgb, var(--background) 60%, transparent);
+  background: var(--overlay-shade);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
-
-  @variant dark {
-    background: color-mix(in srgb, var(--background) 64%, transparent);
-  }
 }
 
 @utility dropdown-glass {
@@ -1036,6 +1103,14 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --terminal-foreground: var(--foreground);
   --terminal-cursor: rgb(38 56 78);
   --terminal-selection-background: rgb(37 63 99 / 20%);
+  /* Material roles for overlays, popups and the preview annotation layer
+     (DESIGN.md section 3). Consumers reference the roles; the values exist
+     only here and in the dark variant below. */
+  --overlay-shade: color-mix(in srgb, var(--background) 60%, transparent);
+  --shadow-popup: 0 16px 40px -18px rgb(0 0 0 / 55%);
+  --shadow-modal: 0 24px 64px -24px rgb(0 0 0 / 65%);
+  --annotation-background: var(--background);
+  --annotation-foreground: var(--contrast-foreground);
 
   @variant dark {
     color-scheme: dark;
@@ -1057,7 +1132,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --accent-foreground: var(--color-neutral-100);
     --error: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
     --error-foreground: var(--color-red-400);
-    --tool-error-icon: #fca5a5;
+    --tool-error-icon: var(--color-red-300);
     --error-surface: color-mix(in srgb, var(--error) 16%, transparent);
     --border: --alpha(var(--color-white) / 6%);
     --input: --alpha(var(--color-white) / 8%);
@@ -1075,6 +1150,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --sidebar-stage-fade: var(--card);
     --terminal-cursor: rgb(180 203 255);
     --terminal-selection-background: rgb(180 203 255 / 25%);
+    --overlay-shade: color-mix(in srgb, var(--background) 64%, transparent);
+    --shadow-popup: 0 18px 44px -18px rgb(0 0 0 / 80%);
+    --shadow-modal: inset 0 1px rgb(255 255 255 / 4%), 0 24px 72px -20px rgb(0 0 0 / 90%);
   }
 }
 
@@ -1211,7 +1289,7 @@ html[data-theme-token-probe] *::after {
 
 #theme-inspector-spotlight {
   position: fixed;
-  z-index: 100;
+  z-index: var(--layer-inspector-shade);
   inset: 0;
   width: 100vw;
   height: 100dvh;
@@ -1219,13 +1297,8 @@ html[data-theme-token-probe] *::after {
   pointer-events: none;
 }
 
-[data-slot="popover-positioner"]:has([data-theme-editor-panel]),
-[data-slot="tooltip-positioner"]:has([data-theme-editor-panel]) {
-  z-index: 120;
-}
-
 .theme-inspector-spotlight-dimmer {
-  fill: rgb(2 3 8 / 54%);
+  fill: var(--inspector-shade);
 }
 
 .theme-inspector-spotlight-glow {
@@ -1238,7 +1311,7 @@ html[data-theme-token-probe] *::after {
 
 #theme-inspector-hover {
   position: fixed;
-  z-index: 101;
+  z-index: var(--layer-inspector-outline);
   pointer-events: none;
   background: color-mix(in oklab, var(--ring) 7%, transparent);
   border: 1px solid color-mix(in oklab, var(--ring) 70%, white);

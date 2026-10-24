@@ -9907,7 +9907,7 @@ export default function ChatView(props: ChatViewProps) {
       className={cn(
         // Keep one viewport anchor inside the header's no-drag region. The
         // header can shrink behind the right panel without moving the controls.
-        "pointer-events-none fixed top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] z-50 mr-px flex h-[var(--workspace-topbar-height)] items-center gap-1 [-webkit-app-region:no-drag]",
+        "pointer-events-none fixed top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] z-(--layer-sticky) mr-px flex h-[var(--workspace-topbar-height)] items-center gap-1 [-webkit-app-region:no-drag]",
       )}
       data-workspace-titlebar-controls
     >
@@ -10280,7 +10280,7 @@ export default function ChatView(props: ChatViewProps) {
           >
             {isWorkspaceFileDragActive ? (
               <div
-                className="pointer-events-none absolute inset-2 z-40 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 bg-primary/[0.035]"
+                className="pointer-events-none absolute inset-2 z-(--layer-passive-notice) flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 bg-primary/[0.035]"
                 data-chat-workspace-drop-overlay="true"
               >
                 <div
@@ -10293,7 +10293,7 @@ export default function ChatView(props: ChatViewProps) {
               </div>
             ) : null}
             {/* Banners overlay the timeline without changing its content height. */}
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-(--layer-sticky) flex flex-col">
               <ProviderStatusBanner
                 status={visibleProviderStatus}
                 onDismiss={() => setDismissedProviderStatusBannerKey(providerStatusBannerKey)}
@@ -10409,7 +10409,7 @@ export default function ChatView(props: ChatViewProps) {
               {/* scroll to end pill — shown when user has scrolled away from the live edge */}
               {showScrollToBottom && (
                 <div
-                  className="pointer-events-none absolute left-1/2 z-30 flex -translate-x-1/2 justify-center py-1.5"
+                  className="pointer-events-none absolute left-1/2 z-(--layer-selection-tools) flex -translate-x-1/2 justify-center py-1.5"
                   style={{ bottom: scrollToEndClearance + 4 }}
                 >
                   <Button
@@ -10437,10 +10437,10 @@ export default function ChatView(props: ChatViewProps) {
               data-chat-composer-overlay="true"
               className={
                 isDraftHeroState
-                  ? "pointer-events-none absolute inset-0 z-20 flex items-center"
+                  ? "pointer-events-none absolute inset-0 z-(--layer-sticky) flex items-center"
                   : isControlledTaskDocked
-                    ? "relative z-20 shrink-0 pt-1.5 sm:pt-2"
-                    : "pointer-events-none absolute inset-x-0 bottom-0 z-20 pt-1.5 sm:pt-2"
+                    ? "relative z-(--layer-sticky) shrink-0 pt-1.5 sm:pt-2"
+                    : "pointer-events-none absolute inset-x-0 bottom-0 z-(--layer-sticky) pt-1.5 sm:pt-2"
               }
             >
               <div
@@ -10453,10 +10453,10 @@ export default function ChatView(props: ChatViewProps) {
               >
                 <div
                   data-chat-composer-stack="true"
-                  className="group/composer-stack pointer-events-auto relative z-10 mx-auto w-full max-w-3xl"
+                  className="group/composer-stack pointer-events-auto relative z-(--layer-raised-content) mx-auto w-full max-w-3xl"
                 >
                   {isDraftHeroState ? (
-                    <div className="absolute inset-x-0 bottom-full z-0">
+                    <div className="absolute inset-x-0 bottom-full z-(--layer-content)">
                       <div
                         className="pb-8 group-has-data-[composer-shoulder-tab]/composer-stack:pb-4"
                         style={
@@ -10485,7 +10485,10 @@ export default function ChatView(props: ChatViewProps) {
                   >
                     <ComposerSurface.Shell contextStrip={showComposerContextStrip}>
                       <ComposerSurface.Host>
-                        <div ref={attachDraftHeroComposerAnchorRef} className="relative z-10">
+                        <div
+                          ref={attachDraftHeroComposerAnchorRef}
+                          className="relative z-(--layer-raised-content)"
+                        >
                           {controlledTaskScope &&
                           controlledTask.task &&
                           !paintOnlyDisplayedTimeline ? (
@@ -10664,7 +10667,7 @@ export default function ChatView(props: ChatViewProps) {
                       <div className="min-h-0">
                         <div
                           data-terminal-open={terminalUiState.terminalOpen ? "true" : undefined}
-                          className="relative z-0"
+                          className="relative z-(--layer-content)"
                         >
                           {mountComposerContextStrip && (
                             <div className="pointer-events-auto">

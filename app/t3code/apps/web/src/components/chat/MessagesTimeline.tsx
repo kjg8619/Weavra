@@ -3226,7 +3226,7 @@ function ActivityShimmerOverlay({ children }: { children: ReactNode }) {
   );
 }
 
-const failedToolIconClassName = "text-tool-error-icon/40";
+const failedToolIconClassName = "text-tool-error-icon";
 
 /** Image icons and the gradient computer-use mark cannot take a currentColor
  *  tint, so failed rows using them get a trailing x instead. */
